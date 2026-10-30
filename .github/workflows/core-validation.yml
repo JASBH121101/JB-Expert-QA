@@ -3,16 +3,30 @@ name: Core validation
 on:
   push:
     branches: [main]
+    paths:
+      - "package.json"
+      - "src/**"
+      - "tests/**"
+      - "config/**"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
+    paths:
+      - "package.json"
+      - "src/**"
+      - "tests/**"
+      - "config/**"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Keep each relevant validation run. Do not cancel a running test when another
+# code commit is pushed; GitHub will queue it instead.
 concurrency:
   group: core-validation-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -20,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         node-version: [20, 22]
     steps:
