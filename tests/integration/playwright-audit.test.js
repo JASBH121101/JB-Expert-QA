@@ -16,7 +16,7 @@ const html = `<!doctype html>
 </body>
 </html>`;
 
-test("Playwright adapter detects responsive, UI UX, accessibility and functional defects", { timeout: 30000 }, async () => {
+test("Playwright and axe-core detect page defects with browser evidence", { timeout: 30000 }, async () => {
   const server = createServer((request, response) => {
     if (request.url === "/missing-image.png") {
       response.writeHead(404, { "content-type": "text/plain" });
@@ -60,8 +60,10 @@ test("Playwright adapter detects responsive, UI UX, accessibility and functional
     assert.ok(ids.some((id) => id.startsWith("UIUX-003")), "should detect small interactive target");
     assert.ok(ids.some((id) => id.startsWith("A11Y-001")), "should detect image without alt");
     assert.ok(ids.some((id) => id.startsWith("A11Y-002")), "should detect unlabeled field");
+    assert.ok(ids.some((id) => id.startsWith("A11Y-AXE-")), "should include axe-core findings");
     assert.ok(ids.some((id) => id.startsWith("FUNC-003")), "should detect HTTP error");
-    assert.ok(report.summary.rulesExecuted >= 17);
+    assert.ok(report.evidence.axeViolations > 0);
+    assert.ok(report.summary.rulesExecuted >= 18);
     assert.equal(report.target.url, url);
   } finally {
     await new Promise((resolve) => server.close(resolve));

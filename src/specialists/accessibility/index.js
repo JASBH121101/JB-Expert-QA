@@ -1,6 +1,40 @@
 import { getElements } from "../shared/context.js";
 
+const IMPACT_TO_SEVERITY = Object.freeze({
+  critical: "critical",
+  serious: "high",
+  moderate: "medium",
+  minor: "low"
+});
+
 export const accessibilityRules = [
+  {
+    id: "accessibility.axe-core",
+    specialist: "accessibility",
+    evaluate(context) {
+      return getElements(context, "axeViolations").map((violation) => {
+        const ruleKey = String(violation.id ?? "unknown")
+          .replace(/[^a-z0-9-]/gi, "-").toUpperCase();
+        const nodes = getElements(violation, "nodes");
+        return {
+          id: "A11Y-AXE-" + ruleKey,
+          title: String(violation.help ?? "Accessibility rule violation"),
+          description: String(violation.description ?? "axe-core detected an accessibility violation."),
+          severity: IMPACT_TO_SEVERITY[violation.impact] ?? "medium",
+          location: nodes[0]?.target?.[0] ?? null,
+          evidence: {
+            ruleId: violation.id,
+            impact: violation.impact,
+            helpUrl: violation.helpUrl,
+            affectedNodes: violation.nodes?.length ?? 0,
+            nodes: nodes.slice(0, 8)
+          },
+          recommendation: String(violation.help ?? "Review the affected element.") +
+            (violation.helpUrl ? " Reference: " + violation.helpUrl : "")
+        };
+      });
+    }
+  },
   {
     id: "accessibility.image-alt",
     specialist: "accessibility",

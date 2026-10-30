@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { createRequire } from "node:module";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
 import {
   responsiveRules,
@@ -10,6 +11,10 @@ import {
 } from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
 import defaultConfig from "../../../config/default.config.json" with { type: "json" };
+
+const require = createRequire(import.meta.url);
+const axeScriptPath = require.resolve("axe-core/axe.min.js");
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
 const ALL_RULES = [
   ...responsiveRules,
@@ -25,7 +30,8 @@ export async function auditUrl(url, {
   viewport = { width: 1365, height: 900 },
   specialist,
   timeout = 30000,
-  headless = true
+  headless = true,
+  runAxe = true
 } = {}) {
   const parsed = new URL(url);
   if (!["http:", "https:"].includes(parsed.protocol)) {
@@ -54,6 +60,33 @@ export async function auditUrl(url, {
     const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
     Object.assign(context, runtimeIssues);
 
+    if (runAxe) {
+      try {
+        await page.addScriptTag({ path: axeScriptPath });
+        context.axeViolations = await page.evaluate(async (tags) => {
+          const result = await window.axe.run(document, {
+            runOnly: { type: "tag", values: tags }
+          });
+          return result.violations.map((violation) => ({
+            id: violation.id,
+            impact: violation.impact,
+            help: violation.help,
+            description: violation.description,
+            helpUrl: violation.helpUrl,
+            nodes: violation.nodes.slice(0, 8).map((node) => ({
+              target: node.target,
+              summary: node.failureSummary?.slice(0, 500) ?? ""
+            }))
+          }));
+        }, AXE_TAGS);
+      } catch (error) {
+        context.axeViolations = [];
+        runtimeIssues.pageErrors.push({
+          message: "axe-core scan failed: " + (error instanceof Error ? error.message : String(error))
+        });
+      }
+    }
+
     const configuredSpecialists = new Set(Object.keys(config.weights ?? {}));
     const activeRules = ALL_RULES.filter((rule) => configuredSpecialists.has(rule.specialist));
     const registry = new RuleRegistry();
@@ -68,7 +101,8 @@ export async function auditUrl(url, {
         documentScrollHeight: context.documentScrollHeight,
         pageErrors: runtimeIssues.pageErrors.length,
         failedRequests: runtimeIssues.failedRequests.length,
-        httpErrors: runtimeIssues.httpErrors.length
+        httpErrors: runtimeIssues.httpErrors.length,
+        axeViolations: context.axeViolations?.length ?? null
       }
     };
   } finally {
@@ -111,7 +145,7 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
   }
   return Object.freeze({
     engine: "JB Expert QA",
-    version: "0.3.0",
+    version: "0.3.1",
     generatedAt: new Date().toISOString(),
     target: { url: new URL(url).href },
     summary: Object.freeze({

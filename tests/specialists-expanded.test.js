@@ -21,6 +21,23 @@ async function runRules(rules, context) {
   return new ExpertQAEngine({ registry, config }).audit(context);
 }
 
+test("accessibility converts axe-core violations into actionable findings", async () => {
+  const report = await runRules(accessibilityRules, {
+    axeViolations: [{
+      id: "color-contrast",
+      impact: "serious",
+      help: "Elements must have sufficient color contrast",
+      description: "Some text does not have enough contrast.",
+      helpUrl: "https://example.com/axe/color-contrast",
+      nodes: [{ target: [".muted-label"], summary: "Foreground and background colors have insufficient contrast." }]
+    }]
+  });
+  const finding = report.diagnostics.find((item) => item.id === "A11Y-AXE-COLOR-CONTRAST");
+  assert.ok(finding);
+  assert.equal(finding.severity, "high");
+  assert.equal(finding.location, ".muted-label");
+});
+
 test("accessibility detects missing image alt and document language", async () => {
   const report = await runRules(accessibilityRules, {
     images: [{ selector: "img.hero", hasAlt: false, visible: true }],
