@@ -18,6 +18,14 @@
   },
   "thresholds": {
     "minimumScore": 80,
-    "failOnCritical": true
+    "failOnCritical": true,
+    "minimumBodyFontPx": 12,
+    "largeEmptySpacePx": 160,
+    "minimumTargetSizePx": 24,
+    "largeResourceBytes": 500000,
+    "slowResourceMs": 2500,
+    "largeDomNodeCount": 1500,
+    "cardImageRatioSpread": 0.2,
+    "cardButtonHeightSpreadPx": 8
   }
 }
