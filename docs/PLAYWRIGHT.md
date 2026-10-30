@@ -1,6 +1,6 @@
 # Browser audits with Playwright
 
-The Playwright adapter opens a target URL in Chromium, collects measurable DOM evidence, and passes that evidence to the deterministic specialist rules.
+The Playwright adapter opens a target URL in Chromium, collects measurable DOM evidence, and passes that evidence to deterministic specialist rules.
 
 ## Setup
 
@@ -9,17 +9,27 @@ npm install
 npx playwright install chromium
 ```
 
-## Run
+## Run one viewport
 
 ```bash
 npm run audit -- https://example.com
 npm run audit -- https://example.com --mobile
 ```
 
-The first profile targets a desktop viewport (1365×900); `--mobile` uses 390×844.
+The default viewport is 1365×900; `--mobile` uses 390×844.
 
-## Scope and limitations
+## Run the full viewport matrix
 
-The first adapter implements evidence collection for the Responsive and UI/UX specialists only. It does not click through forms, authenticate to protected sites, inspect every possible viewport, or infer design intent. A detected large gap is a heuristic requiring human review; whitespace can be intentional.
+```bash
+npm run audit -- https://example.com --matrix
+```
 
-Only audit websites you own or are authorized to test. Avoid passing credentials in command-line arguments. The adapter currently audits publicly reachable HTTP(S) pages and local development URLs.
+The default matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900), then reports pass/fail and findings separately for each viewport.
+
+## Current scope
+
+Implemented: horizontal document overflow, visible elements beyond viewport bounds, mobile fixed-width heuristics, small text, unusually large vertical gaps, and small interactive targets.
+
+The DOM collector is heuristic. A large whitespace region can be intentional; fixed-width detection currently uses inline CSS and width attributes; stylesheet-only fixed widths may instead be caught through measured overflow. This adapter does not yet click through forms, authenticate to protected sites, test every browser engine, or make subjective design decisions.
+
+Only audit websites you own or are authorized to test. Avoid passing credentials in command-line arguments. The adapter supports HTTP(S) pages, including local development URLs.
