@@ -26,8 +26,8 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
           right: rect.right,
           width: rect.width,
           height: rect.height,
-          fixedWidth: (/^(?:\\d+(?:\\.\\d+)?)(?:px|rem|em)$/.test(element.style.width) ||
-            /^\\d+$/.test(element.getAttribute("width") ?? "")),
+          fixedWidth: (/^(?:\d+(?:\.\d+)?)(?:px|rem|em)$/.test(element.style.width) ||
+            /^\d+$/.test(element.getAttribute("width") ?? "")),
           visible: true
         };
       });
