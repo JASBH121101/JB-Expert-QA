@@ -41,3 +41,61 @@ export async function auditUrl(url, {
     await browser.close();
   }
 }
+
+const DEFAULT_VIEWPORTS = Object.freeze([
+  { name: "mobile", width: 390, height: 844 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1365, height: 900 }
+]);
+
+export async function auditViewports(url, {
+  viewports = DEFAULT_VIEWPORTS,
+  ...options
+} = {}) {
+  if (!Array.isArray(viewports) || viewports.length === 0) {
+    throw new TypeError("At least one viewport is required");
+  }
+
+  const seen = new Set();
+  const results = [];
+  for (const viewport of viewports) {
+    if (!viewport.name || !Number.isFinite(viewport.width) ||
+        !Number.isFinite(viewport.height) || viewport.width <= 0 || viewport.height <= 0) {
+      throw new TypeError("Each viewport requires a name and positive numeric width and height");
+    }
+    if (seen.has(viewport.name)) {
+      throw new Error(`Duplicate viewport name: ${viewport.name}`);
+    }
+    seen.add(viewport.name);
+    const report = await auditUrl(url, {
+      ...options,
+      viewport: { width: viewport.width, height: viewport.height }
+    });
+    results.push({
+      name: viewport.name,
+      viewport: { width: viewport.width, height: viewport.height },
+      passed: report.scoring.passed,
+      score: report.scoring.score,
+      findings: report.diagnostics,
+      summary: report.summary,
+      execution: report.execution
+    });
+  }
+
+  return Object.freeze({
+    engine: "JB Expert QA",
+    version: "0.2.0",
+    generatedAt: new Date().toISOString(),
+    target: { url: new URL(url).href },
+    summary: Object.freeze({
+      viewportsChecked: results.length,
+      passedViewports: results.filter((item) => item.passed).length,
+      failedViewports: results.filter((item) => !item.passed).length,
+      totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0)
+    }),
+    passed: results.every((item) => item.passed),
+    viewports: Object.freeze(results)
+  });
+}
+
+export { DEFAULT_VIEWPORTS };
