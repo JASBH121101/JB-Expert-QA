@@ -4,7 +4,7 @@
   "private": true,
   "description": "Portable, rule-based quality assurance engine for web projects.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
