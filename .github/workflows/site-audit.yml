@@ -1,0 +1,104 @@
+name: Website audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Public website URL to audit (HTTP or HTTPS)"
+        required: true
+        type: string
+      viewport_profile:
+        description: "Viewport configuration"
+        required: true
+        type: choice
+        options:
+          - matrix
+          - desktop
+          - mobile
+        default: matrix
+      report_format:
+        description: "Report file format"
+        required: true
+        type: choice
+        options:
+          - html
+          - markdown
+          - json
+        default: html
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit website
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run website audit
+        id: run_audit
+        continue-on-error: true
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          VIEWPORT_PROFILE: ${{ inputs.viewport_profile }}
+          REPORT_FORMAT: ${{ inputs.report_format }}
+        run: |
+          set -euo pipefail
+
+          case "$TARGET_URL" in
+            http://*|https://*) ;;
+            *)
+              echo "The target must start with http:// or https://"
+              exit 2
+              ;;
+          esac
+
+          case "$REPORT_FORMAT" in
+            html) extension="html" ;;
+            markdown) extension="md" ;;
+            json) extension="json" ;;
+            *)
+              echo "Unsupported report format"
+              exit 2
+              ;;
+          esac
+
+          args=()
+          case "$VIEWPORT_PROFILE" in
+            matrix) args+=(--matrix) ;;
+            mobile) args+=(--mobile) ;;
+            desktop) ;;
+            *)
+              echo "Unsupported viewport profile"
+              exit 2
+              ;;
+          esac
+
+          npm run audit -- "$TARGET_URL" "${args[@]}" \
+            "--format=$REPORT_FORMAT" \
+            "--output=reports/jb-expert-qa-report.$extension"
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jb-expert-qa-report
+          path: reports/jb-expert-qa-report.*
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+      - name: Mark audit result
+        if: steps.run_audit.outcome == 'failure'
+        run: |
+          echo "The report was generated, but the audit did not meet the configured approval criteria."
+          exit 1
