@@ -61,6 +61,39 @@ test("configured minimum score controls approval", () => {
   assert.equal(result.passed, true);
 });
 
+test("only specialists included in the audit affect its score", () => {
+  const result = calculateScore([{
+    specialist: "responsive",
+    severity: "high"
+  }], {
+    weights: { responsive: 20, "ui-ux": 20, accessibility: 15, performance: 15, functional: 20, consistency: 10 },
+    includedSpecialists: ["responsive"]
+  });
+  assert.equal(result.score, 88);
+  assert.deepEqual(result.assessedSpecialists, ["responsive"]);
+});
+
+test("audit cannot pass when a rule execution fails", async () => {
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.failure",
+    specialist: "ui-ux",
+    evaluate() { throw new Error("simulated failure"); }
+  });
+  const report = await new ExpertQAEngine({ registry, config }).audit();
+  assert.equal(report.scoring.passed, false);
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
+});
+
+test("audit with no registered rules cannot pass", async () => {
+  const report = await new ExpertQAEngine({
+    registry: new RuleRegistry(),
+    config
+  }).audit();
+  assert.equal(report.scoring.score, null);
+  assert.equal(report.scoring.passed, false);
+});
+
 test("critical findings block approval", () => {
   const result = calculateScore([{
     specialist: "ui-ux",
