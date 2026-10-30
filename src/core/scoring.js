@@ -3,8 +3,13 @@ import { DEFAULT_SEVERITY_PENALTIES } from "./severities.js";
 export function calculateScore(diagnostics, {
   weights = {},
   severityPenalties = DEFAULT_SEVERITY_PENALTIES,
+  minimumScore = 80,
   failOnCritical = true
 } = {}) {
+  if (!Number.isFinite(minimumScore) || minimumScore < 0 || minimumScore > 100) {
+    throw new TypeError("minimumScore must be a number between 0 and 100");
+  }
+
   const specialistScores = {};
   const names = Object.keys(weights);
 
@@ -34,8 +39,9 @@ export function calculateScore(diagnostics, {
   const hasCritical = diagnostics.some((item) => item.severity === "critical");
   return Object.freeze({
     score,
+    minimumScore,
     specialistScores: Object.freeze(specialistScores),
-    passed: score >= 80 && !(failOnCritical && hasCritical),
+    passed: score >= minimumScore && !(failOnCritical && hasCritical),
     blockedByCritical: Boolean(failOnCritical && hasCritical)
   });
 }
