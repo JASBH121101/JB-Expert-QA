@@ -23,11 +23,11 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
         return {
           selector: selectorFor(element),
           tagName: element.tagName.toLowerCase(),
-          right: rect.right + window.scrollX,
+          right: rect.right,
           width: rect.width,
           height: rect.height,
-          fixedWidth: style.width !== "auto" && style.maxWidth === "none" &&
-            !style.width.endsWith("%") && !style.width.endsWith("vw"),
+          fixedWidth: (/^(?:\\d+(?:\\.\\d+)?)(?:px|rem|em)$/.test(element.style.width) ||
+            /^\\d+$/.test(element.getAttribute("width") ?? "")),
           visible: true
         };
       });
