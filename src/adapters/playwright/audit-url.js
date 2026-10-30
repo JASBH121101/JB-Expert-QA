@@ -19,7 +19,8 @@ export async function auditUrl(url, {
   const browser = await chromium.launch({ headless });
   try {
     const page = await browser.newPage({ viewport });
-    await page.goto(parsed.href, { waitUntil: "networkidle", timeout });
+    await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
+    await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
     const context = await collectPageContext(page, {
       thresholds: config.thresholds ?? {}
     });
