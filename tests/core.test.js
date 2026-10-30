@@ -50,11 +50,15 @@ test("engine runs rules and returns structured findings", async () => {
 });
 
 test("configured minimum score controls approval", () => {
-  const result = calculateScore([], {
+  const result = calculateScore([{
+    specialist: "responsive",
+    severity: "medium"
+  }], {
     weights: config.weights,
-    minimumScore: 101
+    minimumScore: 98
   });
-  assert.equal(result.passed, false);
+  assert.equal(result.score, 98);
+  assert.equal(result.passed, true);
 });
 
 test("critical findings block approval", () => {
