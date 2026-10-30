@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "profile": "general-web",
+  "weights": {
+    "ui-ux": 20,
+    "responsive": 20,
+    "accessibility": 15,
+    "performance": 15,
+    "functional": 20,
+    "consistency": 10
+  },
+  "severityPenalties": {
+    "critical": 25,
+    "high": 12,
+    "medium": 5,
+    "low": 2,
+    "info": 0
+  },
+  "thresholds": {
+    "minimumScore": 80,
+    "failOnCritical": true
+  }
+}
