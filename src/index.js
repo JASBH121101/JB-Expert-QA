@@ -12,5 +12,4 @@ export {
   consistencyRules,
   SPECIALIST_IDS
 } from "./specialists/index.js";
-export { collectPageContext } from "./adapters/playwright/context.js";
-export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";
+export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";

@@ -9,22 +9,24 @@ npm install
 npx playwright install chromium
 ```
 
-## Run one viewport
+## Run an audit
 
 ```bash
 npm run audit -- https://example.com
 npm run audit -- https://example.com --mobile
-```
-
-The default viewport is 1365×900; `--mobile` uses 390×844.
-
-## Run the responsive matrix
-
-```bash
 npm run audit -- https://example.com --matrix
 ```
 
-The default matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900), then reports findings separately for each viewport.
+The default viewport is 1365×900; `--mobile` uses 390×844. The matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900).
+
+## Export reports
+
+```bash
+npm run audit -- https://example.com --matrix --format=markdown --output=reports/site-audit.md
+npm run audit -- https://example.com --format=html --output=reports/site-audit.html
+```
+
+Formats: `json` (default), `markdown`, and `html`. Reports include target, status, summary, findings, recommendations, and rule execution details. HTML output escapes report content before rendering.
 
 ## Implemented specialist evidence
 
