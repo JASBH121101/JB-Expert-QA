@@ -47,6 +47,7 @@ export class ExpertQAEngine {
     const scoring = calculateScore(diagnostics, {
       weights: this.config.weights,
       severityPenalties: this.config.severityPenalties,
+      minimumScore: this.config.thresholds?.minimumScore ?? 80,
       failOnCritical: this.config.thresholds?.failOnCritical ?? true
     });
 
