@@ -4,18 +4,25 @@ import { createServer } from "node:http";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
 const html = `<!doctype html>
-<html lang="en">
+<html>
 <head><meta charset="utf-8"><title>JB Expert QA fixture</title></head>
 <body style="margin:0">
   <div class="wide-panel" style="width:600px;height:20px">Wide panel</div>
   <p class="tiny-copy" style="font-size:10px">Small text sample</p>
-  <button style="width:16px;height:16px;padding:0">x</button>
-  <div class="large-gap" style="margin-top:220px">Content after intentional test gap</div>
+  <button style="width:16px;height:16px;padding:0"></button>
+  <div class="large-gap" style="margin-top:220px">Content after test gap</div>
+  <img src="/missing-image.png">
+  <input id="email" type="email">
 </body>
 </html>`;
 
-test("Playwright adapter detects responsive and UI UX fixture defects", { timeout: 30000 }, async () => {
-  const server = createServer((_request, response) => {
+test("Playwright adapter detects responsive, UI UX, accessibility and functional defects", { timeout: 30000 }, async () => {
+  const server = createServer((request, response) => {
+    if (request.url === "/missing-image.png") {
+      response.writeHead(404, { "content-type": "text/plain" });
+      response.end("missing");
+      return;
+    }
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(html);
   });
@@ -26,10 +33,10 @@ test("Playwright adapter detects responsive and UI UX fixture defects", { timeou
   });
 
   const address = server.address();
-  const url = `http://127.0.0.1:${address.port}/`;
+  const url = "http://127.0.0.1:" + address.port + "/";
   const config = {
     profile: "playwright-integration",
-    weights: { responsive: 50, "ui-ux": 50 },
+    weights: { responsive: 20, "ui-ux": 20, accessibility: 20, performance: 20, functional: 20 },
     severityPenalties: { critical: 25, high: 12, medium: 5, low: 2, info: 0 },
     thresholds: {
       minimumScore: 0,
@@ -51,7 +58,10 @@ test("Playwright adapter detects responsive and UI UX fixture defects", { timeou
     assert.ok(ids.includes("RESP-001"), "should detect document horizontal overflow");
     assert.ok(ids.some((id) => id.startsWith("UIUX-001")), "should detect small text");
     assert.ok(ids.some((id) => id.startsWith("UIUX-003")), "should detect small interactive target");
-    assert.ok(report.summary.rulesExecuted >= 6);
+    assert.ok(ids.some((id) => id.startsWith("A11Y-001")), "should detect image without alt");
+    assert.ok(ids.some((id) => id.startsWith("A11Y-002")), "should detect unlabeled field");
+    assert.ok(ids.some((id) => id.startsWith("FUNC-003")), "should detect HTTP error");
+    assert.ok(report.summary.rulesExecuted >= 17);
     assert.equal(report.target.url, url);
   } finally {
     await new Promise((resolve) => server.close(resolve));

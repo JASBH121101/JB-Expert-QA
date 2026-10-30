@@ -1,8 +1,24 @@
 import { chromium } from "playwright";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
-import { responsiveRules, uiUxRules } from "../../specialists/index.js";
+import {
+  responsiveRules,
+  uiUxRules,
+  accessibilityRules,
+  performanceRules,
+  functionalRules,
+  consistencyRules
+} from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
 import defaultConfig from "../../../config/default.config.json" with { type: "json" };
+
+const ALL_RULES = [
+  ...responsiveRules,
+  ...uiUxRules,
+  ...accessibilityRules,
+  ...performanceRules,
+  ...functionalRules,
+  ...consistencyRules
+];
 
 export async function auditUrl(url, {
   config = defaultConfig,
@@ -19,14 +35,29 @@ export async function auditUrl(url, {
   const browser = await chromium.launch({ headless });
   try {
     const page = await browser.newPage({ viewport });
-    await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
-    await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
-    const context = await collectPageContext(page, {
-      thresholds: config.thresholds ?? {}
+    const runtimeIssues = { pageErrors: [], failedRequests: [], httpErrors: [] };
+    page.on("pageerror", (error) => runtimeIssues.pageErrors.push({ message: error.message }));
+    page.on("requestfailed", (request) => runtimeIssues.failedRequests.push({
+      url: request.url(),
+      failureText: request.failure()?.errorText ?? "Request failed"
+    }));
+    page.on("response", (response) => {
+      if (response.status() >= 400) runtimeIssues.httpErrors.push({
+        url: response.url(),
+        status: response.status(),
+        resourceType: response.request().resourceType()
+      });
     });
 
+    await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
+    await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
+    const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
+    Object.assign(context, runtimeIssues);
+
+    const configuredSpecialists = new Set(Object.keys(config.weights ?? {}));
+    const activeRules = ALL_RULES.filter((rule) => configuredSpecialists.has(rule.specialist));
     const registry = new RuleRegistry();
-    [...responsiveRules, ...uiUxRules].forEach((rule) => registry.register(rule));
+    activeRules.forEach((rule) => registry.register(rule));
     const engine = new ExpertQAEngine({ registry, config });
     const report = await engine.audit(context, { specialist });
     return {
@@ -34,7 +65,10 @@ export async function auditUrl(url, {
       target: { url: parsed.href, viewport, pageTitle: context.title },
       evidence: {
         documentScrollWidth: context.documentScrollWidth,
-        documentScrollHeight: context.documentScrollHeight
+        documentScrollHeight: context.documentScrollHeight,
+        pageErrors: runtimeIssues.pageErrors.length,
+        failedRequests: runtimeIssues.failedRequests.length,
+        httpErrors: runtimeIssues.httpErrors.length
       }
     };
   } finally {
@@ -48,14 +82,10 @@ const DEFAULT_VIEWPORTS = Object.freeze([
   { name: "desktop", width: 1365, height: 900 }
 ]);
 
-export async function auditViewports(url, {
-  viewports = DEFAULT_VIEWPORTS,
-  ...options
-} = {}) {
+export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...options } = {}) {
   if (!Array.isArray(viewports) || viewports.length === 0) {
     throw new TypeError("At least one viewport is required");
   }
-
   const seen = new Set();
   const results = [];
   for (const viewport of viewports) {
@@ -63,9 +93,7 @@ export async function auditViewports(url, {
         !Number.isFinite(viewport.height) || viewport.width <= 0 || viewport.height <= 0) {
       throw new TypeError("Each viewport requires a name and positive numeric width and height");
     }
-    if (seen.has(viewport.name)) {
-      throw new Error(`Duplicate viewport name: ${viewport.name}`);
-    }
+    if (seen.has(viewport.name)) throw new Error("Duplicate viewport name: " + viewport.name);
     seen.add(viewport.name);
     const report = await auditUrl(url, {
       ...options,
@@ -81,10 +109,9 @@ export async function auditViewports(url, {
       execution: report.execution
     });
   }
-
   return Object.freeze({
     engine: "JB Expert QA",
-    version: "0.2.0",
+    version: "0.3.0",
     generatedAt: new Date().toISOString(),
     target: { url: new URL(url).href },
     summary: Object.freeze({
