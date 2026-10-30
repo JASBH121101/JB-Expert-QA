@@ -1,17 +1,19 @@
 {
   "name": "jb-expert-qa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Portable, rule-based quality assurance engine for web projects.",
   "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
     "check": "node --check src/index.js && node --test",
-    "example": "node examples/basic-audit.js"
+    "example": "node examples/basic-audit.js",
+    "audit": "node src/cli.js"
+  },
+  "dependencies": {
+    "playwright": "^1.56.1"
   },
   "license": "UNLICENSED"
 }
