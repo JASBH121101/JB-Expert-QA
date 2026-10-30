@@ -26,9 +26,9 @@ export class ExpertQAEngine {
         for (const finding of findings) {
           if (finding) {
             diagnostics.push(createDiagnostic({
+              ...finding,
               ruleId: rule.id,
-              specialist: rule.specialist,
-              ...finding
+              specialist: rule.specialist
             }));
           }
         }
@@ -48,7 +48,9 @@ export class ExpertQAEngine {
       weights: this.config.weights,
       severityPenalties: this.config.severityPenalties,
       minimumScore: this.config.thresholds?.minimumScore ?? 80,
-      failOnCritical: this.config.thresholds?.failOnCritical ?? true
+      failOnCritical: this.config.thresholds?.failOnCritical ?? true,
+      includedSpecialists: [...new Set(rules.map((rule) => rule.specialist))],
+      executionErrors: execution.filter((item) => item.status === "error").length
     });
 
     return Object.freeze({
