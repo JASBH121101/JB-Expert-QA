@@ -12,7 +12,7 @@
 
 1. **Core engine** — coordinates rules and creates audit reports.
 2. **Rule registry** — validates and stores specialist rules.
-3. **Specialists** — UI/UX, responsive, accessibility, performance, functional, consistency.
+3. **Specialists** — UI/UX and responsive rules are implemented first; accessibility, performance, functional, and consistency are planned modules.
 4. **Adapters** — connect browser automation and external project types to the engine.
 5. **Profiles** — project-specific thresholds, weights, and rule configuration.
 6. **Reporters** — JSON, Markdown, and HTML output (planned).
@@ -31,6 +31,6 @@ The core does not transmit project data. Browser adapters may access the target 
 
 ## Current scope: 0.1.0
 
-Implemented: rule registry, diagnostic validation, deterministic scoring, audit orchestration, JSON report object, and Node.js tests.
+Implemented: rule registry, diagnostic validation, deterministic scoring, audit orchestration, UI/UX and responsive DOM rules, Playwright Chromium adapter, single-viewport CLI audit, multi-viewport matrix, and automated unit/integration tests.
 
-Not yet implemented: browser adapter, DOM rules, screenshot comparison, Lighthouse/axe integrations, dashboard, WordPress adapter, and archive packaging.
+Not yet implemented: screenshot comparison, Lighthouse/axe integrations, dashboard, remaining four specialists, WordPress adapter, and archive packaging.
