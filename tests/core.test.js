@@ -49,6 +49,14 @@ test("engine runs rules and returns structured findings", async () => {
   assert.equal(report.scoring.passed, true);
 });
 
+test("configured minimum score controls approval", () => {
+  const result = calculateScore([], {
+    weights: config.weights,
+    minimumScore: 101
+  });
+  assert.equal(result.passed, false);
+});
+
 test("critical findings block approval", () => {
   const result = calculateScore([{
     specialist: "ui-ux",
