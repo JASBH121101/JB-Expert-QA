@@ -58,3 +58,29 @@ test("engine config validates project-specific scanner limits and applies defaul
   assert.throws(() => validateEngineConfig({ scan: { maxFiles: 0 } }), /positive integer/);
   assert.throws(() => validateEngineConfig({ scan: { unknown: 10 } }), /Unknown project scan option/);
 });
+
+test("engine config keeps online advisories opt-in and validates safety limits", () => {
+  const defaults = validateEngineConfig({});
+  assert.deepEqual(defaults.advisories, {
+    enabled: false,
+    required: false,
+    provider: "osv",
+    maxPackages: 1000,
+    batchSize: 100,
+    maxVulnerabilities: 200,
+    timeoutMs: 8000
+  });
+
+  const enabled = validateEngineConfig({
+    advisories: { enabled: true, required: true, maxPackages: 250, batchSize: 50 }
+  });
+  assert.equal(enabled.advisories.enabled, true);
+  assert.equal(enabled.advisories.required, true);
+  assert.equal(enabled.advisories.maxPackages, 250);
+  assert.equal(enabled.advisories.batchSize, 50);
+
+  assert.throws(() => validateEngineConfig({ advisories: { enabled: "yes" } }), /must be a boolean/);
+  assert.throws(() => validateEngineConfig({ advisories: { provider: "other" } }), /provider must be/);
+  assert.throws(() => validateEngineConfig({ advisories: { batchSize: 101 } }), /safety limit/);
+  assert.throws(() => validateEngineConfig({ advisories: { unknown: true } }), /Unknown advisory option/);
+});
