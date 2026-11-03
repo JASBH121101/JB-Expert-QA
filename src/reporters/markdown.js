@@ -20,7 +20,7 @@ function cell(value) {
 
 export function formatMarkdownReport(report) {
   const findings = findingsFor(report);
-  const target = cell(report.target?.url ?? "Not specified");
+  const target = cell(report.target?.url ?? report.target?.project ?? "Not specified");
   const score = report.scoring?.score ?? null;
   const passed = Array.isArray(report.viewports)
     ? report.passed
@@ -51,6 +51,17 @@ export function formatMarkdownReport(report) {
       "- Rules executed: " + cell(report.summary?.rulesExecuted ?? 0),
       "- Rule execution errors: " + cell(report.summary?.rulesWithErrors ?? 0),
       "- Findings: " + cell(report.summary?.findings ?? findings.length),
+      ""
+    );
+  }
+
+  if (report.projectScan) {
+    lines.push(
+      "- Project files read: " + cell(report.projectScan.filesRead ?? 0),
+      "- Bytes read: " + cell(report.projectScan.totalBytes ?? 0),
+      "- Environment files skipped: " + cell(report.projectScan.environmentFiles ?? 0),
+      "- Sensitive files skipped: " + cell(report.projectScan.sensitiveFiles ?? 0),
+      "- Scan truncated: " + cell(report.projectScan.truncated ?? false),
       ""
     );
   }

@@ -13,4 +13,13 @@ export {
   consistencyRules,
   SPECIALIST_IDS
 } from "./specialists/index.js";
+export {
+  codeQualityRules,
+  securityRules,
+  dependencyRules,
+  databaseRules,
+  projectRules
+} from "./specialists/project-rules.js";
+export { scanProject } from "./adapters/filesystem/scan-project.js";
+export { auditProject } from "./adapters/filesystem/audit-project.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";

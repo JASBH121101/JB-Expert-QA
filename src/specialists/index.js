@@ -11,5 +11,9 @@ export const SPECIALIST_IDS = Object.freeze([
   "accessibility",
   "performance",
   "functional",
-  "consistency"
+  "consistency",
+  "code-quality",
+  "security",
+  "dependencies",
+  "database"
 ]);

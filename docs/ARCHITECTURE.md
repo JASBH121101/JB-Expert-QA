@@ -12,8 +12,8 @@
 
 1. **Core engine** — coordinates rules and creates audit reports.
 2. **Rule registry** — validates and stores built-in and project-specific specialist rules.
-3. **Specialists** — built-in UI/UX, responsive, accessibility, performance, functional, and consistency checks; projects may register additional specialist IDs.
-4. **Adapters** — connect browser automation and project types to the engine.
+3. **Specialists** — browser specialists for UI/UX, responsive, accessibility, performance, functional, and consistency; static project specialists for code quality, security, dependencies, and database review.
+4. **Adapters** — Playwright browser adapter and read-only local filesystem adapter.
 5. **Profiles** — project-specific thresholds, weights, and rule configuration.
 6. **Reporters** — JSON, Markdown, and HTML report output.
 
@@ -27,14 +27,14 @@ Scores are weighted across the specialists actually included in an audit. Each a
 
 ## Privacy and execution
 
-The core does not transmit project data and does not require an external AI API. Browser adapters visit the target site only as part of a user-run audit. Secrets and environment files must never be committed.
+The core does not require an external AI API. Browser audits use the URL safety guard. Local project audits read supported text files only, skip environment and credential files, do not follow symlinks, and do not execute project code, install dependencies, or connect to databases. Reports intentionally omit project source contents and detected credential values.
 
 ## Current scope: 0.3.1
 
-Implemented: rule registry, extensible specialist IDs, engine configuration validation, diagnostic validation, deterministic scoring, six built-in specialist modules, Playwright Chromium adapter, DOM/network evidence collection, responsive multi-viewport matrix, CLI, JSON/Markdown/HTML reporters, and automated unit/integration tests.
+Implemented: extensible rule registry, validated engine configuration, deterministic scoring, six browser specialists, four static project specialists, Playwright Chromium adapter, safe local filesystem scanner, responsive multi-viewport matrix, CLI commands for website and project audits, JSON/Markdown/HTML reporters, and automated tests.
 
-Planned: source-code and dependency auditing, screenshot comparison, richer visual analysis, dashboard, WordPress adapter, and archive packaging.
+Planned: richer syntax-aware analysis, dependency advisory integration under an explicitly approved no-cost strategy, screenshot comparison, live database schema inspection with read-only credentials, dashboard, WordPress adapter, and archive packaging.
 
 ## Heuristic limitations
 
-Automated checks identify measurable risks, not absolute design truth. Decorative images may intentionally use empty alt text; card consistency rules require recognizable repeated-card selectors; resource timing and transfer sizes may be unavailable for cross-origin resources. Findings should be reviewed before changing a site.
+Automated checks identify measurable risks, not absolute truth. Static rules are pattern-based and can miss vulnerabilities or produce false positives. Dependency checks do not query a vulnerability database or determine whether versions are current. Database rules review source files only; they do not inspect a live database or validate migration state. Findings require human review before changes are made.
