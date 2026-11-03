@@ -45,7 +45,7 @@ When deep analysis is explicitly enabled, the provider router uses this order:
 2. **Cloudflare Workers AI** — fallback after Gemini quota exhaustion or a transient Gemini availability/network failure.
 3. **Local deterministic engine** — final fallback; no further AI requests.
 
-The router remembers provider failure for the current process. Once Gemini is rate-limited/quota-exhausted, it does not call Gemini again during that run. Once Cloudflare reports that its daily free allocation is exhausted, or JB Expert QA reaches its local Cloudflare request cap, all AI is disabled for the remainder of that run. It does not rotate back to Gemini, retry in a loop, or silently switch to paid models.
+The router remembers provider failure for the current process. Once Gemini is rate-limited/quota-exhausted, it does not call Gemini again during that run. When Cloudflare reports its **daily** free allocation is exhausted, JB Expert QA writes a small quota marker (no keys or prompts) to `~/.jb-expert-qa/provider-quota.json`. On the same machine, Cloudflare is not called again until the UTC day changes (00:00 UTC); Gemini may still be used if it remains available. If Cloudflare reaches only the local per-run request cap, all AI is disabled for the remainder of that run. It does not rotate back to an exhausted provider, retry in a loop, or silently switch to paid models. Set `JBQA_AI_QUOTA_STATE_PATH` to choose another marker-file path.
 
 Cloudflare is limited to these model IDs in this release:
 
@@ -70,7 +70,7 @@ Cloudflare fallback:
 
 **Important billing boundary:** Cloudflare documents a shared allowance of 10,000 Neurons per day, resetting at 00:00 UTC. On Workers Free, inference beyond that allocation fails. On Workers Paid, usage above the free allocation is billable at the published rate. The environment flag `CLOUDFLARE_FREE_TIER_CONFIRMED=true` is an explicit operator confirmation; the API does not let this library independently verify the account's billing plan. Set it only after confirming the account is on Workers Free and no Workers Paid billing has been enabled. Usage by other Workers AI workloads in the same account can consume the shared daily allowance. If zero overage risk is required, do not enable the Cloudflare fallback on an account with paid Workers billing.
 
-Monitor consumption in the Cloudflare Workers AI dashboard. Quota data and billing tier are controlled by Cloudflare, not JB Expert QA.
+Monitor consumption in the Cloudflare Workers AI dashboard. Quota data and billing tier are controlled by Cloudflare, not JB Expert QA. GitHub-hosted runners are ephemeral, so their local daily marker does not persist between separate workflow runs; Cloudflare's own Free-plan rejection still causes the router to stop AI immediately within that run.
 
 For the first visual call, Cloudflare's Llama 3.2 Vision model requires the Meta licence and acceptable-use terms to be accepted once. Do this deliberately from Cloudflare's documented model instructions before enabling visual fallback. JB Expert QA does not silently accept third-party model terms on the user's behalf.
 
