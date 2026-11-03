@@ -8,7 +8,23 @@ JB Expert QA can inspect a local source tree without executing the project or se
 npm run audit:project -- .
 npm run audit:project -- ../ERP-Perfume --format=markdown
 npm run audit:project -- ../Cat-logo --format=html --output=reports/project-audit.html
+npm run audit:project -- ../ERP-Perfume --config=../ERP-Perfume/jb-expert-qa.config.json --format=markdown
 ~~~
+
+## Project-specific profiles
+
+The project auditor accepts a JSON policy file through `--config=PATH`. This keeps engine code shared while letting each repository set its own profile, scoring weights, severity penalties, score threshold, source-size threshold, and scanner limits.
+
+Example:
+
+~~~bash
+npm run audit:project -- . --config=./jb-expert-qa.config.json
+npm run audit:project -- . --config=./jb-expert-qa.config.json --format=markdown --output=reports/qa.md
+~~~
+
+The `scan` section supports `maxFiles`, `maxFileBytes`, `maxTotalBytes`, and `maxDepth`. Omitted values use the safe engine defaults. Invalid values and unknown scanner options stop the audit instead of silently falling back. Config files contain policy only; do not put API keys, credentials, or customer information in them.
+
+A repository may keep its own `jb-expert-qa.config.json` and pass it to CI. The shared engine's default profile remains unchanged for projects without a custom file.
 
 The scanner reads supported text files, skips dependency/build/VCS folders, never follows symbolic links, enforces file-count and size limits, and does not open local environment or credential files such as environment files, package-manager auth files, private keys, or certificate containers. Environment filenames are matched case-insensitively. It reports the presence of skipped sensitive files without including their contents.
 
