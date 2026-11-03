@@ -57,4 +57,59 @@ export const uiUxRules = [
         }));
     }
   }
+  ,
+  {
+    id: "ui-ux.interactive-overlap",
+    specialist: "ui-ux",
+    evaluate(context) {
+      return getElements(context, "interactiveOverlaps")
+        .filter((overlap) =>
+          Number.isFinite(Number(overlap.overlapPercentOfSmallerTarget)) &&
+          Number(overlap.overlapPercentOfSmallerTarget) >= 8
+        )
+        .map((overlap, index) => {
+          const overlapPercent = Number(overlap.overlapPercentOfSmallerTarget);
+          const blockedRatio = Number(overlap.blockedSampleRatio ?? 0);
+          const blocked = Boolean(overlap.blockedSelector);
+          const severity = blocked && blockedRatio >= 0.6 && overlapPercent >= 25
+            ? "high"
+            : blocked || overlapPercent >= 25
+              ? "medium"
+              : "low";
+          const location = [overlap.selectorA, overlap.selectorB].filter(Boolean).join(" ↔ ") || null;
+          const obstruction = blocked
+            ? (overlap.blockingSelector
+                ? overlap.blockingSelector + " covers " + overlap.blockedSelector
+                : overlap.blockedSelector + " is obscured")
+            : "Neither target consistently blocked the other's hit test";
+
+          return {
+            id: "UIUX-004-" + (index + 1),
+            title: blocked
+              ? "Interactive control is obscured by an overlapping element"
+              : "Interactive controls overlap",
+            description: (overlap.selectorA || "Control A") + " and " +
+              (overlap.selectorB || "Control B") + " intersect by " + overlapPercent +
+              "% of the smaller target. " + obstruction + ".",
+            severity,
+            location,
+            evidence: {
+              selectorA: overlap.selectorA ?? null,
+              selectorB: overlap.selectorB ?? null,
+              overlapAreaPx2: Number(overlap.overlapAreaPx2 ?? 0),
+              overlapPercentOfSmallerTarget: overlapPercent,
+              blockedSelector: overlap.blockedSelector ?? null,
+              blockingSelector: overlap.blockingSelector ?? null,
+              blockedSampleRatio: blockedRatio,
+              sampleCount: Number(overlap.sampleCount ?? 0),
+              positionA: overlap.positionA ?? null,
+              positionB: overlap.positionB ?? null,
+              zIndexA: overlap.zIndexA ?? null,
+              zIndexB: overlap.zIndexB ?? null
+            },
+            recommendation: "Separate the controls at this viewport or correct their positioning and stacking order. Check the page in the affected viewport and confirm that every visible control has an unobstructed, independent hit target. Intentional menus and dialogs should not leave background controls interactable."
+          };
+        });
+    }
+  }
 ];
