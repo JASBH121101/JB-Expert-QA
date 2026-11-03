@@ -32,7 +32,9 @@ test("public address classifier rejects private, loopback and reserved addresses
     "fd12:3456::1",
     "fe80::1",
     "ff02::1",
-    "2001:db8::1"
+    "2001:db8::1",
+    "3fff::1",
+    "3fff:0fff::1"
   ]) {
     assert.equal(isPublicAddress(address), false, address);
   }
