@@ -38,7 +38,7 @@ export function formatHtmlReport(report) {
       " · Findings: " + (report.summary?.findings ?? findings.length);
 
   const projectSummary = report.projectScan
-    ? "<p class=\\"meta\\">Project files read: " + escapeHtml(report.projectScan.filesRead) +
+    ? '<p class="meta">Project files read: ' + escapeHtml(report.projectScan.filesRead) +
       " · Environment files skipped: " + escapeHtml(report.projectScan.environmentFiles) +
       " · Sensitive files skipped: " + escapeHtml(report.projectScan.sensitiveFiles) +
       " · Scan truncated: " + escapeHtml(report.projectScan.truncated) + "</p>"
