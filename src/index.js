@@ -1,5 +1,6 @@
 export { ExpertQAEngine } from "./core/engine.js";
-export { RuleRegistry } from "./core/rule-registry.js";
+export { RuleRegistry, isValidSpecialistId } from "./core/rule-registry.js";
+export { validateEngineConfig } from "./core/config.js";
 export { createDiagnostic } from "./core/diagnostic.js";
 export { calculateScore } from "./core/scoring.js";
 export { SEVERITIES, DEFAULT_SEVERITY_PENALTIES } from "./core/severities.js";

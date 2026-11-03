@@ -8,12 +8,19 @@ function findingsFor(report) {
 }
 
 function cell(value) {
-  return String(value ?? "—").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+  return String(value ?? "—")
+    .replace(/\\/g, "\\\\")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\|/g, "\\|")
+    .replace(/([\x60*_{}\[\]()#+\-.!])/g, "\\$1");
 }
 
 export function formatMarkdownReport(report) {
   const findings = findingsFor(report);
-  const target = report.target?.url ?? "Not specified";
+  const target = cell(report.target?.url ?? "Not specified");
   const score = report.scoring?.score ?? null;
   const passed = Array.isArray(report.viewports)
     ? report.passed
@@ -23,9 +30,9 @@ export function formatMarkdownReport(report) {
     "# JB Expert QA report",
     "",
     "- **Target:** " + target,
-    "- **Generated:** " + (report.generatedAt ?? "Unknown"),
+    "- **Generated:** " + cell(report.generatedAt ?? "Unknown"),
     "- **Status:** " + (passed ? "PASS" : "REVIEW REQUIRED"),
-    "- **Score:** " + (score === null ? "Per viewport" : score + "/100"),
+    "- **Score:** " + (score === null ? "Per viewport" : cell(score) + "/100"),
     "",
     "## Summary",
     ""
@@ -33,17 +40,17 @@ export function formatMarkdownReport(report) {
 
   if (Array.isArray(report.viewports)) {
     lines.push(
-      "- Viewports checked: " + (report.summary?.viewportsChecked ?? report.viewports.length),
-      "- Passed viewports: " + (report.summary?.passedViewports ?? 0),
-      "- Failed viewports: " + (report.summary?.failedViewports ?? 0),
-      "- Total findings: " + (report.summary?.totalFindings ?? findings.length),
+      "- Viewports checked: " + cell(report.summary?.viewportsChecked ?? report.viewports.length),
+      "- Passed viewports: " + cell(report.summary?.passedViewports ?? 0),
+      "- Failed viewports: " + cell(report.summary?.failedViewports ?? 0),
+      "- Total findings: " + cell(report.summary?.totalFindings ?? findings.length),
       ""
     );
   } else {
     lines.push(
-      "- Rules executed: " + (report.summary?.rulesExecuted ?? 0),
-      "- Rule execution errors: " + (report.summary?.rulesWithErrors ?? 0),
-      "- Findings: " + (report.summary?.findings ?? findings.length),
+      "- Rules executed: " + cell(report.summary?.rulesExecuted ?? 0),
+      "- Rule execution errors: " + cell(report.summary?.rulesWithErrors ?? 0),
+      "- Findings: " + cell(report.summary?.findings ?? findings.length),
       ""
     );
   }
@@ -82,9 +89,9 @@ export function formatMarkdownReport(report) {
     lines.push("No rule execution details were included.");
   } else {
     for (const item of executions) {
-      lines.push("- [" + (item.status ?? "unknown") + "] " +
-        (item.viewport ? item.viewport + " · " : "") +
-        item.ruleId + (item.error ? " — " + item.error : ""));
+      lines.push("- [" + cell(item.status ?? "unknown") + "] " +
+        (item.viewport ? cell(item.viewport) + " · " : "") +
+        cell(item.ruleId ?? "unknown") + (item.error ? " — " + cell(item.error) : ""));
     }
   }
   lines.push("");

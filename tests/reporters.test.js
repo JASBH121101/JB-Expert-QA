@@ -12,7 +12,7 @@ const report = {
     id: "UIUX-001-1",
     specialist: "ui-ux",
     severity: "medium",
-    title: "Small <label>",
+    title: "Small <label> | *bold*",
     description: "Text is too small",
     location: ".caption",
     recommendation: "Increase size & review contrast"
@@ -20,11 +20,11 @@ const report = {
   execution: [{ ruleId: "ui-ux.tiny-text", status: "passed" }]
 };
 
-test("markdown reporter includes findings and recommendations", () => {
+test("markdown reporter includes findings and neutralizes Markdown/HTML controls", () => {
   const output = formatMarkdownReport(report);
   assert.match(output, /JB Expert QA report/);
-  assert.match(output, /Small <label>/);
-  assert.match(output, /Increase size & review contrast/);
+  assert.ok(output.includes("Small &lt;label&gt; \\| \\*bold\\*"));
+  assert.match(output, /Increase size &amp; review contrast/);
 });
 
 test("html reporter escapes untrusted report strings", () => {
