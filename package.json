@@ -1,8 +1,8 @@
 {
   "name": "jb-expert-qa",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "Supervised QA engine with deterministic project audits, optional OSV dependency advisories, and visual regression.",
+  "description": "Supervised QA engine with dependency advisories, visual regression, and interactive layout collision detection.",
   "type": "module",
   "engines": {
     "node": ">=22"
