@@ -3,25 +3,23 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
-const html = [
-  "<!doctype html>",
-  "<html>",
-  "<head><meta charset=\"utf-8\"><title>JB Expert QA fixture</title></head>",
-  "<body style=\"margin:0\">",
-  "  <div class=\"wide-panel\" style=\"width:600px;height:20px\">Wide panel</div>",
-  "  <p class=\"tiny-copy\" style=\"font-size:10px\">Small text sample</p>",
-  "  <button style=\"width:16px;height:16px;padding:0\"></button>",
-  "  <div id=\\"overlap-fixture\\" style=\\"position:relative;width:320px;height:64px\\">",
-  "    <button id=\\"overlap-a\\" style=\\"position:absolute;left:0;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:1\\">A</button>",
-  "    <button id=\\"overlap-b\\" style=\\"position:absolute;left:60px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:2\\">B</button>",
-  "    <button id=\\"separate-button\\" style=\\"position:absolute;left:190px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box\\">C</button>",
-  "  </div>",
-  "  <div class=\"large-gap\" style=\"margin-top:220px\">Content after test gap</div>",
-  "  <img src=\"/missing-image.png\">",
-  "  <input id=\"email\" type=\"email\">",
-  "</body>",
-  "</html>"
-].join("\n");
+const html = \`<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>JB Expert QA fixture</title></head>
+<body style="margin:0">
+  <div class="wide-panel" style="width:600px;height:20px">Wide panel</div>
+  <p class="tiny-copy" style="font-size:10px">Small text sample</p>
+  <button style="width:16px;height:16px;padding:0"></button>
+  <div id="overlap-fixture" style="position:relative;width:320px;height:64px">
+    <button id="overlap-a" style="position:absolute;left:0;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:1">A</button>
+    <button id="overlap-b" style="position:absolute;left:60px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:2">B</button>
+    <button id="separate-button" style="position:absolute;left:190px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box">C</button>
+  </div>
+  <div class="large-gap" style="margin-top:220px">Content after test gap</div>
+  <img src="/missing-image.png">
+  <input id="email" type="email">
+</body>
+</html>\`;
 
 test("Playwright and axe-core detect page defects with browser evidence", { timeout: 30000 }, async () => {
   const server = createServer((request, response) => {
