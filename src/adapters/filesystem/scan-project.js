@@ -70,7 +70,8 @@ export async function scanProject(rootPath, {
   let truncated = false;
 
   async function walk(directory, depth) {
-    if (depth > maxDepth || truncated) return;
+    if (depth > maxDepth) { truncated = true; return; }
+    if (truncated) return;
     let entries;
     try {
       entries = await readdir(directory, { withFileTypes: true });

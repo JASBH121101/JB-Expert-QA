@@ -17,7 +17,7 @@ The scanner reads supported text files, skips dependency/build/VCS folders, neve
 - **Code quality:** unusually large source files and absence of recognizable test files.
 - **Security:** likely hardcoded credentials (redacted from output), dynamic code execution, raw HTML sinks, disabled TLS verification, and local sensitive files.
 - **Dependencies:** floating package versions, missing root lockfiles, malformed package manifests, and risky install lifecycle scripts.
-- **Database:** destructive SQL operations, PostgreSQL SECURITY DEFINER functions without an explicit search_path in the file, and unsafe Prisma raw-query APIs.
+- **Database:** destructive SQL operations, PostgreSQL SECURITY DEFINER functions without an explicit search_path in the file, unsafe Prisma raw-query APIs, Prisma relation fields that may lack a supporting leading index, broad grants to `PUBLIC`, and elevated PostgreSQL role attributes.
 
 ## Important limits
 

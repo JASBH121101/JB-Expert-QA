@@ -142,6 +142,71 @@ test("database checks flag destructive SQL, SECURITY DEFINER and unsafe raw-quer
   assert.equal(report.diagnostics.some((item) => item.id.startsWith("DB-RAW-")), true);
 });
 
+test("Prisma relation fields without a supporting leading index are reported", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "prisma/schema.prisma",
+      extension: ".prisma",
+      lineCount: 16,
+      content: [
+        "model Order {",
+        "  id String @id",
+        "  ownerId String",
+        "  owner User @relation(fields: [ownerId], references: [id])",
+        "}",
+        "",
+        "model Invoice {",
+        "  id String @id",
+        "  customerId String",
+        "  customer Customer @relation(fields: [customerId], references: [id])",
+        "  @@index([customerId, createdAt])",
+        "}"
+      ].join("\\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const missing = report.diagnostics.filter((item) => item.id.startsWith("DB-PRISMA-INDEX-"));
+  assert.equal(missing.length, 1);
+  assert.match(missing[0].id, /Order-ownerId/);
+  assert.equal(missing[0].metadata.foreignKeyField, "ownerId");
+  assert.equal(missing[0].severity, "medium");
+});
+
+test("PostgreSQL rules flag broad PUBLIC grants and elevated role attributes", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "migrations/003_permissions.sql",
+      extension: ".sql",
+      lineCount: 4,
+      content: [
+        "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;",
+        "CREATE ROLE app_runtime WITH LOGIN NOSUPERUSER;",
+        "ALTER ROLE app_runtime WITH BYPASSRLS;",
+        "GRANT CREATE ON SCHEMA public TO PUBLIC;"
+      ].join("\\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  assert.equal(report.diagnostics.filter((item) => item.id.startsWith("DB-PUBLIC-GRANT-")).length, 2);
+  assert.equal(report.diagnostics.filter((item) => item.id.startsWith("DB-PRIVILEGED-ROLE-")).length, 1);
+  assert.equal(report.diagnostics.some((item) => item.id.startsWith("DB-PRIVILEGED-ROLE-") && item.severity === "high"), true);
+});
+
+test("scanner marks the result truncated when it reaches the depth limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-depth-"));
+  try {
+    await mkdir(join(root, "level-1", "level-2"), { recursive: true });
+    await writeFile(join(root, "level-1", "level-2", "deep.js"), "export const deep = true;");
+    const scan = await scanProject(root, { maxDepth: 1 });
+    assert.equal(scan.summary.truncated, true);
+    assert.equal(scan.files.some((file) => file.path.endsWith("deep.js")), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("end-to-end project audit returns a safe report and exports Markdown/HTML", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-project-"));
   const secret = "ghp_" + "B".repeat(36);
@@ -158,7 +223,7 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 12);
+    assert.equal(report.summary.rulesExecuted, 15);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);

@@ -267,6 +267,129 @@ export const databaseRules = [
   }
 ];
 
+
+function sqlStatements(content) {
+  const statements = [];
+  let offset = 0;
+  for (const statement of content.split(";")) {
+    const clean = statement
+      .replace(/--[^\r\n]*/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    statements.push({ text: clean, offset });
+    offset += statement.length + 1;
+  }
+  return statements;
+}
+
+function sourceLine(content, offset) {
+  return content.slice(0, offset).split(/\r\n|\n|\r/).length;
+}
+
+export const postgresPrismaRules = [
+  {
+    id: "database.prisma-relation-index",
+    specialist: "database",
+    evaluate(context) {
+      const findings = [];
+      const modelPattern = /(?:^|\n)[ \t]*model[ \t]+([A-Za-z_]\w*)[ \t]*\{([\s\S]*?)^[ \t]*\}/gm;
+      for (const file of context.projectFiles ?? []) {
+        if (file.extension !== ".prisma") continue;
+        for (const modelMatch of file.content.matchAll(modelPattern)) {
+          const modelName = modelMatch[1];
+          const body = modelMatch[2];
+          const modelStart = modelMatch.index + modelMatch[0].indexOf("{") + 1;
+          const safeBody = body
+            .replace(/\/\/[^\r\n]*/g, "")
+            .replace(/\/\*[\s\S]*?\*\//g, (value) => value.replace(/[^\r\n]/g, " "));
+          const indexed = new Set();
+          for (const indexMatch of safeBody.matchAll(/@@(?:index|unique)\s*\(\s*\[([^\]]+)\]/g)) {
+            const firstField = indexMatch[1].split(",")[0].trim().match(/^[A-Za-z_]\w*/)?.[0];
+            if (firstField) indexed.add(firstField);
+          }
+          const singleColumnUnique = new Set();
+          for (const line of safeBody.split(/\r\n|\n|\r/)) {
+            const field = line.match(/^\s*([A-Za-z_]\w*)\s+\S+[^@\r\n]*(?:@id|@unique)\b/);
+            if (field) singleColumnUnique.add(field[1]);
+          }
+          const reported = new Set();
+          const relationPattern = /@relation\s*\(([\s\S]*?)\)/g;
+          for (const relationMatch of safeBody.matchAll(relationPattern)) {
+            const fieldsMatch = relationMatch[1].match(/\bfields\s*:\s*\[([^\]]+)\]/);
+            if (!fieldsMatch) continue;
+            const foreignKeys = fieldsMatch[1].split(",").map((value) => value.trim()).filter(Boolean);
+            for (const foreignKey of foreignKeys) {
+              const fieldName = foreignKey.match(/^[A-Za-z_]\w*/)?.[0];
+              if (!fieldName || reported.has(fieldName)) continue;
+              if (indexed.has(fieldName) || singleColumnUnique.has(fieldName)) continue;
+              reported.add(fieldName);
+              const absoluteOffset = modelStart + relationMatch.index;
+              const line = sourceLine(file.content, absoluteOffset);
+              findings.push(finding(
+                "DB-PRISMA-INDEX-" + modelName + "-" + fieldName,
+                "Prisma relation field may lack a supporting index",
+                "Model " + modelName + " uses " + fieldName + " as a relation scalar field, but no single-column unique constraint or index with that field as its leading column was detected.",
+                "medium", file.path,
+                "Review query patterns and add @@index([" + fieldName + "]) when appropriate. Composite indexes only support lookups efficiently when this field is a leading column.",
+                { database: "postgresql", model: modelName, foreignKeyField: fieldName, heuristic: true }, line
+              ));
+            }
+          }
+        }
+      }
+      return findings;
+    }
+  },
+  {
+    id: "database.public-broad-grants",
+    specialist: "database",
+    evaluate(context) {
+      const findings = [];
+      for (const file of context.projectFiles ?? []) {
+        if (file.extension !== ".sql") continue;
+        for (const statement of sqlStatements(file.content)) {
+          const broadAll = /\bGRANT\s+ALL(?:\s+PRIVILEGES)?\b[\s\S]*?\bTO\s+PUBLIC\b/i.test(statement.text);
+          const schemaCreate = /\bGRANT\s+CREATE\s+ON\s+SCHEMA\b[\s\S]*?\bTO\s+PUBLIC\b/i.test(statement.text);
+          if (!broadAll && !schemaCreate) continue;
+          const line = sourceLine(file.content, statement.offset);
+          findings.push(finding(
+            "DB-PUBLIC-GRANT-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
+            "Broad PostgreSQL privileges granted to PUBLIC",
+            "A SQL grant gives all privileges or schema creation rights to the PUBLIC role, potentially exposing database capabilities to every database role.",
+            "high", file.path,
+            "Restrict the grant to the minimum required application or maintenance role and verify the effective privileges after migration.",
+            { database: "postgresql", grantee: "PUBLIC", requiresManualReview: true }, line
+          ));
+        }
+      }
+      return findings;
+    }
+  },
+  {
+    id: "database.privileged-role-attributes",
+    specialist: "database",
+    evaluate(context) {
+      const findings = [];
+      const privileged = /\b(?:SUPERUSER|BYPASSRLS|CREATEROLE|REPLICATION)\b/i;
+      for (const file of context.projectFiles ?? []) {
+        if (file.extension !== ".sql") continue;
+        for (const statement of sqlStatements(file.content)) {
+          if (!/\b(?:CREATE|ALTER)\s+(?:ROLE|USER)\b/i.test(statement.text) || !privileged.test(statement.text)) continue;
+          const line = sourceLine(file.content, statement.offset);
+          findings.push(finding(
+            "DB-PRIVILEGED-ROLE-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
+            "Privileged PostgreSQL role attribute detected",
+            "A role definition changes a high-privilege attribute such as SUPERUSER, BYPASSRLS, CREATEROLE, or REPLICATION.",
+            "high", file.path,
+            "Verify that the role is a tightly controlled administrative identity and that application runtime roles do not receive unnecessary elevated attributes.",
+            { database: "postgresql", requiresManualReview: true }, line
+          ));
+        }
+      }
+      return findings;
+    }
+  }
+];
+
 export const projectRules = Object.freeze([
-  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules
+  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules, ...postgresPrismaRules
 ]);
