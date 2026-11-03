@@ -131,3 +131,48 @@ test("browser audit redacts secrets from target and resource URLs", { timeout: 3
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("same-origin-only browser audits block all third-party HTTP requests", { timeout: 30000 }, async () => {
+  let externalRequests = 0;
+  const externalServer = createServer((_request, response) => {
+    externalRequests += 1;
+    response.writeHead(200, { "content-type": "image/svg+xml" });
+    response.end("<svg xmlns='http://www.w3.org/2000/svg' width='2' height='2'></svg>");
+  });
+  await new Promise((resolve, reject) => {
+    externalServer.once("error", reject);
+    externalServer.listen(0, "127.0.0.1", resolve);
+  });
+
+  const externalUrl = "http://127.0.0.1:" + externalServer.address().port + "/pixel.svg";
+  const mainServer = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><html lang='en'><head><title>Isolated audit</title></head><body><h1>Local preview</h1><img src='" + externalUrl + "' alt='pixel'></body></html>");
+  });
+  await new Promise((resolve, reject) => {
+    mainServer.once("error", reject);
+    mainServer.listen(0, "127.0.0.1", resolve);
+  });
+
+  const url = "http://127.0.0.1:" + mainServer.address().port + "/";
+  try {
+    const report = await auditUrl(url, {
+      config: {
+        profile: "same-origin-isolation",
+        weights: { responsive: 50, "ui-ux": 50 },
+        thresholds: { minimumScore: 0, failOnCritical: true }
+      },
+      viewport: { width: 390, height: 844 },
+      timeout: 10000,
+      runAxe: false,
+      allowPrivateNetworks: true,
+      sameOriginOnly: true
+    });
+    assert.equal(report.evidence.sameOriginOnly, true);
+    assert.ok(report.evidence.blockedRequests >= 1);
+    assert.equal(externalRequests, 0, "third-party server must receive no browser request");
+  } finally {
+    await new Promise((resolve) => mainServer.close(resolve));
+    await new Promise((resolve) => externalServer.close(resolve));
+  }
+});
