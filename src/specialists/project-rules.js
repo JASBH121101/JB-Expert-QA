@@ -413,6 +413,80 @@ export const dependencyRules = [
     }
   },
   {
+    id: "dependencies.osv-advisories",
+    specialist: "dependencies",
+    evaluate(context) {
+      const scan = context.dependencyAdvisoryScan;
+      if (!scan?.enabled) return [];
+      const findings = [];
+
+      if (scan.status === "unavailable") {
+        findings.push(finding(
+          "DEP-OSV-001",
+          "Dependency advisory lookup unavailable",
+          "OSV.dev could not complete the dependency advisory lookup. " + (scan.error || "No additional error details are available."),
+          scan.required ? "high" : "info",
+          "package.json",
+          scan.required
+            ? "Restore advisory service connectivity and rerun the audit before accepting this release."
+            : "Retry the online advisory lookup; this run must not be interpreted as proof that dependencies are vulnerability-free.",
+          { provider: "OSV.dev", required: scan.required === true, networkRequests: scan.networkRequests ?? 0 }
+        ));
+      } else if (scan.status !== "complete") {
+        const directOnly = scan.directOnly === true;
+        const statusDescription = scan.message || "A complete resolved dependency graph was not available.";
+        findings.push(finding(
+          "DEP-OSV-COVERAGE-001",
+          directOnly ? "Transitive dependency coverage is incomplete" : "Dependency advisory coverage is incomplete",
+          statusDescription,
+          scan.required ? "high" : "info",
+          "package.json",
+          directOnly
+            ? "Commit a supported npm lockfile to let the auditor check resolved direct and transitive package versions."
+            : "Add or repair a supported lockfile, increase the configured safety limits, or resolve the advisory lookup issue, then rerun the audit.",
+          {
+            provider: "OSV.dev",
+            status: scan.status,
+            required: scan.required === true,
+            packagesDiscovered: scan.packagesDiscovered ?? 0,
+            packagesQueried: scan.packagesQueried ?? 0,
+            packagesSkipped: scan.packagesSkipped ?? 0,
+            truncated: scan.truncated === true
+          }
+        ));
+      }
+
+      for (const item of scan.findings ?? []) {
+        const safeId = String(item.id || "unknown").replace(/[^a-z0-9]+/gi, "-");
+        const packageId = String(item.packageName || "package").replace(/[^a-z0-9]+/gi, "-");
+        const fixed = Array.isArray(item.fixedVersions) ? item.fixedVersions : [];
+        const recommendation = fixed.length
+          ? "Upgrade " + item.packageName + " to " + fixed.join(" or ") + " after checking compatibility, then rerun the audit and tests."
+          : "Review OSV.dev advisory " + item.id + ", determine whether a patched release exists, and upgrade or mitigate the affected package.";
+        const references = Array.isArray(item.references) ? item.references : [];
+        findings.push(finding(
+          "DEP-OSV-" + safeId + "-" + packageId,
+          "Known dependency vulnerability: " + item.packageName,
+          "OSV.dev reports " + item.packageName + "@" + item.installedVersion + " as affected by " + item.id + ". " + (item.summary || ""),
+          item.severity || "medium",
+          scan.supportedLockfiles?.[0] || "package.json",
+          recommendation,
+          {
+            provider: "OSV.dev",
+            advisoryId: item.id,
+            packageName: item.packageName,
+            installedVersion: item.installedVersion,
+            fixedVersions: fixed,
+            modified: item.modified ?? null,
+            references,
+            detailsUnavailable: item.detailsUnavailable === true
+          }
+        ));
+      }
+      return findings;
+    }
+  },
+  {
     id: "dependencies.invalid-manifest",
     specialist: "dependencies",
     evaluate(context) {
