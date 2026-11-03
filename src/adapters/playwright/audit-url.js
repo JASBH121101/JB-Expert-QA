@@ -163,6 +163,7 @@ export async function auditUrl(url, {
         failedRequests: runtimeIssues.failedRequests.length,
         httpErrors: runtimeIssues.httpErrors.length,
         blockedRequests: runtimeIssues.blockedRequests.length,
+        interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
         axeViolations: context.axeViolations?.length ?? null,
         screenshotPath
       }
