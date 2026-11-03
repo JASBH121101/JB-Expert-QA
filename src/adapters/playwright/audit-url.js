@@ -1,4 +1,7 @@
 import { chromium } from "playwright";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { comparePngFiles } from "../visual/png-diff.js";
 import { createRequire } from "node:module";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
 import { ENGINE_VERSION } from "../../core/version.js";
@@ -35,8 +38,11 @@ export async function auditUrl(url, {
   timeout = 30000,
   headless = true,
   runAxe = true,
-  allowPrivateNetworks = false
+  allowPrivateNetworks = false,
+  screenshotPath = null,
+  screenshotFullPage = false
 } = {}) {
+  if (screenshotPath !== null && (typeof screenshotPath !== "string" || !screenshotPath.trim())) throw new TypeError("screenshotPath must be a non-empty path");
   const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
   const parsed = await assertSafeUrl(url);
 
@@ -135,6 +141,11 @@ export async function auditUrl(url, {
       }
     }
 
+    if (screenshotPath) {
+      await mkdir(dirname(screenshotPath), { recursive: true });
+      await page.screenshot({ path: screenshotPath, fullPage: screenshotFullPage, animations: "disabled" });
+    }
+
     const configuredSpecialists = new Set(Object.keys(config.weights ?? {}));
     const activeRules = ALL_RULES.filter((rule) => configuredSpecialists.has(rule.specialist));
     const registry = new RuleRegistry();
@@ -151,7 +162,8 @@ export async function auditUrl(url, {
         failedRequests: runtimeIssues.failedRequests.length,
         httpErrors: runtimeIssues.httpErrors.length,
         blockedRequests: runtimeIssues.blockedRequests.length,
-        axeViolations: context.axeViolations?.length ?? null
+        axeViolations: context.axeViolations?.length ?? null,
+        screenshotPath
       }
     };
   } finally {
@@ -166,12 +178,24 @@ const DEFAULT_VIEWPORTS = Object.freeze([
   { name: "desktop", width: 1365, height: 900 }
 ]);
 
-export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...options } = {}) {
+export async function auditViewports(url, {
+  viewports = DEFAULT_VIEWPORTS,
+  screenshotDir = null,
+  screenshotFullPage = false,
+  baselineDir = null,
+  diffDir = null,
+  updateBaselines = false,
+  visualThreshold = 0.1,
+  maxDiffPixelRatio = 0.005,
+  ...options
+} = {}) {
   if (!Array.isArray(viewports) || viewports.length === 0) {
     throw new TypeError("At least one viewport is required");
   }
   const seen = new Set();
   const results = [];
+  if (updateBaselines && !baselineDir) throw new TypeError("baselineDir is required when updating visual baselines");
+  if (baselineDir && !screenshotDir) throw new TypeError("screenshotDir is required when comparing visual baselines");
   for (const viewport of viewports) {
     if (!viewport.name || !Number.isFinite(viewport.width) ||
         !Number.isFinite(viewport.height) || viewport.width <= 0 || viewport.height <= 0) {
@@ -179,19 +203,50 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
     }
     if (seen.has(viewport.name)) throw new Error("Duplicate viewport name: " + viewport.name);
     seen.add(viewport.name);
+    const safeName = viewport.name.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+    const screenshotPath = screenshotDir ? join(screenshotDir, safeName + ".png") : null;
     const report = await auditUrl(url, {
       ...options,
+      screenshotPath,
+      screenshotFullPage,
       viewport: { width: viewport.width, height: viewport.height }
     });
+    let visualComparison = null;
+    if (baselineDir) {
+      const baselinePath = join(baselineDir, safeName + ".png");
+      if (updateBaselines) {
+        await mkdir(dirname(baselinePath), { recursive: true });
+        await writeFile(baselinePath, await readFile(screenshotPath));
+        visualComparison = { status: "baseline-updated", passed: false, baselinePath, actualPath: screenshotPath };
+      } else {
+        let baselineExists = true;
+        try { await access(baselinePath); } catch { baselineExists = false; }
+        if (!baselineExists) {
+          visualComparison = { status: "baseline-missing", passed: false, baselinePath, actualPath: screenshotPath };
+        } else {
+          visualComparison = await comparePngFiles({
+            baselinePath,
+            actualPath: screenshotPath,
+            diffPath: diffDir ? join(diffDir, safeName + ".diff.png") : null,
+            threshold: visualThreshold,
+            maxDiffPixelRatio
+          });
+        }
+      }
+    }
+    const visualPassed = !visualComparison ||
+      (visualComparison.status === "compared" && visualComparison.passed === true);
     results.push({
       name: viewport.name,
       viewport: { width: viewport.width, height: viewport.height },
-      passed: report.scoring.passed,
+      passed: report.scoring.passed && visualPassed,
       score: report.scoring.score,
       findings: report.diagnostics,
       summary: report.summary,
       execution: report.execution,
-      evidence: report.evidence
+      evidence: report.evidence,
+      screenshotPath,
+      visualComparison
     });
   }
   return Object.freeze({
@@ -204,8 +259,10 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
       passedViewports: results.filter((item) => item.passed).length,
       failedViewports: results.filter((item) => !item.passed).length,
       totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0),
-      blockedRequests: results.reduce((sum, item) =>
-        sum + (item.evidence?.blockedRequests ?? 0), 0)
+      blockedRequests: results.reduce((sum, item) => sum + (item.evidence?.blockedRequests ?? 0), 0),
+      baselineMissing: results.filter((item) => item.visualComparison?.status === "baseline-missing").length,
+      visualFailures: results.filter((item) => item.visualComparison?.status === "compared" && !item.visualComparison.passed).length,
+      baselinesUpdated: results.filter((item) => item.visualComparison?.status === "baseline-updated").length
     }),
     passed: results.every((item) => item.passed),
     viewports: Object.freeze(results)

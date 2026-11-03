@@ -66,6 +66,60 @@ export function formatMarkdownReport(report) {
     );
   }
 
+  if (Array.isArray(report.viewports) &&
+      report.viewports.some((viewport) => viewport.visualComparison || viewport.screenshotPath)) {
+    lines.push(
+      "## Visual regression",
+      "",
+      "| Viewport | Capture | Baseline status | Difference | Result |",
+      "|---|---|---|---:|---|"
+    );
+    for (const viewport of report.viewports) {
+      const visual = viewport.visualComparison;
+      lines.push("| " + [
+        cell(viewport.name),
+        cell(viewport.screenshotPath || "not captured"),
+        cell(visual ? visual.status : "not compared"),
+        visual && visual.diffPixelRatio !== null && visual.diffPixelRatio !== undefined
+          ? cell((visual.diffPixelRatio * 100).toFixed(3) + "%")
+          : "—",
+        visual ? (visual.passed ? "PASS" : "REVIEW") : "—"
+      ].join(" | ") + " |");
+    }
+    lines.push("");
+  }
+
+  if (report.aiVisualReview) {
+    lines.push(
+      "## AI-assisted visual review",
+      "",
+      "- Provider: " + cell(report.aiVisualReview.provider || "not configured"),
+      "- Model: " + cell(report.aiVisualReview.model || "not selected"),
+      "- Status: " + cell(report.aiVisualReview.status || "unknown"),
+      "- Human review required: yes",
+      ""
+    );
+    for (const item of report.aiVisualReview.reviews || []) {
+      lines.push("### " + cell(item.viewport || "Viewport"), "");
+      if (item.review) {
+        lines.push(
+          "- Visual score: " + cell(item.review.visualScore ?? "not scored"),
+          "- Assessment: " + cell(item.review.assessment || "No assessment"),
+          ""
+        );
+        for (const issue of item.review.issues || []) {
+          lines.push("- **" + cell(issue.severity) + "** — " +
+            cell(issue.region) + ": " + cell(issue.evidence) +
+            " Recommendation: " + cell(issue.recommendation));
+        }
+      } else {
+        lines.push("- Review status: " + cell(item.status || "unavailable"),
+          item.error ? "- Error: " + cell(item.error) : "");
+      }
+      lines.push("");
+    }
+  }
+
   lines.push(
     "## Findings",
     "",

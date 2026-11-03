@@ -14,8 +14,11 @@
 2. **Rule registry** — validates and stores built-in and project-specific specialist rules.
 3. **Specialists** — browser specialists for UI/UX, responsive, accessibility, performance, functional, and consistency; static project specialists for code quality, security, dependencies, and database review.
 4. **Adapters** — Playwright browser adapter and read-only local filesystem adapter.
-5. **Profiles** — project-specific thresholds, weights, and rule configuration.
-6. **Reporters** — JSON, Markdown, and HTML report output.
+5. **Visual regression adapter** — PNG capture and local pixel comparison against explicit baselines.
+6. **Optional AI layer** — replaceable Gemini provider for screenshot critique and structured remediation planning.
+7. **Supervised agent** — isolated local Git worktree, allowlisted patches, bounded test/verification attempts.
+8. **Profiles** — project-specific thresholds, weights, and rule configuration.
+9. **Reporters** — JSON, Markdown, and HTML report output.
 
 ## Diagnostic contract
 
@@ -29,11 +32,13 @@ Scores are weighted across the specialists actually included in an audit. Each a
 
 The core does not require an external AI API. Browser audits use the URL safety guard. Local project audits read supported text files only, skip environment and credential files, do not follow symlinks, and do not execute project code, install dependencies, or connect to databases. Reports intentionally omit project source contents and detected credential values.
 
-## Current scope: 0.3.1
+## Current scope: 0.4.0
 
-Implemented: extensible rule registry, validated engine configuration, deterministic scoring, six browser specialists, four static project specialists, Playwright Chromium adapter, safe local filesystem scanner, responsive multi-viewport matrix, CLI commands for website and project audits, JSON/Markdown/HTML reporters, and automated tests.
+Implemented: extensible rule registry, validated engine configuration, deterministic scoring, six browser specialists, four static project specialists, Playwright Chromium adapter, safe local filesystem scanner, responsive multi-viewport matrix, PNG screenshots, explicit pixel-diff baselines, optional Gemini screenshot review, structured remediation planning, local worktree-based low-risk repair with explicit opt-ins, JSON/Markdown/HTML reports, and automated tests.
 
-Planned: richer syntax-aware analysis, dependency advisory integration under an explicitly approved no-cost strategy, screenshot comparison, live database schema inspection with read-only credentials, dashboard, WordPress adapter, and archive packaging.
+Planned: syntax-aware static analysis, dependency advisory integration under an explicitly approved no-cost strategy, live database schema inspection with read-only credentials, a review dashboard, broader browser-engine coverage, and packaging.
+
+AI is optional. Deterministic rules and pixel comparisons continue to work without model credentials. AI responses never approve releases. Auto-repair is restricted to low-risk source files in src/, requires an explicit source-upload opt-in and an explicit test-run opt-in, creates a local worktree, and never pushes, opens a PR, merges or deploys.
 
 ## Heuristic limitations
 

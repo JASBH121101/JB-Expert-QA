@@ -23,3 +23,11 @@ export {
 export { scanProject } from "./adapters/filesystem/scan-project.js";
 export { auditProject } from "./adapters/filesystem/audit-project.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";
+
+export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";
+export { comparePngBuffers, comparePngFiles } from "./adapters/visual/png-diff.js";
+export { createGeminiProvider } from "./ai/gemini-provider.js";
+export { reviewScreenshot, reviewViewportScreenshots, validateVisualReview } from "./ai/visual-review.js";
+export { createRemediationPlan, validateRemediationPlan } from "./ai/remediation-plan.js";
+export { runAutopilot } from "./agent/autopilot.js";
+export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";

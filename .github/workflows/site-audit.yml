@@ -25,6 +25,16 @@ on:
           - markdown
           - json
         default: html
+      capture_screenshots:
+        description: "Capture viewport screenshots as report artifacts"
+        required: true
+        type: boolean
+        default: false
+      ai_visual_review:
+        description: "Send public-site screenshots to Gemini for optional visual critique"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,6 +63,10 @@ jobs:
           TARGET_URL: ${{ inputs.target_url }}
           VIEWPORT_PROFILE: ${{ inputs.viewport_profile }}
           REPORT_FORMAT: ${{ inputs.report_format }}
+          CAPTURE_SCREENSHOTS: ${{ inputs.capture_screenshots }}
+          AI_VISUAL_REVIEW: ${{ inputs.ai_visual_review }}
+          GEMINI_API_KEY: ${{ inputs.ai_visual_review && secrets.GEMINI_API_KEY || '' }}
+          GEMINI_VISION_MODEL: ${{ vars.GEMINI_VISION_MODEL }}
         run: |
           set -euo pipefail
 
@@ -85,6 +99,22 @@ jobs:
               ;;
           esac
 
+          if [[ "$CAPTURE_SCREENSHOTS" == "true" ]]; then
+            args+=(--screenshots=reports/screenshots)
+          fi
+
+          if [[ "$AI_VISUAL_REVIEW" == "true" ]]; then
+            if [[ "$CAPTURE_SCREENSHOTS" != "true" || "$VIEWPORT_PROFILE" != "matrix" ]]; then
+              echo "AI visual review requires screenshot capture and the matrix viewport profile."
+              exit 2
+            fi
+            if [[ -z "\${GEMINI_API_KEY:-}" ]]; then
+              echo "AI visual review was requested, but the GEMINI_API_KEY repository secret is not configured."
+              exit 2
+            fi
+            args+=(--ai-visual-review)
+          fi
+
           npm run audit -- "$TARGET_URL" "${args[@]}" \
             "--format=$REPORT_FORMAT" \
             "--output=reports/jb-expert-qa-report.$extension"
@@ -93,7 +123,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: jb-expert-qa-report
-          path: reports/jb-expert-qa-report.*
+          path: reports/
           archive: false
           if-no-files-found: error
           retention-days: 7

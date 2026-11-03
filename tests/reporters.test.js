@@ -38,3 +38,52 @@ test("report format dispatcher supports JSON and rejects unknown formats", () =>
   assert.match(formatReport(report, "json"), /"score": 88/);
   assert.throws(() => formatReport(report, "pdf"), /Unsupported report format/);
 });
+
+
+test("reporters include visual regression and escaped AI observations", () => {
+  const visualReport = {
+    ...report,
+    passed: false,
+    summary: { viewportsChecked: 1, passedViewports: 0, failedViewports: 1, totalFindings: 0 },
+    viewports: [{
+      name: "desktop",
+      findings: [],
+      execution: [],
+      screenshotPath: "artifacts/screenshots/desktop.png",
+      visualComparison: {
+        status: "compared",
+        passed: false,
+        diffPixelRatio: 0.125
+      }
+    }],
+    aiVisualReview: {
+      provider: "google-gemini",
+      model: "gemini-test-model",
+      status: "completed",
+      reviews: [{
+        viewport: "desktop",
+        status: "reviewed",
+        review: {
+          visualScore: 81,
+          assessment: "A <strong>misaligned</strong> header.",
+          issues: [{
+            severity: "low",
+            region: "header",
+            evidence: "<script>alert(1)</script>",
+            recommendation: "Align the header."
+          }]
+        }
+      }]
+    }
+  };
+  const markdown = formatMarkdownReport(visualReport);
+  const html = formatHtmlReport(visualReport);
+  assert.match(markdown, /Visual regression/);
+  assert.match(markdown, /12\\.500%/);
+  assert.match(markdown, /AI-assisted visual review/);
+  assert.ok(markdown.includes("&lt;script&gt;"));
+  assert.match(html, /Visual regression/);
+  assert.match(html, /AI-assisted visual review/);
+  assert.ok(html.includes("&lt;script&gt;"));
+  assert.equal(html.includes("<script>alert(1)</script>"), false);
+});

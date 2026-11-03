@@ -44,6 +44,48 @@ export function formatHtmlReport(report) {
       " · Scan truncated: " + escapeHtml(report.projectScan.truncated) + "</p>"
     : "";
 
+  const visualSection = Array.isArray(report.viewports) &&
+    report.viewports.some((viewport) => viewport.visualComparison || viewport.screenshotPath)
+    ? "<h2>Visual regression</h2><table><thead><tr><th>Viewport</th><th>Capture</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
+      report.viewports.map((viewport) => {
+        const visual = viewport.visualComparison;
+        const difference = visual && typeof visual.diffPixelRatio === "number"
+          ? (visual.diffPixelRatio * 100).toFixed(3) + "%" : "—";
+        return "<tr>" + [
+          viewport.name,
+          viewport.screenshotPath || "not captured",
+          visual ? visual.status : "not compared",
+          difference,
+          visual ? (visual.passed ? "PASS" : "REVIEW") : "—"
+        ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>";
+      }).join("") + "</tbody></table>"
+    : "";
+
+  const aiReviews = report.aiVisualReview;
+  const aiSection = aiReviews
+    ? "<h2>AI-assisted visual review</h2><p class=\\"meta\\">Provider: " +
+      escapeHtml(aiReviews.provider || "not configured") + " · Model: " +
+      escapeHtml(aiReviews.model || "not selected") + " · Status: " +
+      escapeHtml(aiReviews.status || "unknown") +
+      " · Human review required: yes</p>" +
+      (aiReviews.reviews || []).map((item) => {
+        const review = item.review;
+        if (!review) {
+          return "<h3>" + escapeHtml(item.viewport || "Viewport") + "</h3><p>" +
+            escapeHtml(item.error || item.status || "Review unavailable") + "</p>";
+        }
+        const issues = (review.issues || []).map((issue) =>
+          "<li><strong>" + escapeHtml(issue.severity) + "</strong> · " +
+          escapeHtml(issue.region) + ": " + escapeHtml(issue.evidence) +
+          " Recommendation: " + escapeHtml(issue.recommendation) + "</li>"
+        ).join("");
+        return "<h3>" + escapeHtml(item.viewport || "Viewport") + "</h3><p>" +
+          "Score: " + escapeHtml(review.visualScore ?? "not scored") + "/100 · " +
+          escapeHtml(review.assessment || "") + "</p><ul>" +
+          (issues || "<li>No visible issues reported.</li>") + "</ul>";
+      }).join("")
+    : "";
+
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -65,6 +107,8 @@ export function formatHtmlReport(report) {
     '<p class="meta">Target: <code>' + escapeHtml(target) + "</code></p>",
     '<p class="meta">Generated: ' + escapeHtml(report.generatedAt) + " · " + escapeHtml(summary) + "</p>",
     projectSummary,
+    visualSection,
+    aiSection,
     "<h2>Findings</h2>",
     "<table>",
     "<thead><tr><th>Viewport</th><th>Specialist</th><th>Severity</th><th>Finding</th><th>Location</th><th>Recommendation</th></tr></thead>",
