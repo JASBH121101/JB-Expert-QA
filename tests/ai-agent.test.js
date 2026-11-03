@@ -184,8 +184,7 @@ test("source redaction removes credential values before AI upload", () => {
   assert.equal(redacted.includes("this-is-a-very-long-secret-key-value"), false);
   assert.equal(redacted.includes("ghp_"), false);
   assert.match(redacted, /REDACTED/);
-  assert.equal(redacted.includes("SECRET-MATERIAL"), false);
-  assert.equal(redacted.includes("url-secret-value"), false);
+  assert.equal(redacted.includes("SECRET-MATERIAL"), false);\n  assert.equal(redacted.includes("url-secret-value"), false);
 });
 
 
@@ -203,7 +202,7 @@ test("unified patch validator accepts multiple approved files but validates each
     "@@ -1 +1 @@",
     "-export const size = 8;",
     "+export const size = 10;"
-  ].join("\\n");
+  ].join("\n");
   assert.deepEqual(validateUnifiedPatch(patch, {
     allowedPaths: ["src/components/card.js", "src/components/header.js"]
   }), ["src/components/card.js", "src/components/header.js"]);
