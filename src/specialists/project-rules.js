@@ -11,7 +11,8 @@ function commentLine(line) { return /^\s*(?:\/\/|\/\*|\*|#|--)/.test(line); }
 function placeholder(value) {
   const text = value.trim().toLowerCase();
   return text.length < 12 ||
-    /^(?:example|sample|dummy|fake|test|placeholder|changeme|change_me|redacted|your[_-]|replace[_-]|<.*>|\*+|x+)$/i.test(text) ||
+    /^(?:example|sample|dummy|fake|test|placeholder|changeme|change_me|redacted|<.*>|\*+|x+)$/i.test(text) ||
+    /^(?:your|replace)[_-].+/i.test(text) ||
     /(?:process\.env|import\.meta\.env|env\.[a-z_]+)/i.test(text);
 }
 
