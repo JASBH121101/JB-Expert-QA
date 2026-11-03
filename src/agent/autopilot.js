@@ -171,7 +171,7 @@ export async function runAutopilot(projectPath, options = {}) {
   const initialAudit = await auditProject(root);
   const scan = initialAudit.projectScan;
   const projectSize = Object.freeze({
-    files: scan.totalBytes === undefined ? initialAudit.analysisScope.filesAnalyzed : initialAudit.analysisScope.filesAnalyzed,
+    files: initialAudit.analysisScope.filesAnalyzed,
     bytes: scan.totalBytes || 0,
     requiredFiles: minProjectFiles,
     requiredBytes: minProjectBytes
@@ -210,7 +210,7 @@ export async function runAutopilot(projectPath, options = {}) {
     return Object.freeze({
       status: "ai-skipped-small-project",
       ...baseResponse,
-      message: "AI is reserved for larger projects. Increase both configured thresholds only when you deliberately want to spend provider quota."
+      message: "AI is reserved for larger projects. Change either minimum only when deliberately authorizing AI usage for this repository."
     });
   }
   if (!initialAudit.analysisScope.complete) {
@@ -231,16 +231,26 @@ export async function runAutopilot(projectPath, options = {}) {
     });
   }
 
-  const planning = await createRemediationPlan(initialAudit, {
-    provider,
-    maxTasks,
-    projectContext: {
-      projectName: initialAudit.target.project,
-      filesAnalyzed: initialAudit.analysisScope.filesAnalyzed,
-      totalBytes: projectSize.bytes,
-      scanComplete: initialAudit.analysisScope.complete
-    }
-  });
+  let planning;
+  try {
+    planning = await createRemediationPlan(initialAudit, {
+      provider,
+      maxTasks,
+      projectContext: {
+        projectName: initialAudit.target.project,
+        filesAnalyzed: initialAudit.analysisScope.filesAnalyzed,
+        totalBytes: projectSize.bytes,
+        scanComplete: initialAudit.analysisScope.complete
+      }
+    });
+  } catch (error) {
+    return Object.freeze({
+      status: "ai-unavailable-local-audit-complete",
+      ...baseResponse,
+      providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
+      message: error instanceof Error ? error.message : "AI provider unavailable; local audit remains complete"
+    });
+  }
 
   const response = {
     status: "plan-only",
@@ -294,7 +304,31 @@ export async function runAutopilot(projectPath, options = {}) {
     const baselineIds = new Set(initialAudit.diagnostics.map((item) => item.id));
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
       const sources = await readApprovedSources(worktreePath, pathPolicy.allowed);
-      const patch = await generatePatch(provider, task, sources, lastFailure);
+      let patch;
+      try {
+        patch = await generatePatch(provider, task, sources, lastFailure);
+      } catch (error) {
+        lastFailure = error instanceof Error ? error.message : "AI provider became unavailable during repair";
+        attempts.push({ attempt, status: "ai-unavailable", reason: lastFailure });
+        return Object.freeze({
+          ...response,
+          status: "ai-unavailable-local-audit-complete",
+          providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
+          execution: {
+            branch,
+            worktreeRemoved: true,
+            attempts,
+            lastFailure,
+            nextStep: "The isolated repair workspace was discarded. Review the local audit; no patch was retained."
+          },
+          safety: {
+            ...response.safety,
+            sourceUploadedToAi: true,
+            isolatedGitWorktree: false,
+            testsExecuted: false
+          }
+        });
+      }
       if (!patch.trim()) {
         lastFailure = "The model returned no safe patch";
         attempts.push({ attempt, status: "no-patch" });
