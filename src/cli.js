@@ -8,7 +8,7 @@ import { createAiProviderRouter } from "./ai/provider-router.js";
 
 const [url, ...args] = process.argv.slice(2);
 if (!url) {
-  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path] [--allow-private-network] [--screenshots=DIR] [--baseline-dir=DIR] [--diff-dir=DIR] [--update-baselines] [--visual-threshold=0.1] [--max-diff-ratio=0.005] [--full-page] [--ai-visual-review]");
+  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path] [--allow-private-network] [--screenshots=DIR] [--baseline-dir=DIR] [--diff-dir=DIR] [--update-baselines] [--visual-threshold=0.1] [--max-diff-ratio=0.005] [--full-page] [--ai-visual-review] [--explore-interactions] [--max-interaction-actions=8]");
   process.exitCode = 2;
 } else {
   try {
@@ -24,6 +24,12 @@ if (!url) {
     const updateBaselines = args.includes("--update-baselines");
     const aiVisualReview = args.includes("--ai-visual-review");
     const screenshotFullPage = args.includes("--full-page");
+    const interactionExploration = args.includes("--explore-interactions");
+    const maxInteractionArg = args.find((arg) => arg.startsWith("--max-interaction-actions="));
+    const maxInteractionActions = maxInteractionArg ? Number(maxInteractionArg.slice("--max-interaction-actions=".length)) : 8;
+    if (!Number.isInteger(maxInteractionActions) || maxInteractionActions < 1 || maxInteractionActions > 30) {
+      throw new Error("--max-interaction-actions must be an integer between 1 and 30");
+    }
     const visualThresholdArg = args.find((arg) => arg.startsWith("--visual-threshold="));
     const maxDiffArg = args.find((arg) => arg.startsWith("--max-diff-ratio="));
     const visualThreshold = visualThresholdArg ? Number(visualThresholdArg.slice("--visual-threshold=".length)) : 0.1;
@@ -43,7 +49,7 @@ if (!url) {
     const format = formatArg ? formatArg.slice("--format=".length) : "json";
     const outputPath = outputArg ? outputArg.slice("--output=".length) : null;
 
-    const auditOptions = { allowPrivateNetworks };
+    const auditOptions = { allowPrivateNetworks, interactionExploration, maxInteractionActions };
     let report = matrix
       ? await auditViewports(url, {
           ...auditOptions,
