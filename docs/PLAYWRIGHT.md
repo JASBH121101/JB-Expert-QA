@@ -44,7 +44,7 @@ Formats: **json** (default), **markdown**, and **html**. Reports include target,
 ## Implemented specialist evidence
 
 - **Responsive:** document overflow and visible element bounds.
-- **UI/UX:** small text, small interactive targets, and large vertical gaps between top-level content blocks.
+- **UI/UX:** small text, small interactive targets, large vertical gaps, and overlapping or obscured interactive controls. For each intersecting control pair, the browser checks five points in the shared visible area and records the overlap percentage, hit-test winner, blocking selector, positioning, and stacking order.
 - **Accessibility:** axe-core WCAG checks, missing image alt attributes, unlabeled visible form controls, missing document language, and skipped heading levels.
 - **Performance:** large transferred resources, slow resources, images without reserved dimensions, and unusually large DOM trees.
 - **Functional:** uncaught page JavaScript errors, failed network requests, and HTTP responses with status 400 or above.
@@ -52,11 +52,19 @@ Formats: **json** (default), **markdown**, and **html**. Reports include target,
 
 axe-core runs locally in the browser as a free open-source accessibility engine; it does not call a hosted AI service.
 
+## Interactive overlap detection
+
+The browser collector measures visible links, buttons, form controls, role=button elements, and keyboard-focusable targets at the active viewport. It compares their visible bounding boxes, excludes ancestor/descendant pairs (for example, an icon nested inside its own button), and checks five points in each meaningful intersection using the browser hit-test stack.
+
+Findings include both selectors, the shared area, percentage of the smaller target covered, which target is blocked, the element covering it where identifiable, and the relevant positioning/z-index values. A mostly covered control is high severity; smaller or unconfirmed intersections are lower severity. The report is viewport-specific, so a mobile collision can be reported without claiming that the same controls collide on desktop.
+
+The detector reads the initial rendered page state. It does not automatically open every menu, modal, tooltip, or authenticated workflow. Intentional layered controls may need manual review; automated geometry is evidence, not a subjective visual design verdict.
+
 ## Heuristic limitations
 
 Automated checks identify measurable risks, not absolute design truth. Decorative images may intentionally use empty alt text; repeated-card checks require recognizable card selectors; cross-origin resource sizes can be unavailable; third-party errors may not be defects in the site itself; whitespace can be intentional. Review evidence before changing a site.
 
-The adapter does not yet click through forms, authenticate to protected sites, test every browser engine, or make subjective design decisions.
+The adapter does not yet click through forms, authenticate to protected sites, exercise every hidden menu/modal state, test every browser engine, or make subjective design decisions.
 
 
 ## Screenshot capture and visual regression
