@@ -1,3 +1,6 @@
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { createGeminiProvider } from "./gemini-provider.js";
 import { createCloudflareProvider } from "./cloudflare-provider.js";
 
@@ -15,19 +18,55 @@ function unavailableError(code, message) {
   return error;
 }
 
+function utcDay() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function hasPersistedCloudflareQuota(path) {
+  if (!path) return false;
+  try {
+    const saved = JSON.parse(readFileSync(path, "utf8"));
+    return saved && saved.version === 1 && saved.day === utcDay() &&
+      saved.cloudflareDailyExhausted === true;
+  } catch {
+    return false;
+  }
+}
+
+function persistCloudflareQuota(path) {
+  if (!path) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    writeFileSync(path, JSON.stringify({
+      version: 1,
+      day: utcDay(),
+      cloudflareDailyExhausted: true
+    }) + "\n", { encoding: "utf8", mode: 0o600 });
+  } catch {
+    // The in-memory circuit breaker remains active even when persistence is unavailable.
+  }
+}
+
 export function createAiProviderRouter({
   enabled = process.env.JBQA_AI_ENABLED === "true",
   primary = createGeminiProvider(),
-  fallback = createCloudflareProvider()
+  fallback = createCloudflareProvider(),
+  quotaStatePath = process.env.JBQA_AI_QUOTA_STATE_PATH ||
+    join(homedir(), ".jb-expert-qa", "provider-quota.json")
 } = {}) {
+  const cloudflareDailyExhausted = hasPersistedCloudflareQuota(quotaStatePath);
   const state = {
     enabled: Boolean(enabled),
     primaryExhausted: false,
     primaryUnavailable: false,
-    fallbackDisabled: false,
+    fallbackDisabled: cloudflareDailyExhausted,
     allAiDisabled: !enabled,
     lastProvider: null,
-    disableReason: enabled ? null : "AI is disabled by default; explicitly enable deep analysis"
+    disableReason: !enabled
+      ? "AI is disabled by default; explicitly enable deep analysis"
+      : cloudflareDailyExhausted
+        ? "Cloudflare Workers AI daily free allocation was already exhausted today; only Gemini can be used"
+        : null
   };
 
   const configuredProviders = [primary, fallback].filter((provider) =>
@@ -40,15 +79,21 @@ export function createAiProviderRouter({
       return state.lastProvider || "jbqa-ai-router";
     },
     get isConfigured() {
-      return state.enabled && configuredProviders.length > 0;
+      return state.enabled && (
+        (primary && primary.isConfigured !== false && typeof primary.generateJson === "function" &&
+          !state.primaryExhausted && !state.primaryUnavailable) ||
+        (fallback && fallback.isConfigured !== false && typeof fallback.generateJson === "function" &&
+          !state.fallbackDisabled)
+      );
     },
     getStatus() {
       return Object.freeze({
         enabled: state.enabled,
         primary: primary && primary.isConfigured !== false && !state.primaryExhausted && !state.primaryUnavailable
           ? "available" : state.primaryExhausted ? "quota-exhausted" : "unavailable",
-        fallback: fallback && fallback.isConfigured !== false && !state.fallbackDisabled
-          ? "available" : state.fallbackDisabled ? "quota-exhausted-or-disabled" : "not-configured",
+        fallback: state.fallbackDisabled
+          ? "daily-quota-exhausted"
+          : fallback && fallback.isConfigured !== false ? "available" : "not-configured",
         lastProvider: state.lastProvider,
         aiDisabled: state.allAiDisabled,
         disableReason: state.disableReason
@@ -90,7 +135,10 @@ export function createAiProviderRouter({
             } else {
               state.fallbackDisabled = true;
               state.allAiDisabled = true;
-              state.disableReason = "Cloudflare Workers AI quota or local request budget exhausted; all AI disabled for this run";
+              state.disableReason = lastError.quotaScope === "daily"
+                ? "Cloudflare Workers AI daily free allocation exhausted; all AI disabled for this run"
+                : "Cloudflare Workers AI per-run request budget exhausted; all AI disabled for this run";
+              if (lastError.quotaScope === "daily") persistCloudflareQuota(quotaStatePath);
               throw unavailableError("ai_quota_exhausted", state.disableReason);
             }
             continue;
