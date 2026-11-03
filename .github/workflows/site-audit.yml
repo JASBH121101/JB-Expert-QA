@@ -39,6 +39,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: jb-expert-qa-site-audit
+  cancel-in-progress: false
+
 jobs:
   audit:
     name: Audit website
