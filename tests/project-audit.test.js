@@ -43,6 +43,8 @@ test("scanner excludes dependencies, symlinks and local secret-file contents", a
     await writeFile(join(root, "node_modules", "fake", "index.js"), "eval('not scanned');");
     await writeFile(join(root, ".env"), "API_KEY=must-not-be-read-or-reported\n");
     await writeFile(join(root, ".env.example"), "API_KEY=your_placeholder_value\n");
+    await writeFile(join(root, "service-account.json"), '{"private_key":"must-not-be-opened"}');
+    await writeFile(join(root, "credentials.json"), '{"password":"must-not-be-opened-either"}');
     await writeFile(join(outside, "outside.js"), "external directory content");
     await symlink(outside, join(root, "linked-folder"), "dir");
     const scan = await scanProject(root);
@@ -51,7 +53,9 @@ test("scanner excludes dependencies, symlinks and local secret-file contents", a
     assert.deepEqual(scan.environmentFiles, [".env"]);
     assert.ok(scan.files.some((file) => file.path === ".env.example"));
     assert.deepEqual(scan.skippedSymlinks, ["linked-folder"]);
+    assert.deepEqual(scan.sensitiveFiles, ["credentials.json", "service-account.json"]);
     assert.equal(JSON.stringify(scan).includes("must-not-be-read-or-reported"), false);
+    assert.equal(JSON.stringify(scan).includes("must-not-be-opened"), false);
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(outside, { recursive: true, force: true });

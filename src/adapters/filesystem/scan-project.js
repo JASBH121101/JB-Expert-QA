@@ -29,7 +29,9 @@ function isEnvFile(name) {
   return name === ".env" || (name.startsWith(".env.") && !SAFE_ENV_TEMPLATES.has(name));
 }
 function isSensitiveFile(name) {
-  return SENSITIVE_FILENAMES.has(name.toLowerCase()) ||
+  const lower = name.toLowerCase();
+  return SENSITIVE_FILENAMES.has(lower) ||
+    /(?:credential|service[-_]?account|private[-_]?key|google[-_]?credentials|firebase-adminsdk|secret).*\.(?:json|ya?ml)$/i.test(lower) ||
     /\.(?:pem|key|p12|pfx|keystore|jks)$/i.test(name);
 }
 function isSupported(name) {
