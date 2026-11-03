@@ -1,10 +1,7 @@
-import { createRequire } from "node:module";
 import { createDiagnostic } from "./diagnostic.js";
 import { validateEngineConfig } from "./config.js";
+import { ENGINE_VERSION } from "./version.js";
 import { calculateScore } from "./scoring.js";
-
-const require = createRequire(import.meta.url);
-const { version: ENGINE_VERSION } = require("../../package.json");
 
 export class ExpertQAEngine {
   constructor({ registry, config = {} } = {}) {

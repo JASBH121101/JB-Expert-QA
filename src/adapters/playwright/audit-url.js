@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { createRequire } from "node:module";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
+import { ENGINE_VERSION } from "../../core/version.js";
 import {
   responsiveRules,
   uiUxRules,
@@ -145,7 +146,7 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
   }
   return Object.freeze({
     engine: "JB Expert QA",
-    version: "0.3.1",
+    version: ENGINE_VERSION,
     generatedAt: new Date().toISOString(),
     target: { url: new URL(url).href },
     summary: Object.freeze({
