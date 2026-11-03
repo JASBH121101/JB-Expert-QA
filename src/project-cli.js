@@ -1,21 +1,42 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { auditProject } from "./adapters/filesystem/audit-project.js";
 import { formatReport } from "./reporters/index.js";
 
 const [projectPath = ".", ...args] = process.argv.slice(2);
 try {
-  const formatArg = args.find((arg) => arg.startsWith("--format="));
-  const outputArg = args.find((arg) => arg.startsWith("--output="));
-  const format = formatArg ? formatArg.slice("--format=".length) : "json";
-  const outputPath = outputArg ? outputArg.slice("--output=".length) : null;
-  const report = await auditProject(projectPath);
+  const option = (name) => args.find((arg) => arg.startsWith(name + "="))?.slice(name.length + 1);
+  const format = option("--format") || "json";
+  const outputPath = option("--output") || null;
+  const configPath = option("--config") || null;
+  let config;
+
+  if (configPath !== null) {
+    if (!configPath.trim()) throw new TypeError("--config requires a JSON file path");
+    const absoluteConfigPath = resolve(configPath);
+    let rawConfig;
+    try {
+      rawConfig = await readFile(absoluteConfigPath, "utf8");
+    } catch (error) {
+      throw new Error("Unable to read project config " + absoluteConfigPath + ": " +
+        (error instanceof Error ? error.message : String(error)));
+    }
+    try {
+      config = JSON.parse(rawConfig);
+    } catch (error) {
+      throw new Error("Project config is not valid JSON: " +
+        (error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  const report = await auditProject(projectPath, config === undefined ? {} : { config });
   const rendered = formatReport(report, format);
   if (outputPath) {
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, rendered + "\n", "utf8");
-    console.log("Project audit report saved to " + outputPath);
+    const absoluteOutputPath = resolve(outputPath);
+    await mkdir(dirname(absoluteOutputPath), { recursive: true });
+    await writeFile(absoluteOutputPath, rendered + "\n", "utf8");
+    console.log("Project audit report saved to " + absoluteOutputPath);
   } else {
     console.log(rendered);
   }
