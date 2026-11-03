@@ -5,13 +5,15 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { auditProject } from "../adapters/filesystem/audit-project.js";
-import { createGeminiProvider } from "../ai/gemini-provider.js";
+import { createAiProviderRouter } from "../ai/provider-router.js";
 import { createRemediationPlan } from "../ai/remediation-plan.js";
 import { evaluatePatchPaths, redactSourceForAI, validateUnifiedPatch } from "./policy.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_CHARS = 18000;
 const MAX_ATTEMPTS = 2;
+const DEFAULT_MIN_AI_FILES = 100;
+const DEFAULT_MIN_AI_BYTES = 1024 * 1024;
 
 async function command(file, args, options = {}) {
   return execFileAsync(file, args, {
@@ -131,15 +133,25 @@ async function createPatchFile(patch) {
   return { directory, patchPath };
 }
 
-export async function runAutopilot(projectPath, {
-  provider = createGeminiProvider({ model: process.env.GEMINI_TEXT_MODEL }),
-  applyLowRisk = false,
-  allowSourceUpload = false,
-  runTests: testsEnabled = false,
-  maxTasks = 5
-} = {}) {
+export async function runAutopilot(projectPath, options = {}) {
+  const suppliedProvider = options.provider || null;
+  const aiEnabled = options.aiEnabled === undefined
+    ? Boolean(suppliedProvider || process.env.JBQA_AI_ENABLED === "true")
+    : Boolean(options.aiEnabled);
+  const {
+    applyLowRisk = false,
+    allowSourceUpload = false,
+    runTests: testsEnabled = false,
+    maxTasks = 5,
+    minProjectFiles = Number(process.env.JBQA_AI_MIN_FILES || DEFAULT_MIN_AI_FILES),
+    minProjectBytes = Number(process.env.JBQA_AI_MIN_BYTES || DEFAULT_MIN_AI_BYTES)
+  } = options;
+
   if (typeof projectPath !== "string" || !projectPath.trim()) {
     throw new TypeError("A project directory path is required");
+  }
+  if (applyLowRisk && !aiEnabled) {
+    throw new Error("Auto-repair requires the explicit --ai-deep-analysis opt-in");
   }
   if (applyLowRisk && !allowSourceUpload) {
     throw new Error("Auto-repair requires allowSourceUpload=true because selected source code will be sent to the configured AI provider");
@@ -147,27 +159,34 @@ export async function runAutopilot(projectPath, {
   if (applyLowRisk && !testsEnabled) {
     throw new Error("Auto-repair requires runTests=true so every patch is validated before it is retained");
   }
+  if (!Number.isInteger(maxTasks) || maxTasks < 1 || maxTasks > 20) {
+    throw new TypeError("maxTasks must be an integer between 1 and 20");
+  }
+  if (!Number.isInteger(minProjectFiles) || minProjectFiles < 1 ||
+      !Number.isInteger(minProjectBytes) || minProjectBytes < 1) {
+    throw new TypeError("AI project-size thresholds must be positive integers");
+  }
+
   const root = resolve(projectPath);
   const initialAudit = await auditProject(root);
-  const planning = await createRemediationPlan(initialAudit, {
-    provider,
-    maxTasks,
-    projectContext: {
-      projectName: initialAudit.target.project,
-      filesAnalyzed: initialAudit.analysisScope.filesAnalyzed,
-      scanComplete: initialAudit.analysisScope.complete
-    }
+  const scan = initialAudit.projectScan;
+  const projectSize = Object.freeze({
+    files: scan.totalBytes === undefined ? initialAudit.analysisScope.filesAnalyzed : initialAudit.analysisScope.filesAnalyzed,
+    bytes: scan.totalBytes || 0,
+    requiredFiles: minProjectFiles,
+    requiredBytes: minProjectBytes
   });
+  const projectEligible = projectSize.files >= minProjectFiles && projectSize.bytes >= minProjectBytes;
 
-  const response = {
-    status: "plan-only",
+  const baseResponse = {
     audit: {
       passed: initialAudit.scoring.passed,
       score: initialAudit.scoring.score,
       findings: initialAudit.diagnostics.length,
       scanComplete: initialAudit.analysisScope.complete
     },
-    planning,
+    projectSize,
+    planning: null,
     execution: null,
     safety: {
       sourceUploadedToAi: false,
@@ -178,6 +197,56 @@ export async function runAutopilot(projectPath, {
       merged: false,
       productionTouched: false
     }
+  };
+
+  if (!aiEnabled) {
+    return Object.freeze({
+      status: "ai-not-requested",
+      ...baseResponse,
+      message: "AI was not requested. The deterministic local audit completed without contacting an AI provider."
+    });
+  }
+  if (!projectEligible) {
+    return Object.freeze({
+      status: "ai-skipped-small-project",
+      ...baseResponse,
+      message: "AI is reserved for larger projects. Increase both configured thresholds only when you deliberately want to spend provider quota."
+    });
+  }
+  if (!initialAudit.analysisScope.complete) {
+    return Object.freeze({
+      status: "ai-blocked-incomplete-audit",
+      ...baseResponse,
+      message: "AI planning is blocked because the deterministic project scan is incomplete."
+    });
+  }
+
+  const provider = suppliedProvider || createAiProviderRouter({ enabled: true });
+  if (provider.isConfigured === false) {
+    return Object.freeze({
+      status: "ai-provider-not-configured",
+      ...baseResponse,
+      providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
+      message: "No eligible AI provider is configured. The local audit remains available."
+    });
+  }
+
+  const planning = await createRemediationPlan(initialAudit, {
+    provider,
+    maxTasks,
+    projectContext: {
+      projectName: initialAudit.target.project,
+      filesAnalyzed: initialAudit.analysisScope.filesAnalyzed,
+      totalBytes: projectSize.bytes,
+      scanComplete: initialAudit.analysisScope.complete
+    }
+  });
+
+  const response = {
+    status: "plan-only",
+    ...baseResponse,
+    planning,
+    providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null
   };
 
   if (!applyLowRisk) return Object.freeze(response);
@@ -268,6 +337,7 @@ export async function runAutopilot(projectPath, {
         return Object.freeze({
           ...response,
           status: "repair-ready-for-review",
+          providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
           execution: {
             branch,
             worktreePath,
@@ -308,6 +378,7 @@ export async function runAutopilot(projectPath, {
     return Object.freeze({
       ...response,
       status: "repair-failed",
+      providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
       execution: {
         branch,
         worktreeRemoved: true,
