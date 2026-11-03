@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { createGeminiProvider } from "./gemini-provider.js";
+import { createAiProviderRouter } from "./provider-router.js";
 
 const VALID_SEVERITIES = new Set(["critical", "high", "medium", "low"]);
 const MAX_IMAGE_BYTES = 5200000;
@@ -53,9 +53,7 @@ export function validateVisualReview(value) {
 }
 
 export async function reviewScreenshot(screenshotPath, {
-  provider = createGeminiProvider({
-    model: process.env.GEMINI_VISION_MODEL || process.env.GEMINI_TEXT_MODEL
-  }),
+  provider = createAiProviderRouter(),
   context = {}
 } = {}) {
   if (typeof screenshotPath !== "string" || !screenshotPath.trim()) {
@@ -107,6 +105,7 @@ export async function reviewScreenshot(screenshotPath, {
 
   return Object.freeze({
     provider: provider.provider || "configured-provider",
+    providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
     model: provider.model || null,
     screenshotPath,
     review: validateVisualReview(raw)
@@ -114,9 +113,7 @@ export async function reviewScreenshot(screenshotPath, {
 }
 
 export async function reviewViewportScreenshots(report, {
-  provider = createGeminiProvider({
-    model: process.env.GEMINI_VISION_MODEL || process.env.GEMINI_TEXT_MODEL
-  }),
+  provider = createAiProviderRouter(),
   maxScreenshots = 3
 } = {}) {
   if (!Array.isArray(report && report.viewports)) {
@@ -128,7 +125,7 @@ export async function reviewViewportScreenshots(report, {
   if (provider.isConfigured === false) {
     return Object.freeze({
       status: "not-configured",
-      provider: provider.provider || "google-gemini",
+      provider: provider.provider || "jbqa-ai-router",
       reviews: Object.freeze([])
     });
   }
@@ -150,13 +147,19 @@ export async function reviewViewportScreenshots(report, {
         viewport: viewport.name,
         status: "review-error",
         error: error instanceof Error ? error.message : "Unknown visual review error",
-        code: error && error.code ? error.code : "visual_review_failed"
+        code: error && error.code ? error.code : "visual_review_failed",
+        providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null
       }));
+      if (error && ["ai_quota_exhausted", "ai_disabled_for_run", "ai_fallback_unavailable",
+        "ai_providers_unavailable"].includes(error.code)) break;
     }
   }
+  const status = reviews.some((item) => item.status === "reviewed") ? "completed"
+    : reviews.some((item) => item.status === "review-error") ? "unavailable" : "unavailable";
   return Object.freeze({
-    status: reviews.some((item) => item.status === "reviewed") ? "completed" : "unavailable",
-    provider: provider.provider || "google-gemini",
+    status,
+    provider: provider.provider || "jbqa-ai-router",
+    providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
     model: provider.model || null,
     reviews: Object.freeze(reviews)
   });
