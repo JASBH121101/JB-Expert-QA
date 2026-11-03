@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { collectPageContext } from "./context.js";
 
 const DEFAULT_MAX_ACTIONS = 8;
@@ -130,7 +132,9 @@ export async function exploreInteractionStates(page, {
   thresholds = {},
   maxActions = DEFAULT_MAX_ACTIONS,
   settleMs = DEFAULT_SETTLE_MS,
-  timeout = 10000
+  timeout = 10000,
+  screenshotDir = null,
+  viewportName = "viewport"
 } = {}) {
   validateOptions({ maxActions, settleMs });
   const originalOrigin = new URL(url).origin;
@@ -170,20 +174,40 @@ export async function exploreInteractionStates(page, {
         state: stateName,
         triggerSelector: candidate.selector
       }));
+      let stateScreenshotPath = null;
+      if (screenshotDir) {
+        const safePart = (value) => String(value).toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "state";
+        const fileName = String(index + 1).padStart(2, "0") + "-" +
+          safePart(candidate.kind) + "-" + safePart(candidate.label) + ".png";
+        stateScreenshotPath = join(screenshotDir, safePart(viewportName), fileName);
+        await mkdir(join(screenshotDir, safePart(viewportName)), { recursive: true });
+        await page.screenshot({
+          path: stateScreenshotPath,
+          fullPage: false,
+          animations: "disabled"
+        });
+      }
+
       const stateOverlaps = (snapshot.interactiveOverlaps ?? []).map((item) => ({
         ...item,
         state: stateName,
-        triggerSelector: candidate.selector
+        triggerSelector: candidate.selector,
+        screenshotPath: stateScreenshotPath
       }));
 
-      interactiveElements.push(...stateElements);
+      interactiveElements.push(...stateElements.map((item) => ({
+        ...item,
+        screenshotPath: stateScreenshotPath
+      })));
       interactiveOverlaps.push(...stateOverlaps);
       states.push({
         name: stateName,
         triggerSelector: candidate.selector,
         kind: candidate.kind,
         visibleControls: stateElements.length,
-        overlapCount: stateOverlaps.length
+        overlapCount: stateOverlaps.length,
+        screenshotPath: stateScreenshotPath
       });
     } catch (error) {
       skipped.push({
