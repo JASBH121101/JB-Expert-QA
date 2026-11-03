@@ -69,11 +69,6 @@ export function createAiProviderRouter({
         : null
   };
 
-  const configuredProviders = [primary, fallback].filter((provider) =>
-    provider && provider.isConfigured !== false &&
-    typeof provider.generateJson === "function"
-  );
-
   const router = {
     get provider() {
       return state.lastProvider || "jbqa-ai-router";
