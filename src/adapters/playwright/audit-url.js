@@ -3,7 +3,8 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { comparePngFiles } from "../visual/png-diff.js";
 import { createRequire } from "node:module";
-import { ExpertQAEngine, RuleRegistry } from "../../index.js";
+import { ExpertQAEngine } from "../../core/engine.js";
+import { RuleRegistry } from "../../core/rule-registry.js";
 import { ENGINE_VERSION } from "../../core/version.js";
 import { createUrlSafetyGuard, assertSafeWebSocketUrl } from "./url-safety.js";
 import { redactUrlForReport, redactUrlsInText } from "../../core/redaction.js";
@@ -260,6 +261,7 @@ export async function auditViewports(url, {
       failedViewports: results.filter((item) => !item.passed).length,
       totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0),
       blockedRequests: results.reduce((sum, item) => sum + (item.evidence?.blockedRequests ?? 0), 0),
+      visualComparisons: results.filter((item) => item.visualComparison?.status === "compared").length,
       baselineMissing: results.filter((item) => item.visualComparison?.status === "baseline-missing").length,
       visualFailures: results.filter((item) => item.visualComparison?.status === "compared" && !item.visualComparison.passed).length,
       baselinesUpdated: results.filter((item) => item.visualComparison?.status === "baseline-updated").length

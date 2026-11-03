@@ -63,7 +63,7 @@ export function formatHtmlReport(report) {
 
   const aiReviews = report.aiVisualReview;
   const aiSection = aiReviews
-    ? "<h2>AI-assisted visual review</h2><p class=\\"meta\\">Provider: " +
+    ? "<h2>AI-assisted visual review</h2><p class='meta'>Provider: " +
       escapeHtml(aiReviews.provider || "not configured") + " · Model: " +
       escapeHtml(aiReviews.model || "not selected") + " · Status: " +
       escapeHtml(aiReviews.status || "unknown") +

@@ -143,11 +143,12 @@ test("patch policy allows source files only and blocks sensitive project paths",
     "package.json",
     "src/auth/login.js",
     "src/database/client.ts",
+    "src/agent/policy.js",
     "../outside.js",
     ".env"
   ]);
   assert.deepEqual(result.allowed, ["src/components/card.js"]);
-  assert.equal(result.blocked.length, 5);
+  assert.equal(result.blocked.length, 6);
 });
 
 test("unified patches are restricted to the exact approved source file", () => {

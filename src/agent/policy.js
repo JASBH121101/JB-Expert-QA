@@ -5,7 +5,7 @@ const SAFE_EXTENSIONS = new Set([
 ]);
 const BLOCKED_SEGMENTS = new Set([
   ".git", ".github", "node_modules", "supabase", "migrations", "migration",
-  "infra", "infrastructure", "terraform", "secrets", "secret",
+  "infra", "infrastructure", "terraform", "secrets", "secret", "core", "agent", "ai", "security",
   "auth", "authentication", "authorization", "billing", "payment", "payments",
   "database", "databases", "db", "config", "deploy", "deployment"
 ]);

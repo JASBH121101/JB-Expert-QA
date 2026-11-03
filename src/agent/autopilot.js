@@ -98,7 +98,7 @@ async function removeWorktree(root, worktreePath, branch) {
 async function runTests(worktree, changedPaths) {
   const syntaxOutput = [];
   for (const path of changedPaths) {
-    if (!/\\.(?:mjs|cjs|js)$/i.test(path)) continue;
+    if (!/\.(?:mjs|cjs|js)$/i.test(path)) continue;
     const checked = await command("node", ["--check", path], {
       cwd: worktree,
       timeout: 30000
@@ -110,7 +110,7 @@ async function runTests(worktree, changedPaths) {
     timeout: 180000
   });
   return {
-    syntaxOutput: syntaxOutput.join("\\n").slice(-4000),
+    syntaxOutput: syntaxOutput.join("\n").slice(-4000),
     testOutput: tests.stdout.slice(-8000)
   };
 }
