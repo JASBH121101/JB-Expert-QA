@@ -15,6 +15,8 @@ npx playwright install chromium
 npm run audit -- https://example.com
 npm run audit -- https://example.com --mobile
 npm run audit -- https://example.com --matrix
+# Also exercise safe menus, tabs, accordions and dialogs
+npm run audit -- https://example.com --matrix --explore-interactions
 ~~~
 
 The default viewport is 1365×900; **--mobile** uses 390×844. The matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900).
@@ -76,7 +78,18 @@ The browser collector measures visible links, buttons, form controls, role=butto
 
 Findings include both selectors, the shared area, percentage of the smaller target covered, which target is blocked, the element covering it where identifiable, and the relevant positioning/z-index values. A mostly covered control is high severity; smaller or unconfirmed intersections are lower severity. The report is viewport-specific, so a mobile collision can be reported without claiming that the same controls collide on desktop.
 
-The detector reads the initial rendered page state. It does not automatically open every menu, modal, tooltip, or authenticated workflow. Intentional layered controls may need manual review; automated geometry is evidence, not a subjective visual design verdict.
+The default detector reads the initial rendered page state. To inspect controls that are closed or collapsed by default, enable **interactive state exploration**:
+
+~~~bash
+npm run audit -- https://example.com --matrix --explore-interactions
+npm run audit -- https://example.com --matrix --explore-interactions --max-interaction-actions=12
+~~~
+
+Exploration is opt-in. It only activates visible, enabled controls with recognizable disclosure semantics or toggle intent: collapsed `aria-expanded` controls, controls referencing hidden `aria-controls` targets, menu/dialog/listbox popups, tabs, closed `details/summary` disclosures, supported Bootstrap toggles, popover triggers, and clearly named menu/sidebar/drawer/dropdown/filter/expand controls. It skips links, submit/reset buttons, and controls whose labels suggest destructive or transactional actions (for example delete, save, send, purchase, or pay).
+
+Each candidate is opened from a fresh load of the audited page, measured as a separate state, and then the original page is restored. The same-origin request policy remains active. The report records the trigger selector, state name, number of controls measured, overlaps, attempted actions, and any skipped controls. The screenshot and axe accessibility scan continue to represent the initial page state.
+
+This approach can expose mobile hamburger menus, sidebars, dropdowns, tabs, accordions, and dialogs that are not visible on first load. It is intentionally bounded (8 candidates by default; configurable up to 30) and does not guess at every generic button. A custom control with no accessible name, state attribute, controlled target, or recognizable toggle class may still require an explicit test. Authenticated workflows, complex multi-step forms, hover-only tooltips, and actions that need application data are not automatically exercised. Intentional layered controls still need human review; geometry is evidence, not a subjective visual design verdict.
 
 ## Heuristic limitations
 
