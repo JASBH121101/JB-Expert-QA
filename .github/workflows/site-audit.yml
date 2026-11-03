@@ -47,6 +47,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Get UTC quota day
+        id: quota_day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore daily AI quota circuit breaker
+        id: ai_quota_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .jbqa-ai-quota
+          key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -72,6 +81,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ inputs.ai_visual_review && secrets.CLOUDFLARE_API_TOKEN || '' }}
           CLOUDFLARE_FREE_TIER_CONFIRMED: ${{ vars.CLOUDFLARE_FREE_TIER_CONFIRMED }}
           CLOUDFLARE_MAX_REQUESTS_PER_RUN: "4"
+          JBQA_AI_QUOTA_STATE_PATH: ${{ github.workspace }}/.jbqa-ai-quota/provider-quota.json
         run: |
           set -euo pipefail
 
@@ -127,6 +137,12 @@ jobs:
           npm run audit -- "$TARGET_URL" "${args[@]}" \
             "--format=$REPORT_FORMAT" \
             "--output=reports/jb-expert-qa-report.$extension"
+      - name: Persist daily AI quota circuit breaker
+        if: always() && steps.ai_quota_cache.outputs.cache-hit != 'true' && hashFiles('.jbqa-ai-quota/provider-quota.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .jbqa-ai-quota
+          key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v7
