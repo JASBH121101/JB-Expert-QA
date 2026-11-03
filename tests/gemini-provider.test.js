@@ -103,3 +103,27 @@ test("Gemini provider rejects malformed JSON output and unsupported image media"
     /Only PNG, JPEG and WebP/
   );
 });
+
+test("Gemini provider uses the configured vision model for image requests", async () => {
+  let capturedUrl = "";
+  const provider = createGeminiProvider({
+    apiKey: "test-key",
+    model: "gemini-text-test",
+    visionModel: "gemini-vision-test",
+    fetchImpl: async (url) => {
+      capturedUrl = String(url);
+      return okResponse({ reviewed: true });
+    }
+  });
+
+  const result = await provider.generateJson({
+    systemInstruction: "Inspect an image",
+    prompt: "Review this screenshot",
+    image: { buffer: Buffer.from([1, 2, 3]), mimeType: "image/png" }
+  });
+
+  assert.deepEqual(result, { reviewed: true });
+  assert.match(capturedUrl, /gemini-vision-test:generateContent$/);
+  assert.equal(provider.model, "gemini-text-test");
+  assert.equal(provider.visionModel, "gemini-vision-test");
+});
