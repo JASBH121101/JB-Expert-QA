@@ -22,14 +22,10 @@ export function formatHtmlReport(report) {
   const passed = Array.isArray(report.viewports) ? report.passed : report.scoring?.passed;
   const status = passed ? "PASS" : "REVIEW REQUIRED";
   const score = report.scoring?.score;
+  const target = report.target?.url ?? report.target?.project ?? "Not specified";
   const rows = findings.length
     ? findings.map((item) => "<tr>" + [
-        item.viewport,
-        item.specialist,
-        item.severity,
-        item.title,
-        item.location,
-        item.recommendation
+        item.viewport, item.specialist, item.severity, item.title, item.location, item.recommendation
       ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>").join("\n")
     : '<tr><td colspan="6">No findings reported.</td></tr>';
 
@@ -41,30 +37,85 @@ export function formatHtmlReport(report) {
       " · Execution errors: " + (report.summary?.rulesWithErrors ?? 0) +
       " · Findings: " + (report.summary?.findings ?? findings.length);
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JB Expert QA report</title>
-<style>
-body{font:16px/1.5 system-ui,sans-serif;max-width:1200px;margin:32px auto;padding:0 20px;color:#172033}
-h1,h2{line-height:1.2} .status{font-weight:700} .meta{color:#586174}
-table{width:100%;border-collapse:collapse;margin-top:16px} th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #dce1ea;overflow-wrap:anywhere}
-th{background:#f2f4f8} code{overflow-wrap:anywhere}
-</style>
-</head>
-<body>
-<h1>JB Expert QA report</h1>
-<p class="status">Status: ${escapeHtml(status)} · Score: ${escapeHtml(score === undefined || score === null ? "Per viewport" : score + "/100")}</p>
-<p class="meta">Target: <code>${escapeHtml(report.target?.url)}</code></p>
-<p class="meta">Generated: ${escapeHtml(report.generatedAt)} · ${escapeHtml(summary)}</p>
-<h2>Findings</h2>
-<table>
-<thead><tr><th>Viewport</th><th>Specialist</th><th>Severity</th><th>Finding</th><th>Location</th><th>Recommendation</th></tr></thead>
-<tbody>${rows}</tbody>
-</table>
-</body>
-</html>
-`;
+  const projectSummary = report.projectScan
+    ? '<p class="meta">Project files read: ' + escapeHtml(report.projectScan.filesRead) +
+      " · Environment files skipped: " + escapeHtml(report.projectScan.environmentFiles) +
+      " · Sensitive files skipped: " + escapeHtml(report.projectScan.sensitiveFiles) +
+      " · Scan truncated: " + escapeHtml(report.projectScan.truncated) + "</p>"
+    : "";
+
+  const visualSection = Array.isArray(report.viewports) &&
+    report.viewports.some((viewport) => viewport.visualComparison || viewport.screenshotPath)
+    ? "<h2>Visual regression</h2><table><thead><tr><th>Viewport</th><th>Capture</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
+      report.viewports.map((viewport) => {
+        const visual = viewport.visualComparison;
+        const difference = visual && typeof visual.diffPixelRatio === "number"
+          ? (visual.diffPixelRatio * 100).toFixed(3) + "%" : "—";
+        return "<tr>" + [
+          viewport.name,
+          viewport.screenshotPath || "not captured",
+          visual ? visual.status : "not compared",
+          difference,
+          visual ? (visual.passed ? "PASS" : "REVIEW") : "—"
+        ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>";
+      }).join("") + "</tbody></table>"
+    : "";
+
+  const aiReviews = report.aiVisualReview;
+  const aiSection = aiReviews
+    ? "<h2>AI-assisted visual review</h2><p class='meta'>Provider: " +
+      escapeHtml(aiReviews.provider || "not configured") + " · Model: " +
+      escapeHtml(aiReviews.model || "not selected") + " · Status: " +
+      escapeHtml(aiReviews.status || "unknown") +
+      " · Human review required: yes</p>" +
+      (aiReviews.reviews || []).map((item) => {
+        const review = item.review;
+        if (!review) {
+          return "<h3>" + escapeHtml(item.viewport || "Viewport") + "</h3><p>" +
+            escapeHtml(item.error || item.status || "Review unavailable") + "</p>";
+        }
+        const issues = (review.issues || []).map((issue) =>
+          "<li><strong>" + escapeHtml(issue.severity) + "</strong> · " +
+          escapeHtml(issue.region) + ": " + escapeHtml(issue.evidence) +
+          " Recommendation: " + escapeHtml(issue.recommendation) + "</li>"
+        ).join("");
+        return "<h3>" + escapeHtml(item.viewport || "Viewport") + "</h3><p>" +
+          "Score: " + escapeHtml(review.visualScore ?? "not scored") + "/100 · " +
+          escapeHtml(review.assessment || "") + "</p><ul>" +
+          (issues || "<li>No visible issues reported.</li>") + "</ul>";
+      }).join("")
+    : "";
+
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    "<title>JB Expert QA report</title>",
+    "<style>",
+    "body{font:16px/1.5 system-ui,sans-serif;max-width:1200px;margin:32px auto;padding:0 20px;color:#172033}",
+    "h1,h2{line-height:1.2}.status{font-weight:700}.meta{color:#586174}",
+    "table{width:100%;border-collapse:collapse;margin-top:16px}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #dce1ea;overflow-wrap:anywhere}",
+    "th{background:#f2f4f8}code{overflow-wrap:anywhere}",
+    "</style>",
+    "</head>",
+    "<body>",
+    "<h1>JB Expert QA report</h1>",
+    '<p class="status">Status: ' + escapeHtml(status) + " · Score: " +
+      escapeHtml(score === undefined || score === null ? "Per viewport" : score + "/100") + "</p>",
+    '<p class="meta">Target: <code>' + escapeHtml(target) + "</code></p>",
+    '<p class="meta">Generated: ' + escapeHtml(report.generatedAt) + " · " + escapeHtml(summary) + "</p>",
+    projectSummary,
+    visualSection,
+    aiSection,
+    "<h2>Findings</h2>",
+    "<table>",
+    "<thead><tr><th>Viewport</th><th>Specialist</th><th>Severity</th><th>Finding</th><th>Location</th><th>Recommendation</th></tr></thead>",
+    "<tbody>" + rows + "</tbody>",
+    "</table>",
+    "</body>",
+    "</html>",
+    ""
+  ].join("\n");
 }

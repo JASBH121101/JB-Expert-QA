@@ -12,7 +12,7 @@ const report = {
     id: "UIUX-001-1",
     specialist: "ui-ux",
     severity: "medium",
-    title: "Small <label>",
+    title: "Small <label> | *bold*",
     description: "Text is too small",
     location: ".caption",
     recommendation: "Increase size & review contrast"
@@ -20,11 +20,11 @@ const report = {
   execution: [{ ruleId: "ui-ux.tiny-text", status: "passed" }]
 };
 
-test("markdown reporter includes findings and recommendations", () => {
+test("markdown reporter includes findings and neutralizes Markdown/HTML controls", () => {
   const output = formatMarkdownReport(report);
   assert.match(output, /JB Expert QA report/);
-  assert.match(output, /Small <label>/);
-  assert.match(output, /Increase size & review contrast/);
+  assert.ok(output.includes("Small &lt;label&gt; \\| \\*bold\\*"));
+  assert.match(output, /Increase size &amp; review contrast/);
 });
 
 test("html reporter escapes untrusted report strings", () => {
@@ -37,4 +37,53 @@ test("html reporter escapes untrusted report strings", () => {
 test("report format dispatcher supports JSON and rejects unknown formats", () => {
   assert.match(formatReport(report, "json"), /"score": 88/);
   assert.throws(() => formatReport(report, "pdf"), /Unsupported report format/);
+});
+
+
+test("reporters include visual regression and escaped AI observations", () => {
+  const visualReport = {
+    ...report,
+    passed: false,
+    summary: { viewportsChecked: 1, passedViewports: 0, failedViewports: 1, totalFindings: 0 },
+    viewports: [{
+      name: "desktop",
+      findings: [],
+      execution: [],
+      screenshotPath: "artifacts/screenshots/desktop.png",
+      visualComparison: {
+        status: "compared",
+        passed: false,
+        diffPixelRatio: 0.125
+      }
+    }],
+    aiVisualReview: {
+      provider: "google-gemini",
+      model: "gemini-test-model",
+      status: "completed",
+      reviews: [{
+        viewport: "desktop",
+        status: "reviewed",
+        review: {
+          visualScore: 81,
+          assessment: "A <strong>misaligned</strong> header.",
+          issues: [{
+            severity: "low",
+            region: "header",
+            evidence: "<script>alert(1)</script>",
+            recommendation: "Align the header."
+          }]
+        }
+      }]
+    }
+  };
+  const markdown = formatMarkdownReport(visualReport);
+  const html = formatHtmlReport(visualReport);
+  assert.match(markdown, /Visual regression/);
+  assert.ok(markdown.includes("12\\.500%"));
+  assert.match(markdown, /AI-assisted visual review/);
+  assert.ok(markdown.includes("&lt;script&gt;"));
+  assert.match(html, /Visual regression/);
+  assert.match(html, /AI-assisted visual review/);
+  assert.ok(html.includes("&lt;script&gt;"));
+  assert.equal(html.includes("<script>alert(1)</script>"), false);
 });

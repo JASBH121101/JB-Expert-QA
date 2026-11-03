@@ -36,16 +36,158 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
         visible: true
       }));
 
-    const interactiveElements = [...document.body.querySelectorAll("a,button,input,select,textarea,[role='button'],[tabindex]")]
-      .filter(visible).slice(0, 500).map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          selector: selectorFor(element),
-          width: rect.width,
-          height: rect.height,
-          visible: true
-        };
-      });
+    const interactiveSelector = "a,button,input,select,textarea,[role='button'],[tabindex]";
+    // When a modal or navigation drawer is open, controls behind it are intentionally
+    // unavailable to the user. Audit the foreground surface, not the dimmed page behind it.
+    const activeOverlayRoots = [...document.querySelectorAll(
+      "dialog:modal,[role='dialog'][aria-modal='true'],[aria-modal='true']," +
+      ".sidebar.open,.drawer.open,[data-qa-overlay-root].open"
+    )].filter(visible);
+    const activeOverlayRoot = activeOverlayRoots
+      .sort((left, right) => {
+        const leftZ = Number.parseInt(getComputedStyle(left).zIndex, 10);
+        const rightZ = Number.parseInt(getComputedStyle(right).zIndex, 10);
+        return (Number.isFinite(rightZ) ? rightZ : 0) - (Number.isFinite(leftZ) ? leftZ : 0);
+      })[0] ?? null;
+    const interactiveNodes = [...document.body.querySelectorAll(interactiveSelector)]
+      .filter((element) => visible(element) &&
+        getComputedStyle(element).pointerEvents !== "none" &&
+        (!activeOverlayRoot || activeOverlayRoot.contains(element)))
+      .slice(0, 300);
+
+    const interactiveElements = interactiveNodes.map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        selector: selectorFor(element),
+        tagName: element.tagName.toLowerCase(),
+        role: element.getAttribute("role") || "",
+        width: rect.width,
+        height: rect.height,
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        position: style.position,
+        zIndex: style.zIndex,
+        pointerEvents: style.pointerEvents,
+        disabled: Boolean(element.disabled),
+        visible: true
+      };
+    });
+
+    const relatedNodes = (left, right) =>
+      left === right || left.contains(right) || right.contains(left);
+    const interactiveOverlaps = [];
+    for (let leftIndex = 0; leftIndex < interactiveNodes.length; leftIndex += 1) {
+      const leftNode = interactiveNodes[leftIndex];
+      const leftRect = leftNode.getBoundingClientRect();
+      const leftArea = leftRect.width * leftRect.height;
+      if (leftArea < 1) continue;
+
+      for (let rightIndex = leftIndex + 1; rightIndex < interactiveNodes.length; rightIndex += 1) {
+        const rightNode = interactiveNodes[rightIndex];
+        if (relatedNodes(leftNode, rightNode)) continue;
+        const rightRect = rightNode.getBoundingClientRect();
+        const rightArea = rightRect.width * rightRect.height;
+        if (rightArea < 1) continue;
+
+        const overlapLeft = Math.max(leftRect.left, rightRect.left, 0);
+        const overlapTop = Math.max(leftRect.top, rightRect.top, 0);
+        const overlapRight = Math.min(leftRect.right, rightRect.right, window.innerWidth);
+        const overlapBottom = Math.min(leftRect.bottom, rightRect.bottom, window.innerHeight);
+        const overlapWidth = Math.max(0, overlapRight - overlapLeft);
+        const overlapHeight = Math.max(0, overlapBottom - overlapTop);
+        const overlapArea = overlapWidth * overlapHeight;
+        const smallerArea = Math.min(leftArea, rightArea);
+        const overlapRatio = smallerArea > 0 ? overlapArea / smallerArea : 0;
+        if (overlapArea < 16 || overlapRatio < 0.08) continue;
+
+        const insetX = Math.min(2, overlapWidth * 0.1);
+        const insetY = Math.min(2, overlapHeight * 0.1);
+        const middleX = (overlapLeft + overlapRight) / 2;
+        const middleY = (overlapTop + overlapBottom) / 2;
+        const samplePoints = [
+          [middleX, middleY],
+          [overlapLeft + insetX, overlapTop + insetY],
+          [overlapRight - insetX, overlapTop + insetY],
+          [overlapLeft + insetX, overlapBottom - insetY],
+          [overlapRight - insetX, overlapBottom - insetY]
+        ];
+
+        let leftWins = 0;
+        let rightWins = 0;
+        let leftBlockedByOther = 0;
+        let rightBlockedByOther = 0;
+        const externalBlockers = new Map();
+
+        for (const [x, y] of samplePoints) {
+          const stack = document.elementsFromPoint(x, y);
+          const topElement = stack[0];
+          if (!topElement) continue;
+
+          const topControl = topElement.closest(interactiveSelector);
+          if (topControl === leftNode || (topControl && leftNode.contains(topControl))) {
+            leftWins += 1;
+          } else if (topControl === rightNode || (topControl && rightNode.contains(topControl))) {
+            rightWins += 1;
+          } else {
+            const topStyle = getComputedStyle(topElement);
+            const blocksPointer = topStyle.pointerEvents !== "none" &&
+              !relatedNodes(topElement, leftNode) && !relatedNodes(topElement, rightNode);
+            if (blocksPointer) {
+              const stackContainsLeft = stack.some((item) => item === leftNode || leftNode.contains(item));
+              const stackContainsRight = stack.some((item) => item === rightNode || rightNode.contains(item));
+              if (stackContainsLeft) leftBlockedByOther += 1;
+              if (stackContainsRight) rightBlockedByOther += 1;
+              if (stackContainsLeft || stackContainsRight) {
+                const blocker = selectorFor(topElement);
+                externalBlockers.set(blocker, (externalBlockers.get(blocker) ?? 0) + 1);
+              }
+            }
+          }
+        }
+
+        let blockedSelector = null;
+        let blockingSelector = null;
+        let blockedSamples = 0;
+        if (leftWins > rightWins) {
+          blockedSelector = selectorFor(rightNode);
+          blockingSelector = selectorFor(leftNode);
+          blockedSamples = leftWins;
+        } else if (rightWins > leftWins) {
+          blockedSelector = selectorFor(leftNode);
+          blockingSelector = selectorFor(rightNode);
+          blockedSamples = rightWins;
+        } else if (leftBlockedByOther > rightBlockedByOther && leftBlockedByOther > 0) {
+          blockedSelector = selectorFor(leftNode);
+          blockedSamples = leftBlockedByOther;
+        } else if (rightBlockedByOther > leftBlockedByOther && rightBlockedByOther > 0) {
+          blockedSelector = selectorFor(rightNode);
+          blockedSamples = rightBlockedByOther;
+        }
+        if (blockedSelector && !blockingSelector && externalBlockers.size) {
+          blockingSelector = [...externalBlockers.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        }
+
+        interactiveOverlaps.push({
+          selectorA: selectorFor(leftNode),
+          selectorB: selectorFor(rightNode),
+          tagA: leftNode.tagName.toLowerCase(),
+          tagB: rightNode.tagName.toLowerCase(),
+          overlapAreaPx2: Math.round(overlapArea),
+          overlapPercentOfSmallerTarget: Number((overlapRatio * 100).toFixed(1)),
+          blockedSelector,
+          blockingSelector,
+          blockedSampleRatio: Number((blockedSamples / samplePoints.length).toFixed(2)),
+          sampleCount: samplePoints.length,
+          positionA: getComputedStyle(leftNode).position,
+          positionB: getComputedStyle(rightNode).position,
+          zIndexA: getComputedStyle(leftNode).zIndex,
+          zIndexB: getComputedStyle(rightNode).zIndex
+        });
+      }
+    }
 
     const verticalGaps = [];
     const candidates = [...document.body.children].filter(visible).slice(0, 100);
@@ -133,6 +275,8 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
       elements,
       textElements,
       interactiveElements,
+      interactiveOverlaps,
+      activeOverlay: activeOverlayRoot ? selectorFor(activeOverlayRoot) : null,
       verticalGaps,
       images,
       formControls,

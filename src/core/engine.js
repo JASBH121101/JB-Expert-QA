@@ -1,16 +1,23 @@
 import { createDiagnostic } from "./diagnostic.js";
+import { validateEngineConfig } from "./config.js";
+import { ENGINE_VERSION } from "./version.js";
 import { calculateScore } from "./scoring.js";
 
 export class ExpertQAEngine {
-  constructor({ registry, config }) {
+  constructor({ registry, config = {} } = {}) {
     if (!registry || typeof registry.list !== "function") {
       throw new TypeError("A valid rule registry is required");
     }
     this.registry = registry;
-    this.config = config ?? {};
+    this.config = validateEngineConfig(config);
   }
 
   async audit(context = {}, options = {}) {
+    if (options.specialist !== undefined &&
+        (typeof options.specialist !== "string" || !options.specialist.trim())) {
+      throw new TypeError("options.specialist must be a non-empty specialist id");
+    }
+
     const rules = this.registry.list(
       options.specialist ? { specialist: options.specialist } : {}
     );
@@ -33,10 +40,16 @@ export class ExpertQAEngine {
           }
         }
 
-        execution.push({ ruleId: rule.id, status: "passed", durationMs: Date.now() - startedAt });
+        execution.push({
+          ruleId: rule.id,
+          specialist: rule.specialist,
+          status: "passed",
+          durationMs: Date.now() - startedAt
+        });
       } catch (error) {
         execution.push({
           ruleId: rule.id,
+          specialist: rule.specialist,
           status: "error",
           durationMs: Date.now() - startedAt,
           error: error instanceof Error ? error.message : String(error)
@@ -44,24 +57,26 @@ export class ExpertQAEngine {
       }
     }
 
+    const includedSpecialists = [...new Set(rules.map((rule) => rule.specialist))];
     const scoring = calculateScore(diagnostics, {
       weights: this.config.weights,
       severityPenalties: this.config.severityPenalties,
-      minimumScore: this.config.thresholds?.minimumScore ?? 80,
-      failOnCritical: this.config.thresholds?.failOnCritical ?? true,
-      includedSpecialists: [...new Set(rules.map((rule) => rule.specialist))],
+      minimumScore: this.config.thresholds.minimumScore,
+      failOnCritical: this.config.thresholds.failOnCritical,
+      includedSpecialists,
       executionErrors: execution.filter((item) => item.status === "error").length
     });
 
     return Object.freeze({
       engine: "JB Expert QA",
-      version: "0.1.0",
+      version: ENGINE_VERSION,
       generatedAt: new Date().toISOString(),
-      profile: this.config.profile ?? "custom",
+      profile: this.config.profile,
       summary: Object.freeze({
         rulesExecuted: execution.length,
         rulesWithErrors: execution.filter((item) => item.status === "error").length,
-        findings: diagnostics.length
+        findings: diagnostics.length,
+        specialists: Object.freeze(includedSpecialists)
       }),
       scoring,
       diagnostics: Object.freeze(diagnostics),

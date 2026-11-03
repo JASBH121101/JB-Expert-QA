@@ -25,9 +25,23 @@ on:
           - markdown
           - json
         default: html
+      capture_screenshots:
+        description: "Capture viewport screenshots as report artifacts"
+        required: true
+        type: boolean
+        default: false
+      ai_visual_review:
+        description: "Use AI for a deliberate, high-value visual review (Gemini primary; Cloudflare fallback)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+
+concurrency:
+  group: jb-expert-qa-site-audit
+  cancel-in-progress: false
 
 jobs:
   audit:
@@ -37,6 +51,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Get UTC quota day
+        id: quota_day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore daily AI quota circuit breaker
+        id: ai_quota_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .jbqa-ai-quota
+          key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -53,6 +76,16 @@ jobs:
           TARGET_URL: ${{ inputs.target_url }}
           VIEWPORT_PROFILE: ${{ inputs.viewport_profile }}
           REPORT_FORMAT: ${{ inputs.report_format }}
+          CAPTURE_SCREENSHOTS: ${{ inputs.capture_screenshots }}
+          AI_VISUAL_REVIEW: ${{ inputs.ai_visual_review }}
+          JBQA_AI_ENABLED: ${{ inputs.ai_visual_review && 'true' || 'false' }}
+          GEMINI_API_KEY: ${{ inputs.ai_visual_review && secrets.GEMINI_API_KEY || '' }}
+          GEMINI_VISION_MODEL: ${{ vars.GEMINI_VISION_MODEL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ inputs.ai_visual_review && secrets.CLOUDFLARE_ACCOUNT_ID || '' }}
+          CLOUDFLARE_API_TOKEN: ${{ inputs.ai_visual_review && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          CLOUDFLARE_FREE_TIER_CONFIRMED: ${{ vars.CLOUDFLARE_FREE_TIER_CONFIRMED }}
+          CLOUDFLARE_MAX_REQUESTS_PER_RUN: "4"
+          JBQA_AI_QUOTA_STATE_PATH: ${{ github.workspace }}/.jbqa-ai-quota/provider-quota.json
         run: |
           set -euo pipefail
 
@@ -85,15 +118,41 @@ jobs:
               ;;
           esac
 
+          if [[ "$CAPTURE_SCREENSHOTS" == "true" ]]; then
+            args+=(--screenshots=reports/screenshots)
+          fi
+
+          if [[ "$AI_VISUAL_REVIEW" == "true" ]]; then
+            if [[ "$CAPTURE_SCREENSHOTS" != "true" || "$VIEWPORT_PROFILE" != "matrix" ]]; then
+              echo "AI visual review requires screenshot capture and the matrix viewport profile."
+              exit 2
+            fi
+            cf_ready=false
+            if [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" && -n "${CLOUDFLARE_API_TOKEN:-}" && "${CLOUDFLARE_FREE_TIER_CONFIRMED:-}" == "true" ]]; then
+              cf_ready=true
+            fi
+            if [[ -z "${GEMINI_API_KEY:-}" && "$cf_ready" != "true" ]]; then
+              echo "AI visual review requires Gemini credentials or Cloudflare credentials with the Free-tier confirmation."
+              exit 2
+            fi
+            args+=(--ai-visual-review)
+          fi
+
           npm run audit -- "$TARGET_URL" "${args[@]}" \
             "--format=$REPORT_FORMAT" \
             "--output=reports/jb-expert-qa-report.$extension"
+      - name: Persist daily AI quota circuit breaker
+        if: always() && steps.ai_quota_cache.outputs.cache-hit != 'true' && hashFiles('.jbqa-ai-quota/provider-quota.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .jbqa-ai-quota
+          key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: jb-expert-qa-report
-          path: reports/jb-expert-qa-report.*
+          path: reports/
           archive: false
           if-no-files-found: error
           retention-days: 7

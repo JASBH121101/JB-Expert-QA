@@ -1,20 +1,26 @@
 {
   "name": "jb-expert-qa",
-  "version": "0.3.1",
+  "version": "0.7.0",
   "private": true,
-  "description": "Portable, rule-based quality assurance engine for web projects.",
+  "description": "Supervised QA engine with dependency advisories, visual regression, and interactive layout collision detection.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
     "check": "node --check src/index.js && node --test",
     "example": "node examples/basic-audit.js",
-    "audit": "node src/cli.js"
+    "audit": "node src/cli.js",
+    "audit:project": "node src/project-cli.js",
+    "autopilot": "node src/autopilot-cli.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
-    "playwright": "1.56.1"
+    "playwright": "1.56.1",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0"
   },
   "license": "UNLICENSED"
 }

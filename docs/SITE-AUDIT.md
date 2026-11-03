@@ -22,6 +22,7 @@ The HTML report can be opened directly in a browser. Reports are retained by Git
 ## Important limitations
 
 - This workflow audits websites reachable from GitHub's hosted runner. It cannot reach a development server running only on your work computer.
-- Sites protected by authentication are not supported by default. Do not put passwords, session cookies, or tokens in the URL.
+- Sites protected by authentication are not supported by default. Do not put passwords, session cookies, or tokens in the URL. Sensitive query parameters and URL fragments are redacted in generated reports.
+- Remote audits block private, loopback, link-local, and reserved destinations for HTTP(S) resources and WebSocket connections. Service workers are disabled so they cannot bypass request routing.
 - Only submit websites you own or are authorized to test.
 - If the audit finds issues, the report is still uploaded; the workflow is marked as failed so the findings are visible.

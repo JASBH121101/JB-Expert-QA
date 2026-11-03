@@ -1,6 +1,13 @@
 import { chromium } from "playwright";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { comparePngFiles } from "../visual/png-diff.js";
 import { createRequire } from "node:module";
-import { ExpertQAEngine, RuleRegistry } from "../../index.js";
+import { ExpertQAEngine } from "../../core/engine.js";
+import { RuleRegistry } from "../../core/rule-registry.js";
+import { ENGINE_VERSION } from "../../core/version.js";
+import { createUrlSafetyGuard, assertSafeWebSocketUrl } from "./url-safety.js";
+import { redactUrlForReport, redactUrlsInText } from "../../core/redaction.js";
 import {
   responsiveRules,
   uiUxRules,
@@ -10,6 +17,7 @@ import {
   consistencyRules
 } from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
+import { exploreInteractionStates } from "./interactions.js";
 import defaultConfig from "../../../config/default.config.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
@@ -31,33 +39,137 @@ export async function auditUrl(url, {
   specialist,
   timeout = 30000,
   headless = true,
-  runAxe = true
+  runAxe = true,
+  allowPrivateNetworks = false,
+  sameOriginOnly = false,
+  interactionExploration = false,
+  maxInteractionActions = 8,
+  interactionSettleMs = 180,
+  interactionScreenshotDir = null,
+  interactionViewportName = "default",
+  screenshotPath = null,
+  screenshotFullPage = false
 } = {}) {
-  const parsed = new URL(url);
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new TypeError("Only http and https URLs are supported");
-  }
+  if (typeof sameOriginOnly !== "boolean") throw new TypeError("sameOriginOnly must be a boolean");
+  if (typeof interactionExploration !== "boolean") throw new TypeError("interactionExploration must be a boolean");
+  if (screenshotPath !== null && (typeof screenshotPath !== "string" || !screenshotPath.trim())) throw new TypeError("screenshotPath must be a non-empty path");
+  const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
+  const parsed = await assertSafeUrl(url);
 
   const browser = await chromium.launch({ headless });
+  let browserContext;
   try {
-    const page = await browser.newPage({ viewport });
-    const runtimeIssues = { pageErrors: [], failedRequests: [], httpErrors: [] };
-    page.on("pageerror", (error) => runtimeIssues.pageErrors.push({ message: error.message }));
+    browserContext = await browser.newContext({ viewport, serviceWorkers: "block" });
+    const page = await browserContext.newPage();
+    const runtimeIssues = {
+      pageErrors: [],
+      failedRequests: [],
+      httpErrors: [],
+      blockedRequests: []
+    };
+    page.on("pageerror", (error) => runtimeIssues.pageErrors.push({
+      message: redactUrlsInText(error.message)
+    }));
     page.on("requestfailed", (request) => runtimeIssues.failedRequests.push({
-      url: request.url(),
-      failureText: request.failure()?.errorText ?? "Request failed"
+      url: redactUrlForReport(request.url()),
+      failureText: redactUrlsInText(request.failure()?.errorText ?? "Request failed")
     }));
     page.on("response", (response) => {
       if (response.status() >= 400) runtimeIssues.httpErrors.push({
-        url: response.url(),
+        url: redactUrlForReport(response.url()),
         status: response.status(),
         resourceType: response.request().resourceType()
       });
     });
 
+    // Re-check every HTTP(S) navigation/resource, including redirects and browser fetches.
+    await page.route("**/*", async (route) => {
+      const requestUrl = route.request().url();
+      try {
+        const requestProtocol = new URL(requestUrl).protocol;
+        if (["http:", "https:"].includes(requestProtocol)) {
+          if (sameOriginOnly && new URL(requestUrl).origin !== parsed.origin) {
+            throw new Error("Request blocked by same-origin-only audit policy");
+          }
+          await assertSafeUrl(requestUrl);
+        }
+        await route.continue();
+      } catch (error) {
+        runtimeIssues.blockedRequests.push({
+          url: redactUrlForReport(requestUrl),
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        await route.abort("blockedbyclient").catch(() => {});
+      }
+    });
+
+    await page.routeWebSocket("**/*", async (webSocketRoute) => {
+      const socketUrl = webSocketRoute.url();
+      try {
+        const normalizedSocketUrl = socketUrl.replace(/^ws:/i, "http:").replace(/^wss:/i, "https:");
+        if (sameOriginOnly && new URL(normalizedSocketUrl).origin !== parsed.origin) {
+          throw new Error("WebSocket blocked by same-origin-only audit policy");
+        }
+        await assertSafeWebSocketUrl(socketUrl, assertSafeUrl);
+        webSocketRoute.connectToServer();
+      } catch (error) {
+        runtimeIssues.blockedRequests.push({
+          url: redactUrlForReport(socketUrl),
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        await webSocketRoute.close({ code: 1008, reason: "Blocked by JB Expert QA network policy" });
+      }
+    });
+
     await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
     await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
     const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
+    context.url = redactUrlForReport(context.url);
+    context.resources = (context.resources ?? []).map((resource) => ({
+      ...resource,
+      name: redactUrlForReport(resource.name)
+    }));
+
+    let interactionResult = null;
+    if (interactionExploration) {
+      interactionResult = await exploreInteractionStates(page, {
+        url: parsed.href,
+        thresholds: config.thresholds ?? {},
+        maxActions: maxInteractionActions,
+        settleMs: interactionSettleMs,
+        timeout,
+        screenshotDir: interactionScreenshotDir ?? (screenshotPath ? join(dirname(screenshotPath), "interaction-states") : null),
+        viewportName: interactionViewportName
+      });
+      context.interactiveElements = [
+        ...(context.interactiveElements ?? []).map((item) => ({ ...item, state: "initial" })),
+        ...interactionResult.interactiveElements
+      ];
+      context.interactiveOverlaps = [
+        ...(context.interactiveOverlaps ?? []).map((item) => ({ ...item, state: "initial" })),
+        ...interactionResult.interactiveOverlaps
+      ];
+      context.interactionExploration = {
+        enabled: true,
+        candidatesDiscovered: interactionResult.candidatesDiscovered,
+        actionsAttempted: interactionResult.actionsAttempted,
+        statesCaptured: interactionResult.statesCaptured,
+        overlapsFound: interactionResult.overlapsFound,
+        states: interactionResult.states,
+        skipped: interactionResult.skipped
+      };
+    } else {
+      context.interactionExploration = {
+        enabled: false,
+        candidatesDiscovered: 0,
+        actionsAttempted: 0,
+        statesCaptured: 0,
+        overlapsFound: 0,
+        states: [],
+        skipped: []
+      };
+    }
+
     Object.assign(context, runtimeIssues);
 
     if (runAxe) {
@@ -87,6 +199,11 @@ export async function auditUrl(url, {
       }
     }
 
+    if (screenshotPath) {
+      await mkdir(dirname(screenshotPath), { recursive: true });
+      await page.screenshot({ path: screenshotPath, fullPage: screenshotFullPage, animations: "disabled" });
+    }
+
     const configuredSpecialists = new Set(Object.keys(config.weights ?? {}));
     const activeRules = ALL_RULES.filter((rule) => configuredSpecialists.has(rule.specialist));
     const registry = new RuleRegistry();
@@ -95,17 +212,26 @@ export async function auditUrl(url, {
     const report = await engine.audit(context, { specialist });
     return {
       ...report,
-      target: { url: parsed.href, viewport, pageTitle: context.title },
+      target: { url: redactUrlForReport(parsed.href), viewport, pageTitle: context.title },
       evidence: {
         documentScrollWidth: context.documentScrollWidth,
         documentScrollHeight: context.documentScrollHeight,
         pageErrors: runtimeIssues.pageErrors.length,
         failedRequests: runtimeIssues.failedRequests.length,
         httpErrors: runtimeIssues.httpErrors.length,
-        axeViolations: context.axeViolations?.length ?? null
+        blockedRequests: runtimeIssues.blockedRequests.length,
+        sameOriginOnly,
+        interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
+        interactionStatesChecked: context.interactionExploration?.statesCaptured ?? 0,
+        interactionCandidates: context.interactionExploration?.candidatesDiscovered ?? 0,
+        interactionActionsAttempted: context.interactionExploration?.actionsAttempted ?? 0,
+        interactionExploration: context.interactionExploration,
+        axeViolations: context.axeViolations?.length ?? null,
+        screenshotPath
       }
     };
   } finally {
+    if (browserContext) await browserContext.close().catch(() => {});
     await browser.close();
   }
 }
@@ -116,12 +242,24 @@ const DEFAULT_VIEWPORTS = Object.freeze([
   { name: "desktop", width: 1365, height: 900 }
 ]);
 
-export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...options } = {}) {
+export async function auditViewports(url, {
+  viewports = DEFAULT_VIEWPORTS,
+  screenshotDir = null,
+  screenshotFullPage = false,
+  baselineDir = null,
+  diffDir = null,
+  updateBaselines = false,
+  visualThreshold = 0.1,
+  maxDiffPixelRatio = 0.005,
+  ...options
+} = {}) {
   if (!Array.isArray(viewports) || viewports.length === 0) {
     throw new TypeError("At least one viewport is required");
   }
   const seen = new Set();
   const results = [];
+  if (updateBaselines && !baselineDir) throw new TypeError("baselineDir is required when updating visual baselines");
+  if (baselineDir && !screenshotDir) throw new TypeError("screenshotDir is required when comparing visual baselines");
   for (const viewport of viewports) {
     if (!viewport.name || !Number.isFinite(viewport.width) ||
         !Number.isFinite(viewport.height) || viewport.width <= 0 || viewport.height <= 0) {
@@ -129,30 +267,69 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
     }
     if (seen.has(viewport.name)) throw new Error("Duplicate viewport name: " + viewport.name);
     seen.add(viewport.name);
+    const safeName = viewport.name.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+    const screenshotPath = screenshotDir ? join(screenshotDir, safeName + ".png") : null;
     const report = await auditUrl(url, {
       ...options,
-      viewport: { width: viewport.width, height: viewport.height }
+      screenshotPath,
+      screenshotFullPage,
+      viewport: { width: viewport.width, height: viewport.height },
+      interactionScreenshotDir: screenshotDir ? join(screenshotDir, "interaction-states") : null,
+      interactionViewportName: safeName
     });
+    let visualComparison = null;
+    if (baselineDir) {
+      const baselinePath = join(baselineDir, safeName + ".png");
+      if (updateBaselines) {
+        await mkdir(dirname(baselinePath), { recursive: true });
+        await writeFile(baselinePath, await readFile(screenshotPath));
+        visualComparison = { status: "baseline-updated", passed: false, baselinePath, actualPath: screenshotPath };
+      } else {
+        let baselineExists = true;
+        try { await access(baselinePath); } catch { baselineExists = false; }
+        if (!baselineExists) {
+          visualComparison = { status: "baseline-missing", passed: false, baselinePath, actualPath: screenshotPath };
+        } else {
+          visualComparison = await comparePngFiles({
+            baselinePath,
+            actualPath: screenshotPath,
+            diffPath: diffDir ? join(diffDir, safeName + ".diff.png") : null,
+            threshold: visualThreshold,
+            maxDiffPixelRatio
+          });
+        }
+      }
+    }
+    const visualPassed = !visualComparison ||
+      (visualComparison.status === "compared" && visualComparison.passed === true);
     results.push({
       name: viewport.name,
       viewport: { width: viewport.width, height: viewport.height },
-      passed: report.scoring.passed,
+      passed: report.scoring.passed && visualPassed,
       score: report.scoring.score,
       findings: report.diagnostics,
       summary: report.summary,
-      execution: report.execution
+      execution: report.execution,
+      evidence: report.evidence,
+      screenshotPath,
+      visualComparison
     });
   }
   return Object.freeze({
     engine: "JB Expert QA",
-    version: "0.3.1",
+    version: ENGINE_VERSION,
     generatedAt: new Date().toISOString(),
-    target: { url: new URL(url).href },
+    target: { url: redactUrlForReport(new URL(url).href) },
     summary: Object.freeze({
       viewportsChecked: results.length,
       passedViewports: results.filter((item) => item.passed).length,
       failedViewports: results.filter((item) => !item.passed).length,
-      totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0)
+      totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0),
+      blockedRequests: results.reduce((sum, item) => sum + (item.evidence?.blockedRequests ?? 0), 0),
+      visualComparisons: results.filter((item) => item.visualComparison?.status === "compared").length,
+      baselineMissing: results.filter((item) => item.visualComparison?.status === "baseline-missing").length,
+      visualFailures: results.filter((item) => item.visualComparison?.status === "compared" && !item.visualComparison.passed).length,
+      baselinesUpdated: results.filter((item) => item.visualComparison?.status === "baseline-updated").length
     }),
     passed: results.every((item) => item.passed),
     viewports: Object.freeze(results)

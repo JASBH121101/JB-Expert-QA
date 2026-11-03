@@ -21,6 +21,26 @@ test("registry rejects duplicate rule identifiers", () => {
   assert.throws(() => registry.register(rule), /already registered/);
 });
 
+test("registry supports project-specific specialist identifiers", () => {
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "erp.inventory.low-stock",
+    specialist: "erp-inventory",
+    evaluate: () => []
+  });
+  assert.deepEqual(registry.listSpecialists(), ["erp-inventory"]);
+  assert.equal(registry.list({ specialist: "erp-inventory" }).length, 1);
+});
+
+test("registry rejects malformed specialist identifiers", () => {
+  const registry = new RuleRegistry();
+  assert.throws(() => registry.register({
+    id: "invalid.specialist",
+    specialist: "ERP Inventory",
+    evaluate: () => []
+  }), /valid specialist id/);
+});
+
 test("diagnostics require fields and valid severity", () => {
   assert.throws(() => createDiagnostic({ id: "x" }), /required/);
   assert.throws(() => createDiagnostic({
@@ -46,6 +66,23 @@ test("engine runs rules and returns structured findings", async () => {
   assert.equal(report.summary.rulesExecuted, 1);
   assert.equal(report.summary.findings, 1);
   assert.equal(report.diagnostics[0].severity, "high");
+  assert.equal(report.scoring.passed, true);
+  assert.equal(report.version, "0.7.0");
+  assert.deepEqual(report.summary.specialists, ["responsive"]);
+});
+
+test("engine supports project-specific specialists when their weight is configured", async () => {
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "erp.inventory.integrity",
+    specialist: "erp-inventory",
+    evaluate: () => []
+  });
+  const report = await new ExpertQAEngine({
+    registry,
+    config: { weights: { "erp-inventory": 100 } }
+  }).audit();
+  assert.equal(report.scoring.score, 100);
   assert.equal(report.scoring.passed, true);
 });
 
