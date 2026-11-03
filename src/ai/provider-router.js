@@ -93,6 +93,8 @@ export function createAiProviderRouter({
             ? "disabled-for-run"
             : fallback && fallback.isConfigured !== false ? "available" : "not-configured",
         lastProvider: state.lastProvider,
+        cloudflareUsage: fallback && typeof fallback.getUsage === "function"
+          ? fallback.getUsage() : null,
         aiDisabled: state.allAiDisabled,
         disableReason: state.disableReason
       });
