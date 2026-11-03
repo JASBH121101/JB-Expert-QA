@@ -31,14 +31,19 @@ function makeProviderError(status) {
 export function createGeminiProvider({
   apiKey = process.env.GEMINI_API_KEY,
   model = process.env.GEMINI_TEXT_MODEL || DEFAULT_MODEL,
+  visionModel = process.env.GEMINI_VISION_MODEL || model,
   fetchImpl = globalThis.fetch,
   timeoutMs = 30000,
   maxImageBytes = 5200000
 } = {}) {
   const key = String(apiKey || "").trim();
   const selectedModel = String(model || "").trim();
+  const selectedVisionModel = String(visionModel || "").trim();
   if (!/^[a-zA-Z0-9._-]{1,100}$/.test(selectedModel)) {
-    throw new TypeError("A valid Gemini model name is required");
+    throw new TypeError("A valid Gemini text model name is required");
+  }
+  if (!/^[a-zA-Z0-9._-]{1,100}$/.test(selectedVisionModel)) {
+    throw new TypeError("A valid Gemini vision model name is required");
   }
   if (typeof fetchImpl !== "function") throw new TypeError("A fetch implementation is required");
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120000) {
@@ -51,6 +56,7 @@ export function createGeminiProvider({
   return Object.freeze({
     provider: "google-gemini",
     model: selectedModel,
+    visionModel: selectedVisionModel,
     isConfigured: Boolean(key),
     async generateJson({
       systemInstruction,
@@ -102,7 +108,7 @@ export function createGeminiProvider({
       let response;
       try {
         response = await fetchImpl(
-          API_ROOT + encodeURIComponent(selectedModel) + ":generateContent",
+          API_ROOT + encodeURIComponent(image === null ? selectedModel : selectedVisionModel) + ":generateContent",
           {
             method: "POST",
             headers: {
