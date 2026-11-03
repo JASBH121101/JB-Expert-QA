@@ -75,3 +75,28 @@ test("project CLI rejects malformed and missing policy files", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("project CLI rejects empty, unknown and duplicate options instead of ignoring them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-cli-args-"));
+  try {
+    const emptyConfig = spawnSync(process.execPath, [cliPath, root, "--config="], {
+      encoding: "utf8", timeout: 30_000
+    });
+    assert.equal(emptyConfig.status, 1);
+    assert.match(emptyConfig.stderr, /requires a non-empty value/);
+
+    const unknown = spawnSync(process.execPath, [cliPath, root, "--configx=ignored.json"], {
+      encoding: "utf8", timeout: 30_000
+    });
+    assert.equal(unknown.status, 1);
+    assert.match(unknown.stderr, /Unknown project audit option/);
+
+    const duplicate = spawnSync(process.execPath, [
+      cliPath, root, "--format=json", "--format=markdown"
+    ], { encoding: "utf8", timeout: 30_000 });
+    assert.equal(duplicate.status, 1);
+    assert.match(duplicate.stderr, /may only be supplied once/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
