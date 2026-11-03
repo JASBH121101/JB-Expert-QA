@@ -117,3 +117,21 @@ test("AI router reports a per-run Cloudflare cap separately from the daily quota
   });
   assert.equal(router.getStatus().fallback, "disabled-for-run");
 });
+
+test("AI router exposes Cloudflare per-run usage and remaining requests", () => {
+  const calls = [];
+  const primary = provider("gemini", [{ ok: true }], calls);
+  const fallback = provider("cloudflare", [{ ok: true }], calls);
+  fallback.getUsage = () => ({
+    requestsUsed: 3,
+    maxRequestsPerRun: 4,
+    remainingRequests: 1
+  });
+  const router = createAiProviderRouter({ enabled: true, primary, fallback });
+
+  assert.deepEqual(router.getStatus().cloudflareUsage, {
+    requestsUsed: 3,
+    maxRequestsPerRun: 4,
+    remainingRequests: 1
+  });
+});
