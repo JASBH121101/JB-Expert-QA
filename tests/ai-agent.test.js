@@ -184,7 +184,8 @@ test("source redaction removes credential values before AI upload", () => {
   assert.equal(redacted.includes("this-is-a-very-long-secret-key-value"), false);
   assert.equal(redacted.includes("ghp_"), false);
   assert.match(redacted, /REDACTED/);
-  assert.equal(redacted.includes("SECRET-MATERIAL"), false);\n  assert.equal(redacted.includes("url-secret-value"), false);
+  assert.equal(redacted.includes("SECRET-MATERIAL"), false);
+  assert.equal(redacted.includes("url-secret-value"), false);
 });
 
 
