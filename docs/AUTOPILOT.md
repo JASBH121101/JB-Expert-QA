@@ -52,7 +52,7 @@ Cloudflare is limited to these model IDs in this release:
 - Text: `@cf/meta/llama-3.1-8b-instruct`
 - Visual: `@cf/meta/llama-3.2-11b-vision-instruct`
 
-Other model IDs, including models documented as requiring a paid billing method, are rejected by the provider allowlist. The Cloudflare provider defaults to at most four requests per run (maximum configurable value: ten).
+Other model IDs, including models documented as requiring a paid billing method, are rejected by the provider allowlist. The Cloudflare provider defaults to at most four requests per run (maximum configurable value: ten). Provider status in reports also exposes the local per-run request count, maximum, and remaining requests when the Cloudflare provider is available; it does not claim to know account-wide Neuron consumption.
 
 ### Credentials and free-tier guard
 
