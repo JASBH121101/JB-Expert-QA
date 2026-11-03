@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
-const html = `<!doctype html>
+const html = \`<!doctype html>
 <html>
 <head><meta charset="utf-8"><title>JB Expert QA fixture</title></head>
 <body style="margin:0">
@@ -14,7 +14,7 @@ const html = `<!doctype html>
   <img src="/missing-image.png">
   <input id="email" type="email">
 </body>
-</html>`;
+</html>\`;
 
 test("Playwright and axe-core detect page defects with browser evidence", { timeout: 30000 }, async () => {
   const server = createServer((request, response) => {
@@ -51,7 +51,8 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
     const report = await auditUrl(url, {
       config,
       viewport: { width: 390, height: 844 },
-      timeout: 10000
+      timeout: 10000,
+      allowPrivateNetworks: true
     });
 
     const ids = report.diagnostics.map((item) => item.id);

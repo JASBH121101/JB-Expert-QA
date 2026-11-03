@@ -6,20 +6,23 @@ import { formatReport } from "./reporters/index.js";
 
 const [url, ...args] = process.argv.slice(2);
 if (!url) {
-  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path]");
+  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path] [--allow-private-network]");
   process.exitCode = 2;
 } else {
   try {
     const matrix = args.includes("--matrix");
     const mobile = args.includes("--mobile");
+    const allowPrivateNetworks = args.includes("--allow-private-network");
     const formatArg = args.find((arg) => arg.startsWith("--format="));
     const outputArg = args.find((arg) => arg.startsWith("--output="));
     const format = formatArg ? formatArg.slice("--format=".length) : "json";
     const outputPath = outputArg ? outputArg.slice("--output=".length) : null;
 
+    const auditOptions = { allowPrivateNetworks };
     const report = matrix
-      ? await auditViewports(url)
+      ? await auditViewports(url, auditOptions)
       : await auditUrl(url, {
+          ...auditOptions,
           viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 900 }
         });
 

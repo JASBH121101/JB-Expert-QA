@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import { createRequire } from "node:module";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
 import { ENGINE_VERSION } from "../../core/version.js";
+import { createUrlSafetyGuard } from "./url-safety.js";
 import {
   responsiveRules,
   uiUxRules,
@@ -32,17 +33,21 @@ export async function auditUrl(url, {
   specialist,
   timeout = 30000,
   headless = true,
-  runAxe = true
+  runAxe = true,
+  allowPrivateNetworks = false
 } = {}) {
-  const parsed = new URL(url);
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new TypeError("Only http and https URLs are supported");
-  }
+  const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
+  const parsed = await assertSafeUrl(url);
 
   const browser = await chromium.launch({ headless });
   try {
     const page = await browser.newPage({ viewport });
-    const runtimeIssues = { pageErrors: [], failedRequests: [], httpErrors: [] };
+    const runtimeIssues = {
+      pageErrors: [],
+      failedRequests: [],
+      httpErrors: [],
+      blockedRequests: []
+    };
     page.on("pageerror", (error) => runtimeIssues.pageErrors.push({ message: error.message }));
     page.on("requestfailed", (request) => runtimeIssues.failedRequests.push({
       url: request.url(),
@@ -54,6 +59,24 @@ export async function auditUrl(url, {
         status: response.status(),
         resourceType: response.request().resourceType()
       });
+    });
+
+    // Re-check every HTTP(S) navigation/resource, including redirects and browser fetches.
+    await page.route("**/*", async (route) => {
+      const requestUrl = route.request().url();
+      try {
+        const requestProtocol = new URL(requestUrl).protocol;
+        if (["http:", "https:"].includes(requestProtocol)) {
+          await assertSafeUrl(requestUrl);
+        }
+        await route.continue();
+      } catch (error) {
+        runtimeIssues.blockedRequests.push({
+          url: requestUrl,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        await route.abort("blockedbyclient").catch(() => {});
+      }
     });
 
     await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
@@ -103,6 +126,7 @@ export async function auditUrl(url, {
         pageErrors: runtimeIssues.pageErrors.length,
         failedRequests: runtimeIssues.failedRequests.length,
         httpErrors: runtimeIssues.httpErrors.length,
+        blockedRequests: runtimeIssues.blockedRequests.length,
         axeViolations: context.axeViolations?.length ?? null
       }
     };
@@ -153,7 +177,9 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
       viewportsChecked: results.length,
       passedViewports: results.filter((item) => item.passed).length,
       failedViewports: results.filter((item) => !item.passed).length,
-      totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0)
+      totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0),
+      blockedRequests: results.reduce((sum, item) =>
+        sum + (item.evidence?.blockedRequests ?? 0), 0)
     }),
     passed: results.every((item) => item.passed),
     viewports: Object.freeze(results)

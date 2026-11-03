@@ -28,7 +28,8 @@ test("multi-viewport audit identifies a defect only at mobile width", { timeout:
         { name: "mobile", width: 390, height: 844 },
         { name: "desktop", width: 1365, height: 900 }
       ],
-      timeout: 10000
+      timeout: 10000,
+      allowPrivateNetworks: true
     });
     const mobile = report.viewports.find((item) => item.name === "mobile");
     const desktop = report.viewports.find((item) => item.name === "desktop");
