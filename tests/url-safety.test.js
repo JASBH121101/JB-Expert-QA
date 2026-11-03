@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  assertSafeWebSocketUrl,
   createUrlSafetyGuard,
   isPublicAddress
 } from "../src/adapters/playwright/url-safety.js";
@@ -76,4 +77,37 @@ test("URL guard allows a hostname only when all DNS answers are public", async (
 test("private network access requires an explicit opt-in", async () => {
   const guard = createUrlSafetyGuard({ allowPrivateNetworks: true });
   assert.equal((await guard("http://127.0.0.1:3000/")).hostname, "127.0.0.1");
+});
+
+test("hostname DNS answers are rechecked for every guarded request", async () => {
+  let calls = 0;
+  const guard = createUrlSafetyGuard({
+    dnsLookup: async () => {
+      calls += 1;
+      return [{
+        address: calls === 1 ? "93.184.216.34" : "127.0.0.1",
+        family: 4
+      }];
+    }
+  });
+  await guard("https://qa.example.com/");
+  await assert.rejects(guard("https://qa.example.com/"), /private or reserved/);
+  assert.equal(calls, 2);
+});
+
+test("WebSocket destinations are checked with the HTTP network policy", async () => {
+  const checkedProtocols = [];
+  const httpGuard = async (input) => {
+    const parsed = input instanceof URL ? input : new URL(input);
+    checkedProtocols.push(parsed.protocol);
+    if (parsed.hostname === "127.0.0.1") throw new TypeError("Private destination blocked");
+    return parsed;
+  };
+  const safe = await assertSafeWebSocketUrl("wss://public.example/ws", httpGuard);
+  assert.equal(safe.protocol, "wss:");
+  assert.deepEqual(checkedProtocols, ["https:"]);
+  await assert.rejects(
+    assertSafeWebSocketUrl("ws://127.0.0.1:3000/socket", httpGuard),
+    /Private destination blocked/
+  );
 });

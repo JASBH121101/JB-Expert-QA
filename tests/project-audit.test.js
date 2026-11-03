@@ -62,6 +62,18 @@ test("scanner excludes dependencies, symlinks and local secret-file contents", a
   }
 });
 
+test("environment files are excluded case-insensitively", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-env-case-"));
+  try {
+    await writeFile(join(root, ".ENV"), "API_KEY=uppercase-secret-not-opened");
+    const scan = await scanProject(root);
+    assert.deepEqual(scan.environmentFiles, [".ENV"]);
+    assert.equal(JSON.stringify(scan).includes("uppercase-secret-not-opened"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("scanner applies size limits and rejects a file as its root", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-scan-"));
   try {
@@ -89,6 +101,20 @@ test("security findings detect credential formats but redact values from reports
   assert.ok(finding);
   assert.equal(finding.severity, "critical");
   assert.equal(finding.evidence.redacted, true);
+  assert.equal(JSON.stringify(report).includes(secret), false);
+});
+
+test("generic access-token assignments are detected and redacted", async () => {
+  const secret = "generic-access-token-value-123";
+  const report = await runRules({
+    projectFiles: [{
+      path: "src/auth.js", extension: ".js", lineCount: 1,
+      content: 'const ACCESS_TOKEN = "' + secret + '";'
+    }],
+    projectScan: { environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  assert.equal(report.diagnostics.some((item) => item.id.startsWith("SEC-SECRET-")), true);
   assert.equal(JSON.stringify(report).includes(secret), false);
 });
 
@@ -305,6 +331,37 @@ test("scanner marks the result truncated when it reaches the depth limit", async
   }
 });
 
+test("an incomplete project scan blocks a passing result", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-incomplete-"));
+  try {
+    await mkdir(join(root, "level-1", "level-2"), { recursive: true });
+    await writeFile(join(root, "level-1", "level-2", "deep.js"), "export const deep = true;");
+    const report = await auditProject(root, { scanOptions: { maxDepth: 1 } });
+    assert.equal(report.analysisScope.complete, false);
+    assert.equal(report.analysisScope.coverage.truncated, true);
+    assert.ok(report.analysisScope.incompleteReasons.length > 0);
+    assert.equal(report.scoring.blockedByCritical, true);
+    assert.equal(report.scoring.passed, false);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-SCAN-001"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("oversized files also block a complete-pass result", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-oversized-"));
+  try {
+    await writeFile(join(root, "src.js"), "export const tooLarge = true;");
+    const report = await auditProject(root, { scanOptions: { maxFileBytes: 1 } });
+    assert.equal(report.analysisScope.complete, false);
+    assert.equal(report.analysisScope.coverage.oversizedFiles, 1);
+    assert.equal(report.scoring.blockedByCritical, true);
+    assert.equal(report.scoring.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("end-to-end project audit returns a safe report and exports Markdown/HTML", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-project-"));
   const secret = "ghp_" + "B".repeat(36);
@@ -321,7 +378,7 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 17);
+    assert.equal(report.summary.rulesExecuted, 18);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);

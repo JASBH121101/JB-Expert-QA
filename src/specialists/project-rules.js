@@ -16,13 +16,48 @@ function placeholder(value) {
     /(?:process\.env|import\.meta\.env|env\.[a-z_]+)/i.test(text);
 }
 
+const SOURCE_EXTENSIONS = new Set([
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+  ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
+  ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
+  ".cs", ".graphql", ".gql"
+]);
+
 export const codeQualityRules = [
+  {
+    id: "code-quality.scan-completeness",
+    specialist: "code-quality",
+    evaluate(context) {
+      const summary = context.projectScan?.summary;
+      if (!summary) return [];
+      const reasons = [];
+      if (summary.truncated) reasons.push("file-count or directory-depth limit reached");
+      if ((summary.oversizedFiles ?? 0) > 0) reasons.push(summary.oversizedFiles + " oversized file(s) skipped");
+      if ((summary.unreadableFiles ?? 0) > 0) reasons.push(summary.unreadableFiles + " unreadable file(s) skipped");
+      if (!reasons.length) return [];
+      return [finding(
+        "CODE-SCAN-001",
+        "Project scan incomplete",
+        "This audit did not inspect the full supported project scope: " + reasons.join("; ") + ". A passing result cannot be issued.",
+        "critical",
+        ".",
+        "Increase scan limits, resolve file-access problems, and rerun the audit until the scan is complete.",
+        {
+          truncated: Boolean(summary.truncated),
+          oversizedFiles: summary.oversizedFiles ?? 0,
+          unreadableFiles: summary.unreadableFiles ?? 0,
+          blocksPass: true
+        }
+      )];
+    }
+  },
   {
     id: "code-quality.file-size",
     specialist: "code-quality",
     evaluate(context) {
       const limit = context.thresholds?.maxFileLines ?? 800;
-      return (context.projectFiles ?? []).filter((file) => file.lineCount > limit).map((file) =>
+      return (context.projectFiles ?? [])
+        .filter((file) => SOURCE_EXTENSIONS.has(file.extension) && file.lineCount > limit).map((file) =>
         finding("CODE-SIZE-" + file.path.replace(/[^a-z0-9]+/gi, "-"),
           "Large source file",
           "This file contains " + file.lineCount + " lines, above the configured review threshold of " + limit + ".",
@@ -56,7 +91,7 @@ export const securityRules = [
     specialist: "security",
     evaluate(context) {
       const findings = [];
-      const assignment = /\b(?:api[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token|password|private[_-]?key|secret)\b\s*[:=]\s*["']([^"']{12,})["']/i;
+      const assignment = /\b(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth(?:entication)?[_-]?token|bearer|token|jwt|credential|password|private[_-]?key|secret)\b\s*[:=]\s*["']([^"']{12,})["']/i;
       const tokenPattern = /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|AIza[0-9A-Za-z_-]{30,}|sk_live_[A-Za-z0-9]{16,})\b/;
       for (const file of context.projectFiles ?? []) {
         const lines = file.content.split(/\r\n|\n|\r/);

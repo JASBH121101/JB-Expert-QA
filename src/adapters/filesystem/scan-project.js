@@ -26,7 +26,9 @@ const SENSITIVE_FILENAMES = new Set([
 
 function posix(value) { return value.split(sep).join("/"); }
 function isEnvFile(name) {
-  return name === ".env" || (name.startsWith(".env.") && !SAFE_ENV_TEMPLATES.has(name));
+  const normalized = name.toLowerCase();
+  return normalized === ".env" ||
+    (normalized.startsWith(".env.") && !SAFE_ENV_TEMPLATES.has(normalized));
 }
 function isSensitiveFile(name) {
   const lower = name.toLowerCase();

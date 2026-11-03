@@ -119,8 +119,6 @@ export function createUrlSafetyGuard({
     throw new TypeError("dnsLookup must be a function");
   }
 
-  const verifiedHosts = new Map();
-
   return async function assertSafeHttpUrl(input) {
     let parsed;
     try {
@@ -152,29 +150,35 @@ export function createUrlSafetyGuard({
       return parsed;
     }
 
-    let verification = verifiedHosts.get(hostname);
-    if (!verification) {
-      verification = (async () => {
-        let records;
-        try {
-          records = await dnsLookup(hostname, { all: true, verbatim: true });
-        } catch {
-          throw new TypeError("Could not resolve and verify the target hostname");
-        }
-        if (!Array.isArray(records) || records.length === 0 ||
-            records.some((record) => !record || !isPublicAddress(record.address))) {
-          throw new TypeError("Target hostname resolves to a private or reserved network address");
-        }
-      })();
-      verifiedHosts.set(hostname, verification);
-    }
-
+    let records;
     try {
-      await verification;
-    } catch (error) {
-      verifiedHosts.delete(hostname);
-      throw error;
+      records = await dnsLookup(hostname, { all: true, verbatim: true });
+    } catch {
+      throw new TypeError("Could not resolve and verify the target hostname");
+    }
+    if (!Array.isArray(records) || records.length === 0 ||
+        records.some((record) => !record || !isPublicAddress(record.address))) {
+      throw new TypeError("Target hostname resolves to a private or reserved network address");
     }
     return parsed;
   };
+}
+
+export async function assertSafeWebSocketUrl(input, assertSafeHttpUrl) {
+  if (typeof assertSafeHttpUrl !== "function") {
+    throw new TypeError("An HTTP URL safety guard is required");
+  }
+  let parsed;
+  try {
+    parsed = input instanceof URL ? new URL(input.href) : new URL(input);
+  } catch {
+    throw new TypeError("WebSocket target must be a valid absolute URL");
+  }
+  if (!["ws:", "wss:"].includes(parsed.protocol)) {
+    throw new TypeError("Only ws and wss WebSocket URLs are supported");
+  }
+  const httpEquivalent = new URL(parsed.href);
+  httpEquivalent.protocol = parsed.protocol === "wss:" ? "https:" : "http:";
+  await assertSafeHttpUrl(httpEquivalent);
+  return parsed;
 }

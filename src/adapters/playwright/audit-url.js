@@ -2,7 +2,8 @@ import { chromium } from "playwright";
 import { createRequire } from "node:module";
 import { ExpertQAEngine, RuleRegistry } from "../../index.js";
 import { ENGINE_VERSION } from "../../core/version.js";
-import { createUrlSafetyGuard } from "./url-safety.js";
+import { createUrlSafetyGuard, assertSafeWebSocketUrl } from "./url-safety.js";
+import { redactUrlForReport, redactUrlsInText } from "../../core/redaction.js";
 import {
   responsiveRules,
   uiUxRules,
@@ -40,22 +41,26 @@ export async function auditUrl(url, {
   const parsed = await assertSafeUrl(url);
 
   const browser = await chromium.launch({ headless });
+  let browserContext;
   try {
-    const page = await browser.newPage({ viewport });
+    browserContext = await browser.newContext({ viewport, serviceWorkers: "block" });
+    const page = await browserContext.newPage();
     const runtimeIssues = {
       pageErrors: [],
       failedRequests: [],
       httpErrors: [],
       blockedRequests: []
     };
-    page.on("pageerror", (error) => runtimeIssues.pageErrors.push({ message: error.message }));
+    page.on("pageerror", (error) => runtimeIssues.pageErrors.push({
+      message: redactUrlsInText(error.message)
+    }));
     page.on("requestfailed", (request) => runtimeIssues.failedRequests.push({
-      url: request.url(),
-      failureText: request.failure()?.errorText ?? "Request failed"
+      url: redactUrlForReport(request.url()),
+      failureText: redactUrlsInText(request.failure()?.errorText ?? "Request failed")
     }));
     page.on("response", (response) => {
       if (response.status() >= 400) runtimeIssues.httpErrors.push({
-        url: response.url(),
+        url: redactUrlForReport(response.url()),
         status: response.status(),
         resourceType: response.request().resourceType()
       });
@@ -72,16 +77,35 @@ export async function auditUrl(url, {
         await route.continue();
       } catch (error) {
         runtimeIssues.blockedRequests.push({
-          url: requestUrl,
+          url: redactUrlForReport(requestUrl),
           reason: error instanceof Error ? error.message : String(error)
         });
         await route.abort("blockedbyclient").catch(() => {});
       }
     });
 
+    await page.routeWebSocket("**/*", async (webSocketRoute) => {
+      const socketUrl = webSocketRoute.url();
+      try {
+        await assertSafeWebSocketUrl(socketUrl, assertSafeUrl);
+        webSocketRoute.connectToServer();
+      } catch (error) {
+        runtimeIssues.blockedRequests.push({
+          url: redactUrlForReport(socketUrl),
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        await webSocketRoute.close({ code: 1008, reason: "Blocked by JB Expert QA network policy" });
+      }
+    });
+
     await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
     await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
     const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
+    context.url = redactUrlForReport(context.url);
+    context.resources = (context.resources ?? []).map((resource) => ({
+      ...resource,
+      name: redactUrlForReport(resource.name)
+    }));
     Object.assign(context, runtimeIssues);
 
     if (runAxe) {
@@ -119,7 +143,7 @@ export async function auditUrl(url, {
     const report = await engine.audit(context, { specialist });
     return {
       ...report,
-      target: { url: parsed.href, viewport, pageTitle: context.title },
+      target: { url: redactUrlForReport(parsed.href), viewport, pageTitle: context.title },
       evidence: {
         documentScrollWidth: context.documentScrollWidth,
         documentScrollHeight: context.documentScrollHeight,
@@ -131,6 +155,7 @@ export async function auditUrl(url, {
       }
     };
   } finally {
+    if (browserContext) await browserContext.close().catch(() => {});
     await browser.close();
   }
 }
@@ -173,7 +198,7 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
     engine: "JB Expert QA",
     version: ENGINE_VERSION,
     generatedAt: new Date().toISOString(),
-    target: { url: new URL(url).href },
+    target: { url: redactUrlForReport(new URL(url).href) },
     summary: Object.freeze({
       viewportsChecked: results.length,
       passedViewports: results.filter((item) => item.passed).length,

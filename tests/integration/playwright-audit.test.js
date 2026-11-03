@@ -72,3 +72,49 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("browser audit redacts secrets from target and resource URLs", { timeout: 30000 }, async () => {
+  const targetSecret = "target-secret-value";
+  const resourceSecret = "resource-secret-value";
+  const server = createServer((request, response) => {
+    if (request.url.startsWith("/asset.js?")) {
+      response.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
+      response.end("window.auditAssetLoaded = true;" + " ".repeat(5000));
+      return;
+    }
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end(
+      "<!doctype html><html lang='en'><head><title>URL redaction fixture</title>" +
+      "<script src='/asset.js?api_key=" + resourceSecret + "'></script>" +
+      "</head><body><main><h1>Audit</h1></main></body></html>"
+    );
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  const url = "http://127.0.0.1:" + address.port + "/?access_token=" + targetSecret;
+  const config = {
+    profile: "redaction-integration",
+    weights: { responsive: 1, "ui-ux": 1, accessibility: 1, performance: 1, functional: 1, consistency: 1 },
+    thresholds: { minimumScore: 0, failOnCritical: false, largeResourceBytes: 1 }
+  };
+  try {
+    const report = await auditUrl(url, {
+      config,
+      viewport: { width: 390, height: 844 },
+      timeout: 10000,
+      runAxe: false,
+      allowPrivateNetworks: true
+    });
+    const serialized = JSON.stringify(report);
+    assert.equal(new URL(report.target.url).searchParams.get("access_token"), "[REDACTED]");
+    assert.equal(serialized.includes(targetSecret), false);
+    assert.equal(serialized.includes(resourceSecret), false);
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("PERF-001")));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

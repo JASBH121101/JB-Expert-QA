@@ -13,6 +13,12 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
 
+  const incompleteReasons = [];
+  if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
+  if (scan.summary.oversizedFiles > 0) incompleteReasons.push(scan.summary.oversizedFiles + " oversized file(s) skipped");
+  if (scan.summary.unreadableFiles > 0) incompleteReasons.push(scan.summary.unreadableFiles + " unreadable file(s) skipped");
+  const scanComplete = incompleteReasons.length === 0;
+
   const context = {
     projectFiles: scan.files,
     packageManifests: scan.manifests,
@@ -29,6 +35,13 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     projectScan: scan.summary,
     analysisScope: Object.freeze({
       mode: "local-static",
+      complete: scanComplete,
+      incompleteReasons: Object.freeze(incompleteReasons),
+      coverage: Object.freeze({
+        truncated: scan.summary.truncated,
+        oversizedFiles: scan.summary.oversizedFiles,
+        unreadableFiles: scan.summary.unreadableFiles
+      }),
       filesAnalyzed: scan.summary.filesRead,
       networkRequests: 0,
       dependencyAdvisoryLookup: false,
@@ -36,7 +49,8 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
       limitations: Object.freeze([
         "Static pattern checks require manual review and can produce false positives.",
         "Dependency CVEs and current package versions are not checked because no advisory service is queried.",
-        "The scanner does not execute project code, install dependencies, or connect to the database."
+        "The scanner does not execute project code, install dependencies, or connect to the database.",
+        ...(scanComplete ? [] : ["The scan is incomplete; the result is blocked until omitted files can be inspected."])
       ])
     })
   });
