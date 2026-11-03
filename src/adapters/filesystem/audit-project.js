@@ -1,5 +1,6 @@
 import { basename, resolve } from "node:path";
 import { ExpertQAEngine } from "../../core/engine.js";
+import { validateEngineConfig } from "../../core/config.js";
 import { RuleRegistry } from "../../core/rule-registry.js";
 import { ENGINE_VERSION } from "../../core/version.js";
 import projectConfig from "../../../config/project-audit.config.json" with { type: "json" };
@@ -9,7 +10,9 @@ import { projectRules } from "../../specialists/project-rules.js";
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) throw new TypeError("A project directory path is required");
   const root = resolve(rootPath);
-  const scan = await scanProject(root, scanOptions);
+  const validatedConfig = validateEngineConfig(config);
+  const effectiveScanOptions = { ...validatedConfig.scan, ...scanOptions };
+  const scan = await scanProject(root, effectiveScanOptions);
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
 
@@ -23,9 +26,9 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     projectFiles: scan.files,
     packageManifests: scan.manifests,
     projectScan: scan,
-    thresholds: config.thresholds ?? {}
+    thresholds: validatedConfig.thresholds
   };
-  const report = await new ExpertQAEngine({ registry, config }).audit(context);
+  const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
 
   return Object.freeze({
     ...report,
