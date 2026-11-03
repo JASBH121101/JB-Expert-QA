@@ -27,6 +27,12 @@ export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporter
 export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";
 export { comparePngBuffers, comparePngFiles } from "./adapters/visual/png-diff.js";
 export { createGeminiProvider } from "./ai/gemini-provider.js";
+export {
+  createCloudflareProvider,
+  CLOUDFLARE_TEXT_MODEL,
+  CLOUDFLARE_VISION_MODEL
+} from "./ai/cloudflare-provider.js";
+export { createAiProviderRouter } from "./ai/provider-router.js";
 export { reviewScreenshot, reviewViewportScreenshots, validateVisualReview } from "./ai/visual-review.js";
 export { createRemediationPlan, validateRemediationPlan } from "./ai/remediation-plan.js";
 export { runAutopilot } from "./agent/autopilot.js";
