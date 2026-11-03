@@ -31,6 +31,7 @@ function cloudflareError(payload, status) {
         : "Cloudflare Workers AI request rejected with HTTP " + status);
   error.provider = "cloudflare-workers-ai";
   error.status = status;
+  if (dailyLimit) error.quotaScope = "daily";
   error.code = dailyLimit ? "quota_exhausted"
     : capacity ? "provider_unavailable"
       : paidModel ? "paid_model_blocked" : "provider_request_rejected";
@@ -95,6 +96,7 @@ export function createCloudflareProvider({
         const error = new Error("Cloudflare Workers AI per-run request budget is exhausted");
         error.provider = "cloudflare-workers-ai";
         error.code = "quota_exhausted";
+        error.quotaScope = "run";
         throw error;
       }
       if (typeof systemInstruction !== "string" || !systemInstruction.trim()) {
