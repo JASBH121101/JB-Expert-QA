@@ -32,7 +32,7 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
 <body>
   <button id="sidebar-toggle" type="button" aria-label="Open sidebar menu" aria-expanded="false" aria-controls="sidebar">☰</button>
   <button id="save-button" type="button">Save changes</button>
-  <button id="background-overlap" type="button" style="position:fixed;top:20px;left:12px;width:150px;height:48px;z-index:10">Background control</button>
+  <button id="background-overlap" type="button" style="position:fixed;top:20px;left:60px;width:150px;height:48px;z-index:10">Background control</button>
   <aside id="sidebar" class="sidebar" hidden>
     <button id="menu-a" type="button">First navigation item</button>
     <button id="menu-b" type="button">Second navigation item</button>
@@ -81,6 +81,7 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
     assert.ok(overlap, "should detect the collision that only exists after opening the sidebar");
     assert.equal(report.diagnostics.some((item) =>
       item.id.startsWith("UIUX-004-") &&
+      item.evidence?.state?.startsWith("interaction-") &&
       [item.evidence.selectorA, item.evidence.selectorB].includes("#background-overlap")
     ), false, "should not flag background controls intentionally covered by the open drawer");
     assert.equal(overlap.evidence.triggerSelector, "#sidebar-toggle");
