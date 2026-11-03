@@ -6,14 +6,31 @@ import { formatReport } from "./reporters/index.js";
 
 const [projectPath = ".", ...args] = process.argv.slice(2);
 try {
-  const option = (name) => args.find((arg) => arg.startsWith(name + "="))?.slice(name.length + 1);
-  const format = option("--format") || "json";
-  const outputPath = option("--output") || null;
-  const configPath = option("--config") || null;
+  const options = new Map();
+  const supportedOptions = ["--config=", "--format=", "--output="];
+
+  for (const arg of args) {
+    const prefix = supportedOptions.find((item) => arg.startsWith(item));
+    if (!prefix) {
+      throw new TypeError("Unknown project audit option: " + arg);
+    }
+    const name = prefix.slice(0, -1);
+    if (options.has(name)) {
+      throw new TypeError("Project audit option may only be supplied once: " + name);
+    }
+    const value = arg.slice(prefix.length);
+    if (!value.trim()) {
+      throw new TypeError(name + " requires a non-empty value");
+    }
+    options.set(name, value);
+  }
+
+  const format = options.get("--format") || "json";
+  const outputPath = options.get("--output") || null;
+  const configPath = options.get("--config") || null;
   let config;
 
   if (configPath !== null) {
-    if (!configPath.trim()) throw new TypeError("--config requires a JSON file path");
     const absoluteConfigPath = resolve(configPath);
     let rawConfig;
     try {
