@@ -32,6 +32,24 @@ npm run audit -- http://192.168.1.20 --matrix --allow-private-network
 
 Do not use the opt-in flag for untrusted URLs. Only audit sites and networks you own or are authorized to test. The hostname check uses DNS answers observed by the Node.js process; it is a defense-in-depth safeguard, not a replacement for network egress controls against a hostile DNS rebinding environment.
 
+## Isolated local preview audits
+
+For local preview environments that must not contact third-party services, set `sameOriginOnly: true` when calling `auditUrl` or `auditViewports`. The target page and all browser resources must then use the exact same origin; HTTP(S) requests and WebSocket connections to other origins are blocked and recorded as blocked requests.
+
+~~~js
+const report = await auditViewports("http://127.0.0.1:4173/", {
+  allowPrivateNetworks: true,
+  sameOriginOnly: true,
+  viewports: [
+    { name: "mobile", width: 390, height: 844 },
+    { name: "desktop", width: 1365, height: 900 }
+  ],
+  screenshotDir: "artifacts/screenshots"
+});
+~~~
+
+Use this mode with a temporary local server for previews that should not reach production databases, APIs, storage, analytics, or third-party hosts. It is an origin boundary, not a substitute for serving only safe preview files from the local server.
+
 ## Export reports
 
 ~~~bash
