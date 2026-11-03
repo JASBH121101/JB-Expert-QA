@@ -67,7 +67,7 @@ test("engine runs rules and returns structured findings", async () => {
   assert.equal(report.summary.findings, 1);
   assert.equal(report.diagnostics[0].severity, "high");
   assert.equal(report.scoring.passed, true);
-  assert.equal(report.version, "0.6.0");
+  assert.equal(report.version, "0.7.0");
   assert.deepEqual(report.summary.specialists, ["responsive"]);
 });
 
