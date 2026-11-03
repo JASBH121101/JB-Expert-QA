@@ -409,13 +409,15 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 18);
+    assert.equal(report.summary.rulesExecuted, 19);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);
     assert.equal(report.projectScan.environmentFiles, 1);
     assert.equal(report.analysisScope.networkRequests, 0);
     assert.equal(report.analysisScope.dependencyAdvisoryLookup, false);
+    assert.equal(report.dependencyAdvisories.status, "disabled");
+    assert.equal(report.dependencyAdvisories.networkRequests, 0);
     assert.match(formatReport(report, "markdown"), /Project files read/);
     assert.match(formatReport(report, "html"), /Target: <code>jbqa-project-/);
   } finally {
