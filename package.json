@@ -1,6 +1,6 @@
 {
   "name": "jb-expert-qa",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Supervised QA engine with dependency advisories, visual regression, and interactive layout collision detection.",
   "type": "module",
