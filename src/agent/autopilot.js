@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -38,6 +38,14 @@ async function readApprovedSources(worktree, paths) {
   for (const path of paths) {
     const fullPath = resolve(worktree, path);
     if (!isInside(worktree, fullPath)) throw new Error("Approved source path escaped the worktree");
+    let cursor = worktree;
+    for (const part of path.split("/")) {
+      cursor = join(cursor, part);
+      const stats = await lstat(cursor);
+      if (stats.isSymbolicLink()) throw new Error("Auto-repair refuses symbolic links: " + path);
+    }
+    const finalStats = await lstat(fullPath);
+    if (!finalStats.isFile()) throw new Error("Approved source path is not a regular file: " + path);
     const content = await readFile(fullPath, "utf8");
     if (content.length > MAX_FILE_CHARS) {
       throw new Error("Source file exceeds the AI context limit: " + path);

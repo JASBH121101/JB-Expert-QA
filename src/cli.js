@@ -7,7 +7,7 @@ import { reviewViewportScreenshots } from "./ai/visual-review.js";
 
 const [url, ...args] = process.argv.slice(2);
 if (!url) {
-  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path] [--allow-private-network] [--screenshots=DIR] [--baseline-dir=DIR] [--diff-dir=DIR] [--update-baselines] [--ai-visual-review]");
+  console.error("Usage: npm run audit -- https://example.com [--mobile|--matrix] [--format=json|markdown|html] [--output=path] [--allow-private-network] [--screenshots=DIR] [--baseline-dir=DIR] [--diff-dir=DIR] [--update-baselines] [--visual-threshold=0.1] [--max-diff-ratio=0.005] [--full-page] [--ai-visual-review]");
   process.exitCode = 2;
 } else {
   try {
@@ -30,6 +30,10 @@ if (!url) {
     if ((baselineDir || diffDir || updateBaselines || aiVisualReview) && !matrix) {
       throw new Error("Visual baselines and AI visual review require --matrix");
     }
+    if ((screenshotsArg && !screenshotDir) || (baselineArg && !baselineDir) || (diffArg && !diffDir)) {
+      throw new Error("Screenshot, baseline and diff directories must not be empty");
+    }
+    if (diffDir && !baselineDir) throw new Error("--diff-dir requires --baseline-dir");
     if ((baselineDir || aiVisualReview) && !screenshotDir) {
       throw new Error("Use --screenshots=DIR when comparing baselines or requesting AI visual review");
     }

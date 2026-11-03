@@ -179,9 +179,31 @@ test("unified patches are restricted to the exact approved source file", () => {
 });
 
 test("source redaction removes credential values before AI upload", () => {
-  const source = 'const API_KEY = "this-is-a-very-long-secret-key-value";\nconst item = "ghp_' + "A".repeat(36) + '";';
+  const source = 'const API_KEY = "this-is-a-very-long-secret-key-value";\nconst item = "ghp_' + "A".repeat(36) + '";\nconst pem = "-----BEGIN PRIVATE KEY-----\\nSECRET-MATERIAL\\n-----END PRIVATE KEY-----";\nconst endpoint = "https://example.com/?access_token=url-secret-value";';
   const redacted = redactSourceForAI(source);
   assert.equal(redacted.includes("this-is-a-very-long-secret-key-value"), false);
   assert.equal(redacted.includes("ghp_"), false);
   assert.match(redacted, /REDACTED/);
+  assert.equal(redacted.includes("SECRET-MATERIAL"), false);\n  assert.equal(redacted.includes("url-secret-value"), false);
+});
+
+
+test("unified patch validator accepts multiple approved files but validates each section", () => {
+  const patch = [
+    "diff --git a/src/components/card.js b/src/components/card.js",
+    "--- a/src/components/card.js",
+    "+++ b/src/components/card.js",
+    "@@ -1 +1 @@",
+    "-export const gap = 8;",
+    "+export const gap = 12;",
+    "diff --git a/src/components/header.js b/src/components/header.js",
+    "--- a/src/components/header.js",
+    "+++ b/src/components/header.js",
+    "@@ -1 +1 @@",
+    "-export const size = 8;",
+    "+export const size = 10;"
+  ].join("\\n");
+  assert.deepEqual(validateUnifiedPatch(patch, {
+    allowedPaths: ["src/components/card.js", "src/components/header.js"]
+  }), ["src/components/card.js", "src/components/header.js"]);
 });

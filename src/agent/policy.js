@@ -1,3 +1,5 @@
+import { redactUrlsInText } from "../core/redaction.js";
+
 const SAFE_EXTENSIONS = new Set([
   ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
   ".html", ".htm", ".css", ".scss", ".sass", ".less",
@@ -69,14 +71,15 @@ export function validateUnifiedPatch(patch, { allowedPaths = [] } = {}) {
   if (Buffer.byteLength(patch, "utf8") > 100000) {
     throw new RangeError("Patch exceeds the 100 KB safety limit");
   }
-  if (/\b(?:new file mode|deleted file mode|rename from|rename to|Binary files)\b/.test(patch)) {
-    throw new Error("New, deleted, renamed or binary files are not allowed");
+  if (/^(?:new file mode|deleted file mode|old mode|new mode|rename from|rename to|copy from|copy to|similarity index|dissimilarity index|GIT binary patch|Binary files)\b/m.test(patch)) {
+    throw new Error("New, deleted, renamed, copied, mode-changed or binary files are not allowed");
   }
   const allowed = new Set(allowedPaths.map(normalizeProjectPath).filter(Boolean));
   const matches = [...patch.matchAll(/^diff --git a\/(.+?) b\/(.+?)\s*$/gm)];
   if (!matches.length) throw new Error("Patch must contain standard git diff file headers");
   const paths = [];
-  for (const match of matches) {
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
     const oldPath = normalizeProjectPath(match[1]);
     const newPath = normalizeProjectPath(match[2]);
     if (!oldPath || !newPath || oldPath !== newPath) {
@@ -85,6 +88,16 @@ export function validateUnifiedPatch(patch, { allowedPaths = [] } = {}) {
     if (!allowed.has(oldPath)) {
       throw new Error("Patch references a file outside the approved source allowlist: " + oldPath);
     }
+    const sectionEnd = index + 1 < matches.length ? matches[index + 1].index : patch.length;
+    const section = patch.slice(match.index, sectionEnd);
+    const fileHeaders = [...section.matchAll(/^(---|\+\+\+) ([ab])\/(.+)$/gm)];
+    const validHeaders = fileHeaders.length === 2 &&
+      fileHeaders[0][1] === "---" && fileHeaders[0][2] === "a" &&
+      fileHeaders[1][1] === "+++" && fileHeaders[1][2] === "b";
+    const headerPaths = fileHeaders.map((header) => normalizeProjectPath(header[3]));
+    if (!validHeaders || headerPaths.some((path) => path !== oldPath)) {
+      throw new Error("Patch file headers must match the approved diff path exactly");
+    }
     paths.push(oldPath);
   }
   return Object.freeze([...new Set(paths)]);
@@ -92,7 +105,8 @@ export function validateUnifiedPatch(patch, { allowedPaths = [] } = {}) {
 
 export function redactSourceForAI(source) {
   if (typeof source !== "string") return "";
-  return source
+  return redactUrlsInText(source)
     .replace(/(\b(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth(?:entication)?[_-]?token|bearer|token|jwt|credential|password|private[_-]?key|secret)\b\s*[:=]\s*["'])([^"']+)(["'])/gi, "$1[REDACTED]$3")
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "[REDACTED_PRIVATE_KEY]")
     .replace(/\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|AIza[0-9A-Za-z_-]{30,}|sk_live_[A-Za-z0-9]{16,})\b/g, "[REDACTED_TOKEN]");
 }

@@ -79,7 +79,7 @@ test("reporters include visual regression and escaped AI observations", () => {
   const markdown = formatMarkdownReport(visualReport);
   const html = formatHtmlReport(visualReport);
   assert.match(markdown, /Visual regression/);
-  assert.match(markdown, /12\\.500%/);
+  assert.ok(markdown.includes("12\\.500%"));
   assert.match(markdown, /AI-assisted visual review/);
   assert.ok(markdown.includes("&lt;script&gt;"));
   assert.match(html, /Visual regression/);
