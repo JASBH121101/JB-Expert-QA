@@ -37,8 +37,22 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
       }));
 
     const interactiveSelector = "a,button,input,select,textarea,[role='button'],[tabindex]";
+    // When a modal or navigation drawer is open, controls behind it are intentionally
+    // unavailable to the user. Audit the foreground surface, not the dimmed page behind it.
+    const activeOverlayRoots = [...document.querySelectorAll(
+      "dialog:modal,[role='dialog'][aria-modal='true'],[aria-modal='true']," +
+      ".sidebar.open,.drawer.open,[data-qa-overlay-root].open"
+    )].filter(visible);
+    const activeOverlayRoot = activeOverlayRoots
+      .sort((left, right) => {
+        const leftZ = Number.parseInt(getComputedStyle(left).zIndex, 10);
+        const rightZ = Number.parseInt(getComputedStyle(right).zIndex, 10);
+        return (Number.isFinite(rightZ) ? rightZ : 0) - (Number.isFinite(leftZ) ? leftZ : 0);
+      })[0] ?? null;
     const interactiveNodes = [...document.body.querySelectorAll(interactiveSelector)]
-      .filter((element) => visible(element) && getComputedStyle(element).pointerEvents !== "none")
+      .filter((element) => visible(element) &&
+        getComputedStyle(element).pointerEvents !== "none" &&
+        (!activeOverlayRoot || activeOverlayRoot.contains(element)))
       .slice(0, 300);
 
     const interactiveElements = interactiveNodes.map((element) => {
@@ -262,6 +276,7 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
       textElements,
       interactiveElements,
       interactiveOverlaps,
+      activeOverlay: activeOverlayRoot ? selectorFor(activeOverlayRoot) : null,
       verticalGaps,
       images,
       formControls,
