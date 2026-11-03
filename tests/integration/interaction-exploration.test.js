@@ -22,8 +22,8 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
 <head>
   <title>Closed sidebar fixture</title>
   <style>
-    #sidebar { display: none; position: fixed; inset: 0 auto auto 0; width: 260px; height: 220px; z-index: 20; background: white; }
-    #sidebar.open { display: block; }
+    #sidebar.sidebar { display: none; position: fixed; inset: 0 auto auto 0; width: 260px; height: 220px; z-index: 20; background: white; }
+    #sidebar.sidebar.open { display: block; }
     #sidebar button { position: absolute; top: 20px; left: 12px; width: 150px; height: 48px; }
     #menu-b { left: 55px !important; top: 20px; z-index: 2; }
     #menu-a { z-index: 1; }
@@ -32,7 +32,8 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
 <body>
   <button id="sidebar-toggle" type="button" aria-label="Open sidebar menu" aria-expanded="false" aria-controls="sidebar">☰</button>
   <button id="save-button" type="button">Save changes</button>
-  <aside id="sidebar" hidden>
+  <button id="background-overlap" type="button" style="position:fixed;top:20px;left:12px;width:150px;height:48px;z-index:10">Background control</button>
+  <aside id="sidebar" class="sidebar" hidden>
     <button id="menu-a" type="button">First navigation item</button>
     <button id="menu-b" type="button">Second navigation item</button>
   </aside>
@@ -78,6 +79,10 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
     );
 
     assert.ok(overlap, "should detect the collision that only exists after opening the sidebar");
+    assert.equal(report.diagnostics.some((item) =>
+      item.id.startsWith("UIUX-004-") &&
+      [item.evidence.selectorA, item.evidence.selectorB].includes("#background-overlap")
+    ), false, "should not flag background controls intentionally covered by the open drawer");
     assert.equal(overlap.evidence.triggerSelector, "#sidebar-toggle");
     assert.equal(overlap.evidence.blockedSelector, "#menu-a");
     assert.equal(report.evidence.interactionStatesChecked, 1);
