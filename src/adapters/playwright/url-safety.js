@@ -26,7 +26,7 @@ function isPrivateIPv4(address) {
     a >= 224 ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 0) ||
+    (a === 192 && b === 0 && c === 0) ||
     (a === 192 && b === 0 && c === 2) ||
     (a === 192 && b === 168) ||
     (a === 192 && b === 88 && c === 99) ||
@@ -96,7 +96,7 @@ function isPrivateIPv6(address) {
 
   // Accept only global-unicast space; deny transition and documentation ranges.
   if ((first & 0xe000) !== 0x2000) return true;
-  if (first === 0x2001 && groups[1] <= 0x01ff) return true;
+  if (first === 0x2001 && (groups[1] <= 0x01ff || groups[1] === 0x0db8)) return true;
   if (first === 0x2002) return true; // 6to4 transition range
   return false;
 }

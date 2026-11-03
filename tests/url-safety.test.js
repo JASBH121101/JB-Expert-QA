@@ -8,6 +8,7 @@ import {
 test("public address classifier accepts public IPv4 and IPv6 addresses", () => {
   assert.equal(isPublicAddress("8.8.8.8"), true);
   assert.equal(isPublicAddress("2606:4700:4700::1111"), true);
+  assert.equal(isPublicAddress("2001:4860:4860::8888"), true);
 });
 
 test("public address classifier rejects private, loopback and reserved addresses", () => {
@@ -18,8 +19,9 @@ test("public address classifier rejects private, loopback and reserved addresses
     "127.0.0.1",
     "169.254.169.254",
     "172.16.0.1",
-    "192.168.1.1",
+    "192.0.0.10",
     "192.0.2.10",
+    "192.168.1.1",
     "198.51.100.20",
     "203.0.113.10",
     "::",

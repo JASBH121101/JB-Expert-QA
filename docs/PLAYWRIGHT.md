@@ -4,20 +4,20 @@ The Playwright adapter opens a target URL in Chromium, collects measurable DOM, 
 
 ## Setup
 
-\`\`\`bash
+~~~bash
 npm install
 npx playwright install chromium
-\`\`\`
+~~~
 
 ## Run an audit
 
-\`\`\`bash
+~~~bash
 npm run audit -- https://example.com
 npm run audit -- https://example.com --mobile
 npm run audit -- https://example.com --matrix
-\`\`\`
+~~~
 
-The default viewport is 1365×900; \`--mobile\` uses 390×844. The matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900).
+The default viewport is 1365×900; **--mobile** uses 390×844. The matrix checks mobile (390×844), tablet (768×1024), and desktop (1365×900).
 
 ## Private and local destinations
 
@@ -25,21 +25,21 @@ Remote audits block loopback, private, link-local, reserved IP addresses and loc
 
 For a local development server or a trusted private test environment, explicitly opt in:
 
-\`\`\`bash
+~~~bash
 npm run audit -- http://127.0.0.1:3000 --allow-private-network
 npm run audit -- http://192.168.1.20 --matrix --allow-private-network
-\`\`\`
+~~~
 
 Do not use the opt-in flag for untrusted URLs. Only audit sites and networks you own or are authorized to test. The hostname check uses DNS answers observed by the Node.js process; it is a defense-in-depth safeguard, not a replacement for network egress controls against a hostile DNS rebinding environment.
 
 ## Export reports
 
-\`\`\`bash
+~~~bash
 npm run audit -- https://example.com --matrix --format=markdown --output=reports/site-audit.md
 npm run audit -- https://example.com --format=html --output=reports/site-audit.html
-\`\`\`
+~~~
 
-Formats: \`json\` (default), \`markdown\`, and \`html\`. Reports include target, status, summary, findings, recommendations, and rule execution details. HTML and Markdown output escape report content before rendering.
+Formats: **json** (default), **markdown**, and **html**. Reports include target, status, summary, findings, recommendations, and rule execution details. HTML and Markdown output escape report content before rendering.
 
 ## Implemented specialist evidence
 

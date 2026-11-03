@@ -35,8 +35,10 @@ test("multi-viewport audit identifies a defect only at mobile width", { timeout:
     const desktop = report.viewports.find((item) => item.name === "desktop");
     assert.ok(mobile.findings.some((item) => item.id === "RESP-001"));
     assert.equal(desktop.findings.some((item) => item.id === "RESP-001"), false);
+    assert.equal(report.version, "0.3.1");
     assert.equal(report.summary.viewportsChecked, 2);
     assert.equal(report.summary.failedViewports, 0);
+    assert.equal(report.summary.blockedRequests, 0);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

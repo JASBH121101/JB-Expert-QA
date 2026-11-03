@@ -165,7 +165,8 @@ export async function auditViewports(url, { viewports = DEFAULT_VIEWPORTS, ...op
       score: report.scoring.score,
       findings: report.diagnostics,
       summary: report.summary,
-      execution: report.execution
+      execution: report.execution,
+      evidence: report.evidence
     });
   }
   return Object.freeze({
