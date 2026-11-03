@@ -61,7 +61,7 @@ test("Cloudflare provider selects its vision model and sends image bytes as base
     prompt: "Return JSON.",
     image: { buffer: Buffer.from("image-data"), mimeType: "image/png" }
   });
-  assert.equal(requestBody.image, Buffer.from("image-data").toString("base64"));
+  assert.equal(requestBody.image, "data:image/png;base64," + Buffer.from("image-data").toString("base64"));
   assert.equal(requestBody.messages[1].content, "Return JSON.");
   assert.ok(CLOUDFLARE_VISION_MODEL.includes("llama-3.2-11b-vision"));
 });
