@@ -21,6 +21,17 @@ An audit is marked incomplete and cannot pass when the scan reaches its file/dep
 - **Dependencies:** floating package versions, missing root lockfiles, malformed package manifests, and risky install lifecycle scripts.
 - **Database:** destructive SQL operations, PostgreSQL SECURITY DEFINER functions without an explicit per-function search_path, unsafe Prisma raw-query APIs, Prisma and SQL foreign-key fields that may lack a supporting leading index, broad grants to `PUBLIC`, elevated PostgreSQL role attributes, and `CREATE INDEX CONCURRENTLY` inside explicit transactions.
 
+## HTML sink classification
+
+HTML-producing assignments are classified rather than all receiving the same penalty:
+
+- Static markup with no dynamic interpolation is not reported as an injection finding.
+- Dynamic markup using a recognized escaping helper (for example, `esc()` or `escapeHtml()`) or a local renderer that calls one is retained as an informational review item. The analyzer does not prove that every interpolation is escaped in the correct HTML text, attribute, or URL context.
+- Common untrusted-input sources reaching a sink without a recognized escaping call are high severity.
+- Dynamic sinks whose data flow cannot be resolved remain medium severity and require manual review.
+
+The source checks are intentionally heuristic. A helper name is not proof that the implementation is correct, and untrusted input that passes through an unrecognized variable or wrapper may not be classified as high severity. Prefer `textContent` and DOM node APIs where practical, and review all dynamic HTML generation before release.
+
 ## Important limits
 
 This is deterministic static analysis, not a generative AI review or a complete security scanner. Pattern matching can miss vulnerabilities and can report false positives. Review each item in context.
