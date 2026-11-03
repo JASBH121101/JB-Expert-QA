@@ -134,7 +134,38 @@ test("security checks ignore placeholders and detect dynamic code and HTML sinks
   });
   assert.equal(report.diagnostics.some((item) => item.id.startsWith("SEC-SECRET-")), false);
   assert.equal(report.diagnostics.some((item) => item.title === "Dynamic eval execution"), true);
-  assert.equal(report.diagnostics.some((item) => item.title === "Direct HTML injection sink"), true);
+  assert.equal(report.diagnostics.some((item) => item.title === "Dynamic HTML sink requires manual review"), true);
+});
+
+test("HTML sink analysis distinguishes static markup, escaping helpers and untrusted input", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "src/html-sinks.js", extension: ".js", lineCount: 10,
+      content: [
+        "function esc(value) { return String(value).replace(/[&<>]/g, ''); }",
+        "function productTable(rows) { return rows.map((row) => '<p>' + esc(row.name) + '</p>').join(''); }",
+        "staticNode.innerHTML = '<p>Loading</p>';",
+        "safeNode.innerHTML = '<p>' + esc(userInput) + '</p>';",
+        "component.innerHTML = productTable(rows);",
+        "rawNode.innerHTML = event.target.value;",
+        "templateNode.innerHTML = `<p>${location.hash}</p>`;",
+        "unknownNode.innerHTML = rawMarkup;",
+        "// commentedNode.innerHTML = event.target.value;"
+      ].join("\n")
+    }],
+    projectScan: { environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const htmlFindings = report.diagnostics.filter((item) => item.metadata.detector === "html-sink-context");
+  assert.equal(htmlFindings.length, 5);
+  assert.equal(htmlFindings.some((item) => item.location === "src/html-sinks.js:3"), false);
+  assert.equal(htmlFindings.filter((item) => item.severity === "info").length, 2);
+  assert.equal(htmlFindings.filter((item) => item.severity === "high").length, 2);
+  assert.equal(htmlFindings.filter((item) => item.severity === "medium").length, 1);
+  assert.ok(htmlFindings.some((item) => item.location === "src/html-sinks.js:6" && item.severity === "high"));
+  assert.ok(htmlFindings.some((item) => item.location === "src/html-sinks.js:7" && item.severity === "high"));
+  assert.ok(htmlFindings.some((item) => item.location === "src/html-sinks.js:8" && item.severity === "medium"));
+  assert.equal(htmlFindings.every((item) => item.metadata.requiresManualReview === true), true);
 });
 
 test("dependency checks identify floating versions, absent locks and risky install hooks", async () => {
