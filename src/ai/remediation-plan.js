@@ -1,4 +1,4 @@
-import { createGeminiProvider } from "./gemini-provider.js";
+import { createAiProviderRouter } from "./provider-router.js";
 
 const VALID_RISKS = new Set(["low", "medium", "high"]);
 
@@ -41,7 +41,7 @@ export function validateRemediationPlan(value, { maxTasks = 8 } = {}) {
 }
 
 export async function createRemediationPlan(auditReport, {
-  provider = createGeminiProvider({ model: process.env.GEMINI_TEXT_MODEL }),
+  provider = createAiProviderRouter(),
   maxTasks = 8,
   projectContext = {}
 } = {}) {
@@ -50,7 +50,7 @@ export async function createRemediationPlan(auditReport, {
     throw new TypeError("A valid JB Expert QA audit report is required");
   }
   if (!Number.isInteger(maxTasks) || maxTasks < 1 || maxTasks > 20) {
-    throw new TypeError("maxTasks must be between 1 and 20");
+    throw new TypeError("maxTasks must be an integer between 1 and 20");
   }
   if (!provider || typeof provider.generateJson !== "function") {
     throw new TypeError("A compatible AI provider is required");
@@ -95,6 +95,7 @@ export async function createRemediationPlan(auditReport, {
 
   return Object.freeze({
     provider: provider.provider || "configured-provider",
+    providerStatus: typeof provider.getStatus === "function" ? provider.getStatus() : null,
     model: provider.model || null,
     plan: validateRemediationPlan(raw, { maxTasks })
   });
