@@ -113,6 +113,168 @@ export const securityRules = [
       return findings;
     }
   },
+
+const HTML_ESCAPE_CALL = /\b(?:esc|escapeHtml|escapeHTML|escapeAttribute|escapeHtmlAttribute|sanitizeHtml|sanitizeHTML|sanitizeHTMLString)\s*\(|\bDOMPurify\s*\.\s*sanitize\s*\(/i;
+const HTML_ESCAPE_CALL_GLOBAL = /\b(?:esc|escapeHtml|escapeHTML|escapeAttribute|escapeHtmlAttribute|sanitizeHtml|sanitizeHTML|sanitizeHTMLString)\s*\(|\bDOMPurify\s*\.\s*sanitize\s*\(/gi;
+const UNTRUSTED_HTML_SOURCE = /\b(?:event|evt)\s*\.\s*target\s*\.\s*(?:value|innerHTML|textContent)\b|\b(?:input|textarea|select)\s*\.\s*value\b|\b(?:userInput|untrustedInput|rawHtml|htmlFromUser)\b|\b(?:req|request)\s*\.\s*(?:body|query|params)\b|\bURLSearchParams\b|\blocation\s*\.\s*(?:hash|search)\b/i;
+
+function balancedClose(source, openIndex, openChar, closeChar) {
+  let depth = 0, quote = null, escaped = false, lineComment = false, blockComment = false;
+  for (let i = openIndex; i < source.length; i += 1) {
+    const char = source[i], next = source[i + 1];
+    if (lineComment) { if (char === "\n" || char === "\r") lineComment = false; continue; }
+    if (blockComment) { if (char === "*" && next === "/") { blockComment = false; i += 1; } continue; }
+    if (quote) {
+      if (escaped) { escaped = false; continue; }
+      if (char === "\\") { escaped = true; continue; }
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "/" && next === "/") { lineComment = true; i += 1; continue; }
+    if (char === "/" && next === "*") { blockComment = true; i += 1; continue; }
+    if (char === "'" || char === '"' || char === "\x60") { quote = char; continue; }
+    if (char === openChar) depth += 1;
+    else if (char === closeChar && --depth === 0) return i;
+  }
+  return -1;
+}
+
+function statementEnd(source, start) {
+  let depth = 0, quote = null, escaped = false, lineComment = false, blockComment = false;
+  const limit = Math.min(source.length, start + 16000);
+  for (let i = start; i < limit; i += 1) {
+    const char = source[i], next = source[i + 1];
+    if (lineComment) { if (char === "\n" || char === "\r") lineComment = false; continue; }
+    if (blockComment) { if (char === "*" && next === "/") { blockComment = false; i += 1; } continue; }
+    if (quote) {
+      if (escaped) { escaped = false; continue; }
+      if (char === "\\") { escaped = true; continue; }
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "/" && next === "/") { lineComment = true; i += 1; continue; }
+    if (char === "/" && next === "*") { blockComment = true; i += 1; continue; }
+    if (char === "'" || char === '"' || char === "\x60") { quote = char; continue; }
+    if (char === "(" || char === "[" || char === "{") depth += 1;
+    else if (char === ")" || char === "]" || char === "}") depth = Math.max(0, depth - 1);
+    else if (char === ";" && depth === 0) return i;
+  }
+  return limit;
+}
+
+function maskNonCode(source) {
+  const output = source.split("");
+  let quote = null, escaped = false, lineComment = false, blockComment = false;
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i], next = source[i + 1];
+    if (lineComment) { if (char === "\n" || char === "\r") lineComment = false; else output[i] = " "; continue; }
+    if (blockComment) {
+      output[i] = char === "\n" || char === "\r" ? char : " ";
+      if (char === "*" && next === "/") { output[i + 1] = " "; blockComment = false; i += 1; }
+      continue;
+    }
+    if (quote) {
+      output[i] = char === "\n" || char === "\r" ? char : " ";
+      if (escaped) { escaped = false; continue; }
+      if (char === "\\") { escaped = true; continue; }
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "/" && next === "/") { output[i] = " "; output[i + 1] = " "; lineComment = true; i += 1; continue; }
+    if (char === "/" && next === "*") { output[i] = " "; output[i + 1] = " "; blockComment = true; i += 1; continue; }
+    if (char === "'" || char === '"' || char === "\x60") { output[i] = " "; quote = char; }
+  }
+  return output.join("");
+}
+
+function expressionCode(expression) {
+  const templateExpressions = [];
+  const withoutTemplates = expression.replace(/\x60(?:\\.|[^\x60\\])*\x60/gs, (literal) => {
+    for (const match of literal.matchAll(/\$\{([\s\S]*?)\}/g)) templateExpressions.push(match[1]);
+    return " ";
+  });
+  return withoutTemplates
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\/\/[^\r\n]*/g, " ")
+    .replace(/'(?:\\.|[^'\\])*'/g, " ")
+    .replace(/"(?:\\.|[^"\\])*"/g, " ")
+    .concat(" ", templateExpressions.join(" "));
+}
+
+function removeEscapedCalls(code) {
+  const ranges = [];
+  HTML_ESCAPE_CALL_GLOBAL.lastIndex = 0;
+  for (const match of code.matchAll(HTML_ESCAPE_CALL_GLOBAL)) {
+    const open = match.index + match[0].lastIndexOf("(");
+    const close = balancedClose(code, open, "(", ")");
+    if (close >= 0) ranges.push([match.index, close + 1]);
+  }
+  let result = "", cursor = 0;
+  for (const [start, end] of ranges) {
+    if (start < cursor) continue;
+    result += code.slice(cursor, start) + " ";
+    cursor = end;
+  }
+  return result + code.slice(cursor);
+}
+
+function localRendererUsesEscaping(code, fullSource) {
+  const calls = [...code.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)].map((item) => item[1]);
+  for (const name of new Set(calls)) {
+    if (["if", "for", "while", "switch", "catch", "function"].includes(name)) continue;
+    const declaration = new RegExp("\\bfunction\\s+" + name + "\\s*\\(");
+    const match = declaration.exec(fullSource);
+    if (!match) continue;
+    const nextFunction = fullSource.indexOf("\n  function ", match.index + match[0].length);
+    const body = fullSource.slice(match.index, nextFunction < 0 ? fullSource.length : nextFunction);
+    if (HTML_ESCAPE_CALL.test(body) || (name === "svg" && /\biconPaths\b/.test(body))) return true;
+  }
+  return false;
+}
+
+function classifyHtmlSink(expression, fullSource) {
+  const code = expressionCode(expression);
+  if (!(code.match(/[A-Za-z_$][\w$]*/g) ?? []).length) {
+    return { skip: true, classification: "static-markup" };
+  }
+  const hasEscapingCall = HTML_ESCAPE_CALL.test(code);
+  const residual = removeEscapedCalls(code);
+  if (UNTRUSTED_HTML_SOURCE.test(residual)) {
+    return { severity: "high", classification: "unescaped-untrusted-source", helperDetected: hasEscapingCall };
+  }
+  if (hasEscapingCall || localRendererUsesEscaping(code, fullSource)) {
+    return { severity: "info", classification: "recognized-escape-or-local-renderer", helperDetected: true };
+  }
+  return { severity: "medium", classification: "dynamic-sink-manual-review", helperDetected: false };
+}
+
+function collectHtmlSinks(source) {
+  const masked = maskNonCode(source);
+  const patterns = [
+    { regex: /\.innerHTML\s*=/g, kind: "innerHTML", call: false },
+    { regex: /\.insertAdjacentHTML\s*\(/g, kind: "insertAdjacentHTML", call: true },
+    { regex: /\bdangerouslySetInnerHTML\s*[:=]/g, kind: "dangerouslySetInnerHTML", call: false }
+  ];
+  const sinks = [];
+  for (const pattern of patterns) {
+    pattern.regex.lastIndex = 0;
+    for (const match of masked.matchAll(pattern.regex)) {
+      let expression;
+      if (pattern.call) {
+        const open = masked.indexOf("(", match.index);
+        const close = balancedClose(masked, open, "(", ")");
+        expression = source.slice(open + 1, close < 0 ? statementEnd(source, open + 1) : close);
+      } else {
+        const start = match.index + match[0].length;
+        expression = source.slice(start, statementEnd(source, start));
+      }
+      const line = source.slice(0, match.index).split(/\r\n|\n|\r/).length;
+      sinks.push({ line, kind: pattern.kind, expression });
+    }
+  }
+  return sinks.sort((a, b) => a.line - b.line);
+}
+
   {
     id: "security.dynamic-code",
     specialist: "security",
@@ -141,6 +303,65 @@ export const securityRules = [
               "Review the data flow and trust boundary. Prefer safe APIs, contextual output encoding, and verified TLS.",
               { detector: pattern.label, requiresManualReview: true }, index + 1));
           }
+        }
+      }
+      return findings;
+    }
+  },
+  {
+    id: "security.dynamic-code",
+    specialist: "security",
+    evaluate(context) {
+      const patterns = [
+        { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high" },
+        { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high" },
+        { regex: /\brejectUnauthorized\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high" }
+      ];
+      const findings = [];
+      for (const file of context.projectFiles ?? []) {
+        const lines = file.content.split(/\r\n|\n|\r/);
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (commentLine(line)) continue;
+          for (const pattern of patterns) {
+            if (!pattern.regex.test(line)) continue;
+            findings.push(finding(
+              "SEC-CODE-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1) + "-" + pattern.label.replace(/[^a-z0-9]+/gi, "-"),
+              pattern.label,
+              "A potentially unsafe code pattern was detected and requires source-level review.",
+              pattern.severity, file.path,
+              "Review the data flow and trust boundary. Avoid dynamic code execution and keep TLS certificate verification enabled.",
+              { detector: pattern.label, requiresManualReview: true }, index + 1));
+          }
+        }
+        for (const sink of collectHtmlSinks(file.content)) {
+          const classification = classifyHtmlSink(sink.expression, file.content);
+          if (classification.skip) continue;
+          const title = classification.severity === "high"
+            ? "Unescaped dynamic HTML injection sink"
+            : classification.severity === "info"
+              ? "HTML sink uses a recognized escaping or rendering helper"
+              : "Dynamic HTML sink requires manual review";
+          const description = classification.severity === "high"
+            ? "A common untrusted-input source appears to reach an HTML sink without a recognized escaping helper. Verify the data flow and remediate before release."
+            : classification.severity === "info"
+              ? "A recognized escaping helper or local renderer is present. This heuristic cannot prove that every interpolation is context-safe, so retain human review."
+              : "Dynamic markup reaches an HTML sink, but the static analyzer cannot trace every value to a trusted source or escaping helper.";
+          const recommendation = classification.severity === "high"
+            ? "Remove the raw untrusted value from the HTML string. Prefer textContent or DOM node APIs; otherwise apply context-appropriate escaping to every dynamic text and attribute value."
+            : "Review every dynamic interpolation, especially attributes and URLs. Prefer DOM node APIs or a vetted sanitizer; do not rely on a helper name alone as proof of safety.";
+          findings.push(finding(
+            "SEC-HTML-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + sink.line + "-" + sink.kind,
+            title, description, classification.severity, file.path, recommendation,
+            {
+              detector: "html-sink-context",
+              sink: sink.kind,
+              classification: classification.classification,
+              escapingHelperDetected: classification.helperDetected,
+              requiresManualReview: true
+            },
+            sink.line
+          ));
         }
       }
       return findings;
