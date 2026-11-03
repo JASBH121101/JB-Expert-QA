@@ -60,7 +60,7 @@ test("multi-viewport audit identifies a defect only at mobile width", { timeout:
     assert.equal(desktop.findings.some((item) => item.id.startsWith("UIUX-004-")), false,
       "should not report the same controls as overlapping at desktop width");
     assert.equal(desktop.findings.some((item) => item.id === "RESP-001"), false);
-    assert.equal(report.version, "0.6.0");
+    assert.equal(report.version, "0.7.0");
     assert.equal(report.summary.viewportsChecked, 2);
     assert.equal(report.summary.failedViewports, 0);
     assert.equal(report.summary.blockedRequests, 0);
