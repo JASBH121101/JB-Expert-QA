@@ -3,18 +3,20 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
-const html = \`<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>JB Expert QA fixture</title></head>
-<body style="margin:0">
-  <div class="wide-panel" style="width:600px;height:20px">Wide panel</div>
-  <p class="tiny-copy" style="font-size:10px">Small text sample</p>
-  <button style="width:16px;height:16px;padding:0"></button>
-  <div class="large-gap" style="margin-top:220px">Content after test gap</div>
-  <img src="/missing-image.png">
-  <input id="email" type="email">
-</body>
-</html>\`;
+const html = [
+  "<!doctype html>",
+  "<html>",
+  "<head><meta charset=\"utf-8\"><title>JB Expert QA fixture</title></head>",
+  "<body style=\"margin:0\">",
+  "  <div class=\"wide-panel\" style=\"width:600px;height:20px\">Wide panel</div>",
+  "  <p class=\"tiny-copy\" style=\"font-size:10px\">Small text sample</p>",
+  "  <button style=\"width:16px;height:16px;padding:0\"></button>",
+  "  <div class=\"large-gap\" style=\"margin-top:220px\">Content after test gap</div>",
+  "  <img src=\"/missing-image.png\">",
+  "  <input id=\"email\" type=\"email\">",
+  "</body>",
+  "</html>"
+].join("\n");
 
 test("Playwright and axe-core detect page defects with browser evidence", { timeout: 30000 }, async () => {
   const server = createServer((request, response) => {
