@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { auditUrl, auditViewports } from "./adapters/playwright/audit-url.js";
 import { formatReport } from "./reporters/index.js";
 import { reviewViewportScreenshots } from "./ai/visual-review.js";
+import { createAiProviderRouter } from "./ai/provider-router.js";
 
 const [url, ...args] = process.argv.slice(2);
 if (!url) {
@@ -62,7 +63,11 @@ if (!url) {
         });
 
     if (aiVisualReview) {
-      const visualReview = await reviewViewportScreenshots(report, { maxScreenshots: 3 });
+      const provider = createAiProviderRouter({ enabled: true });
+      const visualReview = await reviewViewportScreenshots(report, {
+        provider,
+        maxScreenshots: 3
+      });
       report = { ...report, aiVisualReview: visualReview };
     }
 
