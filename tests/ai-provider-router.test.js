@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createAiProviderRouter } from "../src/ai/provider-router.js";
 
 function provider(name, sequence, calls) {
@@ -66,4 +69,35 @@ test("AI router falls back on Gemini network errors but does not retry either pr
 
   assert.deepEqual(await router.generateJson({ prompt: "test" }), { ok: true });
   assert.deepEqual(calls.map((call) => call.name), ["gemini", "cloudflare"]);
+});
+
+test("Cloudflare daily quota circuit breaker persists for the UTC day", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jbqa-ai-quota-"));
+  const quotaStatePath = join(directory, "quota.json");
+  try {
+    const calls = [];
+    const exhausted = quotaError();
+    exhausted.quotaScope = "daily";
+    const firstRouter = createAiProviderRouter({
+      enabled: true,
+      primary: provider("gemini", [quotaError()], calls),
+      fallback: provider("cloudflare", [exhausted], calls),
+      quotaStatePath
+    });
+    await assert.rejects(firstRouter.generateJson({ prompt: "quota check" }), {
+      code: "ai_quota_exhausted"
+    });
+
+    const secondRouter = createAiProviderRouter({
+      enabled: true,
+      primary: provider("gemini", [{ source: "gemini" }], calls),
+      fallback: provider("cloudflare", [{ source: "must-not-run" }], calls),
+      quotaStatePath
+    });
+    assert.equal(secondRouter.getStatus().fallback, "daily-quota-exhausted");
+    assert.deepEqual(await secondRouter.generateJson({ prompt: "next process" }), { source: "gemini" });
+    assert.deepEqual(calls.map((call) => call.name), ["gemini", "cloudflare", "gemini"]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
