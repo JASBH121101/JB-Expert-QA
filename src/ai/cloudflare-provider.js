@@ -135,7 +135,10 @@ export function createCloudflareProvider({
         temperature,
         response_format: { type: "json_object" }
       };
-      if (hasImage) body.image = image.buffer.toString("base64");
+      if (hasImage) {
+        const mimeType = String(image.mimeType || "image/png").toLowerCase();
+        body.image = "data:" + mimeType + ";base64," + image.buffer.toString("base64");
+      }
 
       requestsUsed += 1;
       let response;
