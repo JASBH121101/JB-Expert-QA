@@ -56,8 +56,7 @@ export const uiUxRules = [
           recommendation: "Increase the clickable or touch area, or provide sufficient spacing around the control."
         }));
     }
-  }
-  ,
+  },
   {
     id: "ui-ux.interactive-overlap",
     specialist: "ui-ux",
