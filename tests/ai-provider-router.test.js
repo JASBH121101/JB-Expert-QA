@@ -101,3 +101,19 @@ test("Cloudflare daily quota circuit breaker persists for the UTC day", async ()
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("AI router reports a per-run Cloudflare cap separately from the daily quota", async () => {
+  const calls = [];
+  const perRunError = quotaError();
+  perRunError.quotaScope = "run";
+  const router = createAiProviderRouter({
+    enabled: true,
+    primary: provider("gemini", [quotaError()], calls),
+    fallback: provider("cloudflare", [perRunError], calls),
+    quotaStatePath: null
+  });
+  await assert.rejects(router.generateJson({ prompt: "cap check" }), {
+    code: "ai_quota_exhausted"
+  });
+  assert.equal(router.getStatus().fallback, "disabled-for-run");
+});
