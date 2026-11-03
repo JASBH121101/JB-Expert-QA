@@ -18,5 +18,11 @@
     "minimumScore": 80,
     "failOnCritical": true,
     "maxFileLines": 800
+  },
+  "scan": {
+    "maxFiles": 2500,
+    "maxFileBytes": 1000000,
+    "maxTotalBytes": 20000000,
+    "maxDepth": 20
   }
 }
