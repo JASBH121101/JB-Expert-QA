@@ -11,6 +11,11 @@ const html = [
   "  <div class=\"wide-panel\" style=\"width:600px;height:20px\">Wide panel</div>",
   "  <p class=\"tiny-copy\" style=\"font-size:10px\">Small text sample</p>",
   "  <button style=\"width:16px;height:16px;padding:0\"></button>",
+  "  <div id=\\"overlap-fixture\\" style=\\"position:relative;width:320px;height:64px\\">",
+  "    <button id=\\"overlap-a\\" style=\\"position:absolute;left:0;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:1\\">A</button>",
+  "    <button id=\\"overlap-b\\" style=\\"position:absolute;left:60px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box;z-index:2\\">B</button>",
+  "    <button id=\\"separate-button\\" style=\\"position:absolute;left:190px;top:0;width:110px;height:44px;padding:0;margin:0;border:0;box-sizing:border-box\\">C</button>",
+  "  </div>",
   "  <div class=\"large-gap\" style=\"margin-top:220px\">Content after test gap</div>",
   "  <img src=\"/missing-image.png\">",
   "  <input id=\"email\" type=\"email\">",
@@ -61,6 +66,16 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
     assert.ok(ids.includes("RESP-001"), "should detect document horizontal overflow");
     assert.ok(ids.some((id) => id.startsWith("UIUX-001")), "should detect small text");
     assert.ok(ids.some((id) => id.startsWith("UIUX-003")), "should detect small interactive target");
+    const overlapFinding = report.diagnostics.find((item) =>
+      item.id.startsWith("UIUX-004-") && item.evidence?.selectorA === "#overlap-a");
+    assert.ok(overlapFinding, "should detect overlapping buttons");
+    assert.equal(overlapFinding.severity, "high", "should flag the button hidden behind the top layer");
+    assert.equal(overlapFinding.evidence.blockedSelector, "#overlap-a");
+    assert.equal(overlapFinding.evidence.blockingSelector, "#overlap-b");
+    assert.ok(overlapFinding.evidence.overlapPercentOfSmallerTarget >= 40);
+    assert.equal(report.diagnostics.some((item) =>
+      item.id.startsWith("UIUX-004-") && item.location?.includes("#separate-button")), false,
+    "should not flag the separate button");
     assert.ok(ids.some((id) => id.startsWith("A11Y-001")), "should detect image without alt");
     assert.ok(ids.some((id) => id.startsWith("A11Y-002")), "should detect unlabeled field");
     assert.ok(ids.some((id) => id.startsWith("A11Y-AXE-")), "should include axe-core findings");
