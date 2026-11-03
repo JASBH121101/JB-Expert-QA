@@ -425,7 +425,7 @@ export const dependencyRules = [
           "DEP-OSV-001",
           "Dependency advisory lookup unavailable",
           "OSV.dev could not complete the dependency advisory lookup. " + (scan.error || "No additional error details are available."),
-          scan.required ? "high" : "info",
+          scan.required ? "critical" : "info",
           "package.json",
           scan.required
             ? "Restore advisory service connectivity and rerun the audit before accepting this release."
@@ -439,7 +439,7 @@ export const dependencyRules = [
           "DEP-OSV-COVERAGE-001",
           directOnly ? "Transitive dependency coverage is incomplete" : "Dependency advisory coverage is incomplete",
           statusDescription,
-          scan.required ? "high" : "info",
+          scan.required ? "critical" : "info",
           "package.json",
           directOnly
             ? "Commit a supported npm lockfile to let the auditor check resolved direct and transitive package versions."
