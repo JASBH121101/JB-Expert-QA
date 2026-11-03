@@ -16,104 +16,6 @@ function placeholder(value) {
     /(?:process\.env|import\.meta\.env|env\.[a-z_]+)/i.test(text);
 }
 
-const SOURCE_EXTENSIONS = new Set([
-  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
-  ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
-  ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
-  ".cs", ".graphql", ".gql"
-]);
-
-export const codeQualityRules = [
-  {
-    id: "code-quality.scan-completeness",
-    specialist: "code-quality",
-    evaluate(context) {
-      const summary = context.projectScan?.summary;
-      if (!summary) return [];
-      const reasons = [];
-      if (summary.truncated) reasons.push("file-count or directory-depth limit reached");
-      if ((summary.oversizedFiles ?? 0) > 0) reasons.push(summary.oversizedFiles + " oversized file(s) skipped");
-      if ((summary.unreadableFiles ?? 0) > 0) reasons.push(summary.unreadableFiles + " unreadable file(s) skipped");
-      if (!reasons.length) return [];
-      return [finding(
-        "CODE-SCAN-001",
-        "Project scan incomplete",
-        "This audit did not inspect the full supported project scope: " + reasons.join("; ") + ". A passing result cannot be issued.",
-        "critical",
-        ".",
-        "Increase scan limits, resolve file-access problems, and rerun the audit until the scan is complete.",
-        {
-          truncated: Boolean(summary.truncated),
-          oversizedFiles: summary.oversizedFiles ?? 0,
-          unreadableFiles: summary.unreadableFiles ?? 0,
-          blocksPass: true
-        }
-      )];
-    }
-  },
-  {
-    id: "code-quality.file-size",
-    specialist: "code-quality",
-    evaluate(context) {
-      const limit = context.thresholds?.maxFileLines ?? 800;
-      return (context.projectFiles ?? [])
-        .filter((file) => SOURCE_EXTENSIONS.has(file.extension) && file.lineCount > limit).map((file) =>
-        finding("CODE-SIZE-" + file.path.replace(/[^a-z0-9]+/gi, "-"),
-          "Large source file",
-          "This file contains " + file.lineCount + " lines, above the configured review threshold of " + limit + ".",
-          "medium", file.path,
-          "Consider separating unrelated responsibilities into smaller modules.",
-          { lineCount: file.lineCount, threshold: limit }));
-    }
-  },
-  {
-    id: "code-quality.test-presence",
-    specialist: "code-quality",
-    evaluate(context) {
-      const files = context.projectFiles ?? [];
-      const sourceCount = files.filter((file) =>
-        /\.(?:[cm]?[jt]sx?|vue|svelte|py|php|java|kt|go|rs)$/i.test(file.path) &&
-        !/(?:^|\/)(?:tests?|__tests__|spec)(?:\/|$)/i.test(file.path)).length;
-      const testCount = files.filter((file) =>
-        /(?:^|\/)(?:tests?|__tests__|spec)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path)).length;
-      if (!sourceCount || testCount) return [];
-      return [finding("CODE-TESTS-001", "No test files detected",
-        "The scanned source tree contains code files but no recognizable test or spec files.",
-        "low", ".", "Add automated tests for critical business rules, calculations, authentication, and data persistence.",
-        { sourceFiles: sourceCount, testFiles: testCount })];
-    }
-  }
-];
-
-export const securityRules = [
-  {
-    id: "security.hardcoded-credentials",
-    specialist: "security",
-    evaluate(context) {
-      const findings = [];
-      const assignment = /\b(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth(?:entication)?[_-]?token|bearer|token|jwt|credential|password|private[_-]?key|secret)\b\s*[:=]\s*["']([^"']{12,})["']/i;
-      const tokenPattern = /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|AIza[0-9A-Za-z_-]{30,}|sk_live_[A-Za-z0-9]{16,})\b/;
-      for (const file of context.projectFiles ?? []) {
-        const lines = file.content.split(/\r\n|\n|\r/);
-        for (let index = 0; index < lines.length; index += 1) {
-          const line = lines[index];
-          if (commentLine(line)) continue;
-          const assigned = assignment.exec(line);
-          const token = tokenPattern.exec(line);
-          if ((assigned && !placeholder(assigned[1])) || token) {
-            findings.push(finding("SEC-SECRET-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1),
-              "Possible hardcoded credential",
-              "A credential-like value was detected. Its contents are intentionally excluded from this report.",
-              "critical", file.path,
-              "Remove the value from source control, rotate the credential if it was real, and load it from a managed environment secret.",
-              { detector: token ? "known-token-format" : "sensitive-assignment", valueRedacted: true }, index + 1));
-          }
-        }
-      }
-      return findings;
-    }
-  },
-
 const HTML_ESCAPE_CALL = /\b(?:esc|escapeHtml|escapeHTML|escapeAttribute|escapeHtmlAttribute|sanitizeHtml|sanitizeHTML|sanitizeHTMLString)\s*\(|\bDOMPurify\s*\.\s*sanitize\s*\(/i;
 const HTML_ESCAPE_CALL_GLOBAL = /\b(?:esc|escapeHtml|escapeHTML|escapeAttribute|escapeHtmlAttribute|sanitizeHtml|sanitizeHTML|sanitizeHTMLString)\s*\(|\bDOMPurify\s*\.\s*sanitize\s*\(/gi;
 const UNTRUSTED_HTML_SOURCE = /\b(?:event|evt)\s*\.\s*target\s*\.\s*(?:value|innerHTML|textContent)\b|\b(?:input|textarea|select)\s*\.\s*value\b|\b(?:userInput|untrustedInput|rawHtml|htmlFromUser)\b|\b(?:req|request)\s*\.\s*(?:body|query|params)\b|\bURLSearchParams\b|\blocation\s*\.\s*(?:hash|search)\b/i;
@@ -274,6 +176,104 @@ function collectHtmlSinks(source) {
   }
   return sinks.sort((a, b) => a.line - b.line);
 }
+
+const SOURCE_EXTENSIONS = new Set([
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+  ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
+  ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
+  ".cs", ".graphql", ".gql"
+]);
+
+export const codeQualityRules = [
+  {
+    id: "code-quality.scan-completeness",
+    specialist: "code-quality",
+    evaluate(context) {
+      const summary = context.projectScan?.summary;
+      if (!summary) return [];
+      const reasons = [];
+      if (summary.truncated) reasons.push("file-count or directory-depth limit reached");
+      if ((summary.oversizedFiles ?? 0) > 0) reasons.push(summary.oversizedFiles + " oversized file(s) skipped");
+      if ((summary.unreadableFiles ?? 0) > 0) reasons.push(summary.unreadableFiles + " unreadable file(s) skipped");
+      if (!reasons.length) return [];
+      return [finding(
+        "CODE-SCAN-001",
+        "Project scan incomplete",
+        "This audit did not inspect the full supported project scope: " + reasons.join("; ") + ". A passing result cannot be issued.",
+        "critical",
+        ".",
+        "Increase scan limits, resolve file-access problems, and rerun the audit until the scan is complete.",
+        {
+          truncated: Boolean(summary.truncated),
+          oversizedFiles: summary.oversizedFiles ?? 0,
+          unreadableFiles: summary.unreadableFiles ?? 0,
+          blocksPass: true
+        }
+      )];
+    }
+  },
+  {
+    id: "code-quality.file-size",
+    specialist: "code-quality",
+    evaluate(context) {
+      const limit = context.thresholds?.maxFileLines ?? 800;
+      return (context.projectFiles ?? [])
+        .filter((file) => SOURCE_EXTENSIONS.has(file.extension) && file.lineCount > limit).map((file) =>
+        finding("CODE-SIZE-" + file.path.replace(/[^a-z0-9]+/gi, "-"),
+          "Large source file",
+          "This file contains " + file.lineCount + " lines, above the configured review threshold of " + limit + ".",
+          "medium", file.path,
+          "Consider separating unrelated responsibilities into smaller modules.",
+          { lineCount: file.lineCount, threshold: limit }));
+    }
+  },
+  {
+    id: "code-quality.test-presence",
+    specialist: "code-quality",
+    evaluate(context) {
+      const files = context.projectFiles ?? [];
+      const sourceCount = files.filter((file) =>
+        /\.(?:[cm]?[jt]sx?|vue|svelte|py|php|java|kt|go|rs)$/i.test(file.path) &&
+        !/(?:^|\/)(?:tests?|__tests__|spec)(?:\/|$)/i.test(file.path)).length;
+      const testCount = files.filter((file) =>
+        /(?:^|\/)(?:tests?|__tests__|spec)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path)).length;
+      if (!sourceCount || testCount) return [];
+      return [finding("CODE-TESTS-001", "No test files detected",
+        "The scanned source tree contains code files but no recognizable test or spec files.",
+        "low", ".", "Add automated tests for critical business rules, calculations, authentication, and data persistence.",
+        { sourceFiles: sourceCount, testFiles: testCount })];
+    }
+  }
+];
+
+export const securityRules = [
+  {
+    id: "security.hardcoded-credentials",
+    specialist: "security",
+    evaluate(context) {
+      const findings = [];
+      const assignment = /\b(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth(?:entication)?[_-]?token|bearer|token|jwt|credential|password|private[_-]?key|secret)\b\s*[:=]\s*["']([^"']{12,})["']/i;
+      const tokenPattern = /\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|AIza[0-9A-Za-z_-]{30,}|sk_live_[A-Za-z0-9]{16,})\b/;
+      for (const file of context.projectFiles ?? []) {
+        const lines = file.content.split(/\r\n|\n|\r/);
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (commentLine(line)) continue;
+          const assigned = assignment.exec(line);
+          const token = tokenPattern.exec(line);
+          if ((assigned && !placeholder(assigned[1])) || token) {
+            findings.push(finding("SEC-SECRET-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1),
+              "Possible hardcoded credential",
+              "A credential-like value was detected. Its contents are intentionally excluded from this report.",
+              "critical", file.path,
+              "Remove the value from source control, rotate the credential if it was real, and load it from a managed environment secret.",
+              { detector: token ? "known-token-format" : "sensitive-assignment", valueRedacted: true }, index + 1));
+          }
+        }
+      }
+      return findings;
+    }
+  },
 
   {
     id: "security.dynamic-code",
