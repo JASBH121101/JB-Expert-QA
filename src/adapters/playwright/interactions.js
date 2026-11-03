@@ -55,7 +55,9 @@ async function discoverCandidates(page, maxActions) {
     for (const element of document.querySelectorAll(selector)) {
       if (!isVisible(element) || element.disabled || element.getAttribute("aria-disabled") === "true") continue;
       if (element.isContentEditable || element.tagName === "A") continue;
-      if (element.tagName === "BUTTON" && !["button", ""].includes((element.getAttribute("type") || "").toLowerCase())) continue;
+      const explicitButtonType = (element.getAttribute("type") || "").toLowerCase();
+      if (element.tagName === "BUTTON" && explicitButtonType && explicitButtonType !== "button") continue;
+      if (element.tagName === "BUTTON" && !explicitButtonType && element.closest("form")) continue;
 
       const role = element.getAttribute("role") || "";
       const expanded = element.getAttribute("aria-expanded");
