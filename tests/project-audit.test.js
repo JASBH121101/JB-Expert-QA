@@ -194,6 +194,104 @@ test("PostgreSQL rules flag broad PUBLIC grants and elevated role attributes", a
   assert.equal(report.diagnostics.some((item) => item.id.startsWith("DB-PRIVILEGED-ROLE-") && item.severity === "high"), true);
 });
 
+test("SECURITY DEFINER search_path is evaluated per function, not per file", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "migrations/004_functions.sql",
+      extension: ".sql",
+      lineCount: 6,
+      content: [
+        "CREATE FUNCTION safe_job() RETURNS integer",
+        "LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog",
+        "AS $ SELECT 1; $;",
+        "CREATE FUNCTION unsafe_job() RETURNS integer",
+        "LANGUAGE sql SECURITY DEFINER",
+        "AS $ SELECT 2; $;"
+      ].join("\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const findings = report.diagnostics.filter((item) => item.id.startsWith("DB-POSTGRES-001-"));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].location, /004_functions\.sql:4/);
+});
+
+test("SQL foreign keys without a supporting index are reported across migration files", async () => {
+  const report = await runRules({
+    projectFiles: [
+      {
+        path: "migrations/005_tables.sql",
+        extension: ".sql",
+        lineCount: 5,
+        content: [
+          "CREATE TABLE public.orders (",
+          "  id bigint PRIMARY KEY,",
+          "  customer_id bigint,",
+          "  CONSTRAINT orders_customer_fk FOREIGN KEY (customer_id) REFERENCES public.customers(id)",
+          ");"
+        ].join("\n")
+      },
+      {
+        path: "migrations/006_indexes.sql",
+        extension: ".sql",
+        lineCount: 1,
+        content: "CREATE INDEX invoices_customer_created_idx ON public.invoices (customer_id, created_at);"
+      }
+    ],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const findings = report.diagnostics.filter((item) => item.id.startsWith("DB-FK-INDEX-"));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].metadata.table, "public.orders");
+  assert.deepEqual(findings[0].metadata.foreignKeyColumns, ["customer_id"]);
+});
+
+test("indexed SQL foreign keys are not flagged and concurrent indexes cannot be in explicit transactions", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "migrations/007_indexed.sql",
+      extension: ".sql",
+      lineCount: 5,
+      content: [
+        "BEGIN;",
+        "CREATE INDEX CONCURRENTLY orders_status_idx ON public.orders(status);",
+        "ALTER TABLE public.invoices ADD CONSTRAINT invoices_customer_fk FOREIGN KEY (customer_id) REFERENCES customers(id);",
+        "CREATE INDEX invoices_customer_idx ON public.invoices(customer_id);",
+        "COMMIT;"
+      ].join("\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  assert.equal(report.diagnostics.filter((item) => item.id.startsWith("DB-FK-INDEX-")).length, 0);
+  const concurrent = report.diagnostics.filter((item) => item.id.startsWith("DB-CONCURRENT-INDEX-"));
+  assert.equal(concurrent.length, 1);
+  assert.equal(concurrent[0].severity, "high");
+});
+
+test("SQL inline REFERENCES declarations are reviewed for an index", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "migrations/008_inline_fk.sql",
+      extension: ".sql",
+      lineCount: 4,
+      content: [
+        "CREATE TABLE public.order_items (",
+        "  id bigint PRIMARY KEY,",
+        "  order_id bigint NOT NULL REFERENCES public.orders(id)",
+        ");"
+      ].join("\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const findings = report.diagnostics.filter((item) => item.id.startsWith("DB-FK-INDEX-"));
+  assert.equal(findings.length, 1);
+  assert.deepEqual(findings[0].metadata.foreignKeyColumns, ["order_id"]);
+});
+
 test("scanner marks the result truncated when it reaches the depth limit", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-depth-"));
   try {
@@ -223,7 +321,7 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 15);
+    assert.equal(report.summary.rulesExecuted, 17);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);

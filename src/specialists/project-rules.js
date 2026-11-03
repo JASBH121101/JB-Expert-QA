@@ -231,14 +231,21 @@ export const databaseRules = [
     evaluate(context) {
       const findings = [];
       for (const file of context.projectFiles ?? []) {
-        if (file.extension !== ".sql" || !/\bsecurity\s+definer\b/i.test(file.content)) continue;
-        if (/\bset\s+search_path\b/i.test(file.content)) continue;
-        findings.push(finding("DB-POSTGRES-001-" + file.path.replace(/[^a-z0-9]+/gi, "-"),
-          "SECURITY DEFINER function without an explicit search_path",
-          "The SQL file declares SECURITY DEFINER but no explicit SET search_path was found in the file.",
-          "high", file.path,
-          "Set a trusted search_path on each SECURITY DEFINER function and schema-qualify referenced objects.",
-          { database: "postgresql", requiresManualReview: true }));
+        if (file.extension !== ".sql") continue;
+        for (const statement of sqlStatements(file.content)) {
+          if (!/\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b/i.test(statement.text) ||
+              !/\bSECURITY\s+DEFINER\b/i.test(statement.text)) continue;
+          const asMatch = /\bAS\s+(?:\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$|')/i.exec(statement.text);
+          const declaration = asMatch ? statement.text.slice(0, asMatch.index) : statement.text;
+          if (/\bSET\s+search_path\b/i.test(declaration)) continue;
+          const line = statementLine(file.content, statement);
+          findings.push(finding("DB-POSTGRES-001-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
+            "SECURITY DEFINER function without an explicit search_path",
+            "This SECURITY DEFINER function declaration has no explicit SET search_path before its function body. Another function in the same file does not satisfy this check.",
+            "high", file.path,
+            "Set a trusted search_path on this function and schema-qualify referenced objects.",
+            { database: "postgresql", requiresManualReview: true }, line));
+        }
       }
       return findings;
     }
@@ -270,19 +277,120 @@ export const databaseRules = [
 
 function sqlStatements(content) {
   const statements = [];
-  let offset = 0;
-  for (const statement of content.split(";")) {
-    const clean = statement
-      .replace(/--[^\r\n]*/g, "")
-      .replace(/\/\*[\s\S]*?\*\//g, "");
-    statements.push({ text: clean, offset });
-    offset += statement.length + 1;
+  let start = 0;
+  let index = 0;
+  let text = "";
+
+  const push = (end) => {
+    if (text.trim()) statements.push({ text, offset: start });
+    text = "";
+    start = end;
+  };
+
+  while (index < content.length) {
+    if (content.startsWith("--", index)) {
+      while (index < content.length && content[index] !== "\n" && content[index] !== "\r") {
+        text += " ";
+        index += 1;
+      }
+      continue;
+    }
+
+    if (content.startsWith("/*", index)) {
+      let depth = 1;
+      text += "  ";
+      index += 2;
+      while (index < content.length && depth > 0) {
+        if (content.startsWith("/*", index)) {
+          depth += 1;
+          text += "  ";
+          index += 2;
+        } else if (content.startsWith("*/", index)) {
+          depth -= 1;
+          text += "  ";
+          index += 2;
+        } else {
+          const current = content[index++];
+          text += current === "\n" || current === "\r" ? current : " ";
+        }
+      }
+      continue;
+    }
+
+    const current = content[index];
+    if (current === "'" || current === '"') {
+      const quote = current;
+      text += current;
+      index += 1;
+      while (index < content.length) {
+        const value = content[index++];
+        text += value;
+        if (value === quote) {
+          if (content[index] === quote) {
+            text += content[index++];
+            continue;
+          }
+          break;
+        }
+        if (value === "\\" && index < content.length) text += content[index++];
+      }
+      continue;
+    }
+
+    if (current === "$") {
+      const tag = /^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/.exec(content.slice(index))?.[0];
+      if (tag) {
+        text += tag;
+        index += tag.length;
+        const closing = content.indexOf(tag, index);
+        if (closing < 0) {
+          text += content.slice(index);
+          index = content.length;
+        } else {
+          text += content.slice(index, closing + tag.length);
+          index = closing + tag.length;
+        }
+        continue;
+      }
+    }
+
+    if (current === ";") {
+      push(index + 1);
+      index += 1;
+      continue;
+    }
+
+    text += current;
+    index += 1;
   }
+
+  push(content.length);
   return statements;
+}
+
+function sqlIdentifier(value) {
+  return value.trim().replace(/"/g, "").replace(/\s+/g, "").toLowerCase();
+}
+
+function sqlColumns(value) {
+  return value.split(",").map((part) => {
+    const match = part.trim().match(/^"?([A-Za-z_][A-Za-z0-9_$]*)"?/);
+    return match?.[1]?.toLowerCase() ?? null;
+  }).filter(Boolean);
+}
+
+function tableKeyFromStatement(statement) {
+  const match = /\b(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+(?:ONLY\s+)?)(("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s*\.\s*("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*))?)/i.exec(statement);
+  return match ? sqlIdentifier(match[1]) : null;
 }
 
 function sourceLine(content, offset) {
   return content.slice(0, offset).split(/\r\n|\n|\r/).length;
+}
+
+function statementLine(content, statement) {
+  const leadingWhitespace = statement.text.match(/^\s*/)?.[0].length ?? 0;
+  return sourceLine(content, statement.offset + leadingWhitespace);
 }
 
 export const postgresPrismaRules = [
@@ -350,7 +458,7 @@ export const postgresPrismaRules = [
           const broadAll = /\bGRANT\s+ALL(?:\s+PRIVILEGES)?\b[\s\S]*?\bTO\s+PUBLIC\b/i.test(statement.text);
           const schemaCreate = /\bGRANT\s+CREATE\s+ON\s+SCHEMA\b[\s\S]*?\bTO\s+PUBLIC\b/i.test(statement.text);
           if (!broadAll && !schemaCreate) continue;
-          const line = sourceLine(file.content, statement.offset);
+          const line = statementLine(file.content, statement);
           findings.push(finding(
             "DB-PUBLIC-GRANT-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
             "Broad PostgreSQL privileges granted to PUBLIC",
@@ -374,7 +482,7 @@ export const postgresPrismaRules = [
         if (file.extension !== ".sql") continue;
         for (const statement of sqlStatements(file.content)) {
           if (!/\b(?:CREATE|ALTER)\s+(?:ROLE|USER)\b/i.test(statement.text) || !privileged.test(statement.text)) continue;
-          const line = sourceLine(file.content, statement.offset);
+          const line = statementLine(file.content, statement);
           findings.push(finding(
             "DB-PRIVILEGED-ROLE-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
             "Privileged PostgreSQL role attribute detected",
@@ -390,6 +498,101 @@ export const postgresPrismaRules = [
   }
 ];
 
+export const postgresMigrationRules = [
+  {
+    id: "database.foreign-key-index",
+    specialist: "database",
+    evaluate(context) {
+      const sqlFiles = (context.projectFiles ?? []).filter((file) => file.extension === ".sql");
+      const statements = sqlFiles.flatMap((file) =>
+        sqlStatements(file.content).map((statement) => ({ ...statement, file })));
+      const indexes = [];
+
+      for (const item of statements) {
+        const createIndex = /\bCREATE\s+(?:UNIQUE\s+)?INDEX\b[\s\S]*?\bON\s+(?:ONLY\s+)?(("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s*\.\s*("(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*))?)\s*(?:USING\s+\w+\s*)?\(([^)]+)\)/i.exec(item.text);
+        if (createIndex) {
+          indexes.push({ table: sqlIdentifier(createIndex[1]), columns: sqlColumns(createIndex[4]) });
+        }
+
+        const table = tableKeyFromStatement(item.text);
+        if (!table) continue;
+        if (/^\s*CREATE\s+TABLE\b/i.test(item.text)) {
+          for (const constraint of item.text.matchAll(/\b(?:PRIMARY\s+KEY|UNIQUE)\s*\(([^)]+)\)/gi)) {
+            indexes.push({ table, columns: sqlColumns(constraint[1]) });
+          }
+        } else if (/^\s*ALTER\s+TABLE\b/i.test(item.text)) {
+          for (const constraint of item.text.matchAll(/\bADD\s+(?:CONSTRAINT\s+\S+\s+)?(?:PRIMARY\s+KEY|UNIQUE)\s*\(([^)]+)\)/gi)) {
+            indexes.push({ table, columns: sqlColumns(constraint[1]) });
+          }
+        }
+      }
+
+      const findings = [];
+      for (const item of statements) {
+        const table = tableKeyFromStatement(item.text);
+        if (!table || !/^\s*(?:CREATE\s+TABLE|ALTER\s+TABLE)\b/i.test(item.text)) continue;
+        const foreignKeys = [...item.text.matchAll(/\bFOREIGN\s+KEY\s*\(([^)]+)\)/gi)]
+          .map((match) => ({ columns: sqlColumns(match[1]), offset: match.index }));
+        if (/^\s*CREATE\s+TABLE\b/i.test(item.text)) {
+          for (const match of item.text.matchAll(/^[ \t]*(?!(?:CONSTRAINT|FOREIGN|PRIMARY|UNIQUE|CHECK)\b)("?[\w$]+"?)[ \t]+[^,\r\n]*\bREFERENCES\b/gim)) {
+            foreignKeys.push({ columns: sqlColumns(match[1]), offset: match.index });
+          }
+        }
+
+        for (const foreignKey of foreignKeys) {
+          const columns = foreignKey.columns;
+          if (!columns.length) continue;
+          const indexed = indexes.some((index) =>
+            index.table === table &&
+            index.columns.length >= columns.length &&
+            columns.every((column, position) => index.columns[position] === column));
+          if (indexed) continue;
+
+          const line = sourceLine(item.file.content, item.offset + foreignKey.offset);
+          findings.push(finding(
+            "DB-FK-INDEX-" + item.file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
+            "Foreign key may lack a supporting index",
+            "The referencing columns (" + columns.join(", ") + ") have no matching index with the same leading column order among the scanned SQL files. PostgreSQL does not automatically create an index on referencing columns.",
+            "medium", item.file.path,
+            "Review join and delete/update patterns; add an index on the referencing columns in the same order when query workload and write costs justify it.",
+            { database: "postgresql", table, foreignKeyColumns: columns, heuristic: true }, line
+          ));
+        }
+      }
+      return findings;
+    }
+  },
+  {
+    id: "database.concurrent-index-transaction",
+    specialist: "database",
+    evaluate(context) {
+      const findings = [];
+      for (const file of context.projectFiles ?? []) {
+        if (file.extension !== ".sql") continue;
+        const statements = sqlStatements(file.content);
+        const hasExplicitTransaction = statements.some((item) =>
+          /^\s*(?:BEGIN|START\s+TRANSACTION)\b/i.test(item.text));
+        if (!hasExplicitTransaction) continue;
+
+        for (const statement of statements) {
+          if (!/\bCREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\b/i.test(statement.text)) continue;
+          const line = statementLine(file.content, statement);
+          findings.push(finding(
+            "DB-CONCURRENT-INDEX-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + line,
+            "CREATE INDEX CONCURRENTLY appears inside an explicit transaction",
+            "PostgreSQL does not allow CREATE INDEX CONCURRENTLY to run inside a transaction block, while this migration file contains an explicit transaction boundary.",
+            "high", file.path,
+            "Move the concurrent index operation into a migration step that runs outside a transaction, or use a regular index build only when the locking impact is acceptable.",
+            { database: "postgresql", requiresMigrationReview: true }, line
+          ));
+        }
+      }
+      return findings;
+    }
+  }
+];
+
 export const projectRules = Object.freeze([
-  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules, ...postgresPrismaRules
+  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules, ...postgresPrismaRules,
+  ...postgresMigrationRules
 ]);
