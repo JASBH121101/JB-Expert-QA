@@ -161,7 +161,7 @@ test("Prisma relation fields without a supporting leading index are reported", a
         "  customer Customer @relation(fields: [customerId], references: [id])",
         "  @@index([customerId, createdAt])",
         "}"
-      ].join("\\n")
+      ].join("\n")
     }],
     projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
     packageManifests: []
@@ -184,7 +184,7 @@ test("PostgreSQL rules flag broad PUBLIC grants and elevated role attributes", a
         "CREATE ROLE app_runtime WITH LOGIN NOSUPERUSER;",
         "ALTER ROLE app_runtime WITH BYPASSRLS;",
         "GRANT CREATE ON SCHEMA public TO PUBLIC;"
-      ].join("\\n")
+      ].join("\n")
     }],
     projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
     packageManifests: []
