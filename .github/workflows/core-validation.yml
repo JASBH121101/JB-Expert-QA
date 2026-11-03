@@ -1,4 +1,5 @@
 name: Core validation
+# Keep browser-state exploration tests in the same validation matrix as static and visual checks.
 
 on:
   push:
