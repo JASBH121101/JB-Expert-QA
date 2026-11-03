@@ -40,9 +40,11 @@ export async function auditUrl(url, {
   headless = true,
   runAxe = true,
   allowPrivateNetworks = false,
+  sameOriginOnly = false,
   screenshotPath = null,
   screenshotFullPage = false
 } = {}) {
+  if (typeof sameOriginOnly !== "boolean") throw new TypeError("sameOriginOnly must be a boolean");
   if (screenshotPath !== null && (typeof screenshotPath !== "string" || !screenshotPath.trim())) throw new TypeError("screenshotPath must be a non-empty path");
   const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
   const parsed = await assertSafeUrl(url);
@@ -79,6 +81,9 @@ export async function auditUrl(url, {
       try {
         const requestProtocol = new URL(requestUrl).protocol;
         if (["http:", "https:"].includes(requestProtocol)) {
+          if (sameOriginOnly && new URL(requestUrl).origin !== parsed.origin) {
+            throw new Error("Request blocked by same-origin-only audit policy");
+          }
           await assertSafeUrl(requestUrl);
         }
         await route.continue();
@@ -94,6 +99,10 @@ export async function auditUrl(url, {
     await page.routeWebSocket("**/*", async (webSocketRoute) => {
       const socketUrl = webSocketRoute.url();
       try {
+        const normalizedSocketUrl = socketUrl.replace(/^ws:/i, "http:").replace(/^wss:/i, "https:");
+        if (sameOriginOnly && new URL(normalizedSocketUrl).origin !== parsed.origin) {
+          throw new Error("WebSocket blocked by same-origin-only audit policy");
+        }
         await assertSafeWebSocketUrl(socketUrl, assertSafeUrl);
         webSocketRoute.connectToServer();
       } catch (error) {
@@ -163,6 +172,7 @@ export async function auditUrl(url, {
         failedRequests: runtimeIssues.failedRequests.length,
         httpErrors: runtimeIssues.httpErrors.length,
         blockedRequests: runtimeIssues.blockedRequests.length,
+        sameOriginOnly,
         interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
         axeViolations: context.axeViolations?.length ?? null,
         screenshotPath
