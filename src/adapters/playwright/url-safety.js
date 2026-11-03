@@ -96,6 +96,7 @@ function isPrivateIPv6(address) {
 
   // Accept only global-unicast space; deny transition and documentation ranges.
   if ((first & 0xe000) !== 0x2000) return true;
+  if (first === 0x3fff && (groups[1] & 0xf000) === 0) return true; // Documentation (3fff::/20)
   if (first === 0x2001 && (groups[1] <= 0x01ff || groups[1] === 0x0db8)) return true;
   if (first === 0x2002) return true; // 6to4 transition range
   return false;
