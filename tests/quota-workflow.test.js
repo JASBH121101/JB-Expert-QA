@@ -21,5 +21,5 @@ test("website audit workflow saves only a quota marker and only when newly creat
 
 test("website audit workflow serializes manual runs sharing provider quotas", async () => {
   const workflow = await readFile(new URL("../.github/workflows/site-audit.yml", import.meta.url), "utf8");
-  assert.match(workflow, /concurrency:\\s+group: jb-expert-qa-site-audit\\s+cancel-in-progress: false/);
+  assert.match(workflow, /concurrency:\s+group: jb-expert-qa-site-audit\s+cancel-in-progress: false/);
 });
