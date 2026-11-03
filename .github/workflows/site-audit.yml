@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       ai_visual_review:
-        description: "Send public-site screenshots to Gemini for optional visual critique"
+        description: "Use AI for a deliberate, high-value visual review (Gemini primary; Cloudflare fallback)"
         required: true
         type: boolean
         default: false
@@ -65,8 +65,13 @@ jobs:
           REPORT_FORMAT: ${{ inputs.report_format }}
           CAPTURE_SCREENSHOTS: ${{ inputs.capture_screenshots }}
           AI_VISUAL_REVIEW: ${{ inputs.ai_visual_review }}
+          JBQA_AI_ENABLED: ${{ inputs.ai_visual_review && 'true' || 'false' }}
           GEMINI_API_KEY: ${{ inputs.ai_visual_review && secrets.GEMINI_API_KEY || '' }}
           GEMINI_VISION_MODEL: ${{ vars.GEMINI_VISION_MODEL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ inputs.ai_visual_review && secrets.CLOUDFLARE_ACCOUNT_ID || '' }}
+          CLOUDFLARE_API_TOKEN: ${{ inputs.ai_visual_review && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          CLOUDFLARE_FREE_TIER_CONFIRMED: ${{ vars.CLOUDFLARE_FREE_TIER_CONFIRMED }}
+          CLOUDFLARE_MAX_REQUESTS_PER_RUN: "4"
         run: |
           set -euo pipefail
 
@@ -108,8 +113,12 @@ jobs:
               echo "AI visual review requires screenshot capture and the matrix viewport profile."
               exit 2
             fi
-            if [[ -z "\${GEMINI_API_KEY:-}" ]]; then
-              echo "AI visual review was requested, but the GEMINI_API_KEY repository secret is not configured."
+            cf_ready=false
+            if [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" && -n "${CLOUDFLARE_API_TOKEN:-}" && "${CLOUDFLARE_FREE_TIER_CONFIRMED:-}" == "true" ]]; then
+              cf_ready=true
+            fi
+            if [[ -z "${GEMINI_API_KEY:-}" && "$cf_ready" != "true" ]]; then
+              echo "AI visual review requires Gemini credentials or Cloudflare credentials with the Free-tier confirmation."
               exit 2
             fi
             args+=(--ai-visual-review)
