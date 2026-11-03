@@ -20,7 +20,7 @@ test("Cloudflare provider is disabled unless free-tier status is explicitly conf
     fetchImpl: async () => fakeResponse()
   });
   assert.equal(provider.isConfigured, false);
-  assert.rejects(provider.generateJson({
+  await assert.rejects(provider.generateJson({
     systemInstruction: "Return JSON.",
     prompt: "Test."
   }), { code: "provider_not_configured" });
