@@ -69,6 +69,41 @@ export function validateEngineConfig(input = {}) {
     }
   }
 
+  const suppliedAdvisories = input.advisories ?? {};
+  if (!isRecord(suppliedAdvisories)) {
+    throw new TypeError("config.advisories must be an object");
+  }
+  const advisoryDefaults = {
+    enabled: false,
+    required: false,
+    provider: "osv",
+    maxPackages: 1000,
+    batchSize: 100,
+    maxVulnerabilities: 200,
+    timeoutMs: 8000
+  };
+  for (const [name, value] of Object.entries(suppliedAdvisories)) {
+    if (!Object.hasOwn(advisoryDefaults, name)) {
+      throw new TypeError("Unknown advisory option: \"" + name + "\"");
+    }
+    if (["enabled", "required"].includes(name) && typeof value !== "boolean") {
+      throw new TypeError("config.advisories." + name + " must be a boolean");
+    }
+    if (name === "provider" && value !== "osv") {
+      throw new TypeError("config.advisories.provider must be \"osv\"");
+    }
+    if (["maxPackages", "batchSize", "maxVulnerabilities", "timeoutMs"].includes(name)) {
+      if (!Number.isInteger(value) || value < 1) {
+        throw new TypeError("config.advisories." + name + " must be a positive integer");
+      }
+      const upperBounds = { maxPackages: 5000, batchSize: 100, maxVulnerabilities: 1000, timeoutMs: 30000 };
+      if (value > upperBounds[name]) {
+        throw new TypeError("config.advisories." + name + " exceeds the safety limit of " + upperBounds[name]);
+      }
+    }
+  }
+  const advisories = { ...advisoryDefaults, ...suppliedAdvisories };
+
   const profile = input.profile ?? "custom";
   if (typeof profile !== "string" || !profile.trim()) {
     throw new TypeError("config.profile must be a non-empty string");
@@ -87,6 +122,7 @@ export function validateEngineConfig(input = {}) {
       minimumScore,
       failOnCritical
     }),
-    scan: Object.freeze({ ...scanDefaults, ...scan })
+    scan: Object.freeze({ ...scanDefaults, ...scan }),
+    advisories: Object.freeze(advisories)
   });
 }
