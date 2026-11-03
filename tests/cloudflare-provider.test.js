@@ -12,7 +12,7 @@ const common = {
   freeTierConfirmed: true
 };
 
-test("Cloudflare provider is disabled unless free-tier status is explicitly confirmed", () => {
+test("Cloudflare provider is disabled unless free-tier status is explicitly confirmed", async () => {
   const provider = createCloudflareProvider({
     accountId: "account-test",
     apiToken: "token-test",
