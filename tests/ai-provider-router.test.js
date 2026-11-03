@@ -1,0 +1,69 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createAiProviderRouter } from "../src/ai/provider-router.js";
+
+function provider(name, sequence, calls) {
+  return {
+    provider: name,
+    isConfigured: true,
+    async generateJson(input) {
+      calls.push({ name, input });
+      const next = sequence.shift();
+      if (next instanceof Error) throw next;
+      return next;
+    }
+  };
+}
+
+function quotaError(message = "Quota exhausted") {
+  const error = new Error(message);
+  error.code = "quota_exhausted";
+  return error;
+}
+
+test("AI router is disabled by default and makes no provider request", async () => {
+  const calls = [];
+  const primary = provider("gemini", [{ ok: true }], calls);
+  const fallback = provider("cloudflare", [{ ok: true }], calls);
+  const router = createAiProviderRouter({ primary, fallback });
+  assert.equal(router.isConfigured, false);
+  await assert.rejects(router.generateJson({ prompt: "test" }), { code: "ai_disabled_by_policy" });
+  assert.equal(calls.length, 0);
+});
+
+test("AI router switches from exhausted Gemini to Cloudflare and keeps using fallback", async () => {
+  const calls = [];
+  const primary = provider("gemini", [quotaError()], calls);
+  const fallback = provider("cloudflare", [{ source: "fallback-1" }, { source: "fallback-2" }], calls);
+  const router = createAiProviderRouter({ enabled: true, primary, fallback });
+
+  assert.deepEqual(await router.generateJson({ prompt: "first" }), { source: "fallback-1" });
+  assert.deepEqual(await router.generateJson({ prompt: "second" }), { source: "fallback-2" });
+  assert.deepEqual(calls.map((call) => call.name), ["gemini", "cloudflare", "cloudflare"]);
+  assert.equal(router.getStatus().primary, "quota-exhausted");
+  assert.equal(router.getStatus().lastProvider, "cloudflare");
+});
+
+test("AI router disables every provider when Cloudflare free quota is exhausted", async () => {
+  const calls = [];
+  const primary = provider("gemini", [quotaError()], calls);
+  const fallback = provider("cloudflare", [quotaError()], calls);
+  const router = createAiProviderRouter({ enabled: true, primary, fallback });
+
+  await assert.rejects(router.generateJson({ prompt: "first" }), { code: "ai_quota_exhausted" });
+  await assert.rejects(router.generateJson({ prompt: "second" }), { code: "ai_disabled_for_run" });
+  assert.deepEqual(calls.map((call) => call.name), ["gemini", "cloudflare"]);
+  assert.equal(router.getStatus().aiDisabled, true);
+});
+
+test("AI router falls back on Gemini network errors but does not retry either provider", async () => {
+  const calls = [];
+  const networkError = new Error("network");
+  networkError.code = "provider_network_error";
+  const primary = provider("gemini", [networkError, { shouldNotRun: true }], calls);
+  const fallback = provider("cloudflare", [{ ok: true }], calls);
+  const router = createAiProviderRouter({ enabled: true, primary, fallback });
+
+  assert.deepEqual(await router.generateJson({ prompt: "test" }), { ok: true });
+  assert.deepEqual(calls.map((call) => call.name), ["gemini", "cloudflare"]);
+});
