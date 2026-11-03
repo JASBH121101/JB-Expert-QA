@@ -5,12 +5,13 @@ import {
   accessibilityRules,
   performanceRules,
   functionalRules,
-  consistencyRules
+  consistencyRules,
+  uiUxRules
 } from "../src/specialists/index.js";
 
 const config = {
   profile: "expanded-specialists",
-  weights: { accessibility: 25, performance: 25, functional: 25, consistency: 25 },
+  weights: { accessibility: 20, performance: 20, functional: 20, consistency: 20, "ui-ux": 20 },
   severityPenalties: { critical: 25, high: 12, medium: 5, low: 2, info: 0 },
   thresholds: { minimumScore: 0, failOnCritical: true }
 };
@@ -82,4 +83,46 @@ test("consistency detects different proportions in repeated cards", async () => 
     ]
   });
   assert.ok(report.diagnostics.some((item) => item.id === "CONS-001"));
+});
+
+
+test("UI/UX reports overlapping controls and identifies which target is blocked", async () => {
+  const report = await runRules(uiUxRules, {
+    interactiveOverlaps: [
+      {
+        selectorA: "#save",
+        selectorB: "#cancel",
+        overlapAreaPx2: 2200,
+        overlapPercentOfSmallerTarget: 45.8,
+        blockedSelector: "#save",
+        blockingSelector: "#cancel",
+        blockedSampleRatio: 1,
+        sampleCount: 5,
+        positionA: "absolute",
+        positionB: "absolute",
+        zIndexA: "1",
+        zIndexB: "2"
+      },
+      {
+        selectorA: "#menu-trigger",
+        selectorB: "#menu-label",
+        overlapAreaPx2: 120,
+        overlapPercentOfSmallerTarget: 12,
+        blockedSelector: null,
+        blockingSelector: null,
+        blockedSampleRatio: 0,
+        sampleCount: 5
+      }
+    ]
+  });
+  const findings = report.diagnostics.filter((item) => item.id.startsWith("UIUX-004-"));
+  assert.equal(findings.length, 2);
+  const blocked = findings.find((item) => item.evidence.blockedSelector === "#save");
+  assert.ok(blocked);
+  assert.equal(blocked.severity, "high");
+  assert.equal(blocked.evidence.blockingSelector, "#cancel");
+  assert.match(blocked.description, /45\.8%/);
+  const geometric = findings.find((item) => item.evidence.blockedSelector === null);
+  assert.ok(geometric);
+  assert.equal(geometric.severity, "low");
 });
