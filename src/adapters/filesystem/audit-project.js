@@ -5,6 +5,7 @@ import { RuleRegistry } from "../../core/rule-registry.js";
 import { ENGINE_VERSION } from "../../core/version.js";
 import projectConfig from "../../../config/project-audit.config.json" with { type: "json" };
 import { scanProject } from "./scan-project.js";
+import { scanNpmAdvisories } from "../advisories/osv.js";
 import { projectRules } from "../../specialists/project-rules.js";
 
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
@@ -13,6 +14,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   const validatedConfig = validateEngineConfig(config);
   const effectiveScanOptions = { ...validatedConfig.scan, ...scanOptions };
   const scan = await scanProject(root, effectiveScanOptions);
+  const dependencyAdvisories = await scanNpmAdvisories(scan, validatedConfig.advisories);
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
 
@@ -26,7 +28,8 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     projectFiles: scan.files,
     packageManifests: scan.manifests,
     projectScan: scan,
-    thresholds: validatedConfig.thresholds
+    thresholds: validatedConfig.thresholds,
+    dependencyAdvisoryScan: dependencyAdvisories
   };
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
 
@@ -36,6 +39,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     version: ENGINE_VERSION,
     target: Object.freeze({ project: basename(root) }),
     projectScan: scan.summary,
+    dependencyAdvisories,
     analysisScope: Object.freeze({
       mode: "local-static",
       complete: scanComplete,
@@ -46,13 +50,18 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
         unreadableFiles: scan.summary.unreadableFiles
       }),
       filesAnalyzed: scan.summary.filesRead,
-      networkRequests: 0,
-      dependencyAdvisoryLookup: false,
+      networkRequests: dependencyAdvisories.networkRequests ?? 0,
+      dependencyAdvisoryLookup: dependencyAdvisories.enabled,
+      dependencyAdvisoryStatus: dependencyAdvisories.status,
       secretsCopiedToReport: false,
       limitations: Object.freeze([
         "Static pattern checks require manual review and can produce false positives.",
         "Dependency CVEs and current package versions are not checked because no advisory service is queried.",
         "The scanner does not execute project code, install dependencies, or connect to the database.",
+        ...(dependencyAdvisories.enabled ? [
+          "When enabled, only package names and exact versions from supported npm lockfiles or pinned manifests are sent to OSV.dev; source code and credentials are not sent.",
+          ...(dependencyAdvisories.complete ? [] : ["Dependency advisory coverage is partial or unavailable; see dependencyAdvisories status and message."])
+        ] : ["Online dependency advisory lookup is disabled for this profile."]),
         ...(scanComplete ? [] : ["The scan is incomplete; the result is blocked until omitted files can be inspected."])
       ])
     })
