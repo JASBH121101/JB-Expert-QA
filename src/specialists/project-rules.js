@@ -282,39 +282,6 @@ export const securityRules = [
       const patterns = [
         { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high" },
         { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high" },
-        { regex: /\.innerHTML\s*=/, label: "Direct HTML injection sink", severity: "medium" },
-        { regex: /\binsertAdjacentHTML\s*\(/, label: "HTML insertion API", severity: "medium" },
-        { regex: /\bdangerouslySetInnerHTML\b/, label: "React raw HTML rendering", severity: "medium" },
-        { regex: /\brejectUnauthorized\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high" }
-      ];
-      const findings = [];
-      for (const file of context.projectFiles ?? []) {
-        const lines = file.content.split(/\r\n|\n|\r/);
-        for (let index = 0; index < lines.length; index += 1) {
-          const line = lines[index];
-          if (commentLine(line)) continue;
-          for (const pattern of patterns) {
-            if (!pattern.regex.test(line)) continue;
-            findings.push(finding(
-              "SEC-CODE-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1) + "-" + pattern.label.replace(/[^a-z0-9]+/gi, "-"),
-              pattern.label,
-              "A potentially unsafe code pattern was detected. Static matching cannot determine whether untrusted input reaches this operation.",
-              pattern.severity, file.path,
-              "Review the data flow and trust boundary. Prefer safe APIs, contextual output encoding, and verified TLS.",
-              { detector: pattern.label, requiresManualReview: true }, index + 1));
-          }
-        }
-      }
-      return findings;
-    }
-  },
-  {
-    id: "security.dynamic-code",
-    specialist: "security",
-    evaluate(context) {
-      const patterns = [
-        { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high" },
-        { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high" },
         { regex: /\brejectUnauthorized\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high" }
       ];
       const findings = [];
