@@ -50,6 +50,25 @@ export function validateEngineConfig(input = {}) {
     throw new TypeError("config.thresholds.failOnCritical must be a boolean");
   }
 
+  const scan = input.scan ?? {};
+  if (!isRecord(scan)) {
+    throw new TypeError("config.scan must be an object");
+  }
+  const scanDefaults = {
+    maxFiles: 2500,
+    maxFileBytes: 1_000_000,
+    maxTotalBytes: 20_000_000,
+    maxDepth: 20
+  };
+  for (const [name, value] of Object.entries(scan)) {
+    if (!Object.hasOwn(scanDefaults, name)) {
+      throw new TypeError("Unknown project scan option: \"" + name + "\"");
+    }
+    if (!Number.isInteger(value) || value < 1) {
+      throw new TypeError("config.scan." + name + " must be a positive integer");
+    }
+  }
+
   const profile = input.profile ?? "custom";
   if (typeof profile !== "string" || !profile.trim()) {
     throw new TypeError("config.profile must be a non-empty string");
@@ -67,6 +86,7 @@ export function validateEngineConfig(input = {}) {
       ...thresholds,
       minimumScore,
       failOnCritical
-    })
+    }),
+    scan: Object.freeze({ ...scanDefaults, ...scan })
   });
 }
