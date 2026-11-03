@@ -45,6 +45,8 @@ export async function auditUrl(url, {
   interactionExploration = false,
   maxInteractionActions = 8,
   interactionSettleMs = 180,
+  interactionScreenshotDir = null,
+  interactionViewportName = "default",
   screenshotPath = null,
   screenshotFullPage = false
 } = {}) {
@@ -135,7 +137,9 @@ export async function auditUrl(url, {
         thresholds: config.thresholds ?? {},
         maxActions: maxInteractionActions,
         settleMs: interactionSettleMs,
-        timeout
+        timeout,
+        screenshotDir: interactionScreenshotDir ?? (screenshotPath ? join(dirname(screenshotPath), "interaction-states") : null),
+        viewportName: interactionViewportName
       });
       context.interactiveElements = [
         ...(context.interactiveElements ?? []).map((item) => ({ ...item, state: "initial" })),
@@ -269,7 +273,9 @@ export async function auditViewports(url, {
       ...options,
       screenshotPath,
       screenshotFullPage,
-      viewport: { width: viewport.width, height: viewport.height }
+      viewport: { width: viewport.width, height: viewport.height },
+      interactionScreenshotDir: screenshotDir ? join(screenshotDir, "interaction-states") : null,
+      interactionViewportName: safeName
     });
     let visualComparison = null;
     if (baselineDir) {
