@@ -44,11 +44,11 @@ test("auto-repair rejects missing opt-ins before making an AI request", async ()
   assert.equal(provider.calls.length, 0);
 });
 
-test("default autopilot produces a plan without uploading source or changing a repository", async () => {
+test("explicit AI opt-in can produce a plan without uploading source or changing a repository", async () => {
   const root = await fixtureProject();
   try {
     const provider = fakeProvider("low");
-    const result = await runAutopilot(root, { provider });
+    const result = await runAutopilot(root, { provider, minProjectFiles: 1, minProjectBytes: 1 });
     assert.equal(result.status, "plan-only");
     assert.equal(result.safety.sourceUploadedToAi, false);
     assert.equal(result.safety.isolatedGitWorktree, false);
@@ -67,6 +67,8 @@ test("medium-risk plans remain advisory even when repair flags are present", asy
     const provider = fakeProvider("medium");
     const result = await runAutopilot(root, {
       provider,
+      minProjectFiles: 1,
+      minProjectBytes: 1,
       applyLowRisk: true,
       allowSourceUpload: true,
       runTests: true
@@ -75,6 +77,36 @@ test("medium-risk plans remain advisory even when repair flags are present", asy
     assert.equal(result.safety.sourceUploadedToAi, false);
     assert.equal(result.safety.isolatedGitWorktree, false);
     assert.equal(result.safety.testsExecuted, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("autopilot defaults to deterministic local audit and does not call AI", async () => {
+  const root = await fixtureProject();
+  try {
+    const result = await runAutopilot(root);
+    assert.equal(result.status, "ai-not-requested");
+    assert.equal(result.safety.sourceUploadedToAi, false);
+    assert.equal(result.planning, null);
+    assert.equal(result.audit.scanComplete, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("autopilot skips AI when an explicitly selected project is below both size thresholds", async () => {
+  const root = await fixtureProject();
+  try {
+    const provider = fakeProvider("low");
+    const result = await runAutopilot(root, {
+      provider,
+      minProjectFiles: 100,
+      minProjectBytes: 1024 * 1024
+    });
+    assert.equal(result.status, "ai-skipped-small-project");
+    assert.equal(result.planning, null);
+    assert.equal(provider.calls.length, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
