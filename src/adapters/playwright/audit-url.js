@@ -17,6 +17,7 @@ import {
   consistencyRules
 } from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
+import { exploreInteractionStates } from "./interactions.js";
 import defaultConfig from "../../../config/default.config.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
@@ -41,10 +42,14 @@ export async function auditUrl(url, {
   runAxe = true,
   allowPrivateNetworks = false,
   sameOriginOnly = false,
+  interactionExploration = false,
+  maxInteractionActions = 8,
+  interactionSettleMs = 180,
   screenshotPath = null,
   screenshotFullPage = false
 } = {}) {
   if (typeof sameOriginOnly !== "boolean") throw new TypeError("sameOriginOnly must be a boolean");
+  if (typeof interactionExploration !== "boolean") throw new TypeError("interactionExploration must be a boolean");
   if (screenshotPath !== null && (typeof screenshotPath !== "string" || !screenshotPath.trim())) throw new TypeError("screenshotPath must be a non-empty path");
   const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
   const parsed = await assertSafeUrl(url);
@@ -122,6 +127,45 @@ export async function auditUrl(url, {
       ...resource,
       name: redactUrlForReport(resource.name)
     }));
+
+    let interactionResult = null;
+    if (interactionExploration) {
+      interactionResult = await exploreInteractionStates(page, {
+        url: parsed.href,
+        thresholds: config.thresholds ?? {},
+        maxActions: maxInteractionActions,
+        settleMs: interactionSettleMs,
+        timeout
+      });
+      context.interactiveElements = [
+        ...(context.interactiveElements ?? []).map((item) => ({ ...item, state: "initial" })),
+        ...interactionResult.interactiveElements
+      ];
+      context.interactiveOverlaps = [
+        ...(context.interactiveOverlaps ?? []).map((item) => ({ ...item, state: "initial" })),
+        ...interactionResult.interactiveOverlaps
+      ];
+      context.interactionExploration = {
+        enabled: true,
+        candidatesDiscovered: interactionResult.candidatesDiscovered,
+        actionsAttempted: interactionResult.actionsAttempted,
+        statesCaptured: interactionResult.statesCaptured,
+        overlapsFound: interactionResult.overlapsFound,
+        states: interactionResult.states,
+        skipped: interactionResult.skipped
+      };
+    } else {
+      context.interactionExploration = {
+        enabled: false,
+        candidatesDiscovered: 0,
+        actionsAttempted: 0,
+        statesCaptured: 0,
+        overlapsFound: 0,
+        states: [],
+        skipped: []
+      };
+    }
+
     Object.assign(context, runtimeIssues);
 
     if (runAxe) {
@@ -174,6 +218,10 @@ export async function auditUrl(url, {
         blockedRequests: runtimeIssues.blockedRequests.length,
         sameOriginOnly,
         interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
+        interactionStatesChecked: context.interactionExploration?.statesCaptured ?? 0,
+        interactionCandidates: context.interactionExploration?.candidatesDiscovered ?? 0,
+        interactionActionsAttempted: context.interactionExploration?.actionsAttempted ?? 0,
+        interactionExploration: context.interactionExploration,
         axeViolations: context.axeViolations?.length ?? null,
         screenshotPath
       }
