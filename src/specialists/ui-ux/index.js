@@ -52,7 +52,7 @@ export const uiUxRules = [
           description: `${getElementLabel(element)} measures ${Number(element.width)}×${Number(element.height)}px in ${element.state ?? "the initial page state"}.`,
           severity: "medium",
           location: element.selector ?? null,
-          evidence: { widthPx: Number(element.width), heightPx: Number(element.height), configuredMinimumPx: minimum, state: element.state ?? "initial", triggerSelector: element.triggerSelector ?? null },
+          evidence: { widthPx: Number(element.width), heightPx: Number(element.height), configuredMinimumPx: minimum, state: element.state ?? "initial", triggerSelector: element.triggerSelector ?? null, screenshotPath: element.screenshotPath ?? null },
           recommendation: "Increase the clickable or touch area, or provide sufficient spacing around the control."
         }));
     }
@@ -106,7 +106,8 @@ export const uiUxRules = [
               zIndexA: overlap.zIndexA ?? null,
               zIndexB: overlap.zIndexB ?? null,
               state: overlap.state ?? "initial",
-              triggerSelector: overlap.triggerSelector ?? null
+              triggerSelector: overlap.triggerSelector ?? null,
+              screenshotPath: overlap.screenshotPath ?? null
             },
             recommendation: "Separate the controls at this viewport or correct their positioning and stacking order. Check the page in the affected viewport and confirm that every visible control has an unobstructed, independent hit target. Intentional menus and dialogs should not leave background controls interactable."
           };
