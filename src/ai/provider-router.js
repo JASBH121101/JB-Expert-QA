@@ -60,6 +60,7 @@ export function createAiProviderRouter({
     primaryExhausted: false,
     primaryUnavailable: false,
     fallbackDisabled: cloudflareDailyExhausted,
+    fallbackDailyQuotaExhausted: cloudflareDailyExhausted,
     allAiDisabled: !enabled,
     lastProvider: null,
     disableReason: !enabled
@@ -86,9 +87,11 @@ export function createAiProviderRouter({
         enabled: state.enabled,
         primary: primary && primary.isConfigured !== false && !state.primaryExhausted && !state.primaryUnavailable
           ? "available" : state.primaryExhausted ? "quota-exhausted" : "unavailable",
-        fallback: state.fallbackDisabled
+        fallback: state.fallbackDailyQuotaExhausted
           ? "daily-quota-exhausted"
-          : fallback && fallback.isConfigured !== false ? "available" : "not-configured",
+          : state.fallbackDisabled
+            ? "disabled-for-run"
+            : fallback && fallback.isConfigured !== false ? "available" : "not-configured",
         lastProvider: state.lastProvider,
         aiDisabled: state.allAiDisabled,
         disableReason: state.disableReason
@@ -129,11 +132,12 @@ export function createAiProviderRouter({
               state.disableReason = "Gemini quota exhausted; switched to Cloudflare Workers AI";
             } else {
               state.fallbackDisabled = true;
+              state.fallbackDailyQuotaExhausted = lastError.quotaScope === "daily";
               state.allAiDisabled = true;
-              state.disableReason = lastError.quotaScope === "daily"
+              state.disableReason = state.fallbackDailyQuotaExhausted
                 ? "Cloudflare Workers AI daily free allocation exhausted; all AI disabled for this run"
                 : "Cloudflare Workers AI per-run request budget exhausted; all AI disabled for this run";
-              if (lastError.quotaScope === "daily") persistCloudflareQuota(quotaStatePath);
+              if (state.fallbackDailyQuotaExhausted) persistCloudflareQuota(quotaStatePath);
               throw unavailableError("ai_quota_exhausted", state.disableReason);
             }
             continue;
