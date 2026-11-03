@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
 function startServer(handler) {
@@ -47,6 +50,7 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
   });
 
   const url = "http://127.0.0.1:" + server.address().port + "/";
+  const screenshotRoot = await mkdtemp(join(tmpdir(), "jb-expert-qa-interactions-"));
   try {
     const report = await auditUrl(url, {
       config: {
@@ -61,7 +65,9 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
       allowPrivateNetworks: true,
       sameOriginOnly: true,
       interactionExploration: true,
-      maxInteractionActions: 8
+      maxInteractionActions: 8,
+      interactionScreenshotDir: screenshotRoot,
+      interactionViewportName: "mobile"
     });
 
     const overlap = report.diagnostics.find((item) =>
@@ -79,14 +85,17 @@ test("interactive exploration opens a closed sidebar and detects its overlapping
     assert.equal(report.evidence.interactionExploration.enabled, true);
     assert.equal(report.evidence.interactionExploration.states[0].overlapCount > 0, true);
     assert.equal(report.evidence.interactionExploration.skipped.length, 0);
+    assert.ok(overlap.evidence.screenshotPath, "should attach a screenshot of the open sidebar state");
+    const screenshot = await readFile(overlap.evidence.screenshotPath);
+    assert.equal(screenshot.subarray(1, 4).toString(), "PNG");
     assert.equal(report.target.pageTitle, "Closed sidebar fixture");
   } finally {
+    await rm(screenshotRoot, { recursive: true, force: true });
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
 test("interaction exploration does not click destructive or submit actions", { timeout: 30000 }, async () => {
-  let destructiveClicks = 0;
   const server = await startServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(`<!doctype html>
@@ -120,7 +129,7 @@ test("interaction exploration does not click destructive or submit actions", { t
     });
     assert.equal(report.evidence.interactionExploration.candidatesDiscovered, 1);
     assert.equal(report.evidence.interactionExploration.actionsAttempted, 1);
-    assert.equal(destructiveClicks, 0);
+    assert.equal(report.evidence.interactionExploration.states[0].triggerSelector, "#menu-toggle");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
