@@ -49,10 +49,10 @@ export const uiUxRules = [
         .map((element, index) => ({
           id: `UIUX-003-${index + 1}`,
           title: "Interactive target is unusually small",
-          description: `${getElementLabel(element)} measures ${Number(element.width)}×${Number(element.height)}px.`,
+          description: `${getElementLabel(element)} measures ${Number(element.width)}×${Number(element.height)}px in ${element.state ?? "the initial page state"}.`,
           severity: "medium",
           location: element.selector ?? null,
-          evidence: { widthPx: Number(element.width), heightPx: Number(element.height), configuredMinimumPx: minimum },
+          evidence: { widthPx: Number(element.width), heightPx: Number(element.height), configuredMinimumPx: minimum, state: element.state ?? "initial", triggerSelector: element.triggerSelector ?? null },
           recommendation: "Increase the clickable or touch area, or provide sufficient spacing around the control."
         }));
     }
@@ -89,7 +89,7 @@ export const uiUxRules = [
               : "Interactive controls overlap",
             description: (overlap.selectorA || "Control A") + " and " +
               (overlap.selectorB || "Control B") + " intersect by " + overlapPercent +
-              "% of the smaller target. " + obstruction + ".",
+              "% of the smaller target in " + (overlap.state ?? "the initial page state") + ". " + obstruction + ".",
             severity,
             location,
             evidence: {
@@ -104,7 +104,9 @@ export const uiUxRules = [
               positionA: overlap.positionA ?? null,
               positionB: overlap.positionB ?? null,
               zIndexA: overlap.zIndexA ?? null,
-              zIndexB: overlap.zIndexB ?? null
+              zIndexB: overlap.zIndexB ?? null,
+              state: overlap.state ?? "initial",
+              triggerSelector: overlap.triggerSelector ?? null
             },
             recommendation: "Separate the controls at this viewport or correct their positioning and stacking order. Check the page in the affected viewport and confirm that every visible control has an unobstructed, independent hit target. Intentional menus and dialogs should not leave background controls interactable."
           };
