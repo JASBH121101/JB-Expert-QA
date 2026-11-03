@@ -64,7 +64,7 @@ Gemini:
 Cloudflare fallback:
 
 - `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_API_TOKEN` with Workers AI permission
+- `CLOUDFLARE_API_TOKEN` created from Cloudflare's Workers AI API token flow, with **Workers AI - Read and Workers AI - Edit** permissions (the current REST API setup guide requests both).
 - `CLOUDFLARE_FREE_TIER_CONFIRMED=true`
 - Optional: `CLOUDFLARE_MAX_REQUESTS_PER_RUN=4`
 
