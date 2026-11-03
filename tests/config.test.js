@@ -39,3 +39,22 @@ test("engine config rejects invalid severity penalties and thresholds", () => {
     thresholds: { failOnCritical: "yes" }
   }), /must be a boolean/);
 });
+
+test("engine config validates project-specific scanner limits and applies defaults", () => {
+  const defaults = validateEngineConfig({});
+  assert.equal(defaults.scan.maxFiles, 2500);
+  assert.equal(defaults.scan.maxFileBytes, 1_000_000);
+  assert.equal(defaults.scan.maxTotalBytes, 20_000_000);
+  assert.equal(defaults.scan.maxDepth, 20);
+
+  const custom = validateEngineConfig({
+    profile: "erp-project",
+    scan: { maxFiles: 120, maxFileBytes: 500_000, maxDepth: 12 }
+  });
+  assert.equal(custom.scan.maxFiles, 120);
+  assert.equal(custom.scan.maxFileBytes, 500_000);
+  assert.equal(custom.scan.maxTotalBytes, 20_000_000);
+  assert.equal(custom.scan.maxDepth, 12);
+  assert.throws(() => validateEngineConfig({ scan: { maxFiles: 0 } }), /positive integer/);
+  assert.throws(() => validateEngineConfig({ scan: { unknown: 10 } }), /Unknown project scan option/);
+});
