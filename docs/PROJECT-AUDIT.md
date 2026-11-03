@@ -30,6 +30,34 @@ The scanner reads supported text files, skips dependency/build/VCS folders, neve
 
 An audit is marked incomplete and cannot pass when the scan reaches its file/depth limit, skips oversized files, or cannot read supported files. Increase the scan limits or resolve the access errors, then rerun the audit.
 
+## Online dependency advisories (optional)
+
+The project auditor can query OSV.dev for known vulnerabilities in exact npm package versions. This is disabled by default in the shared engine and is enabled only when a project profile explicitly sets `advisories.enabled: true`.
+
+Example profile section:
+
+~~~json
+{
+  "advisories": {
+    "enabled": true,
+    "required": false,
+    "provider": "osv",
+    "maxPackages": 1000,
+    "batchSize": 100,
+    "maxVulnerabilities": 200,
+    "timeoutMs": 8000
+  }
+}
+~~~
+
+The scanner prefers resolved versions from npm `package-lock.json` or `npm-shrinkwrap.json`. If no supported lockfile exists, it may check exact versions from the root `package.json`, but labels that result **partial** because transitive dependencies are not covered. Ranged versions such as `^4.0.0`, `latest`, Git URLs and workspace references are not guessed.
+
+Only npm package names and exact versions are sent to the fixed OSV.dev API endpoint. Project source, environment files, credentials, repository contents, and customer data are not sent. The lookup uses bounded batches, response-size limits, request timeouts, package/vulnerability caps, and no API key. It does not install packages or run package lifecycle scripts.
+
+When `required` is false, an unavailable or partial online lookup is reported but does not by itself block the audit. When `required` is true, incomplete advisory coverage becomes a critical finding and blocks a passing result. Known advisories are assigned severity using the OSV record's severity fields or CVSS score; records without usable severity default to medium for manual review.
+
+OSV.dev is an external advisory source, not a guarantee that every vulnerability is known or that a package is safe. A clean result means no matching advisories were returned for the versions queried at that time.
+
 ## Current static specialists
 
 - **Code quality:** scan completeness, unusually large source files, and absence of recognizable test files.
