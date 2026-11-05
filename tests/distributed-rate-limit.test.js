@@ -106,7 +106,8 @@ test("events and store keys never contain raw client identifiers", async () => {
   assert.equal(events.length, 1);
 });
 
-test("configuration rejects weak secrets, missing stores and unknown options", () => {
+test("configuration rejects weak or missing secrets, missing stores and unknown options", () => {
+  assert.throws(() => createDistributedRateLimit({ store: createAtomicMemoryStore() }), /at least 32 bytes/);
   assert.throws(() => createDistributedRateLimit({ store: {} }), /consumeLimit/);
   assert.throws(() => createDistributedRateLimit({
     store: createAtomicMemoryStore(), secret: "weak"
