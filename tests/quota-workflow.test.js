@@ -19,6 +19,17 @@ test("website audit workflow saves only a quota marker and only when newly creat
   assert.doesNotMatch(workflow, /path: .*\.env/);
 });
 
+test("website audit workflow pins every third-party action and disables install scripts", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/site-audit.yml", import.meta.url), "utf8");
+  const actionRefs = [...workflow.matchAll(/^\\s+uses:\\s+([^\\s]+)$/gm)].map((match) => match[1]);
+  assert.ok(actionRefs.length >= 5);
+  assert.ok(actionRefs.every((reference) => /@[a-f0-9]{40}$/.test(reference)));
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /npm install --ignore-scripts --no-audit --no-fund/);
+  assert.match(workflow, /npm audit --audit-level=high/);
+  assert.doesNotMatch(workflow, /npx playwright install/);
+});
+
 test("website audit workflow serializes manual runs sharing provider quotas", async () => {
   const workflow = await readFile(new URL("../.github/workflows/site-audit.yml", import.meta.url), "utf8");
   assert.match(workflow, /concurrency:\s+group: jb-expert-qa-site-audit\s+cancel-in-progress: false/);
