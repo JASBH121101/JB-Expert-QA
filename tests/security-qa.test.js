@@ -1,4 +1,6 @@
 import test from "node:test";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -8,6 +10,7 @@ import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 import { formatReport } from "../src/reporters/index.js";
 import { ExpertQAEngine, RuleRegistry } from "../src/index.js";
 import { securityRuntimeRules } from "../src/specialists/runtime-security-rules.js";
+import { auditSecurityUrl } from "../src/adapters/filesystem/audit-security-url.js";
 
 async function withProject(run) {
   const root = await mkdtemp(join(tmpdir(), "jb-security-qa-"));
@@ -167,6 +170,8 @@ test("OSV dependency advisory lookup is opt-in and sends only package coordinate
     await writeFile(join(root, "package.json"), JSON.stringify({
       name: "fixture", version: "1.0.0", dependencies: { lodash: "4.17.21" }
     }));
+    const sourceSentinel = "private-customer-source-must-not-leave-this-repository";
+    await writeFile(join(root, "src", "private.js"), "const privateData = \"" + sourceSentinel + "\";");
     await writeFile(join(root, "package-lock.json"), JSON.stringify({
       name: "fixture",
       lockfileVersion: 3,
@@ -177,10 +182,12 @@ test("OSV dependency advisory lookup is opt-in and sends only package coordinate
     }));
 
     let calls = 0;
+    let submittedPayload = null;
     const fetchImpl = async (url, options = {}) => {
       calls += 1;
       if (String(url).endsWith("/querybatch")) {
         const payload = JSON.parse(options.body);
+        submittedPayload = payload;
         assert.deepEqual(payload.queries, [{
           package: { name: "lodash", ecosystem: "npm" },
           version: "4.17.21"
@@ -215,7 +222,8 @@ test("OSV dependency advisory lookup is opt-in and sends only package coordinate
     assert.equal(online.securityAssessment.onlineDependencyAdvisories, true);
     assert.ok(online.diagnostics.some((item) => item.id.startsWith("DEP-OSV-GHSA-TEST-1")));
     assert.equal(calls, 2);
-    assert.equal(JSON.stringify(online).includes("application source"), false);
+    assert.equal(JSON.stringify(submittedPayload).includes(sourceSentinel), false);
+    assert.equal(JSON.stringify(online).includes(sourceSentinel), false);
   });
 });
 
@@ -307,4 +315,43 @@ test("runtime cookie findings include cookie names but never cookie values", asy
   assert.ok(cookieFinding);
   assert.deepEqual(cookieFinding.metadata.missingAttributes, ["Secure", "HttpOnly", "SameSite"]);
   assert.equal(JSON.stringify(report).includes("sensitive-cookie-value-must-not-leak"), false);
+});
+
+
+test("runtime URL auditor refuses private destinations unless a local test opts in", async () => {
+  await assert.rejects(
+    auditSecurityUrl("http://127.0.0.1/"),
+    /Private, loopback, link-local, or reserved IP destinations are blocked/
+  );
+});
+
+test("runtime URL auditor can inspect a controlled local HTTP fixture without exploit requests", async () => {
+  const server = createServer((request, response) => {
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+      "referrer-policy": "strict-origin-when-cross-origin",
+      "permissions-policy": "camera=(), microphone=(), geolocation=()"
+    });
+    response.end("<!doctype html><html><head><title>Fixture</title></head><body>Security QA fixture</body></html>");
+  });
+
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  try {
+    const report = await auditSecurityUrl("http://127.0.0.1:" + address.port + "/", {
+      allowPrivateNetworks: true,
+      timeout: 15000
+    });
+    assert.equal(report.target.status, 200);
+    assert.equal(report.runtimeAssessment.mode, "passive-browser-observation");
+    assert.equal(report.runtimeAssessment.exploitPayloadsSent, false);
+    assert.equal(report.runtimeAssessment.authenticatedSessionUsed, false);
+    assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-001"));
+    assert.equal(report.runtimeAssessment.databaseConnections, 0);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });

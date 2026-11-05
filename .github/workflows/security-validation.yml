@@ -17,6 +17,7 @@ on:
       - "src/**"
       - "tests/**"
       - "config/security-audit.config.json"
+      - "config/security-url.config.json"
       - ".github/workflows/security-validation.yml"
   workflow_dispatch:
 
@@ -24,14 +25,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: jb-security-qa
-  cancel-in-progress: false
+  group: jb-security-qa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   security-tests:
     name: Deterministic security-profile tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +45,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
+      - name: Install dependencies without running package install scripts
+        run: npm install --ignore-scripts
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js

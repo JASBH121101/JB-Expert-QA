@@ -33,6 +33,15 @@ export async function auditSecurityProject(rootPath, {
   if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
   if (scan.summary.oversizedFiles > 0) incompleteReasons.push(scan.summary.oversizedFiles + " oversized file(s) skipped");
   if (scan.summary.unreadableFiles > 0) incompleteReasons.push(scan.summary.unreadableFiles + " unreadable file(s) skipped");
+  const hasDeclaredNpmDependencies = scan.manifests.some((manifest) =>
+    manifest.path === "package.json" && manifest.data &&
+    ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((section) =>
+      Object.keys(manifest.data[section] ?? {}).length > 0
+    )
+  );
+  if (dependencyAdvisories.enabled && hasDeclaredNpmDependencies && !dependencyAdvisories.complete) {
+    incompleteReasons.push("dependency advisory coverage is incomplete");
+  }
 
   const registry = new RuleRegistry();
   registry.register(codeQualityRules[0]);

@@ -420,6 +420,13 @@ export const dependencyRules = [
     evaluate(context) {
       const scan = context.dependencyAdvisoryScan;
       if (!scan?.enabled) return [];
+      const hasDeclaredNpmDependencies = (context.packageManifests ?? []).some((manifest) =>
+        manifest.path === "package.json" && manifest.data &&
+        ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((section) =>
+          Object.keys(manifest.data[section] ?? {}).length > 0
+        )
+      );
+      if (scan.status === "skipped-no-resolved-versions" && !hasDeclaredNpmDependencies) return [];
       const findings = [];
 
       if (scan.status === "unavailable") {
