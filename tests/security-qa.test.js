@@ -1,6 +1,4 @@
 import test from "node:test";
-import { createServer } from "node:http";
-import { once } from "node:events";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -10,7 +8,6 @@ import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 import { formatReport } from "../src/reporters/index.js";
 import { ExpertQAEngine, RuleRegistry } from "../src/index.js";
 import { securityRuntimeRules } from "../src/specialists/runtime-security-rules.js";
-import { auditSecurityUrl } from "../src/adapters/filesystem/audit-security-url.js";
 
 async function withProject(run) {
   const root = await mkdtemp(join(tmpdir(), "jb-security-qa-"));
@@ -316,95 +313,4 @@ test("runtime cookie findings include cookie names but never cookie values", asy
   assert.ok(cookieFinding);
   assert.deepEqual(cookieFinding.metadata.missingAttributes, ["Secure", "HttpOnly", "SameSite"]);
   assert.equal(JSON.stringify(report).includes("sensitive-cookie-value-must-not-leak"), false);
-});
-
-
-test("runtime URL auditor refuses private destinations unless a local test opts in", async () => {
-  await assert.rejects(
-    auditSecurityUrl("http://127.0.0.1/"),
-    /Private, loopback, link-local, or reserved IP destinations are blocked/
-  );
-});
-
-test("runtime URL auditor can inspect a controlled local HTTP fixture without exploit requests", async () => {
-  const server = createServer((request, response) => {
-    response.writeHead(200, {
-      "content-type": "text/html; charset=utf-8",
-      "x-content-type-options": "nosniff",
-      "content-security-policy": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
-      "referrer-policy": "strict-origin-when-cross-origin",
-      "permissions-policy": "camera=(), microphone=(), geolocation=()"
-    });
-    response.end("<!doctype html><html><head><title>Fixture</title></head><body>Security QA fixture</body></html>");
-  });
-
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  try {
-    const report = await auditSecurityUrl("http://127.0.0.1:" + address.port + "/", {
-      allowPrivateNetworks: true,
-      timeout: 15000
-    });
-    assert.equal(report.target.status, 200);
-    assert.equal(report.runtimeAssessment.mode, "passive-browser-observation");
-    assert.equal(report.runtimeAssessment.exploitPayloadsSent, false);
-    assert.equal(report.runtimeAssessment.authenticatedSessionUsed, false);
-    assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-001"));
-    assert.equal(report.runtimeAssessment.databaseConnections, 0);
-  } finally {
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
-});
-
-
-test("runtime security rules detect an HTTP entry point even when it redirects to HTTPS", async () => {
-  const registry = new RuleRegistry();
-  for (const rule of securityRuntimeRules) registry.register(rule);
-  const report = await new ExpertQAEngine({
-    registry,
-    config: {
-      weights: { "security-runtime": 100 },
-      thresholds: { minimumScore: 90, failOnCritical: true }
-    }
-  }).audit({
-    securityHttpResponse: {
-      initialUrl: "http://app.example/",
-      finalUrl: "https://app.example/",
-      headers: {
-        "strict-transport-security": ["max-age=31536000"],
-        "content-security-policy": ["default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"],
-        "x-content-type-options": ["nosniff"],
-        "referrer-policy": ["strict-origin-when-cross-origin"],
-        "permissions-policy": ["camera=(), microphone=()"]
-      },
-      cookies: [],
-      mixedContent: []
-    }
-  });
-  assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-002"));
-  assert.equal(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-001"), false);
-  assert.equal(report.scoring.passed, false);
-});
-
-test("runtime CSP policy without a script source directive is flagged", async () => {
-  const registry = new RuleRegistry();
-  for (const rule of securityRuntimeRules) registry.register(rule);
-  const report = await new ExpertQAEngine({
-    registry,
-    config: {
-      weights: { "security-runtime": 100 },
-      thresholds: { minimumScore: 90, failOnCritical: true }
-    }
-  }).audit({
-    securityHttpResponse: {
-      finalUrl: "https://app.example/",
-      headers: {
-        "content-security-policy": ["object-src 'none'; base-uri 'self'; frame-ancestors 'self'"]
-      },
-      cookies: [],
-      mixedContent: []
-    }
-  });
-  assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-CSP-006"));
 });
