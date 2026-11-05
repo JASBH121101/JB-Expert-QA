@@ -404,7 +404,9 @@ export function createSecurityGuard(options = {}) {
       event.path = request.url.split("?", 1)[0].slice(0, 256);
     }
 
-    const hasNonRateLimitFinding = findings.some((finding) => finding.id !== "JBG-RATE-001");
+    const hasNonRateLimitFinding = findings.some((finding) =>
+      finding.id !== "JBG-RATE-001" && finding.id !== "JBG-RATE-002"
+    );
     const shouldEmitEvent = hasNonRateLimitFinding || !rateLimitResult || rateLimitResult.shouldEmit;
     if (shouldEmitEvent) {
       counters.incidents += 1;
