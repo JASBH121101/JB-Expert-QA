@@ -1,0 +1,17 @@
+{
+  "name": "@jb/security-guard",
+  "version": "0.1.0",
+  "description": "Runtime HTTP request protection middleware for Node.js applications.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED"
+}

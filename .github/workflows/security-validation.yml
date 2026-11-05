@@ -5,6 +5,7 @@ on:
     branches: [main, "feature/**"]
     paths:
       - "package.json"
+      - "packages/**"
       - "src/**"
       - "tests/**"
       - "config/security-audit.config.json"
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - "package.json"
+      - "packages/**"
       - "src/**"
       - "tests/**"
       - "config/security-audit.config.json"
@@ -55,5 +57,8 @@ jobs:
           node --check src/specialists/runtime-security-rules.js
           node --check src/adapters/filesystem/audit-security-url.js
           node --check src/security-url-cli.js
-      - name: Run security QA tests
-        run: node --test tests/security-qa.test.js
+          node --check packages/security-guard/src/index.js
+      - name: Run security QA and Guard tests
+        run: |
+          node --test tests/security-qa.test.js
+          npm run test:security-guard

@@ -87,3 +87,38 @@ It performs a normal page load using Chromium and inspects the main document res
 The auditor reuses the URL safety guard: localhost, private, link-local, and reserved network destinations are blocked by default, including redirects and browser subrequests. The scan does not bypass certificate validation. Reports include only cookie names and security attributes, never cookie values.
 
 The runtime result is an observation of one page load, not a complete assessment of every API route, authenticated screen, CDN response, or infrastructure setting. A clean response does not certify the entire site.
+
+## JB Security Guard — runtime protection package
+
+The separate `@jb/security-guard` workspace package provides server-side HTTP middleware for Node.js applications. It is independent of the audit commands: it continues to enforce its configured policy without JB Expert QA running.
+
+```js
+import { createSecurityGuard } from "@jb/security-guard";
+
+const guard = createSecurityGuard({
+  mode: process.env.JB_GUARD_MODE ?? "monitor",
+  onEvent: (incident) => logger.warn(incident)
+});
+
+app.use(guard.middleware);
+```
+
+Register it before body parsers and application routes. The initial release supports:
+
+- `monitor`: record observations and allow requests; default mode.
+- `balanced`: block high- and critical-severity detections.
+- `strict`: also block medium-severity detections.
+- `custom`: select severities through `blockSeverities`.
+
+The initial rules inspect request targets for common high-confidence XSS, SQL-injection, and path-traversal signatures; enforce request-target, header, and declared Content-Length limits; and apply a per-process in-memory rate limit. Block responses are generic and use `Cache-Control: no-store`.
+
+Events intentionally omit request bodies, query strings, header values, cookies, and client IP addresses. A path is included only when `includePath: true` is explicitly configured.
+
+Important boundaries:
+
+- This version does not inspect request bodies. Enforce actual streamed/chunked body limits in the framework or server body parser too.
+- The rate limiter is local to one Node.js process. Clustered or multi-region deployments need a shared atomic store before limits are global.
+- Forwarded IP headers are not trusted by default. A custom `keyGenerator` must be based only on a narrowly configured trusted-proxy chain.
+- Pattern detection is heuristic. It is not a replacement for parameterized queries, output encoding, application authorization, a WAF, or security testing.
+- Guard must run on the server; it is not a frontend JavaScript security library.
+- The package is a workspace source package and is not yet published to a public npm registry.
