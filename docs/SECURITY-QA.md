@@ -151,3 +151,8 @@ Email and SMS delivery are dispatched asynchronously through provider adapters s
 Guard now inspects up to eight decoding rounds of request targets, rejects malformed percent/UTF-8 sequences and encoded control characters, and checks request framing ambiguity when the host HTTP adapter exposes raw headers. Conflicting Content-Length values and Content-Length combined with Transfer-Encoding are rejected with a generic 400 response in enforcing modes. These checks complement—not replace—the Node.js HTTP parser and upstream proxy controls.
 
 The middleware still does not consume request bodies. Every host application must enforce streamed/chunked request limits at the framework parser and upload layer. Guard also rejects unknown configuration keys for its HTTP, authentication, and recovery factories so misspelled security options cannot be silently ignored.
+
+
+## Node.js server boundary controls
+
+Guard now exports configureNodeHttpServer() for Node.js HTTP/HTTPS Server instances. It applies bounded header/request/socket timeouts, keep-alive reuse limits, header-count limits, and an early Expect: 100-continue Content-Length gate. It must run before listen(). It does not apply to HTTP/2 or external edge platforms, and chunked payloads still need framework body-parser limits.

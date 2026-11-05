@@ -53,6 +53,8 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Audit resolved dependency tree for high and critical vulnerabilities
         run: npm audit --audit-level=high
+      - name: Audit resolved dependency tree
+        run: npm audit --audit-level=high
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js
@@ -65,6 +67,8 @@ jobs:
           node --check packages/security-guard/src/auth-protection.js
           node --check packages/security-guard/src/account-recovery.js
           node --check packages/security-guard/src/security-headers.js
+          node --check packages/security-guard/src/node-server-hardening.js
+          node --check tests/node-server-hardening.test.js
           node --check tests/security-headers.test.js
           node --check packages/security-guard/testing/recovery-adapters.js
       - name: Run security QA and Guard tests

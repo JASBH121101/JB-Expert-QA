@@ -272,3 +272,31 @@ This is defense in depth, not a replacement for the Node.js HTTP parser or an up
 Guard checks a declared Content-Length against maxBodyBytes, but it does not consume or inspect request bodies. Chunked or streamed bodies must still be limited by the framework body parser and upload handler (for example, explicit limits for JSON, URL-encoded, multipart, and raw body parsing). Do not rely on Content-Length alone for upload protection.
 
 Security-related configuration rejects unknown option names. This is intentional: a misspelled limit or policy setting must fail at startup rather than silently leave the default in place.
+
+
+## Node.js server hardening
+
+For Node.js HTTP/HTTPS servers, configure parser and connection limits before listen(). This protects the server boundary against slow header delivery, stalled requests, excessive keep-alive reuse, and oversized declared bodies sent with Expect: 100-continue.
+
+~~~js
+import { createServer } from "node:http";
+import express from "express";
+import { configureNodeHttpServer, createSecurityGuard } from "@jb/security-guard";
+
+const app = express();
+const guard = createSecurityGuard({ mode: "balanced", maxBodyBytes: 1024 * 1024 });
+app.use(guard.securityHeaders);
+app.use(guard.middleware);
+app.use(express.json({ limit: "1mb", strict: true, inflate: false }));
+app.use(express.urlencoded({ extended: false, limit: "64kb", parameterLimit: 100 }));
+
+const server = createServer(app);
+configureNodeHttpServer(server, { maxBodyBytes: 1024 * 1024 });
+server.listen(process.env.PORT ?? 3000);
+~~~
+
+Defaults set a 10-second header timeout, 30-second request receipt timeout, 5-second keep-alive timeout, 60-second socket inactivity timeout, 100 requests per socket, and 100 headers. For Expect: 100-continue, the helper rejects a declared body above maxBodyBytes before sending the 100 Continue response, and otherwise forwards the request to the normal application listener. If the host already manages checkContinue, set handleExpectContinue: false and implement the same early length check in that handler.
+
+This helper applies to Node.js HTTP/HTTPS server instances, not HTTP/2 servers or edge platforms. Tune timeouts for legitimate long-running uploads, streaming responses, and long polling. Match maxBodyBytes with the security middleware and parser limits. Chunked bodies still require parser-level streaming limits.
+
+For multipart uploads, configure per-file size, total file count, field count, part count, and field-size limits in the multipart parser. Keep uploaded content in a private quarantine location until an actual malware scanner has accepted it. A MIME type or file extension check is not antivirus protection.

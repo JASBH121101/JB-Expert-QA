@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import { createAuthProtection } from "./auth-protection.js";
 import { createAccountRecovery } from "./account-recovery.js";
 import { createSecurityHeaders } from "./security-headers.js";
+import { configureNodeHttpServer } from "./node-server-hardening.js";
 export { createAuthProtection } from "./auth-protection.js";
 export { createAccountRecovery, createMemoryRecoveryStore } from "./account-recovery.js";
 export { createSecurityHeaders } from "./security-headers.js";
+export { configureNodeHttpServer } from "./node-server-hardening.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
