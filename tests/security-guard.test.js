@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, request as httpRequest } from "node:http";
-import { createSecurityGuard } from "../packages/security-guard/src/index.js";
+import { createSecurityGuard } from "@jb/security-guard";
 
 async function withGuard(options, run) {
   const events = [];
