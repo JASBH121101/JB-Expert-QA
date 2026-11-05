@@ -483,3 +483,27 @@ test("authentication bucket saturation preserves existing lockout state and fail
   auth.reset();
   assert.equal(auth.getStatus({ account: "account-d", client: "client-d" }).blocked, false);
 });
+
+test("authentication storage reclaims expired buckets but never evicts live ones", () => {
+  let now = 1_000;
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const auth = guard.createAuthProtection({
+    identityKeyGenerator: (request) => request.account,
+    clientKeyGenerator: (request) => request.client,
+    maxTrackedKeys: 1,
+    resetAfterMs: 1_000,
+    clock: () => now,
+    policies: {
+      ip: { maxFailures: 5, lockoutMs: 1000, maxLockoutMs: 2000 },
+      accountIp: { maxFailures: 5, lockoutMs: 1000, maxLockoutMs: 2000 },
+      account: { maxFailures: 5, lockoutMs: 1000, maxLockoutMs: 2000 }
+    }
+  });
+  auth.recordFailure({ account: "expired-account", client: "expired-client" });
+  now += 1_001;
+  auth.recordFailure({ account: "new-account", client: "new-client" });
+  assert.equal(auth.getStats().trackedIpKeys, 1);
+  assert.equal(auth.getStats().trackedAccountIpKeys, 1);
+  assert.equal(auth.getStats().trackedAccountKeys, 1);
+  assert.equal(auth.getStatus({ account: "third-account", client: "third-client" }).blocked, false);
+});
