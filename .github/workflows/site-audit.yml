@@ -58,7 +58,7 @@ jobs:
         run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - name: Restore daily AI quota circuit breaker
         id: ai_quota_cache
-        uses: actions/cache/restore@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .jbqa-ai-quota
           key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
@@ -147,13 +147,13 @@ jobs:
             "--output=reports/jb-expert-qa-report.$extension"
       - name: Persist daily AI quota circuit breaker
         if: always() && steps.ai_quota_cache.outputs.cache-hit != 'true' && hashFiles('.jbqa-ai-quota/provider-quota.json') != ''
-        uses: actions/cache/save@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .jbqa-ai-quota
           key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jb-expert-qa-report
           path: reports/
