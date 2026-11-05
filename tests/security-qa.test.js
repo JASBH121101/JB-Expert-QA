@@ -141,7 +141,7 @@ test("security reports are available in JSON, Markdown, and HTML formats", async
 
     assert.match(formatReport(report, "json"), /Security Auditor/);
     assert.match(formatReport(report, "markdown"), /JB Expert QA report/);
-    assert.match(formatReport(report, "html"), /Security Auditor/);
+    assert.match(formatReport(report, "html"), /<h1>JB Expert QA report<\/h1>/);
   });
 });
 
