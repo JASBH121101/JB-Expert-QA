@@ -110,3 +110,30 @@ test("localhost HTTP is allowed for development but never broad wildcard hosts",
   });
   assert.equal(result.continued, 1);
 });
+
+
+test("permissive missing-origin mode never treats duplicate or foreign headers as absent", () => {
+  const origin = createOriginProtection({
+    allowedOrigins: ["https://app.example.test"],
+    allowMissingOrigin: true,
+    allowRefererFallback: true
+  });
+
+  const duplicate = invoke(origin.middleware, {
+    method: "POST",
+    headers: { origin: ["https://app.example.test", "https://attacker.example"] }
+  });
+  assert.equal(duplicate.response.statusCode, 403);
+
+  const foreignReferer = invoke(origin.middleware, {
+    method: "POST",
+    headers: { referer: "https://attacker.example/forged" }
+  });
+  assert.equal(foreignReferer.response.statusCode, 403);
+
+  const trulyMissing = invoke(origin.middleware, {
+    method: "POST",
+    headers: {}
+  });
+  assert.equal(trulyMissing.continued, 1);
+});

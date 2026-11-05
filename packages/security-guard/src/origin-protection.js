@@ -41,9 +41,36 @@ function normalizeAllowedOrigin(value) {
 }
 
 function readSingleHeader(request, name) {
+  const rawValues = [];
+  if (Array.isArray(request.rawHeaders)) {
+    for (let index = 0; index + 1 < request.rawHeaders.length; index += 2) {
+      if (String(request.rawHeaders[index]).toLowerCase() === name) {
+        rawValues.push(String(request.rawHeaders[index + 1] ?? ""));
+      }
+    }
+  }
+  if (rawValues.length > 0) {
+    return {
+      present: true,
+      malformed: rawValues.length !== 1,
+      value: rawValues.length === 1 ? rawValues[0] : null
+    };
+  }
+
   const value = request.headers?.[name];
-  if (Array.isArray(value)) return value.length === 1 ? String(value[0]) : null;
-  return typeof value === "string" ? value : null;
+  if (value === undefined || value === null) {
+    return { present: false, malformed: false, value: null };
+  }
+  if (Array.isArray(value)) {
+    return {
+      present: true,
+      malformed: value.length !== 1,
+      value: value.length === 1 ? String(value[0]) : null
+    };
+  }
+  return typeof value === "string"
+    ? { present: true, malformed: false, value }
+    : { present: true, malformed: true, value: null };
 }
 
 function parseOrigin(value, allowRefererPath) {
@@ -117,14 +144,20 @@ export function createOriginProtection(options = {}) {
       return;
     }
 
-    const headerOrigin = readSingleHeader(request, "origin");
-    let candidate = headerOrigin === null ? null : parseOrigin(headerOrigin, false);
-    if (!candidate && !headerOrigin && settings.allowRefererFallback) {
-      const referer = readSingleHeader(request, "referer");
-      candidate = parseOrigin(referer, true);
+    const originHeader = readSingleHeader(request, "origin");
+    const refererHeader = readSingleHeader(request, "referer");
+    let candidate = originHeader.present && !originHeader.malformed
+      ? parseOrigin(originHeader.value, false)
+      : null;
+
+    if (!originHeader.present && !originHeader.malformed &&
+        settings.allowRefererFallback && refererHeader.present && !refererHeader.malformed) {
+      candidate = parseOrigin(refererHeader.value, true);
     }
 
-    const missingAllowed = !headerOrigin && !candidate && settings.allowMissingOrigin;
+    const missingAllowed = !originHeader.present &&
+      !refererHeader.present &&
+      settings.allowMissingOrigin;
     const allowed = missingAllowed || (candidate !== null && settings.allowedOrigins.has(candidate));
     if (allowed) {
       stats.allowed += 1;
