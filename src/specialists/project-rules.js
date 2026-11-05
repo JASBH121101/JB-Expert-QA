@@ -1,3 +1,5 @@
+import { securityDefenseRules } from "./security-rules.js";
+
 function finding(id, title, description, severity, path, recommendation, metadata = {}, line = null) {
   return {
     id, title, description, severity,
@@ -890,6 +892,6 @@ export const postgresMigrationRules = [
 ];
 
 export const projectRules = Object.freeze([
-  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules, ...postgresPrismaRules,
-  ...postgresMigrationRules
+  ...codeQualityRules, ...securityRules, ...securityDefenseRules, ...dependencyRules, ...databaseRules,
+  ...postgresPrismaRules, ...postgresMigrationRules
 ]);
