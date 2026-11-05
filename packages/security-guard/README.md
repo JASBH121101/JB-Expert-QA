@@ -321,3 +321,26 @@ app.use(originProtection.middleware);
 Unsafe methods (everything except GET, HEAD, and OPTIONS) must carry an exact allowed Origin. The default is fail-closed when Origin is missing. Referer fallback and missing-origin allowance are disabled by default. Do not enable allowMissingOrigin on cookie-authenticated routes unless a separate synchronizer-token or equivalent CSRF mechanism is enforced. Keep GET/HEAD/OPTIONS handlers free of state changes.
 
 This is an origin-validation defense in depth, not a CSRF-token implementation and not a CORS configuration. Configure CORS separately; do not use wildcard credentialed origins. Mount this middleware only on routes intended for browser requests. Native mobile clients, webhooks, and machine APIs without browser Origin headers should use separate routes and authentication appropriate to those clients.
+
+
+## Session-bound CSRF tokens
+
+For cookie-authenticated routes that change data, use a synchronizer token bound to the host application's current session:
+
+~~~js
+const csrf = guard.createCsrfProtection({
+  secret: process.env.JB_CSRF_SECRET,
+  sessionKeyGenerator: (req) => req.sessionID
+});
+
+app.get("/csrf-token", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ token: csrf.createToken(req) });
+});
+
+app.use(csrf.middleware);
+~~~
+
+The browser should fetch the token over the authenticated same-origin session and send it in the configured X-CSRF-Token header on unsafe methods. The token is an HMAC derived from the current opaque session ID and a stable secret; it is not stored by Guard. Session rotation changes the token. Keep the secret in a server-side secret manager and rotate it deliberately (rotation invalidates tokens). Never put the token in a URL, query string, or logs.
+
+This module does not create or manage sessions. The host application must provide a strong, unpredictable session identifier, secure session cookies (Secure, HttpOnly, explicit SameSite), and session rotation at login and privilege changes. A CSRF token does not protect against same-origin XSS or a compromised client. Combine it with origin validation for browser routes, authorization checks, and safe output encoding. API clients using bearer tokens should use a separate route policy rather than bypassing cookie-route checks.

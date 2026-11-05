@@ -161,3 +161,8 @@ Guard now exports configureNodeHttpServer() for Node.js HTTP/HTTPS Server instan
 ## Browser origin validation
 
 Guard exposes a separate origin-allowlist middleware for cookie-authenticated browser routes. Unsafe methods require an exact configured Origin by default; missing Origin, null Origin, malformed Origin, and untrusted origins are rejected. Referer fallback and missing-origin allowance are opt-in. This is defense in depth against cross-site request forgery, not a CSRF-token replacement and not a CORS policy.
+
+
+## Session-bound CSRF tokens
+
+Guard includes an optional HMAC synchronizer-token helper bound to the host application's session identifier. It rejects unsafe methods without a valid session-bound token, does not store session state, and emits sanitized events. It requires a stable secret and the host application's session manager; it does not replace secure cookies, session rotation, authorization, or XSS prevention.
