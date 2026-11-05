@@ -199,3 +199,35 @@ The emailProvider.send() and smsProvider.send() adapters are required for actual
 
 The default createMemoryRecoveryStore() is bounded and process-local. It is suitable for development and a single application process; restarts clear active challenges and counters. For clustered or multi-region production, supply a shared store whose putChallenge, consumeChallenge, consumeLimit, and deleteChallenge operations are atomic across all instances. consumeChallenge must compare the digest, increment failed attempts, expire challenges, and consume a valid challenge atomically. consumeLimit must implement an atomic fixed-window counter. Do not use a non-atomic read-then-write Redis adapter.
 
+
+
+## Safe offline testing without real contacts or provider credentials
+
+The repository includes a test-only helper at `packages/security-guard/testing/recovery-adapters.js`. It provides mock email and SMS providers that capture messages in bounded process memory. They do not send network requests, write message files, or log tokens/OTPs. The helper is intentionally excluded from the package's published files and runtime exports.
+
+Example:
+
+~~~js
+import { randomBytes } from "node:crypto";
+import { createAccountRecovery, createMemoryRecoveryStore } from "@jb/security-guard";
+import { createMockRecoveryProviders } from "../packages/security-guard/testing/recovery-adapters.js";
+
+const mocks = createMockRecoveryProviders();
+const recovery = createAccountRecovery({
+  secret: randomBytes(32), // ephemeral test-only secret; never use this pattern in production
+  store: createMemoryRecoveryStore(),
+  emailProvider: mocks.emailProvider,
+  smsProvider: mocks.smsProvider
+});
+
+// Supply an internal test account and a verified synthetic destination.
+// Read the token/code from mocks.getMessages(...) inside the test process only.
+~~~
+
+Run the focused suite with:
+
+~~~bash
+npm run test:security-guard
+~~~
+
+No real email, phone number, account record, provider credential, Redis service, or production secret is required. Do not print captured messages to CI logs. Production integration must inject real providers and a stable secret from a secret manager, use verified contacts resolved server-side, and use a shared atomic store for multi-instance deployments.

@@ -60,6 +60,7 @@ jobs:
           node --check packages/security-guard/src/index.js
           node --check packages/security-guard/src/auth-protection.js
           node --check packages/security-guard/src/account-recovery.js
+          node --check packages/security-guard/testing/recovery-adapters.js
       - name: Run security QA and Guard tests
         run: |
           node --test tests/security-qa.test.js

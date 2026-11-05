@@ -143,22 +143,30 @@ export function createMemoryRecoveryStore(options = {}) {
   }
 
   function putChallenge(record) {
-    if (!isRecord(record) || typeof record.id !== "string" ||
-        typeof record.subjectKey !== "string" || typeof record.credentialDigest !== "string") {
+    if (!isRecord(record) ||
+        typeof record.id !== "string" || !record.id || record.id.length > 128 ||
+        typeof record.subjectKey !== "string" || !/^[a-f0-9]{64}$/i.test(record.subjectKey) ||
+        typeof record.accountId !== "string" ||
+        (record.channel !== "email" && record.channel !== "sms") ||
+        typeof record.credentialDigest !== "string" || !/^[a-f0-9]{64}$/i.test(record.credentialDigest) ||
+        !Number.isSafeInteger(record.createdAt) || !Number.isSafeInteger(record.expiresAt) ||
+        record.expiresAt <= record.createdAt) {
       throw new TypeError("challenge record is invalid");
+    }
+
+    // Expired challenges may be reclaimed, but a live challenge is never
+    // silently evicted just because the bounded store has reached capacity.
+    for (const [knownId, knownChallenge] of challenges) {
+      if (record.createdAt >= knownChallenge.expiresAt) removeChallenge(knownId);
     }
 
     const previousId = subjectIndex.get(record.subjectKey);
     if (previousId) removeChallenge(previousId);
+    if (challenges.size >= maxChallenges) return false;
 
     challenges.set(record.id, { ...record, attempts: 0 });
     subjectIndex.set(record.subjectKey, record.id);
-
-    while (challenges.size > maxChallenges) {
-      const oldestId = challenges.keys().next().value;
-      if (oldestId === undefined) break;
-      removeChallenge(oldestId);
-    }
+    return true;
   }
 
   function consumeChallenge({ id, credentialDigest, now, maxAttempts }) {
@@ -200,26 +208,46 @@ export function createMemoryRecoveryStore(options = {}) {
   }
 
   function consumeLimit({ key, now, windowMs, maxRequests }) {
+    if (typeof key !== "string" || !key || key.length > 256 ||
+        !Number.isSafeInteger(now) || now < 0 ||
+        !Number.isSafeInteger(windowMs) || windowMs < 1 ||
+        !Number.isSafeInteger(maxRequests) || maxRequests < 1) {
+      throw new TypeError("store.consumeLimit received invalid limiter input");
+    }
+
+    // Reclaim only genuinely expired windows before considering capacity.
+    // A backwards wall-clock adjustment must not silently reset every bucket.
+    for (const [knownKey, knownEntry] of limits) {
+      if (now >= knownEntry.windowStartedAt &&
+          now - knownEntry.windowStartedAt >= knownEntry.windowMs) {
+        limits.delete(knownKey);
+      }
+    }
+
     let entry = limits.get(key);
-    if (!entry || now - entry.windowStartedAt >= windowMs || now < entry.windowStartedAt) {
-      entry = { windowStartedAt: now, count: 0 };
-      limits.delete(key);
-      limits.set(key, entry);
-    } else {
-      limits.delete(key);
+    if (!entry && limits.size >= maxRateKeys) {
+      // Never evict a live bucket: doing so would let attackers bypass limits
+      // by creating many distinct keys. Unknown keys fail closed until a slot
+      // naturally expires; existing buckets continue to work.
+      let retryAfterMs = Number.POSITIVE_INFINITY;
+      for (const knownEntry of limits.values()) {
+        retryAfterMs = Math.min(
+          retryAfterMs,
+          Math.max(1, knownEntry.windowStartedAt + knownEntry.windowMs - now)
+        );
+      }
+      return { allowed: false, retryAfterMs: Number.isFinite(retryAfterMs) ? retryAfterMs : windowMs };
+    }
+
+    if (!entry || entry.windowMs !== windowMs) {
+      entry = { windowStartedAt: now, windowMs, count: 0 };
       limits.set(key, entry);
     }
 
     entry.count += 1;
-    while (limits.size > maxRateKeys) {
-      const oldestKey = limits.keys().next().value;
-      if (oldestKey === undefined) break;
-      limits.delete(oldestKey);
-    }
-
     return {
       allowed: entry.count <= maxRequests,
-      retryAfterMs: Math.max(0, entry.windowStartedAt + windowMs - now)
+      retryAfterMs: Math.max(0, entry.windowStartedAt + entry.windowMs - now)
     };
   }
 
@@ -288,10 +316,18 @@ export function createAccountRecovery(options = {}) {
     return createHmac("sha256", secret).update(scope).update("\0").update(value).digest("hex");
   }
 
+  function readNow() {
+    const now = clock();
+    if (!Number.isSafeInteger(now) || now < 0) {
+      throw new TypeError("clock must return a non-negative safe integer timestamp in milliseconds");
+    }
+    return now;
+  }
+
   function emit(action, ruleId, channel, scopes = [], severity = "medium") {
     safeNotify(onEvent, {
       id: randomUUID(),
-      timestamp: new Date(clock()).toISOString(),
+      timestamp: new Date(readNow()).toISOString(),
       component: "jb-security-guard",
       action,
       severity,
@@ -347,7 +383,7 @@ export function createAccountRecovery(options = {}) {
     }
 
     stats.requests += 1;
-    const now = clock();
+    const now = readNow();
     const requestId = randomUUID();
     const clientDigest = getClientDigest(input.request);
     const accountId = normalizeAccountId(input.accountId);
@@ -364,13 +400,13 @@ export function createAccountRecovery(options = {}) {
         name: "account",
         key: eligible
           ? digest("request-account", accountDigest)
-          : digest("request-account-missing", requestId)
+          : digest("request-account-missing", channel)
       },
       {
         name: "destination",
         key: eligible
           ? digest("request-destination", destinationDigest)
-          : digest("request-destination-missing", requestId)
+          : digest("request-destination-missing", channel)
       }
     ];
     const policyMap = requestPolicies;
@@ -395,7 +431,7 @@ export function createAccountRecovery(options = {}) {
     const subjectKey = digest("subject-index", accountDigest + "\0" + channel);
     const credentialDigest = digest("credential", requestId + "\0" + credential);
 
-    await store.putChallenge({
+    const stored = await store.putChallenge({
       id: requestId,
       subjectKey,
       accountId,
@@ -404,6 +440,11 @@ export function createAccountRecovery(options = {}) {
       createdAt: now,
       expiresAt
     });
+    if (stored === false) {
+      stats.suppressed += 1;
+      emit("request-suppressed", REQUEST_RULE, channel, [], "medium");
+      return Object.freeze({ accepted: true, requestId });
+    }
     stats.challengesIssued += 1;
 
     const delivery = channel === "email"
@@ -435,9 +476,10 @@ export function createAccountRecovery(options = {}) {
     const requestId = typeof input.requestId === "string" ? input.requestId.trim() : "";
     const credential = typeof input.credential === "string" ? input.credential : "";
 
+    const now = readNow();
     const limit = await store.consumeLimit({
       key: digest("verify-ip", getClientDigest(input.request)),
-      now: clock(),
+      now,
       windowMs: verifyIpPolicy.windowMs,
       maxRequests: verifyIpPolicy.maxRequests
     });
@@ -452,7 +494,7 @@ export function createAccountRecovery(options = {}) {
       return Object.freeze({ valid: false });
     }
 
-    if (!/^[0-9a-f-]{36}$/i.test(requestId) || credential.length < 1 || credential.length > 2048) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) || credential.length < 1 || credential.length > 2048) {
       stats.verificationFailed += 1;
       emit("verification-failed", VERIFY_RULE, null, [], "medium");
       return Object.freeze({ valid: false });
@@ -462,7 +504,7 @@ export function createAccountRecovery(options = {}) {
     const result = await store.consumeChallenge({
       id: requestId,
       credentialDigest,
-      now: clock(),
+      now,
       maxAttempts
     });
 
