@@ -231,3 +231,33 @@ npm run test:security-guard
 ~~~
 
 No real email, phone number, account record, provider credential, Redis service, or production secret is required. Do not print captured messages to CI logs. Production integration must inject real providers and a stable secret from a secret manager, use verified contacts resolved server-side, and use a shared atomic store for multi-instance deployments.
+
+
+## Response security headers
+
+The Guard factory exposes a separate response middleware:
+
+~~~js
+const guard = createSecurityGuard({
+  mode: "balanced",
+  securityHeaders: {
+    // Add only after inventorying the app's scripts, APIs, images and embeds.
+    contentSecurityPolicy: "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+  }
+});
+
+app.use(guard.securityHeaders);
+app.use(guard.middleware);
+~~~
+
+It adds X-Content-Type-Options: nosniff, a conservative Referrer-Policy, Permissions-Policy disabling camera/microphone/geolocation, and X-Frame-Options: SAMEORIGIN by default. It removes the X-Powered-By response header when the framework exposes removeHeader().
+
+HSTS is emitted only when the request is demonstrably secure (request.socket.encrypted or request.secure). Forwarded headers are not trusted by default. Behind a reverse proxy, supply isSecureRequest only when the application has a narrowly defined trusted-proxy boundary. Never use a client-controlled X-Forwarded-Proto value as proof of TLS.
+
+A generic CSP is deliberately not forced because an incorrect policy can break a real application. Define and test an application-specific enforced CSP (or report-only policy) after inventorying required origins, scripts, fonts, APIs and embeds. Do not allow later route middleware to overwrite security headers unintentionally.
+
+## Capacity exhaustion is fail-closed
+
+The per-process rate limiter and authentication-failure tracker no longer evict live client/account buckets to make room for new identities. When their bounded tables are full, untracked identities share a bounded overflow bucket or are rejected by the rate limiter. In balanced/strict modes this can temporarily deny new clients while active windows expire; this trades availability for avoiding lockout-reset bypass through identity rotation. Monitor capacity and size limits for expected traffic before production rollout.
+
+This remains process-local. A horizontally scaled deployment still needs shared atomic rate-limit and authentication-failure storage; independent in-memory instances are not one global control.

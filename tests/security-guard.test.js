@@ -434,3 +434,52 @@ test("auth protection validates identity resolver and safely bounds tracked keys
   assert.equal(auth.getStats().failures, 0);
   assert.equal(auth.getStats().trackedIpKeys, 0);
 });
+
+
+test("rate-limit table saturation fails closed without evicting live client buckets", async () => {
+  await withGuard({
+    mode: "balanced",
+    rateLimit: { max: 100, windowMs: 60_000, maxKeys: 1 },
+    keyGenerator: (request) => request.headers["x-test-client"] ?? "missing"
+  }, async ({ events, request, guard }) => {
+    assert.equal((await request("/ok", {
+      headers: { "x-test-client": "client-a" }
+    })).statusCode, 200);
+    const saturated = await request("/ok", {
+      headers: { "x-test-client": "client-b" }
+    });
+    assert.equal(saturated.statusCode, 429);
+    assert.equal(JSON.parse(saturated.body).error, "request_blocked");
+    const repeated = await request("/ok", {
+      headers: { "x-test-client": "client-c" }
+    });
+    assert.equal(repeated.statusCode, 429);
+    assert.ok(events.some((event) => event.ruleIds.includes("JBG-RATE-002")));
+    assert.equal(events.filter((event) => event.ruleIds.includes("JBG-RATE-002")).length, 1);
+    assert.equal(guard.getStats().rateLimitKeys, 1);
+  });
+});
+
+test("authentication bucket saturation preserves existing lockout state and fails closed for new identities", () => {
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const auth = guard.createAuthProtection({
+    identityKeyGenerator: (request) => request.account,
+    clientKeyGenerator: (request) => request.client,
+    maxTrackedKeys: 1,
+    policies: {
+      ip: { maxFailures: 2, lockoutMs: 1000, maxLockoutMs: 2000 },
+      accountIp: { maxFailures: 2, lockoutMs: 1000, maxLockoutMs: 2000 },
+      account: { maxFailures: 2, lockoutMs: 1000, maxLockoutMs: 2000 }
+    },
+    clock: () => 10_000
+  });
+  auth.recordFailure({ account: "account-a", client: "client-a" });
+  auth.recordFailure({ account: "account-b", client: "client-b" });
+  auth.recordFailure({ account: "account-c", client: "client-c" });
+  assert.equal(auth.getStatus({ account: "account-d", client: "client-d" }).blocked, true);
+  assert.equal(auth.getStats().trackedIpKeys, 1);
+  assert.equal(auth.getStats().trackedAccountIpKeys, 1);
+  assert.equal(auth.getStats().trackedAccountKeys, 1);
+  auth.reset();
+  assert.equal(auth.getStatus({ account: "account-d", client: "client-d" }).blocked, false);
+});

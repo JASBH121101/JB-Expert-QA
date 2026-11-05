@@ -113,6 +113,7 @@ export function createAuthProtection(options = {}) {
     accountIp: new Map(),
     account: new Map()
   };
+  const overflowBuckets = { ip: null, accountIp: null, account: null };
   const stats = {
     failures: 0,
     lockouts: 0,
@@ -146,13 +147,29 @@ export function createAuthProtection(options = {}) {
   }
 
   function touchBucket(scope, key, now) {
-    if (!key) return null;
     const store = buckets[scope];
     let entry = store.get(key);
-
     if (entry && now - entry.lastFailureAt >= resetAfterMs) {
       entry = null;
       store.delete(key);
+    }
+
+    if (!entry && store.size >= maxTrackedKeys) {
+      // Preserve live identity buckets. New identities share one bounded
+      // overflow bucket and can temporarily throttle new authentication attempts.
+      entry = overflowBuckets[scope];
+      if (entry && now - entry.lastFailureAt >= resetAfterMs) entry = null;
+      if (!entry) {
+        entry = {
+          windowStartedAt: now,
+          lastFailureAt: now,
+          failures: 0,
+          lockouts: 0,
+          blockedUntil: 0
+        };
+      }
+      overflowBuckets[scope] = entry;
+      return entry;
     }
 
     if (!entry) {
@@ -164,14 +181,7 @@ export function createAuthProtection(options = {}) {
         blockedUntil: 0
       };
     }
-
-    store.delete(key);
     store.set(key, entry);
-    while (store.size > maxTrackedKeys) {
-      const oldest = store.keys().next().value;
-      if (oldest === undefined) break;
-      store.delete(oldest);
-    }
     return entry;
   }
 
@@ -181,10 +191,13 @@ export function createAuthProtection(options = {}) {
     for (const scope of ["ip", "accountIp", "account"]) {
       const key = keys[scope];
       if (!key) continue;
-      const entry = buckets[scope].get(key);
-      if (entry && entry.blockedUntil > now) {
-        activeScopes.push(scope);
-        blockedUntil = Math.max(blockedUntil, entry.blockedUntil);
+      const entry = key ? buckets[scope].get(key) : null;
+      const overflow = overflowBuckets[scope];
+      for (const candidate of [entry, overflow]) {
+        if (candidate && now - candidate.lastFailureAt < resetAfterMs && candidate.blockedUntil > now) {
+          activeScopes.push(scope);
+          blockedUntil = Math.max(blockedUntil, candidate.blockedUntil);
+        }
       }
     }
     return {
@@ -328,6 +341,7 @@ export function createAuthProtection(options = {}) {
 
   function reset() {
     for (const store of Object.values(buckets)) store.clear();
+    for (const scope of Object.keys(overflowBuckets)) overflowBuckets[scope] = null;
     for (const key of Object.keys(stats)) stats[key] = 0;
   }
 

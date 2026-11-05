@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createAuthProtection } from "./auth-protection.js";
 import { createAccountRecovery } from "./account-recovery.js";
+import { createSecurityHeaders } from "./security-headers.js";
 export { createAuthProtection } from "./auth-protection.js";
 export { createAccountRecovery, createMemoryRecoveryStore } from "./account-recovery.js";
+export { createSecurityHeaders } from "./security-headers.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
@@ -247,7 +249,9 @@ function safeNotify(onEvent, event) {
 
 export function createSecurityGuard(options = {}) {
   const settings = normalizeOptions(options);
+  const securityHeaders = createSecurityHeaders(options.securityHeaders ?? {});
   const rateState = new Map();
+  const overflowState = { incidentId: null, alerted: false, windowStartedAt: 0 };
   const counters = {
     requests: 0,
     inspected: 0,
@@ -268,6 +272,42 @@ export function createSecurityGuard(options = {}) {
     }
 
     let entry = rateState.get(clientKey);
+    if (!entry && rateState.size >= settings.rateLimit.maxKeys) {
+      // Only scan for expired keys at capacity; never evict a live client's bucket.
+      for (const [knownKey, knownEntry] of rateState) {
+        if (now - knownEntry.windowStartedAt >= settings.rateLimit.windowMs) {
+          rateState.delete(knownKey);
+        }
+      }
+      if (overflowState.incidentId &&
+          now - overflowState.windowStartedAt >= settings.rateLimit.windowMs) {
+        overflowState.incidentId = null;
+        overflowState.alerted = false;
+        overflowState.windowStartedAt = 0;
+      }
+      entry = rateState.get(clientKey);
+    }
+
+    if (!entry && rateState.size >= settings.rateLimit.maxKeys) {
+      // Identity rotation must not erase accumulated counters. Unknown keys
+      // fail closed while the bounded table contains only live buckets.
+      if (!overflowState.incidentId) {
+        overflowState.incidentId = randomUUID();
+        overflowState.windowStartedAt = now;
+      }
+      return {
+        finding: {
+          id: "JBG-RATE-002",
+          severity: "high",
+          reason: "rate-limit-capacity-exceeded",
+          statusCode: 429
+        },
+        shouldEmit: !overflowState.alerted,
+        incidentId: overflowState.incidentId,
+        markAlerted() { overflowState.alerted = true; }
+      };
+    }
+
     if (!entry || now - entry.windowStartedAt >= settings.rateLimit.windowMs) {
       entry = {
         windowStartedAt: now,
@@ -275,20 +315,10 @@ export function createSecurityGuard(options = {}) {
         alerted: false,
         incidentId: null
       };
-      rateState.delete(clientKey);
-      rateState.set(clientKey, entry);
-    } else {
-      rateState.delete(clientKey);
       rateState.set(clientKey, entry);
     }
 
     entry.count += 1;
-    while (rateState.size > settings.rateLimit.maxKeys) {
-      const oldestKey = rateState.keys().next().value;
-      if (oldestKey === undefined) break;
-      rateState.delete(oldestKey);
-    }
-
     if (entry.count <= settings.rateLimit.max) return null;
 
     if (!entry.incidentId) entry.incidentId = randomUUID();
@@ -321,6 +351,9 @@ export function createSecurityGuard(options = {}) {
 
   function reset() {
     rateState.clear();
+    overflowState.incidentId = null;
+    overflowState.alerted = false;
+    overflowState.windowStartedAt = 0;
     counters.requests = 0;
     counters.inspected = 0;
     counters.incidents = 0;
@@ -408,6 +441,7 @@ export function createSecurityGuard(options = {}) {
 
   return Object.freeze({
     middleware,
+    securityHeaders: securityHeaders.middleware,
     getStats,
     reset,
     createAuthProtection: (options = {}) => createAuthProtection({
