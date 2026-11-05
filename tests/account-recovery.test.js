@@ -137,7 +137,9 @@ test("wrong OTP attempts lock and consume a challenge after the configured maxim
     request: REQUEST
   }), { valid: false });
   assert.deepEqual(await recovery.verifyRecovery({
-    requestId: issued.requestId, credential: "000000", request: REQUEST
+    requestId: issued.requestId,
+    credential: deliveries[0].code === "000000" ? "000001" : "000000",
+    request: REQUEST
   }), { valid: false });
   assert.deepEqual(await recovery.verifyRecovery({
     requestId: issued.requestId, credential: deliveries[0].code, request: REQUEST

@@ -301,7 +301,7 @@ export function createAccountRecovery(options = {}) {
     });
   }
 
-  async function applyLimits(scopes, policies) {
+  async function applyLimits(scopes, policies, now) {
     let allowed = true;
     let retryAfterMs = 0;
     const blockedScopes = [];
@@ -310,7 +310,7 @@ export function createAccountRecovery(options = {}) {
       const policy = policies[scope.name];
       const result = await store.consumeLimit({
         key: scope.key,
-        now: clock(),
+        now,
         windowMs: policy.windowMs,
         maxRequests: policy.maxRequests
       });
@@ -347,6 +347,7 @@ export function createAccountRecovery(options = {}) {
     }
 
     stats.requests += 1;
+    const now = clock();
     const requestId = randomUUID();
     const clientDigest = getClientDigest(input.request);
     const accountId = normalizeAccountId(input.accountId);
@@ -355,21 +356,25 @@ export function createAccountRecovery(options = {}) {
     const accountDigest = eligible ? digest("account", accountId) : null;
     const destinationDigest = eligible ? digest("destination:" + channel, destination) : null;
 
+    // Always perform the same three store operations, including for unknown
+    // accounts, so a shared remote adapter does not add a simple timing oracle.
     const scopes = [
-      { name: "ip", key: digest("request-ip", clientDigest) }
+      { name: "ip", key: digest("request-ip", clientDigest) },
+      {
+        name: "account",
+        key: eligible
+          ? digest("request-account", accountDigest)
+          : digest("request-account-missing", requestId)
+      },
+      {
+        name: "destination",
+        key: eligible
+          ? digest("request-destination", destinationDigest)
+          : digest("request-destination-missing", requestId)
+      }
     ];
-    const policyMap = { ip: requestPolicies.ip };
-
-    if (eligible) {
-      scopes.push(
-        { name: "account", key: digest("request-account", accountDigest) },
-        { name: "destination", key: digest("request-destination", destinationDigest) }
-      );
-      policyMap.account = requestPolicies.account;
-      policyMap.destination = requestPolicies.destination;
-    }
-
-    const limited = await applyLimits(scopes, policyMap);
+    const policyMap = requestPolicies;
+    const limited = await applyLimits(scopes, policyMap, now);
     if (!limited.allowed) {
       stats.rateLimited += 1;
       emit("request-rate-limited", RATE_RULE, channel, limited.blockedScopes, "high");
@@ -386,7 +391,7 @@ export function createAccountRecovery(options = {}) {
     const credential = channel === "email"
       ? randomBytes(32).toString("base64url")
       : String(randomInt(0, 1_000_000)).padStart(6, "0");
-    const expiresAt = clock() + (channel === "email" ? emailTtlMs : smsTtlMs);
+    const expiresAt = now + (channel === "email" ? emailTtlMs : smsTtlMs);
     const subjectKey = digest("subject-index", accountDigest + "\0" + channel);
     const credentialDigest = digest("credential", requestId + "\0" + credential);
 
@@ -396,7 +401,7 @@ export function createAccountRecovery(options = {}) {
       accountId,
       channel,
       credentialDigest,
-      createdAt: clock(),
+      createdAt: now,
       expiresAt
     });
     stats.challengesIssued += 1;
