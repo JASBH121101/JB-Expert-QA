@@ -305,3 +305,19 @@ For multipart uploads, configure per-file size, total file count, field count, p
 ## Upload quarantine contract
 
 Guard does not claim to be an antivirus engine. Before enabling uploads in a host application, implement the separate quarantine pipeline described in docs/FILE-UPLOAD-SECURITY.md. Unscanned files must never be published, previewed inline, or made downloadable by customers. If the scanner is unavailable or times out, keep the object quarantined and fail closed; do not treat a missing scan result as clean.
+
+
+## Origin validation for browser routes
+
+For cookie-authenticated browser routes, mount the origin protector before body parsers and routes:
+
+~~~js
+const originProtection = guard.createOriginProtection({
+  allowedOrigins: [process.env.PUBLIC_APP_ORIGIN]
+});
+app.use(originProtection.middleware);
+~~~
+
+Unsafe methods (everything except GET, HEAD, and OPTIONS) must carry an exact allowed Origin. The default is fail-closed when Origin is missing. Referer fallback and missing-origin allowance are disabled by default. Do not enable allowMissingOrigin on cookie-authenticated routes unless a separate synchronizer-token or equivalent CSRF mechanism is enforced. Keep GET/HEAD/OPTIONS handlers free of state changes.
+
+This is an origin-validation defense in depth, not a CSRF-token implementation and not a CORS configuration. Configure CORS separately; do not use wildcard credentialed origins. Mount this middleware only on routes intended for browser requests. Native mobile clients, webhooks, and machine APIs without browser Origin headers should use separate routes and authentication appropriate to those clients.

@@ -3,10 +3,12 @@ import { createAuthProtection } from "./auth-protection.js";
 import { createAccountRecovery } from "./account-recovery.js";
 import { createSecurityHeaders } from "./security-headers.js";
 import { configureNodeHttpServer } from "./node-server-hardening.js";
+import { createOriginProtection } from "./origin-protection.js";
 export { createAuthProtection } from "./auth-protection.js";
 export { createAccountRecovery, createMemoryRecoveryStore } from "./account-recovery.js";
 export { createSecurityHeaders } from "./security-headers.js";
 export { configureNodeHttpServer } from "./node-server-hardening.js";
+export { createOriginProtection } from "./origin-protection.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
@@ -573,6 +575,10 @@ export function createSecurityGuard(options = {}) {
       ...options
     }),
     createAccountRecovery: (options = {}) => createAccountRecovery({
+      onEvent: settings.onEvent,
+      ...options
+    }),
+    createOriginProtection: (options = {}) => createOriginProtection({
       onEvent: settings.onEvent,
       ...options
     })

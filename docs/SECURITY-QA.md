@@ -156,3 +156,8 @@ The middleware still does not consume request bodies. Every host application mus
 ## Node.js server boundary controls
 
 Guard now exports configureNodeHttpServer() for Node.js HTTP/HTTPS Server instances. It applies bounded header/request/socket timeouts, keep-alive reuse limits, header-count limits, and an early Expect: 100-continue Content-Length gate. It must run before listen(). It does not apply to HTTP/2 or external edge platforms, and chunked payloads still need framework body-parser limits.
+
+
+## Browser origin validation
+
+Guard exposes a separate origin-allowlist middleware for cookie-authenticated browser routes. Unsafe methods require an exact configured Origin by default; missing Origin, null Origin, malformed Origin, and untrusted origins are rejected. Referer fallback and missing-origin allowance are opt-in. This is defense in depth against cross-site request forgery, not a CSRF-token replacement and not a CORS policy.
