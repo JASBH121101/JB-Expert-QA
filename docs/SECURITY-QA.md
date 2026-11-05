@@ -122,7 +122,7 @@ The default policy throttles an account-client pair after 5 failures in 10 minut
 
 Identity and client keys are HMAC-derived with an in-memory process secret; event records contain no raw account identifier or client address. The default client resolver uses the socket peer address and ignores forwarded headers. Use a custom client resolver only behind a specifically trusted proxy.
 
-`monitor` observes but does not enforce throttles. `balanced` and `strict` enforce them. The application must return a generic authentication response and must not reveal whether an account exists.
+`monitor` observes but does not enforce throttles. `balanced` and `strict` enforce them. The application must return a generic authentication response, set `Retry-After` to `attempt.retryAfterSeconds` when enforcing a threshold-reaching failure, and must not reveal whether an account exists.
 
 Important boundaries:
 

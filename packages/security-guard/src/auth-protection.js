@@ -245,6 +245,7 @@ export function createAuthProtection(options = {}) {
       throttled: latest.blocked,
       enforced: latest.blocked && enforced,
       retryAfterMs: latest.retryAfterMs,
+      retryAfterSeconds: latest.blocked ? Math.max(1, Math.ceil(latest.retryAfterMs / 1000)) : 0,
       scopes: Object.freeze([...new Set([...active, ...latest.scopes])])
     });
 

@@ -237,6 +237,7 @@ async function withAuth(options, run) {
 
       const result = auth.recordFailure(request);
       response.statusCode = result.enforced ? 429 : 401;
+      if (result.enforced) response.setHeader("Retry-After", String(result.retryAfterSeconds));
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("Content-Type", "application/json; charset=utf-8");
       response.end(JSON.stringify({

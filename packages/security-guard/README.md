@@ -73,6 +73,7 @@ app.post("/login", auth.middleware, async (req, res) => {
 
   if (!user) {
     const attempt = auth.recordFailure(req);
+    if (attempt.enforced) res.setHeader("Retry-After", String(attempt.retryAfterSeconds));
     return res.status(attempt.enforced ? 429 : 401).json({
       error: attempt.enforced ? "authentication_temporarily_unavailable" : "invalid_credentials"
     });
