@@ -21,7 +21,11 @@ export function redactUrlForReport(input) {
   if (typeof input !== "string" || !input) return input ?? "";
   let parsed;
   try { parsed = new URL(input); }
-  catch { return input.length > 2048 ? input.slice(0, 2048) + "…" : input; }
+  catch {
+    // Never echo malformed URL text: credentials or tokens may be present in
+    // userinfo/query data that cannot be parsed safely.
+    return "[unparseable URL omitted]";
+  }
 
   if (["data:", "blob:", "javascript:"].includes(parsed.protocol)) return parsed.protocol + "[omitted]";
   if (parsed.username) parsed.username = "[REDACTED]";
