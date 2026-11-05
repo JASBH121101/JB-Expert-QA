@@ -107,6 +107,10 @@ export function configureNodeHttpServer(server, options = {}) {
     throw new TypeError("handleExpectContinue must be a boolean");
   }
 
+  if (settings.handleExpectContinue && server.listenerCount("checkContinue") > 0) {
+    throw new TypeError("A checkContinue listener already exists; configure it explicitly or set handleExpectContinue to false");
+  }
+
   // Node enforces these timeouts at the HTTP parser/socket boundary, before app middleware.
   server.headersTimeout = settings.headersTimeout;
   server.requestTimeout = settings.requestTimeout;
@@ -116,10 +120,6 @@ export function configureNodeHttpServer(server, options = {}) {
   server.maxHeadersCount = settings.maxHeadersCount;
 
   if (settings.handleExpectContinue) {
-    if (server.listenerCount("checkContinue") > 0) {
-      throw new TypeError("A checkContinue listener already exists; configure it explicitly or set handleExpectContinue to false");
-    }
-
     server.on("checkContinue", (request, response) => {
       const contentLengths = headerValues(request, "content-length");
       const transferEncodings = headerValues(request, "transfer-encoding");

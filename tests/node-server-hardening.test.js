@@ -118,3 +118,14 @@ test("valid Expect: 100-continue requests continue through the ordinary applicat
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("custom checkContinue listeners are not overwritten and failed configuration is atomic", () => {
+  const server = createServer();
+  const originalHeadersTimeout = server.headersTimeout;
+  server.on("checkContinue", () => {});
+  assert.throws(() => configureNodeHttpServer(server), /checkContinue listener already exists/);
+  assert.equal(server.headersTimeout, originalHeadersTimeout);
+  assert.equal(server.listenerCount("checkContinue"), 1);
+  server.close();
+});

@@ -300,3 +300,8 @@ Defaults set a 10-second header timeout, 30-second request receipt timeout, 5-se
 This helper applies to Node.js HTTP/HTTPS server instances, not HTTP/2 servers or edge platforms. Tune timeouts for legitimate long-running uploads, streaming responses, and long polling. Match maxBodyBytes with the security middleware and parser limits. Chunked bodies still require parser-level streaming limits.
 
 For multipart uploads, configure per-file size, total file count, field count, part count, and field-size limits in the multipart parser. Keep uploaded content in a private quarantine location until an actual malware scanner has accepted it. A MIME type or file extension check is not antivirus protection.
+
+
+## Upload quarantine contract
+
+Guard does not claim to be an antivirus engine. Before enabling uploads in a host application, implement the separate quarantine pipeline described in docs/FILE-UPLOAD-SECURITY.md. Unscanned files must never be published, previewed inline, or made downloadable by customers. If the scanner is unavailable or times out, keep the object quarantined and fail closed; do not treat a missing scan result as clean.
