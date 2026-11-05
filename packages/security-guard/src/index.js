@@ -6,6 +6,7 @@ import { configureNodeHttpServer } from "./node-server-hardening.js";
 import { createOriginProtection } from "./origin-protection.js";
 import { createCsrfProtection } from "./csrf-protection.js";
 import { createDistributedRateLimit } from "./distributed-rate-limit.js";
+import { createDistributedAuthProtection } from "./distributed-auth-protection.js";
 export { createAuthProtection } from "./auth-protection.js";
 export { createAccountRecovery, createMemoryRecoveryStore } from "./account-recovery.js";
 export { createSecurityHeaders } from "./security-headers.js";
@@ -13,6 +14,7 @@ export { configureNodeHttpServer } from "./node-server-hardening.js";
 export { createOriginProtection } from "./origin-protection.js";
 export { createCsrfProtection } from "./csrf-protection.js";
 export { createDistributedRateLimit } from "./distributed-rate-limit.js";
+export { createDistributedAuthProtection } from "./distributed-auth-protection.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
@@ -591,6 +593,12 @@ export function createSecurityGuard(options = {}) {
       ...options
     }),
     createDistributedRateLimit: (options = {}) => createDistributedRateLimit({
+      onEvent: settings.onEvent,
+      ...options
+    }),
+    createDistributedAuthProtection: (options = {}) => createDistributedAuthProtection({
+      mode: settings.mode,
+      blockSeverities: settings.blockSeverities,
       onEvent: settings.onEvent,
       ...options
     })
