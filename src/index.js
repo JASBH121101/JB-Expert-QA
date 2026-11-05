@@ -21,9 +21,11 @@ export {
   projectRules
 } from "./specialists/project-rules.js";
 export { securityDefenseRules } from "./specialists/security-rules.js";
+export { securityRuntimeRules } from "./specialists/runtime-security-rules.js";
 export { scanProject } from "./adapters/filesystem/scan-project.js";
 export { auditProject } from "./adapters/filesystem/audit-project.js";
 export { auditSecurityProject } from "./adapters/filesystem/audit-security-project.js";
+export { auditSecurityUrl } from "./adapters/filesystem/audit-security-url.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";
 
 export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";

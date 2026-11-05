@@ -9,8 +9,14 @@ const [projectPath = ".", ...args] = process.argv.slice(2);
 try {
   const options = new Map();
   const supportedOptions = ["--config=", "--format=", "--output="];
+  let onlineAdvisories = false;
 
   for (const arg of args) {
+    if (arg === "--online-advisories") {
+      if (onlineAdvisories) throw new TypeError("--online-advisories may only be supplied once");
+      onlineAdvisories = true;
+      continue;
+    }
     const prefix = supportedOptions.find((item) => arg.startsWith(item));
     if (!prefix) throw new TypeError("Unknown security audit option: " + arg);
     const name = prefix.slice(0, -1);
@@ -42,7 +48,10 @@ try {
     }
   }
 
-  const report = await auditSecurityProject(projectPath, config === undefined ? {} : { config });
+  const report = await auditSecurityProject(projectPath, {
+    ...(config === undefined ? {} : { config }),
+    onlineAdvisories
+  });
   const rendered = formatReport(report, format);
 
   if (outputPath) {

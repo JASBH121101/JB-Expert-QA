@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { auditSecurityProject } from "../src/adapters/filesystem/audit-security-project.js";
 import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 import { formatReport } from "../src/reporters/index.js";
+import { ExpertQAEngine, RuleRegistry } from "../src/index.js";
+import { securityRuntimeRules } from "../src/specialists/runtime-security-rules.js";
 
 async function withProject(run) {
   const root = await mkdtemp(join(tmpdir(), "jb-security-qa-"));
@@ -157,4 +159,152 @@ test("general project audits also include the dedicated security defense rules",
 
 test("security audit rejects an empty project path", async () => {
   await assert.rejects(auditSecurityProject(" "), /directory path is required/);
+});
+
+
+test("OSV dependency advisory lookup is opt-in and sends only package coordinates", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "package.json"), JSON.stringify({
+      name: "fixture", version: "1.0.0", dependencies: { lodash: "4.17.21" }
+    }));
+    await writeFile(join(root, "package-lock.json"), JSON.stringify({
+      name: "fixture",
+      lockfileVersion: 3,
+      packages: {
+        "": { name: "fixture", version: "1.0.0" },
+        "node_modules/lodash": { version: "4.17.21" }
+      }
+    }));
+
+    let calls = 0;
+    const fetchImpl = async (url, options = {}) => {
+      calls += 1;
+      if (String(url).endsWith("/querybatch")) {
+        const payload = JSON.parse(options.body);
+        assert.deepEqual(payload.queries, [{
+          package: { name: "lodash", ecosystem: "npm" },
+          version: "4.17.21"
+        }]);
+        return new Response(JSON.stringify({
+          results: [{ vulns: [{ id: "GHSA-TEST-1" }] }]
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      assert.match(String(url), /\/vulns\/GHSA-TEST-1$/);
+      return new Response(JSON.stringify({
+        id: "GHSA-TEST-1",
+        summary: "Test package security advisory",
+        database_specific: { severity: "HIGH" },
+        affected: [],
+        references: []
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const offline = await auditSecurityProject(root, {
+      fetchImpl: async () => { throw new Error("Network must not be used by default"); }
+    });
+    assert.equal(offline.dependencyAdvisories.status, "disabled");
+    assert.equal(offline.securityAssessment.networkRequests, 0);
+    assert.equal(calls, 0);
+
+    const online = await auditSecurityProject(root, {
+      onlineAdvisories: true,
+      fetchImpl
+    });
+    assert.equal(online.dependencyAdvisories.status, "complete");
+    assert.equal(online.dependencyAdvisories.networkRequests, 2);
+    assert.equal(online.securityAssessment.onlineDependencyAdvisories, true);
+    assert.ok(online.diagnostics.some((item) => item.id.startsWith("DEP-OSV-GHSA-TEST-1")));
+    assert.equal(calls, 2);
+    assert.equal(JSON.stringify(online).includes("application source"), false);
+  });
+});
+
+test("runtime security rules accept a deliberate baseline response", async () => {
+  const registry = new RuleRegistry();
+  for (const rule of securityRuntimeRules) registry.register(rule);
+  const report = await new ExpertQAEngine({
+    registry,
+    config: {
+      profile: "runtime-fixture",
+      weights: { "security-runtime": 100 },
+      thresholds: { minimumScore: 90, failOnCritical: true }
+    }
+  }).audit({
+    securityHttpResponse: {
+      finalUrl: "https://safe.example/",
+      headers: {
+        "strict-transport-security": ["max-age=31536000; includeSubDomains"],
+        "content-security-policy": [
+          "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+        ],
+        "x-content-type-options": ["nosniff"],
+        "referrer-policy": ["strict-origin-when-cross-origin"],
+        "permissions-policy": ["camera=(), microphone=(), geolocation=()"]
+      },
+      cookies: [{ name: "session", secure: true, httpOnly: true, sameSite: "Lax" }],
+      mixedContent: []
+    }
+  });
+  assert.equal(report.scoring.score, 100);
+  assert.equal(report.scoring.passed, true);
+  assert.equal(report.summary.rulesExecuted, securityRuntimeRules.length);
+});
+
+test("runtime security rules block HTTP pages and identify weak response controls", async () => {
+  const registry = new RuleRegistry();
+  for (const rule of securityRuntimeRules) registry.register(rule);
+  const report = await new ExpertQAEngine({
+    registry,
+    config: {
+      profile: "runtime-fixture",
+      weights: { "security-runtime": 100 },
+      thresholds: { minimumScore: 90, failOnCritical: true }
+    }
+  }).audit({
+    securityHttpResponse: {
+      finalUrl: "http://unsafe.example/",
+      headers: {
+        "content-security-policy": ["default-src * 'unsafe-inline' 'unsafe-eval'"]
+      },
+      cookies: [],
+      mixedContent: [{ url: "http://cdn.example/script.js", resourceType: "script" }]
+    }
+  });
+  const ids = report.diagnostics.map((item) => item.id);
+  assert.ok(ids.includes("SEC-RUNTIME-HTTPS-001"));
+  assert.ok(ids.includes("SEC-RUNTIME-CSP-002"));
+  assert.ok(ids.includes("SEC-RUNTIME-CSP-003"));
+  assert.ok(ids.includes("SEC-RUNTIME-XCTO-001"));
+  assert.ok(ids.includes("SEC-RUNTIME-FRAME-001"));
+  assert.ok(ids.includes("SEC-RUNTIME-MIXED-1"));
+  assert.equal(report.scoring.passed, false);
+});
+
+test("runtime cookie findings include cookie names but never cookie values", async () => {
+  const registry = new RuleRegistry();
+  for (const rule of securityRuntimeRules) registry.register(rule);
+  const report = await new ExpertQAEngine({
+    registry,
+    config: {
+      weights: { "security-runtime": 100 },
+      thresholds: { minimumScore: 0, failOnCritical: true }
+    }
+  }).audit({
+    securityHttpResponse: {
+      finalUrl: "https://app.example/",
+      headers: {},
+      cookies: [{
+        name: "session",
+        secure: false,
+        httpOnly: false,
+        sameSite: null,
+        value: "sensitive-cookie-value-must-not-leak"
+      }],
+      mixedContent: []
+    }
+  });
+  const cookieFinding = report.diagnostics.find((item) => item.id.startsWith("SEC-RUNTIME-COOKIE-"));
+  assert.ok(cookieFinding);
+  assert.deepEqual(cookieFinding.metadata.missingAttributes, ["Secure", "HttpOnly", "SameSite"]);
+  assert.equal(JSON.stringify(report).includes("sensitive-cookie-value-must-not-leak"), false);
 });

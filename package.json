@@ -15,7 +15,8 @@
     "audit": "node src/cli.js",
     "audit:project": "node src/project-cli.js",
     "audit:security": "node src/security-cli.js",
-    "autopilot": "node src/autopilot-cli.js"
+    "autopilot": "node src/autopilot-cli.js",
+    "audit:security:url": "node src/security-url-cli.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",

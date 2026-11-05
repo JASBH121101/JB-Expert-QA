@@ -25,6 +25,14 @@ Use a custom profile:
 npm run audit:security -- . --config=config/security-audit.config.json
 ~~~
 
+The default command remains offline. To explicitly query OSV.dev for known vulnerabilities in resolved npm packages:
+
+~~~bash
+npm run audit:security -- . --online-advisories
+~~~
+
+Only package names and exact versions from supported npm lockfiles are sent to OSV.dev. The report records coverage and network request counts. Advisory lookup is not run unless the flag or a custom config explicitly enables it.
+
 The default security profile has a 90/100 minimum score. Critical findings block approval, and incomplete scans cannot pass. High-severity findings reduce the score and may block approval depending on the configured threshold.
 
 ## Checks included
@@ -46,16 +54,16 @@ Every heuristic finding includes a file/line location, severity, detector identi
 
 ## Execution and data boundaries
 
-This profile is local and static:
+The source-code profile is local and static:
 
 - It does not execute the target application's code.
 - It does not send attack payloads or issue HTTP requests.
 - It does not connect to a live database, Cloudflare account, storage bucket, or production service.
 - It does not install target-project dependencies.
 - It does not open environment or credential files; it records their paths only.
-- It makes no network requests. The default profile disables online dependency advisory lookup.
+- It makes no network requests unless the explicit `--online-advisories` option or a custom enabled advisory profile is used. The OSV check sends package names and exact versions only.
 
-## Important limitations
+## Runtime site mode\n\nThe separate `audit:security:url` command loads one public page with Chromium to observe the document response. It uses the URL safety guard to block internal and reserved destinations. It does not authenticate or exploit the target.\n\n## Important limitations
 
 Static analysis is not a penetration test. Pattern matching cannot fully trace tainted values, framework middleware, multi-line cookie options, authentication context, network boundaries, or controls implemented in an external dashboard. A finding requires human review, and no findings do not prove that an application is secure.
 
@@ -64,3 +72,18 @@ For a full security review, combine this profile with dependency advisory checks
 ## CI
 
 The Security QA GitHub Actions workflow runs deterministic security-profile tests for changes to JB Expert QA. The regular Core validation workflow remains enabled as the broader regression suite. Security QA results are designed to be consumed by other repositories through a pinned JB Expert QA release or commit; consuming repositories should not need a new personal token for each engine update when access is configured with a stable, least-privilege GitHub App or read-only package/repository credential.
+
+
+## Passive live-site security headers
+
+For a public website you own or are authorized to assess, run the passive browser check:
+
+~~~bash
+npm run audit:security:url -- https://example.com
+~~~
+
+It performs a normal page load using Chromium and inspects the main document response for HTTPS, HSTS, enforced CSP quality, MIME sniffing protection, anti-framing controls, Referrer-Policy, Permissions-Policy, CORS response consistency, authentication-cookie attributes, and mixed content. It does not submit forms, authenticate, crawl linked pages, or send exploit payloads.
+
+The auditor reuses the URL safety guard: localhost, private, link-local, and reserved network destinations are blocked by default, including redirects and browser subrequests. The scan does not bypass certificate validation. Reports include only cookie names and security attributes, never cookie values.
+
+The runtime result is an observation of one page load, not a complete assessment of every API route, authenticated screen, CDN response, or infrastructure setting. A clean response does not certify the entire site.

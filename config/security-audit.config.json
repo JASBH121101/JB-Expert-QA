@@ -3,7 +3,8 @@
   "profile": "security-static",
   "weights": {
     "code-quality": 0,
-    "security": 100
+    "security": 80,
+    "dependencies": 20
   },
   "severityPenalties": {
     "critical": 25,
@@ -21,5 +22,14 @@
     "maxFileBytes": 1000000,
     "maxTotalBytes": 20000000,
     "maxDepth": 20
+  },
+  "advisories": {
+    "enabled": false,
+    "required": false,
+    "provider": "osv",
+    "maxPackages": 1000,
+    "batchSize": 100,
+    "maxVulnerabilities": 200,
+    "timeoutMs": 8000
   }
 }
