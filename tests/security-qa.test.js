@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { auditSecurityProject } from "../src/adapters/filesystem/audit-security-project.js";
+import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 import { formatReport } from "../src/reporters/index.js";
 
 async function withProject(run) {
@@ -142,6 +143,15 @@ test("security reports are available in JSON, Markdown, and HTML formats", async
     assert.match(formatReport(report, "json"), /Security Auditor/);
     assert.match(formatReport(report, "markdown"), /JB Expert QA report/);
     assert.match(formatReport(report, "html"), /<h1>JB Expert QA report<\/h1>/);
+  });
+});
+
+test("general project audits also include the dedicated security defense rules", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "endpoint.js"), 'const endpoint = "http://api.example.com/v1";');
+    const report = await auditProject(root);
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("SEC-HTTP-")));
+    assert.ok(report.summary.specialists.includes("security"));
   });
 });
 
