@@ -68,7 +68,9 @@ jobs:
           node --check packages/security-guard/src/node-server-hardening.js
           node --check packages/security-guard/src/origin-protection.js
           node --check packages/security-guard/src/csrf-protection.js
+          node --check packages/security-guard/src/distributed-rate-limit.js
           node --check tests/csrf-protection.test.js
+          node --check tests/distributed-rate-limit.test.js
           node --check tests/origin-protection.test.js
           node --check tests/node-server-hardening.test.js
           node --check tests/security-headers.test.js
