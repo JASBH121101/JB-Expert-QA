@@ -282,6 +282,7 @@ test("runtime security rules block HTTP pages and identify weak response control
   assert.ok(ids.includes("SEC-RUNTIME-HTTPS-001"));
   assert.ok(ids.includes("SEC-RUNTIME-CSP-002"));
   assert.ok(ids.includes("SEC-RUNTIME-CSP-003"));
+  assert.ok(ids.includes("SEC-RUNTIME-CSP-007"));
   assert.ok(ids.includes("SEC-RUNTIME-XCTO-001"));
   assert.ok(ids.includes("SEC-RUNTIME-FRAME-001"));
   assert.ok(ids.includes("SEC-RUNTIME-MIXED-1"));
@@ -354,4 +355,56 @@ test("runtime URL auditor can inspect a controlled local HTTP fixture without ex
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+
+test("runtime security rules detect an HTTP entry point even when it redirects to HTTPS", async () => {
+  const registry = new RuleRegistry();
+  for (const rule of securityRuntimeRules) registry.register(rule);
+  const report = await new ExpertQAEngine({
+    registry,
+    config: {
+      weights: { "security-runtime": 100 },
+      thresholds: { minimumScore: 90, failOnCritical: true }
+    }
+  }).audit({
+    securityHttpResponse: {
+      initialUrl: "http://app.example/",
+      finalUrl: "https://app.example/",
+      headers: {
+        "strict-transport-security": ["max-age=31536000"],
+        "content-security-policy": ["default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"],
+        "x-content-type-options": ["nosniff"],
+        "referrer-policy": ["strict-origin-when-cross-origin"],
+        "permissions-policy": ["camera=(), microphone=()"]
+      },
+      cookies: [],
+      mixedContent: []
+    }
+  });
+  assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-002"));
+  assert.equal(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-HTTPS-001"), false);
+  assert.equal(report.scoring.passed, false);
+});
+
+test("runtime CSP policy without a script source directive is flagged", async () => {
+  const registry = new RuleRegistry();
+  for (const rule of securityRuntimeRules) registry.register(rule);
+  const report = await new ExpertQAEngine({
+    registry,
+    config: {
+      weights: { "security-runtime": 100 },
+      thresholds: { minimumScore: 90, failOnCritical: true }
+    }
+  }).audit({
+    securityHttpResponse: {
+      finalUrl: "https://app.example/",
+      headers: {
+        "content-security-policy": ["object-src 'none'; base-uri 'self'; frame-ancestors 'self'"]
+      },
+      cookies: [],
+      mixedContent: []
+    }
+  });
+  assert.ok(report.diagnostics.some((item) => item.id === "SEC-RUNTIME-CSP-006"));
 });

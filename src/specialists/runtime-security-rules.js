@@ -31,15 +31,28 @@ export const securityRuntimeRules = Object.freeze([
     id: "security-runtime.transport",
     specialist: "security-runtime",
     evaluate(context) {
-      if (isHttps(context)) return [];
-      return [finding(
-        "SEC-RUNTIME-HTTPS-001",
-        "Final page response is not protected by HTTPS",
-        "The inspected page finished loading over plain HTTP. Network traffic can be read or modified in transit.",
-        "critical",
-        "Serve the site over HTTPS with a valid certificate and redirect HTTP requests to the HTTPS canonical URL.",
-        { finalUrl: context.securityHttpResponse?.finalUrl ?? null }
-      )];
+      const initialUrl = context.securityHttpResponse?.initialUrl;
+      if (!isHttps(context)) {
+        return [finding(
+          "SEC-RUNTIME-HTTPS-001",
+          "Final page response is not protected by HTTPS",
+          "The inspected page finished loading over plain HTTP. Network traffic can be read or modified in transit.",
+          "critical",
+          "Serve the site over HTTPS with a valid certificate and redirect HTTP requests to the HTTPS canonical URL.",
+          { initialUrl: initialUrl ?? null, finalUrl: context.securityHttpResponse?.finalUrl ?? null }
+        )];
+      }
+      if (initialUrl && !initialUrl.startsWith("https://")) {
+        return [finding(
+          "SEC-RUNTIME-HTTPS-002",
+          "Initial navigation began over HTTP before reaching HTTPS",
+          "The browser had to make the initial navigation over an unencrypted connection before arriving at the HTTPS page. That first redirect can be intercepted on an untrusted network.",
+          "high",
+          "Publish HTTPS links as the canonical entry point and enable HSTS after confirming HTTPS support across the host.",
+          { initialUrl, finalUrl: context.securityHttpResponse?.finalUrl ?? null }
+        )];
+      }
+      return [];
     }
   },
   {
@@ -80,6 +93,26 @@ export const securityRuntimeRules = Object.freeze([
         "Deploy a restrictive Content-Security-Policy using the site's required origins and nonces or hashes. Start with report-only while testing if the current application has not yet been inventoried."
       )];
       const findings = [];
+      const directives = value.split(";").map((item) => item.trim()).filter(Boolean);
+      const scriptDirective = directives.find((item) => /^script-src\s+/i.test(item)) ??
+        directives.find((item) => /^default-src\s+/i.test(item));
+      if (!scriptDirective) {
+        findings.push(finding(
+          "SEC-RUNTIME-CSP-006",
+          "Content-Security-Policy does not restrict script sources",
+          "The enforced policy contains no script-src or default-src directive, so this policy does not establish a source allowlist for scripts.",
+          "high",
+          "Define a restrictive script-src or default-src directive and use nonces or hashes for required inline scripts."
+        ));
+      } else if (scriptDirective.split(/\s+/).slice(1).includes("*")) {
+        findings.push(finding(
+          "SEC-RUNTIME-CSP-007",
+          "Content-Security-Policy permits scripts from any origin",
+          "The effective script source directive includes the wildcard source, allowing scripts from arbitrary origins.",
+          "high",
+          "Replace the wildcard with a strict allowlist of required script origins, and prefer nonces or hashes for inline scripts."
+        ));
+      }
       if (/(?:^|;)\s*script-src(?:\s+[^;]*)?\s+[^;]*'unsafe-eval'/i.test(value) ||
           /(?:^|;)\s*default-src(?:\s+[^;]*)?\s+[^;]*'unsafe-eval'/i.test(value)) {
         findings.push(finding(

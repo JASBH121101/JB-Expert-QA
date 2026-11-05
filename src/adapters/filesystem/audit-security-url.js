@@ -57,7 +57,7 @@ export async function auditSecurityUrl(url, {
   try {
     browserContext = await browser.newContext({ serviceWorkers: "block" });
     const page = await browserContext.newPage();
-    const mixedContent = [];
+    const httpSubresources = [];
     const blockedRequests = [];
     await page.route("**/*", async (route) => {
       const requestUrl = route.request().url();
@@ -86,11 +86,16 @@ export async function auditSecurityUrl(url, {
       }
     });
     page.on("request", (request) => {
-      if (parsed.protocol === "https:" && new URL(request.url()).protocol === "http:") {
-        mixedContent.push({
-          url: redactUrlForReport(request.url()),
-          resourceType: request.resourceType()
-        });
+      try {
+        const requestUrl = new URL(request.url());
+        if (requestUrl.protocol === "http:" && request.resourceType() !== "document") {
+          httpSubresources.push({
+            url: redactUrlForReport(request.url()),
+            resourceType: request.resourceType()
+          });
+        }
+      } catch {
+        // Non-HTTP browser-internal URLs are outside the mixed-content check.
       }
     });
 
@@ -111,6 +116,7 @@ export async function auditSecurityUrl(url, {
       .map((entry) => parseSetCookie(entry.value))
       .filter((item) => item.name);
     const finalUrl = page.url();
+    const mixedContent = finalUrl.startsWith("https://") ? httpSubresources : [];
     const context = {
       securityHttpResponse: {
         initialUrl: redactUrlForReport(parsed.href),

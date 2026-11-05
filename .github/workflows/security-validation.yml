@@ -32,7 +32,7 @@ jobs:
   security-tests:
     name: Deterministic security-profile tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -47,8 +47,6 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies without running package install scripts
         run: npm install --ignore-scripts
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js

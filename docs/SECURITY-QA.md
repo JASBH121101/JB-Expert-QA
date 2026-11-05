@@ -31,7 +31,7 @@ The default command remains offline. To explicitly query OSV.dev for known vulne
 npm run audit:security -- . --online-advisories
 ~~~
 
-Only package names and exact versions from supported npm lockfiles are sent to OSV.dev. The report records coverage and network request counts. Advisory lookup is not run unless the flag or a custom config explicitly enables it.
+Only package names and exact versions are sent to OSV.dev. It prefers supported npm lockfiles and falls back to exact pinned direct-dependency versions in package.json when no supported lockfile exists; that direct-only coverage is reported as incomplete and blocks approval. The report records coverage and network request counts. Advisory lookup is not run unless the flag or a custom config explicitly enables it.
 
 The default security profile has a 90/100 minimum score. Critical findings block approval, and incomplete scans cannot pass. High-severity findings reduce the score and may block approval depending on the configured threshold.
 
