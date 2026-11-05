@@ -144,3 +144,10 @@ The application must resolve accounts server-side, pass only an opaque internal 
 
 Email and SMS delivery are dispatched asynchronously through provider adapters supplied by the host application; vendor credentials must remain in the host application's secret manager. The default memory store is bounded but process-local and resets on restart. Clustered deployments require an external adapter with atomic putChallenge, consumeChallenge, consumeLimit, and deleteChallenge operations shared by every instance. This package does not claim distributed protection until such an adapter is configured.
 
+
+
+## Guard request-boundary hardening
+
+Guard now inspects up to eight decoding rounds of request targets, rejects malformed percent/UTF-8 sequences and encoded control characters, and checks request framing ambiguity when the host HTTP adapter exposes raw headers. Conflicting Content-Length values and Content-Length combined with Transfer-Encoding are rejected with a generic 400 response in enforcing modes. These checks complement—not replace—the Node.js HTTP parser and upstream proxy controls.
+
+The middleware still does not consume request bodies. Every host application must enforce streamed/chunked request limits at the framework parser and upload layer. Guard also rejects unknown configuration keys for its HTTP, authentication, and recovery factories so misspelled security options cannot be silently ignored.

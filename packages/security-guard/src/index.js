@@ -35,16 +35,36 @@ function positiveInteger(value, name, maximum) {
 
 function decodeForInspection(value) {
   let decoded = value;
-  for (let index = 0; index < 2; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     try {
       const next = decodeURIComponent(decoded.replace(/\+/g, "%20"));
-      if (next === decoded) break;
+      if (next === decoded) return { value: decoded, excessive: false, invalidUtf8: false };
       decoded = next;
     } catch {
-      break;
+      return { value: decoded, excessive: false, invalidUtf8: index === 0 };
     }
   }
-  return decoded;
+  return { value: decoded, excessive: /%[0-9a-f]{2}/i.test(decoded), invalidUtf8: false };
+}
+
+function rawHeaderValues(request, headerName) {
+  const normalizedName = headerName.toLowerCase();
+  const values = [];
+  if (Array.isArray(request.rawHeaders)) {
+    for (let index = 0; index + 1 < request.rawHeaders.length; index += 2) {
+      if (String(request.rawHeaders[index]).toLowerCase() === normalizedName) {
+        values.push(String(request.rawHeaders[index + 1] ?? "").trim());
+      }
+    }
+  }
+  if (values.length === 0) {
+    const normalized = request.headers?.[normalizedName];
+    if (Array.isArray(normalized)) return normalized.map((value) => String(value).trim());
+    if (normalized !== undefined && normalized !== null) {
+      return String(normalized).split(",").map((value) => value.trim());
+    }
+  }
+  return values;
 }
 
 function getHeaderMetrics(request) {
@@ -86,7 +106,41 @@ function detectRequestThreats(request, settings) {
       statusCode: 400
     });
   } else {
-    const inspectedTarget = decodeForInspection(rawTarget).slice(0, settings.maxRequestTargetLength);
+    if (/%(?![0-9a-f]{2})/i.test(rawTarget)) {
+      findings.push({
+        id: "JBG-REQ-003",
+        severity: "high",
+        reason: "malformed-percent-encoding",
+        statusCode: 400
+      });
+    }
+
+    const decoded = decodeForInspection(rawTarget);
+    const inspectedTarget = decoded.value.slice(0, settings.maxRequestTargetLength);
+    if (decoded.invalidUtf8) {
+      findings.push({
+        id: "JBG-REQ-003",
+        severity: "high",
+        reason: "invalid-url-encoding",
+        statusCode: 400
+      });
+    }
+    if (decoded.excessive) {
+      findings.push({
+        id: "JBG-REQ-005",
+        severity: "high",
+        reason: "excessive-url-encoding-depth",
+        statusCode: 400
+      });
+    }
+    if (/[\u0000-\u001f\u007f]/.test(inspectedTarget)) {
+      findings.push({
+        id: "JBG-REQ-004",
+        severity: "high",
+        reason: "encoded-control-character",
+        statusCode: 400
+      });
+    }
 
     if (/<\s*(?:script|iframe|object|svg)\b|javascript\s*:|data\s*:\s*text\/html|on(?:error|load|click|mouseover)\s*=/i.test(inspectedTarget)) {
       findings.push({
@@ -126,23 +180,74 @@ function detectRequestThreats(request, settings) {
     });
   }
 
-  const contentLengthHeader = request.headers?.["content-length"];
-  if (contentLengthHeader !== undefined) {
-    const contentLength = Number(contentLengthHeader);
-    if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
+  const contentLengthValues = rawHeaderValues(request, "content-length");
+  const transferEncodingValues = rawHeaderValues(request, "transfer-encoding");
+  const hasContentLength = contentLengthValues.length > 0;
+  const hasTransferEncoding = transferEncodingValues.length > 0;
+
+  if (Array.isArray(request.rawHeaders) && request.rawHeaders.length % 2 !== 0) {
+    findings.push({
+      id: "JBG-HTTP-004",
+      severity: "high",
+      reason: "malformed-raw-header-list",
+      statusCode: 400
+    });
+  }
+  if (hasContentLength && hasTransferEncoding) {
+    findings.push({
+      id: "JBG-HTTP-005",
+      severity: "critical",
+      reason: "ambiguous-content-length-and-transfer-encoding",
+      statusCode: 400
+    });
+  }
+  if (contentLengthValues.length > 1 && new Set(contentLengthValues).size > 1) {
+    findings.push({
+      id: "JBG-HTTP-006",
+      severity: "critical",
+      reason: "conflicting-content-length-headers",
+      statusCode: 400
+    });
+  }
+  if (transferEncodingValues.length > 1 &&
+      new Set(transferEncodingValues.map((value) => value.toLowerCase())).size > 1) {
+    findings.push({
+      id: "JBG-HTTP-007",
+      severity: "high",
+      reason: "conflicting-transfer-encoding-headers",
+      statusCode: 400
+    });
+  }
+
+  if (hasContentLength) {
+    const normalizedLengths = contentLengthValues.map((value) => value.trim());
+    if (normalizedLengths.some((value) => !/^\d+$/.test(value))) {
       findings.push({
         id: "JBG-HTTP-002",
         severity: "high",
         reason: "invalid-content-length",
         statusCode: 400
       });
-    } else if (contentLength > settings.maxBodyBytes) {
-      findings.push({
-        id: "JBG-HTTP-003",
-        severity: "high",
-        reason: "request-body-over-limit",
-        statusCode: 413
-      });
+    } else {
+      const distinctLengths = [...new Set(normalizedLengths)];
+      if (distinctLengths.length === 1) {
+        const contentLength = Number(distinctLengths[0]);
+        if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
+          findings.push({
+            id: "JBG-HTTP-002",
+            severity: "high",
+            reason: "invalid-content-length",
+            statusCode: 400
+          });
+        } else if (contentLength > settings.maxBodyBytes) {
+          findings.push({
+            id: "JBG-HTTP-003",
+            severity: "high",
+            reason: "request-body-over-limit",
+            statusCode: 413
+          });
+        }
+      }
     }
   }
 
@@ -166,6 +271,14 @@ function getDefaultClientKey(request) {
 
 function normalizeOptions(options) {
   if (!isRecord(options)) throw new TypeError("Security Guard options must be an object");
+  const allowedOptions = new Set([
+    "mode", "rateLimit", "maxRequestTargetLength", "maxHeaderBytes",
+    "maxHeaderCount", "maxBodyBytes", "blockSeverities", "keyGenerator",
+    "onEvent", "includePath", "securityHeaders"
+  ]);
+  for (const key of Object.keys(options)) {
+    if (!allowedOptions.has(key)) throw new TypeError("Unknown Security Guard option: " + key);
+  }
 
   const mode = options.mode ?? "monitor";
   if (!SECURITY_GUARD_MODES.includes(mode)) {
@@ -174,6 +287,11 @@ function normalizeOptions(options) {
 
   const rateLimitInput = options.rateLimit ?? {};
   if (!isRecord(rateLimitInput)) throw new TypeError("rateLimit must be an object");
+  for (const key of Object.keys(rateLimitInput)) {
+    if (!["enabled", "max", "windowMs", "maxKeys"].includes(key)) {
+      throw new TypeError("Unknown rateLimit option: " + key);
+    }
+  }
   const rateLimit = { ...DEFAULT_RATE_LIMIT, ...rateLimitInput };
   if (typeof rateLimit.enabled !== "boolean") throw new TypeError("rateLimit.enabled must be a boolean");
   rateLimit.max = positiveInteger(rateLimit.max, "rateLimit.max", 1_000_000);

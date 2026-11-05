@@ -269,6 +269,14 @@ export function createMemoryRecoveryStore(options = {}) {
 
 export function createAccountRecovery(options = {}) {
   if (!isRecord(options)) throw new TypeError("account recovery options must be an object");
+  const allowedOptions = new Set([
+    "secret", "store", "emailProvider", "smsProvider", "clientKeyGenerator",
+    "onEvent", "clock", "requestPolicies", "verifyIpPolicy", "emailTtlMs",
+    "smsTtlMs", "maxAttempts"
+  ]);
+  for (const key of Object.keys(options)) {
+    if (!allowedOptions.has(key)) throw new TypeError("Unknown account recovery option: " + key);
+  }
 
   const secret = normalizeSecret(options.secret);
   const store = validateStore(options.store ?? createMemoryRecoveryStore());

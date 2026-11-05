@@ -74,6 +74,14 @@ function normalizePolicies(input = {}) {
 
 export function createAuthProtection(options = {}) {
   if (!isRecord(options)) throw new TypeError("Authentication protection options must be an object");
+  const allowedOptions = new Set([
+    "identityKeyGenerator", "clientKeyGenerator", "mode", "blockSeverities",
+    "onEvent", "windowMs", "resetAfterMs", "maxTrackedKeys", "policies",
+    "clock", "keySecret"
+  ]);
+  for (const key of Object.keys(options)) {
+    if (!allowedOptions.has(key)) throw new TypeError("Unknown authentication protection option: " + key);
+  }
 
   const identityKeyGenerator = options.identityKeyGenerator;
   if (typeof identityKeyGenerator !== "function") {
@@ -88,8 +96,10 @@ export function createAuthProtection(options = {}) {
     throw new TypeError("mode must be monitor, balanced, strict, or custom");
   }
   const blockSeverities = options.blockSeverities ?? ["high", "critical"];
-  if (!Array.isArray(blockSeverities) || blockSeverities.some((value) => !["info", "low", "medium", "high", "critical"].includes(value))) {
-    throw new TypeError("blockSeverities must contain supported severity names");
+  if (!Array.isArray(blockSeverities) ||
+      blockSeverities.some((value) => !["info", "low", "medium", "high", "critical"].includes(value)) ||
+      new Set(blockSeverities).size !== blockSeverities.length) {
+    throw new TypeError("blockSeverities must contain unique supported severity names");
   }
 
   const onEvent = options.onEvent ?? (() => {});
@@ -120,6 +130,14 @@ export function createAuthProtection(options = {}) {
     blocked: 0,
     observed: 0
   };
+
+  function readNow() {
+    const now = clock();
+    if (!Number.isSafeInteger(now) || now < 0) {
+      throw new TypeError("clock must return a non-negative safe integer timestamp in milliseconds");
+    }
+    return now;
+  }
 
   function digest(scope, value) {
     return createHmac("sha256", keySecret).update(scope).update("\0").update(value).digest("hex");
@@ -213,7 +231,7 @@ export function createAuthProtection(options = {}) {
   }
 
   function statusFor(request) {
-    const now = clock();
+    const now = readNow();
     return getActiveStatus(getKeys(request), now);
   }
 
@@ -221,7 +239,7 @@ export function createAuthProtection(options = {}) {
     if (!request || typeof request !== "object") {
       throw new TypeError("recordFailure requires the authentication request");
     }
-    const now = clock();
+    const now = readNow();
     const keys = getKeys(request);
     const triggered = [];
     const active = [];

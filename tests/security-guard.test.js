@@ -507,3 +507,90 @@ test("authentication storage reclaims expired buckets but never evicts live ones
   assert.equal(auth.getStats().trackedAccountKeys, 1);
   assert.equal(auth.getStatus({ account: "third-account", client: "third-client" }).blocked, false);
 });
+
+
+function invokeGuardDirect(guard, request) {
+  const headers = new Map();
+  const response = {
+    headersSent: false,
+    writableEnded: false,
+    statusCode: 200,
+    setHeader(name, value) { headers.set(name.toLowerCase(), String(value)); },
+    end(body) { this.body = body; this.writableEnded = true; },
+    destroy() { this.destroyed = true; }
+  };
+  let continued = 0;
+  guard.middleware(request, response, () => { continued += 1; });
+  return { response, headers, continued };
+}
+
+test("repeated URL decoding cannot hide path traversal signatures", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const response = await request("/files/%2525252e%2525252e%2525252fprivate.txt");
+    assert.equal(response.statusCode, 403);
+    assert.ok(events[0].ruleIds.includes("JBG-PATH-001"));
+  });
+});
+
+test("malformed and encoded control characters are rejected before routing", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const malformed = await request("/search?q=%ZZ");
+    assert.equal(malformed.statusCode, 400);
+    assert.ok(events.some((event) => event.ruleIds.includes("JBG-REQ-003")));
+
+    const encodedControl = await request("/search?q=%250d%250aInjected");
+    assert.equal(encodedControl.statusCode, 400);
+    assert.ok(events.some((event) => event.ruleIds.includes("JBG-REQ-004")));
+  });
+});
+
+test("ambiguous HTTP message framing is rejected when the adapter exposes raw headers", () => {
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const result = invokeGuardDirect(guard, {
+    url: "/submit", method: "POST",
+    headers: { "content-length": "5", "transfer-encoding": "chunked" },
+    rawHeaders: ["Host", "example.test", "Content-Length", "5", "Transfer-Encoding", "chunked"],
+    socket: { remoteAddress: "192.0.2.20" }
+  });
+  assert.equal(result.response.statusCode, 400);
+  assert.equal(result.continued, 0);
+  assert.equal(JSON.parse(result.response.body).error, "request_blocked");
+  assert.ok(result.headers.has("cache-control"));
+  assert.ok(guard.getStats().byRule["JBG-HTTP-005"] >= 1);
+});
+
+test("conflicting duplicate Content-Length headers are rejected", () => {
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const result = invokeGuardDirect(guard, {
+    url: "/submit", method: "POST",
+    headers: { "content-length": "5, 6" },
+    rawHeaders: ["Host", "example.test", "Content-Length", "5", "Content-Length", "6"],
+    socket: { remoteAddress: "192.0.2.21" }
+  });
+  assert.equal(result.response.statusCode, 400);
+  assert.equal(result.continued, 0);
+  assert.ok(guard.getStats().byRule["JBG-HTTP-006"] >= 1);
+});
+
+test("security configuration fails fast on misspelled or unsupported options", () => {
+  assert.throws(() => createSecurityGuard({ maxHeaderByes: 123 }), /Unknown Security Guard option/);
+  assert.throws(() => createSecurityGuard({ rateLimit: { maxKeeys: 10 } }), /Unknown rateLimit option/);
+  assert.throws(() => createSecurityGuard({ securityHeaders: { unexpected: true } }),
+    /Unknown securityHeaders option/);
+});
+
+test("authentication configuration rejects unknown options, duplicate severities and invalid clocks", () => {
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  assert.throws(() => guard.createAuthProtection({
+    identityKeyGenerator: () => "account", maxTrackdKeys: 10
+  }), /Unknown authentication protection option/);
+  assert.throws(() => guard.createAuthProtection({
+    identityKeyGenerator: () => "account", blockSeverities: ["high", "high"]
+  }), /unique supported severity names/);
+  const invalidClock = guard.createAuthProtection({
+    identityKeyGenerator: () => "account", clock: () => Number.NaN
+  });
+  assert.throws(() => invalidClock.recordFailure({
+    socket: { remoteAddress: "192.0.2.22" }
+  }), /non-negative safe integer timestamp/);
+});

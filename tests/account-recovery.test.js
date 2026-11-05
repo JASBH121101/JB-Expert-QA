@@ -416,3 +416,10 @@ test("recovery rejects malformed UUIDs and invalid clock values", async () => {
     request: REQUEST
   }), { valid: false });
 });
+
+
+test("account recovery rejects unknown security configuration options", () => {
+  assert.throws(() => createAccountRecovery({
+    secret: SECRET, maxAttemps: 2
+  }), /Unknown account recovery option/);
+});

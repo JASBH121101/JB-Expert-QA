@@ -261,3 +261,14 @@ A generic CSP is deliberately not forced because an incorrect policy can break a
 The per-process rate limiter and authentication-failure tracker no longer evict live client/account buckets to make room for new identities. When their bounded tables are full, untracked identities share a bounded overflow bucket or are rejected by the rate limiter. In balanced/strict modes this can temporarily deny new clients while active windows expire; this trades availability for avoiding lockout-reset bypass through identity rotation. Monitor capacity and size limits for expected traffic before production rollout.
 
 This remains process-local. A horizontally scaled deployment still needs shared atomic rate-limit and authentication-failure storage; independent in-memory instances are not one global control.
+
+
+## Request parsing and framing hardening
+
+Guard inspects up to eight rounds of URL percent-decoding before applying its high-confidence request-target signatures. It rejects malformed percent escapes, invalid first-pass UTF-8 escapes, encoded control characters, and excessive nested encoding. When the HTTP adapter exposes rawHeaders, Guard also rejects ambiguous Content-Length plus Transfer-Encoding framing and conflicting duplicate framing headers.
+
+This is defense in depth, not a replacement for the Node.js HTTP parser or an upstream reverse proxy that rejects request-smuggling syntax. Some malformed wire-level messages are rejected by Node before middleware runs, so the application cannot expect a Guard event for every malformed packet.
+
+Guard checks a declared Content-Length against maxBodyBytes, but it does not consume or inspect request bodies. Chunked or streamed bodies must still be limited by the framework body parser and upload handler (for example, explicit limits for JSON, URL-encoded, multipart, and raw body parsing). Do not rely on Content-Length alone for upload protection.
+
+Security-related configuration rejects unknown option names. This is intentional: a misspelled limit or policy setting must fail at startup rather than silently leave the default in place.
