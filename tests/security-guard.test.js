@@ -129,7 +129,10 @@ test("content-length limits are enforced before an application body parser", asy
   }, async ({ events, request }) => {
     const response = await request("/upload", {
       method: "POST",
-      headers: { "content-type": "application/octet-stream" },
+      headers: {
+        "content-type": "application/octet-stream",
+        "content-length": "11"
+      },
       body: "01234567890"
     });
 
