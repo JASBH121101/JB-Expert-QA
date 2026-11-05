@@ -356,7 +356,7 @@ test("account-level throttling correlates attempts from different client address
 test("successful authentication clears account and account-IP failures but not the IP bucket", async () => {
   await withAuth({
     policies: {
-      ip: { maxFailures: 2, lockoutMs: 1000, maxLockoutMs: 8000 },
+      ip: { maxFailures: 3, lockoutMs: 1000, maxLockoutMs: 8000 },
       accountIp: { maxFailures: 100, lockoutMs: 1000, maxLockoutMs: 8000 },
       account: { maxFailures: 100, lockoutMs: 1000, maxLockoutMs: 8000 }
     }
