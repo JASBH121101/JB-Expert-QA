@@ -155,21 +155,26 @@ export function createAuthProtection(options = {}) {
     }
 
     if (!entry && store.size >= maxTrackedKeys) {
-      // Preserve live identity buckets. New identities share one bounded
-      // overflow bucket and can temporarily throttle new authentication attempts.
-      entry = overflowBuckets[scope];
-      if (entry && now - entry.lastFailureAt >= resetAfterMs) entry = null;
-      if (!entry) {
-        entry = {
-          windowStartedAt: now,
-          lastFailureAt: now,
-          failures: 0,
-          lockouts: 0,
-          blockedUntil: 0
-        };
+      // Reclaim only expired buckets. Live identity buckets are never evicted.
+      for (const [knownKey, knownEntry] of store) {
+        if (now - knownEntry.lastFailureAt >= resetAfterMs) store.delete(knownKey);
       }
-      overflowBuckets[scope] = entry;
-      return entry;
+      if (store.size >= maxTrackedKeys) {
+        // New identities share one bounded overflow bucket and can temporarily throttle.
+        entry = overflowBuckets[scope];
+        if (entry && now - entry.lastFailureAt >= resetAfterMs) entry = null;
+        if (!entry) {
+          entry = {
+            windowStartedAt: now,
+            lastFailureAt: now,
+            failures: 0,
+            lockouts: 0,
+            blockedUntil: 0
+          };
+        }
+        overflowBuckets[scope] = entry;
+        return entry;
+      }
     }
 
     if (!entry) {
