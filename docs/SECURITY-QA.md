@@ -114,6 +114,16 @@ The initial rules inspect request targets for common high-confidence XSS, SQL-in
 
 Events intentionally omit request bodies, query strings, header values, cookies, and client IP addresses. A path is included only when `includePath: true` is explicitly configured.
 
+### Authentication brute-force protection
+
+Security Guard exposes `guard.createAuthProtection({ identityKeyGenerator })` for login routes. The application must call `recordFailure(request)` only after credentials actually fail and `recordSuccess(request)` after successful authentication. Mount `auth.middleware` after the request body parser and before the login handler.
+
+The default policy throttles an account-client pair after 5 failures in 10 minutes, a client after 20 failures in 10 minutes, and an account across clients after 12 failures in 10 minutes. Cooldowns increase progressively but have per-scope caps. A successful authentication clears the account and account-client buckets, not the client-wide bucket.
+
+Identity and client keys are HMAC-derived with an in-memory process secret; event records contain no raw account identifier or client address. The default client resolver uses the socket peer address and ignores forwarded headers. Use a custom client resolver only behind a specifically trusted proxy.
+
+`monitor` observes but does not enforce throttles. `balanced` and `strict` enforce them. The application must return a generic authentication response and must not reveal whether an account exists.
+
 Important boundaries:
 
 - This version does not inspect request bodies. Enforce actual streamed/chunked body limits in the framework or server body parser too.

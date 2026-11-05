@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { createAuthProtection } from "./auth-protection.js";
+export { createAuthProtection } from "./auth-protection.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
