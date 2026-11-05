@@ -354,3 +354,8 @@ For the host-application middleware order and pre-production release gate, see d
 ## Distributed request rate limiting
 
 See [Distributed rate limiting](../../docs/DISTRIBUTED-RATE-LIMIT.md) for the shared atomic-store contract, fail-closed behavior, deployment example, and production adapter requirements. This is an optional asynchronous middleware; disable the built-in process-local limiter when mounting it to avoid applying two independent limits.
+
+
+## Distributed authentication protection
+
+See [Distributed authentication protection](../../docs/DISTRIBUTED-AUTH-PROTECTION.md) for the shared atomic-store contract, asynchronous API, fail-closed behavior and production integration requirements. The existing process-local authentication protection remains available for single-process deployments.
