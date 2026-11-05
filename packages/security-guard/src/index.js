@@ -407,6 +407,12 @@ export function createSecurityGuard(options = {}) {
   return Object.freeze({
     middleware,
     getStats,
-    reset
+    reset,
+    createAuthProtection: (options = {}) => createAuthProtection({
+      mode: settings.mode,
+      blockSeverities: settings.blockSeverities,
+      onEvent: settings.onEvent,
+      ...options
+    })
   });
 }
