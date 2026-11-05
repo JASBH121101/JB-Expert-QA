@@ -114,3 +114,88 @@ Events contain only a rule ID, scope names, timestamp, action, severity, and coo
 - Signature detection is heuristic and can produce false positives or miss novel attacks. It is not a replacement for parameterized database queries, output encoding, authorization checks, a WAF, or a controlled security assessment.
 - Do not expose Guard as a client-side browser script. It must run on the server.
 - Monitor mode is recommended for baseline observation before enabling blocking.
+
+
+## Account recovery: verified email and SMS
+
+~~~js
+import { createSecurityGuard } from "@jb/security-guard";
+
+const guard = createSecurityGuard({ mode: process.env.JB_GUARD_MODE ?? "monitor" });
+const recovery = guard.createAccountRecovery({
+  // Keep this stable across restarts and instances; load it from a secret manager.
+  secret: process.env.JB_RECOVERY_SECRET,
+  emailProvider: {
+    async send({ to, requestId, token, expiresAt }) {
+      const url = new URL("/reset-password", process.env.PUBLIC_APP_URL);
+      // Keep the credential in the fragment; browsers do not send fragments
+      // in the initial HTTP request or the Referer header.
+      url.hash = new URLSearchParams({ rid: requestId, token }).toString();
+      await mailer.send({ to, subject: "Reset your password", text: url.toString() });
+    }
+  },
+  smsProvider: {
+    async send({ to, requestId, code, expiresAt }) {
+      const message = "Your recovery code is " + code + ". It expires at " +
+        new Date(expiresAt).toISOString() + ".";
+      await sms.send({ to, text: message });
+    }
+  }
+});
+
+// Resolve the account server-side. Pass only verified contact details.
+// A missing account or unverified contact still receives the same generic response.
+app.post("/account/recovery", async (req, res) => {
+  const user = await findUserForRecovery(req.body.identifier);
+  const channel = req.body.channel === "sms" ? "sms" : "email";
+  const destination = channel === "sms" ? user?.verifiedPhone : user?.verifiedEmail;
+  const result = await recovery.requestRecovery({
+    accountId: user?.id ?? null,
+    channel,
+    destination: destination ?? null,
+    contactVerified: Boolean(destination),
+    request: req
+  });
+
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(202).json({
+    accepted: result.accepted,
+    requestId: result.requestId,
+    message: "If the account and contact are eligible, recovery instructions will be sent."
+  });
+});
+
+app.post("/account/recovery/verify", async (req, res) => {
+  const result = await recovery.verifyRecovery({
+    requestId: req.body.requestId,
+    credential: req.body.token ?? req.body.code,
+    request: req
+  });
+  if (!result.valid) {
+    return res.status(400).set("Cache-Control", "no-store").json({
+      error: "recovery_invalid_or_expired"
+    });
+  }
+
+  // Hash with Argon2id (or an approved password-hashing implementation),
+  // update the password, then revoke every existing session for this account.
+  await updatePassword(result.accountId, req.body.newPassword);
+  await revokeAllSessions(result.accountId);
+  return res.status(204).end();
+});
+~~~
+
+Security properties:
+
+- Email recovery uses a cryptographically random 256-bit token; SMS recovery uses a six-digit one-time code.
+- Challenge records store a keyed digest, never the raw token or OTP. A new challenge replaces the previous challenge for the same account and channel.
+- Default expiry is 15 minutes for email and 5 minutes for SMS; both are single-use and allow at most 5 verification attempts.
+- Request throttles default to 10 per IP / 15 minutes, 3 per account / 15 minutes, and 3 per destination / hour. Verification has a separate 20 attempts per IP / 15 minutes limit.
+- Unknown accounts, unverified contacts, unavailable channels, and rate-limited requests receive the same generic accepted response. Events contain no account ID, email, phone, token, OTP, or provider error.
+- Only pass an internal opaque account ID and a contact already verified by the application. This module does not verify ownership of an email address or phone number.
+- The application must hash the new password with Argon2id or another approved password-hashing algorithm and revoke existing sessions after a successful reset.
+
+The emailProvider.send() and smsProvider.send() adapters are required for actual delivery. Credentials and vendor configuration belong in the host application's secret manager, not in this package. Use an HTTPS public application URL for email reset links. The reset page should read the fragment, immediately clear it with history.replaceState, and POST the values over HTTPS. Avoid third-party analytics or embedded external content on that page.
+
+The default createMemoryRecoveryStore() is bounded and process-local. It is suitable for development and a single application process; restarts clear active challenges and counters. For clustered or multi-region production, supply a shared store whose putChallenge, consumeChallenge, consumeLimit, and deleteChallenge operations are atomic across all instances. consumeChallenge must compare the digest, increment failed attempts, expire challenges, and consume a valid challenge atomically. consumeLimit must implement an atomic fixed-window counter. Do not use a non-atomic read-then-write Redis adapter.
+

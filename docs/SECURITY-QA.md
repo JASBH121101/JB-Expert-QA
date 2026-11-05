@@ -132,3 +132,15 @@ Important boundaries:
 - Pattern detection is heuristic. It is not a replacement for parameterized queries, output encoding, application authorization, a WAF, or security testing.
 - Guard must run on the server; it is not a frontend JavaScript security library.
 - The package is a workspace source package and is not yet published to a public npm registry.
+
+
+### Account recovery by verified email or SMS
+
+The runtime package also exposes guard.createAccountRecovery({ secret, emailProvider, smsProvider }). Email challenges use a random 256-bit token; SMS challenges use a six-digit OTP. Both are single-use, expire by default after 15 minutes (email) or 5 minutes (SMS), and permit at most five failed verification attempts.
+
+The module stores a keyed HMAC digest rather than the raw token or code. A new challenge replaces the previous one for the same account and channel. The default throttles are 10 requests per IP per 15 minutes, 3 per account per 15 minutes, 3 per destination per hour, and 20 verification attempts per IP per 15 minutes. Unknown accounts, unverified contacts, missing providers, and rate-limited requests return the same generic accepted response. Audit events omit account IDs, destination values, credentials, and provider error details.
+
+The application must resolve accounts server-side, pass only an opaque internal account ID and an already-verified email address or E.164 phone number, hash the replacement password with Argon2id (or another approved password hash), and revoke all existing sessions after a successful reset. Email reset links should carry credentials in the URL fragment rather than query parameters; the reset page should clear the fragment immediately and submit the token in an HTTPS POST. The module does not itself prove ownership of a contact or perform the database password update.
+
+Email and SMS delivery are dispatched asynchronously through provider adapters supplied by the host application; vendor credentials must remain in the host application's secret manager. The default memory store is bounded but process-local and resets on restart. Clustered deployments require an external adapter with atomic putChallenge, consumeChallenge, consumeLimit, and deleteChallenge operations shared by every instance. This package does not claim distributed protection until such an adapter is configured.
+

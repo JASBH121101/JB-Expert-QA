@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createAuthProtection } from "./auth-protection.js";
+import { createAccountRecovery } from "./account-recovery.js";
 export { createAuthProtection } from "./auth-protection.js";
+export { createAccountRecovery, createMemoryRecoveryStore } from "./account-recovery.js";
 
 export const SECURITY_GUARD_VERSION = "0.1.0";
 export const SECURITY_GUARD_MODES = Object.freeze(["monitor", "balanced", "strict", "custom"]);
@@ -411,6 +413,10 @@ export function createSecurityGuard(options = {}) {
     createAuthProtection: (options = {}) => createAuthProtection({
       mode: settings.mode,
       blockSeverities: settings.blockSeverities,
+      onEvent: settings.onEvent,
+      ...options
+    }),
+    createAccountRecovery: (options = {}) => createAccountRecovery({
       onEvent: settings.onEvent,
       ...options
     })
