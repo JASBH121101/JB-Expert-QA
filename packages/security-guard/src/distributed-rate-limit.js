@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 const RULE_ID = "JBG-RATE-DISTRIBUTED-001";
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -43,7 +43,7 @@ export function createDistributedRateLimit(options = {}) {
   if (!isRecord(store) || typeof store.consumeLimit !== "function") {
     throw new TypeError("store.consumeLimit must implement an atomic shared fixed-window counter");
   }
-  const secret = options.secret ?? randomBytes(32);
+  const secret = options.secret;
   if (!(typeof secret === "string" && Buffer.byteLength(secret) >= 32) &&
       !(Buffer.isBuffer(secret) && secret.length >= 32)) {
     throw new TypeError("secret must contain at least 32 bytes and remain stable across instances");
