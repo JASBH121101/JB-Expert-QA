@@ -349,3 +349,8 @@ This module does not create or manage sessions. The host application must provid
 ## ERP integration checklist
 
 For the host-application middleware order and pre-production release gate, see docs/GUARD-ERP-INTEGRATION.md in the repository.
+
+
+## Distributed request rate limiting
+
+See [Distributed rate limiting](../../docs/DISTRIBUTED-RATE-LIMIT.md) for the shared atomic-store contract, fail-closed behavior, deployment example, and production adapter requirements. This is an optional asynchronous middleware; disable the built-in process-local limiter when mounting it to avoid applying two independent limits.
