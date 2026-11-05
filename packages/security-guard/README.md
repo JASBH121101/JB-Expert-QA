@@ -344,3 +344,8 @@ app.use(csrf.middleware);
 The browser should fetch the token over the authenticated same-origin session and send it in the configured X-CSRF-Token header on unsafe methods. The token is an HMAC derived from the current opaque session ID and a stable secret; it is not stored by Guard. Session rotation changes the token. Keep the secret in a server-side secret manager and rotate it deliberately (rotation invalidates tokens). Never put the token in a URL, query string, or logs.
 
 This module does not create or manage sessions. The host application must provide a strong, unpredictable session identifier, secure session cookies (Secure, HttpOnly, explicit SameSite), and session rotation at login and privilege changes. A CSRF token does not protect against same-origin XSS or a compromised client. Combine it with origin validation for browser routes, authorization checks, and safe output encoding. API clients using bearer tokens should use a separate route policy rather than bypassing cookie-route checks.
+
+
+## ERP integration checklist
+
+For the host-application middleware order and pre-production release gate, see docs/GUARD-ERP-INTEGRATION.md in the repository.
