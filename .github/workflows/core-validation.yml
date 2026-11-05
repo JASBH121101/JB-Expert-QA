@@ -16,6 +16,7 @@ on:
     paths:
       - "package.json"
       - "src/**"
+      - "packages/**"
       - "tests/**"
       - "config/**"
       - ".github/workflows/**"
@@ -49,6 +50,8 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Audit resolved dependency tree for high and critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run syntax checks and tests
