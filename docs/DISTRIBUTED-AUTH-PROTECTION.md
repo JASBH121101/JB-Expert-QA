@@ -28,7 +28,7 @@ app.post("/login", authGuard.middleware, loginHandler);
 
 After credential verification, call `await authGuard.recordFailure(req)` only for a genuine failed attempt. After successful verification call `await authGuard.recordSuccess(req)`. The identity resolver must return an opaque, server-resolved account ID; never trust an account ID supplied only by the request body. Do not call `recordFailure` for malformed requests, unavailable identity providers or internal errors.
 
-This API is asynchronous; callers must await `recordFailure` and `recordSuccess`. If recording a failed attempt errors, the login handler must fail closed and must not proceed with authentication. Middleware fails closed with HTTP 503 if the store cannot be read. Keep the existing synchronous module if the host framework cannot safely await the new API.
+This API is asynchronous; callers must await `recordFailure` and `recordSuccess`. If recording a failed attempt errors, the login handler must fail closed and must not proceed with authentication. Middleware fails closed with HTTP 503 if the store cannot be read, the injected clock is invalid, or both server-resolved identity functions fail to produce a usable account/client key. At least one trustworthy identity is required; if account resolution fails, the client IP bucket remains active. A failed `recordFailure` call may have partially committed independent scope counters if the backend fails mid-operation; the host application must fail closed and the adapter should make per-scope writes atomic and observable. Do not blindly retry a failed recording operation. Keep the existing synchronous module if the host framework cannot safely await the new API.
 
 ## Limitations
 

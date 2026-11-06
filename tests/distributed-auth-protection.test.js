@@ -112,3 +112,32 @@ test("configuration rejects missing stable secrets and incomplete stores", () =>
   assert.throws(() => createDistributedAuthProtection({ store: atomicStore(), identityKeyGenerator: r => r.account }), /at least 32 bytes/);
   assert.throws(() => createDistributedAuthProtection({ store: {}, secret: SECRET, identityKeyGenerator: r => r.account }), /store.recordFailure/);
 });
+
+
+test("identity resolver failures with no fallback fail closed instead of skipping all buckets", async () => {
+  const store = atomicStore();
+  const guard = createDistributedAuthProtection({
+    store,
+    secret: SECRET,
+    identityKeyGenerator: () => { throw new Error("resolver unavailable"); },
+    clientKeyGenerator: () => null,
+    mode: "balanced"
+  });
+  const result = await invoke(guard.middleware, req());
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(result.nextCount, 0);
+  await assert.rejects(guard.recordFailure(req()), /identity/);
+});
+
+test("invalid injected clock fails closed without throwing from middleware error handling", async () => {
+  const guard = createDistributedAuthProtection({
+    store: atomicStore(),
+    secret: SECRET,
+    identityKeyGenerator: r => r.account,
+    mode: "balanced",
+    clock: () => Number.NaN
+  });
+  const result = await invoke(guard.middleware, req());
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(result.nextCount, 0);
+});

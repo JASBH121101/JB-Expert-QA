@@ -92,9 +92,10 @@ export function createDistributedRateLimit(options = {}) {
       throw new TypeError("Distributed rate-limit middleware requires (request, response, next)");
     }
     stats.requests += 1;
-    const now = readNow();
+    let now;
     let result;
     try {
+      now = readNow();
       result = await store.consumeLimit({ key: makeKey(request), now, windowMs, maxRequests });
       if (!isRecord(result) || typeof result.allowed !== "boolean" ||
           (result.count !== undefined && (!Number.isSafeInteger(result.count) || result.count < 1)) ||
@@ -104,7 +105,7 @@ export function createDistributedRateLimit(options = {}) {
     } catch {
       stats.storeErrors += 1;
       notify(onEvent, {
-        id: randomUUID(), timestamp: new Date(now).toISOString(),
+        id: randomUUID(), timestamp: new Date(Number.isSafeInteger(now) ? now : Date.now()).toISOString(),
         component: "jb-security-guard", action: "distributed-rate-store-unavailable",
         severity: "critical", ruleIds: [RULE_ID]
       });

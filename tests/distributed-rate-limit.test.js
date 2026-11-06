@@ -126,3 +126,16 @@ test("invalid store results fail closed", async () => {
   assert.equal(result.response.statusCode, 503);
   assert.equal(result.continued, 0);
 });
+
+
+test("invalid injected clock fails closed with 503 instead of rejecting middleware", async () => {
+  const limiter = createDistributedRateLimit({
+    store: createAtomicMemoryStore(),
+    secret: SECRET,
+    clock: () => Number.NaN
+  });
+  const result = await invoke(limiter.middleware);
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(result.continued, 0);
+  assert.equal(limiter.getStats().storeErrors, 1);
+});

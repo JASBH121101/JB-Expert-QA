@@ -127,11 +127,15 @@ export function createDistributedAuthProtection(options = {}) {
         if (client.length > 256) client = client.slice(0, 256);
       }
     } catch { /* Keep account-scoped protection when client resolution fails. */ }
-    return {
+    const keys = {
       account: account ? digest("account", account) : null,
       ip: client ? digest("ip", client) : null,
       accountIp: account && client ? digest("account-ip", account + "\0" + client) : null
     };
+    if (!keys.account && !keys.ip) {
+      throw new TypeError("At least one server-resolved account or client identity is required");
+    }
+    return keys;
   }
 
   function activeKeys(keys) {
@@ -213,7 +217,7 @@ export function createDistributedAuthProtection(options = {}) {
     } catch {
       stats.storeErrors += 1;
       notify(onEvent, {
-        id: randomUUID(), timestamp: new Date(now()).toISOString(),
+        id: randomUUID(), timestamp: new Date().toISOString(),
         component: "jb-security-guard", action: "distributed-auth-store-unavailable",
         mode, severity: "critical", ruleIds: [RULE_ID], scopes: []
       });
