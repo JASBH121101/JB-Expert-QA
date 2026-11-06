@@ -18,7 +18,7 @@
     "autopilot": "node src/autopilot-cli.js",
     "test:expert-qa": "node --test tests/security-qa.test.js",
     "test:security-guard": "node --test tests/account-recovery.test.js tests/csrf-protection.test.js tests/distributed-auth-protection.test.js tests/distributed-rate-limit.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/security-bridge.test.js tests/security-bridge-integration.test.js tests/security-guard.test.js tests/security-headers.test.js tests/upload-inspector.test.js",
-    "test:all-engines": "npm run test:expert-qa && npm run test:security-guard && npm run test:malware-engine"
+    "test:all-engines": "npm test"
   },
   "dependencies": {
     "axe-core": "4.14.0",
