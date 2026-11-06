@@ -314,3 +314,48 @@ test("runtime cookie findings include cookie names but never cookie values", asy
   assert.deepEqual(cookieFinding.metadata.missingAttributes, ["Secure", "HttpOnly", "SameSite"]);
   assert.equal(JSON.stringify(report).includes("sensitive-cookie-value-must-not-leak"), false);
 });
+
+
+test("AST data-flow analysis follows request-controlled aliases into critical sinks", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "tainted-flow.js"), [
+      "const target = req.query.url;",
+      "const redirectTarget = target;",
+      "fetch(redirectTarget);",
+      "const next = req.body.next;",
+      "res.redirect(next);",
+      "const html = req.body.html;",
+      "document.querySelector('#preview').innerHTML = html;",
+      "const command = req.query.command;",
+      "exec(command);",
+      "const statement = req.body.statement;",
+      "database.query(statement);",
+      "element.insertAdjacentHTML('beforeend', html);"
+    ].join("\\n"));
+
+    const report = await auditSecurityProject(root);
+    const findings = report.diagnostics.filter((item) => item.id.startsWith("AST-"));
+    const ids = findings.map((item) => item.id);
+
+    assert.ok(ids.some((id) => id.startsWith("AST-SSRF-")));
+    assert.ok(ids.some((id) => id.startsWith("AST-REDIRECT-")));
+    assert.ok(ids.filter((id) => id.startsWith("AST-DOM-XSS-")).length >= 2);
+    assert.ok(ids.some((id) => id.startsWith("AST-COMMAND-")));
+    assert.ok(ids.some((id) => id.startsWith("AST-SQL-")));
+    assert.ok(findings.every((item) => item.metadata.analysis === "intra-file variable alias tracking"));
+  });
+});
+
+test("AST data-flow analysis does not flag trusted constants as request-tainted", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "trusted-flow.js"), [
+      "const target = process.env.TRUSTED_API_URL;",
+      "fetch(target);",
+      "const label = req.body.label;",
+      "document.querySelector('#label').textContent = label;"
+    ].join("\\n"));
+
+    const report = await auditSecurityProject(root);
+    assert.equal(report.diagnostics.some((item) => item.id.startsWith("AST-")), false);
+  });
+});
