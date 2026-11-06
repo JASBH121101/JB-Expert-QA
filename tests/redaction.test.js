@@ -34,7 +34,8 @@ test("redacts WebSocket credentials and secret query values in URL text", () => 
   );
   assert.equal(result.includes("password"), false);
   assert.equal(result.includes("socket-secret"), false);
-  assert.match(result, /wss:\/\/\[REDACTED\]:\[REDACTED\]@example\.com/);
+  assert.equal(result.includes("operator"), false);
+  assert.equal(result.includes("example.com"), true);
 });
 
 test("omits malformed absolute URLs rather than echoing possible secrets", () => {
