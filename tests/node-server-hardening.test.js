@@ -140,6 +140,46 @@ test("chunked bodies are counted and rejected after the configured streamed byte
   }
 });
 
+test("readable-mode consumers cannot bypass the streamed body limit", async () => {
+  let applicationCompleted = false;
+  let applicationBytes = 0;
+  const server = createServer((request, response) => {
+    request.on("readable", () => {
+      let chunk;
+      while ((chunk = request.read()) !== null) {
+        applicationBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+      }
+    });
+    request.on("end", () => {
+      applicationCompleted = true;
+      response.end("accepted");
+    });
+  });
+  configureNodeHttpServer(server, { maxBodyBytes: 5 });
+  await listen(server);
+
+  try {
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/readable",
+      method: "POST",
+      headers: { "Transfer-Encoding": "chunked" }
+    });
+    const resultPromise = readResponse(outgoing);
+    outgoing.write("1234");
+    outgoing.end("5678");
+    const result = await resultPromise;
+
+    assert.equal(result.statusCode, 413);
+    assert.equal(JSON.parse(result.body).error, "request_body_too_large");
+    assert.equal(applicationCompleted, false);
+    assert.ok(applicationBytes <= 5, "readable-mode consumers must not receive bytes beyond the configured limit");
+  } finally {
+    await close(server);
+  }
+});
+
 test("chunked requests exactly at maxBodyBytes are accepted", async () => {
   const server = createServer((request, response) => {
     let body = "";
