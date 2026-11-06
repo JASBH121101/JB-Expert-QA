@@ -62,6 +62,16 @@ test("server hardening validates configuration and must run before listen", () =
   server.close();
 });
 
+test("server hardening cannot be installed twice on one server", () => {
+  const server = createServer();
+  configureNodeHttpServer(server, { handleExpectContinue: false });
+  assert.throws(
+    () => configureNodeHttpServer(server, { handleExpectContinue: false }),
+    /already been configured/
+  );
+  server.close();
+});
+
 test("oversized Content-Length requests are rejected before application body handling", async () => {
   let applicationReached = false;
   const server = createServer((request, response) => {

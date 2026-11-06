@@ -1,3 +1,5 @@
+const CONFIGURED_SERVERS = new WeakSet();
+
 const DEFAULTS = Object.freeze({
   headersTimeout: 10_000,
   requestTimeout: 30_000,
@@ -154,6 +156,9 @@ export function configureNodeHttpServer(server, options = {}) {
   if (server.listening === true) {
     throw new TypeError("Configure the HTTP server before calling listen()");
   }
+  if (CONFIGURED_SERVERS.has(server)) {
+    throw new TypeError("Server hardening has already been configured");
+  }
   if (!isRecord(options)) throw new TypeError("server hardening options must be an object");
 
   const allowed = new Set(Object.keys(DEFAULTS));
@@ -198,8 +203,10 @@ export function configureNodeHttpServer(server, options = {}) {
     throw new TypeError("A checkContinue listener already exists; configure it explicitly or set handleExpectContinue to false");
   }
 
-  // Validate all options before mutating the server. Node enforces these
-  // parser/socket limits before application middleware is entered.
+  // Validate all options before mutating the server. A server must be
+  // configured exactly once to prevent nested stream counters and handlers.
+  CONFIGURED_SERVERS.add(server);
+  // Node enforces these parser/socket limits before application middleware.
   server.headersTimeout = settings.headersTimeout;
   server.requestTimeout = settings.requestTimeout;
   server.keepAliveTimeout = settings.keepAliveTimeout;
