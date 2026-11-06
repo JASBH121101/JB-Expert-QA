@@ -13,3 +13,9 @@ Fixtures contain a PNG signature followed by inert bytes. They are synthetic pip
 The workflow runs automatically when `packages/security-guard/**` or benchmark files change on `feature/jb-security-guard`. It can also be started manually from GitHub Actions. JSON and Markdown reports are uploaded for 30 days and the Markdown report is added to the workflow summary.
 
 No paid services, external network calls, cloud storage, or third-party benchmark packages are used. Results are informational and must be compared on equivalent runners and Node versions.
+
+## Execution and quota policy
+
+To avoid consuming Actions minutes on every small feature-branch commit, automatic runs are limited to pushes on `main` and pull requests targeting `main`. Each workflow also supports manual dispatch. Feature branches can be validated by opening a pull request or dispatching a workflow when a runner is available.
+
+The permanent history writer appends records only from a valid run on `main` (push or manual dispatch on `main`). Pull-request and feature-branch runs produce temporary reports but do not commit history. This prevents benchmark runs from creating more pushes and triggering themselves.
