@@ -48,10 +48,10 @@ The store adapter must implement:
 
 - createWriteStream({ uploadId }): return a writable stream that writes only to private quarantine storage. The object must not be reachable from public URLs or normal download routes.
 - createReadStream({ uploadId }): return a readable stream of the complete quarantined object for scanning.
-- promote({ uploadId, metadata }): perform an atomic quarantine-to-approved transition and resolve with { promoted: true } only after the approved object is committed.
+- promote({ uploadId, metadata, expectedSha256, expectedSize }): atomically compare the current quarantined object's bytes to the expected digest and size, and promote that exact immutable object in one transaction. Resolve with { promoted: true } only after the verified approved object is committed. A separate check followed by a later copy is vulnerable to a time-of-check/time-of-use race.
 - delete({ uploadId }): delete a quarantined object.
 
-scanner.scan({ stream, uploadId, size, sha256, detectedMimeType, signal }) must consume the entire stream and return { verdict: clean | malicious | unknown, engine, version }. The scanner adapter must honor AbortSignal; it must not return clean before the complete file has been inspected. Guard verifies that the scanner's Node.js readable stream reached its end before accepting a clean verdict.
+scanner.scan({ stream, uploadId, size, sha256, detectedMimeType, signal }) must consume the entire stream and return { verdict: clean | malicious | unknown, engine, version }. The scanner adapter must honor AbortSignal; it must not return clean before the complete file has been inspected. Guard wraps the scanner input in a streaming verifier. It recalculates SHA-256 and byte count over the bytes flowing to the scanner, rejects truncation, extension, or content substitution, and verifies that the readable stream reached its end before accepting a clean verdict. It then passes the expected digest and size to promote(); the storage adapter must atomically verify those values against the quarantined object at promotion time. This closes the gap between the initial upload hash, the object scanned, and the object approved, provided the production adapter honors the atomic verification contract.
 
 Guard defaults to a 5 MiB file limit and a 15-second scan timeout. Both are configurable within hard upper bounds. Scanner outages, timeouts, invalid results, unknown verdicts, and promotion failures never approve the file. Items whose scanner/approval status is uncertain remain in quarantine and must be private.
 

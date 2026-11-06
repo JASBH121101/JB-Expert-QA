@@ -38,10 +38,15 @@ function createMemoryStore() {
       if (!bytes) throw new Error("missing quarantine object");
       return Readable.from([bytes]);
     },
-    async promote({ uploadId, metadata }) {
-      calls.push(["promote", uploadId]);
-      if (!quarantine.has(uploadId)) return { promoted: false };
-      approved.set(uploadId, { bytes: quarantine.get(uploadId), metadata });
+    async promote({ uploadId, metadata, expectedSha256, expectedSize }) {
+      calls.push(["promote", uploadId, expectedSha256, expectedSize]);
+      const bytes = quarantine.get(uploadId);
+      if (!bytes ||
+          bytes.length !== expectedSize ||
+          createHash("sha256").update(bytes).digest("hex") !== expectedSha256) {
+        return { promoted: false };
+      }
+      approved.set(uploadId, { bytes, metadata });
       quarantine.delete(uploadId);
       return { promoted: true };
     },
@@ -89,6 +94,9 @@ test("clean signature-validated uploads are scanned from quarantine before promo
   assert.deepEqual(store.calls.map(([name]) => name), [
     "createWriteStream", "createReadStream", "promote"
   ]);
+  const promotionCall = store.calls.find(([name]) => name === "promote");
+  assert.equal(promotionCall[2], result.sha256);
+  assert.equal(promotionCall[3], result.size);
 });
 
 test("unsupported signatures are rejected and never promoted", async () => {
@@ -152,6 +160,49 @@ test("uploads exceeding the streaming byte cap are stopped and removed from quar
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 0);
+});
+
+test("scanner stream bytes must match the original quarantined upload hash and size", async () => {
+  const store = createMemoryStore();
+  store.createReadStream = async ({ uploadId }) => {
+    const original = store.quarantine.get(uploadId);
+    return Readable.from([Buffer.concat([original, Buffer.from("tampered")])]);
+  };
+
+  await assert.rejects(
+    inspector(store).inspect({
+      source: Readable.from([PNG]),
+      fileName: "tampered-in-quarantine.png"
+    }),
+    (error) => error.code === "INVALID_SCAN_RESULT"
+  );
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
+
+test("promotion adapter must verify the exact scanned object before approval", async () => {
+  const store = createMemoryStore();
+  const scanner = {
+    async scan({ stream }) {
+      for await (const chunk of stream) void chunk;
+      store.quarantine.set([...store.quarantine.keys()][0], Buffer.from("changed after scan"));
+      return { verdict: "clean", engine: "MockAV", version: "1.0" };
+    }
+  };
+
+  await assert.rejects(
+    inspector(store, scanner).inspect({
+      source: Readable.from([PNG]),
+      fileName: "changed-after-scan.png"
+    }),
+    (error) => error.code === "APPROVAL_FAILED"
+  );
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  const promotionCall = store.calls.find(([name]) => name === "promote");
+  assert.equal(promotionCall[2], createHash("sha256").update(PNG).digest("hex"));
+  assert.equal(promotionCall[3], PNG.length);
 });
 
 test("malware verdicts are rejected and the quarantined object is deleted", async () => {

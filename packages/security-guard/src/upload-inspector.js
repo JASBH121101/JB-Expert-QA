@@ -162,6 +162,41 @@ function makeInspector(maxBytes, hash) {
   };
 }
 
+function makeScanVerificationStream(expectedSize, expectedSha256) {
+  const hash = createHash("sha256");
+  let size = 0;
+
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      let bytes;
+      if (Buffer.isBuffer(chunk)) bytes = chunk;
+      else if (typeof chunk === "string") bytes = Buffer.from(chunk, encoding);
+      else if (chunk instanceof Uint8Array) bytes = Buffer.from(chunk);
+      else {
+        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        return;
+      }
+
+      if (size + bytes.length > expectedSize) {
+        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        return;
+      }
+
+      size += bytes.length;
+      hash.update(bytes);
+      callback(null, bytes);
+    },
+    flush(callback) {
+      const actualSha256 = hash.digest("hex");
+      if (size !== expectedSize || actualSha256 !== expectedSha256) {
+        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        return;
+      }
+      callback();
+    }
+  });
+}
+
 function validScannerLabel(value) {
   return typeof value === "string" &&
     value.length >= 1 &&
@@ -235,7 +270,7 @@ async function runScanner(scanner, input, timeoutMs) {
  *
  * Scanner contract:
  * - scan({ stream, uploadId, size, sha256, detectedMimeType, signal })
- *   consumes the complete stream and resolves with
+ *   consumes the complete verified stream and resolves with
  *   { verdict: "clean" | "malicious" | "unknown", engine, version }.
  */
 export function createUploadInspector(options = {}) {
@@ -335,24 +370,34 @@ export function createUploadInspector(options = {}) {
       }
 
       let scanResult;
+      let verifiedScanStream;
+      let scanPipeline;
       try {
+        verifiedScanStream = makeScanVerificationStream(inspector.size, sha256);
+        scanPipeline = pipeline(scanStream, verifiedScanStream);
+        // A scanner can fail or return early; keep pipeline rejection handled
+        // while the scanner is consuming the verified readable side.
+        scanPipeline.catch(() => {});
+
         scanResult = await runScanner(scanner, {
-          stream: scanStream,
+          stream: verifiedScanStream,
           uploadId,
           size: inspector.size,
           sha256,
           detectedMimeType
         }, scannerTimeoutMs);
+
+        if (verifiedScanStream.readableEnded !== true) {
+          throw new UploadInspectionError("INVALID_SCAN_RESULT");
+        }
+        await scanPipeline;
       } catch (error) {
         retainQuarantine = true;
         if (error instanceof UploadInspectionError) throw error;
         throw new UploadInspectionError("SCANNER_UNAVAILABLE");
       } finally {
+        verifiedScanStream?.destroy?.();
         scanStream.destroy?.();
-      }
-      if (scanStream.readableEnded !== true) {
-        retainQuarantine = true;
-        throw new UploadInspectionError("INVALID_SCAN_RESULT");
       }
 
       if (!isRecord(scanResult) || !["clean", "malicious", "unknown"].includes(scanResult.verdict)) {
@@ -384,7 +429,12 @@ export function createUploadInspector(options = {}) {
 
       let promotion;
       try {
-        promotion = await store.promote({ uploadId, metadata });
+        promotion = await store.promote({
+          uploadId,
+          metadata,
+          expectedSha256: sha256,
+          expectedSize: inspector.size
+        });
       } catch {
         retainQuarantine = true;
         throw new UploadInspectionError("APPROVAL_FAILED");
