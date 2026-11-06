@@ -71,7 +71,7 @@ jobs:
   persist-history:
     name: Persist benchmark history in Git
     needs: benchmark
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -80,7 +80,7 @@ jobs:
       - name: Checkout current branch head
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           persist-credentials: true
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
