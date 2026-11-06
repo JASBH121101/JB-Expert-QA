@@ -42,6 +42,8 @@ const result = await inspector.inspect({
 
 The default content allowlist is deliberately narrow: JPEG, PNG, GIF, WebP and PDF. Guard does not approve SVG, HTML, XML, ZIP archives, executables, or arbitrary MIME types. The allowedMimeTypes option can narrow the built-in list; it cannot add new types without code-level signature support. application/octet-stream is accepted as a generic client hint, but the file signature must still match an allowed type.
 
+**Important boundary:** signature inspection is bounded prefix-based type identification, not full format validation, content disarm/reconstruction (CDR), or proof that a file is safe. A valid header does not rule out malformed, polyglot, or active trailing content. Decode and re-encode user-uploaded images with a maintained image library before publication. Serve PDFs as attachments by default; if previews are required, render them on a separate untrusted-content origin with restrictive browser policy. Keep `X-Content-Type-Options: nosniff` and explicit `Content-Disposition` controls.
+
 ### Adapter contracts
 
 The store adapter must implement:
