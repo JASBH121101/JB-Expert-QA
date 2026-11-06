@@ -111,13 +111,17 @@ export function isPublicAddress(address) {
 
 export function createUrlSafetyGuard({
   allowPrivateNetworks = false,
-  dnsLookup = lookup
+  dnsLookup = lookup,
+  dnsTimeoutMs = 5_000
 } = {}) {
   if (typeof allowPrivateNetworks !== "boolean") {
     throw new TypeError("allowPrivateNetworks must be a boolean");
   }
   if (typeof dnsLookup !== "function") {
     throw new TypeError("dnsLookup must be a function");
+  }
+  if (!Number.isSafeInteger(dnsTimeoutMs) || dnsTimeoutMs < 1 || dnsTimeoutMs > 30_000) {
+    throw new TypeError("dnsTimeoutMs must be between 1 and 30000 milliseconds");
   }
 
   return async function assertSafeHttpUrl(input) {
@@ -152,10 +156,26 @@ export function createUrlSafetyGuard({
     }
 
     let records;
+    let timeoutHandle;
+    let dnsTimedOut = false;
+    const lookupPromise = Promise.resolve().then(() =>
+      dnsLookup(hostname, { all: true, verbatim: true })
+    );
+    lookupPromise.catch(() => {});
+    const timeoutPromise = new Promise((resolve, reject) => {
+      timeoutHandle = setTimeout(() => {
+        dnsTimedOut = true;
+        reject(new Error("DNS lookup timeout"));
+      }, dnsTimeoutMs);
+    });
     try {
-      records = await dnsLookup(hostname, { all: true, verbatim: true });
+      records = await Promise.race([lookupPromise, timeoutPromise]);
     } catch {
-      throw new TypeError("Could not resolve and verify the target hostname");
+      throw new TypeError(dnsTimedOut
+        ? "DNS resolution timed out; target was not contacted"
+        : "Could not resolve and verify the target hostname");
+    } finally {
+      clearTimeout(timeoutHandle);
     }
     if (!Array.isArray(records) || records.length === 0 ||
         records.some((record) => !record || !isPublicAddress(record.address))) {
