@@ -2,7 +2,7 @@ name: JB Engines Permanent Benchmark
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main]
     paths:
       - "src/**"
       - "packages/**"
@@ -71,13 +71,13 @@ jobs:
   persist-history:
     name: Persist benchmark history in Git
     needs: benchmark
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - name: Checkout current branch head
+      - name: Checkout tested commit on the stable branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
