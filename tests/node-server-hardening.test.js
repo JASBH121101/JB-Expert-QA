@@ -3,6 +3,39 @@ import assert from "node:assert/strict";
 import { createServer, request as httpRequest } from "node:http";
 import { configureNodeHttpServer } from "@jb/security-guard";
 
+function listen(server) {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+}
+
+function close(server) {
+  return new Promise((resolve) => {
+    if (!server.listening) return resolve();
+    server.close(resolve);
+  });
+}
+
+function readResponse(outgoing) {
+  return new Promise((resolve, reject) => {
+    outgoing.once("error", (error) => {
+      if (error.code === "ECONNRESET") return;
+      reject(error);
+    });
+    outgoing.once("response", (incoming) => {
+      const chunks = [];
+      incoming.on("data", (chunk) => chunks.push(chunk));
+      incoming.on("end", () => resolve({
+        statusCode: incoming.statusCode,
+        body: Buffer.concat(chunks).toString("utf8"),
+        headers: incoming.headers
+      }));
+      incoming.on("error", reject);
+    });
+  });
+}
+
 test("Node HTTP server receives conservative timeout and connection limits", () => {
   const server = createServer();
   const result = configureNodeHttpServer(server);
@@ -15,6 +48,7 @@ test("Node HTTP server receives conservative timeout and connection limits", () 
   assert.equal(server.maxRequestsPerSocket, 100);
   assert.equal(server.maxHeadersCount, 100);
   assert.equal(server.listenerCount("checkContinue"), 1);
+  assert.equal(server.listeners("request")[0] !== undefined, true);
   server.close();
 });
 
@@ -24,53 +58,139 @@ test("server hardening validates configuration and must run before listen", () =
   assert.throws(() => configureNodeHttpServer(server, { maxHeaderCount: 10 }), /Unknown server hardening option/);
   assert.throws(() => configureNodeHttpServer(server, { maxBodyBytes: 0 }), /maxBodyBytes/);
   assert.throws(() => configureNodeHttpServer(server, { handleExpectContinue: "yes" }), /handleExpectContinue/);
-  assert.throws(() => configureNodeHttpServer({ listening: true, on() {}, emit() {}, listenerCount() { return 0; } }),
+  assert.throws(() => configureNodeHttpServer({ listening: true, on() {}, emit() {}, prependListener() {}, listenerCount() { return 0; } }),
     /before calling listen/);
   server.close();
 });
 
-test("oversized Expect: 100-continue requests are rejected before the body is accepted", async () => {
-  let applicationReached = false;
+test("oversized Content-Length requests are rejected before application body handling", async () => {
+  let applicationCompleted = false;
   const server = createServer((request, response) => {
-    applicationReached = true;
-    response.statusCode = 200;
-    response.end("application reached");
+    request.on("end", () => {
+      applicationCompleted = true;
+      response.end("accepted");
+    });
+    request.resume();
   });
   configureNodeHttpServer(server, { maxBodyBytes: 5 });
-
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
+  await listen(server);
 
   try {
-    const response = await new Promise((resolve, reject) => {
-      const outgoing = httpRequest({
-        host: "127.0.0.1",
-        port: server.address().port,
-        path: "/upload",
-        method: "POST",
-        headers: {
-          Expect: "100-continue",
-          "Content-Length": "10"
-        }
-      }, (incoming) => {
-        let body = "";
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk) => { body += chunk; });
-        incoming.on("end", () => resolve({ statusCode: incoming.statusCode, body, headers: incoming.headers }));
-      });
-      outgoing.once("error", reject);
-      outgoing.flushHeaders();
-      outgoing.on("continue", () => outgoing.end("0123456789"));
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/upload",
+      method: "POST",
+      headers: { "Content-Length": "10" }
     });
+    const resultPromise = readResponse(outgoing);
+    outgoing.end("0123456789");
+    const result = await resultPromise;
 
-    assert.equal(response.statusCode, 413);
-    assert.equal(response.headers["cache-control"], "no-store");
-    assert.equal(JSON.parse(response.body).error, "request_body_too_large");
-    assert.equal(applicationReached, false);
+    assert.equal(result.statusCode, 413);
+    assert.equal(result.headers.connection, "close");
+    assert.equal(result.headers["cache-control"], "no-store");
+    assert.equal(JSON.parse(result.body).error, "request_body_too_large");
+    assert.equal(applicationCompleted, false);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await close(server);
+  }
+});
+
+test("chunked bodies are counted and rejected after the configured streamed byte limit", async () => {
+  let applicationCompleted = false;
+  let applicationBytes = 0;
+  const server = createServer((request, response) => {
+    request.on("data", (chunk) => { applicationBytes += chunk.length; });
+    request.on("end", () => {
+      applicationCompleted = true;
+      response.end("accepted");
+    });
+  });
+  configureNodeHttpServer(server, { maxBodyBytes: 5 });
+  await listen(server);
+
+  try {
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/chunked",
+      method: "POST",
+      headers: { "Transfer-Encoding": "chunked" }
+    });
+    const resultPromise = readResponse(outgoing);
+    outgoing.write("1234");
+    outgoing.end("5678");
+    const result = await resultPromise;
+
+    assert.equal(result.statusCode, 413);
+    assert.equal(result.headers.connection, "close");
+    assert.equal(JSON.parse(result.body).error, "request_body_too_large");
+    assert.equal(applicationCompleted, false);
+    assert.ok(applicationBytes <= 8, "only the chunk crossing the limit may reach a streaming application listener");
+  } finally {
+    await close(server);
+  }
+});
+
+test("chunked requests exactly at maxBodyBytes are accepted", async () => {
+  const server = createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => { body += chunk; });
+    request.on("end", () => response.end(body));
+  });
+  configureNodeHttpServer(server, { maxBodyBytes: 5 });
+  await listen(server);
+
+  try {
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/exact",
+      method: "POST",
+      headers: { "Transfer-Encoding": "chunked" }
+    });
+    const resultPromise = readResponse(outgoing);
+    outgoing.end("12345");
+    const result = await resultPromise;
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body, "12345");
+  } finally {
+    await close(server);
+  }
+});
+
+test("oversized Expect: 100-continue requests are rejected before the body is accepted", async () => {
+  let applicationCompleted = false;
+  const server = createServer((request, response) => {
+    request.on("end", () => {
+      applicationCompleted = true;
+      response.end("accepted");
+    });
+    request.resume();
+  });
+  configureNodeHttpServer(server, { maxBodyBytes: 5 });
+  await listen(server);
+
+  try {
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/upload",
+      method: "POST",
+      headers: { Expect: "100-continue", "Content-Length": "10" }
+    });
+    const resultPromise = readResponse(outgoing);
+    outgoing.flushHeaders();
+    outgoing.on("continue", () => outgoing.end("0123456789"));
+    const result = await resultPromise;
+
+    assert.equal(result.statusCode, 413);
+    assert.equal(JSON.parse(result.body).error, "request_body_too_large");
+    assert.equal(applicationCompleted, false);
+  } finally {
+    await close(server);
   }
 });
 
@@ -79,46 +199,28 @@ test("valid Expect: 100-continue requests continue through the ordinary applicat
     let body = "";
     request.setEncoding("utf8");
     request.on("data", (chunk) => { body += chunk; });
-    request.on("end", () => {
-      response.statusCode = 200;
-      response.end(body);
-    });
+    request.on("end", () => response.end(body));
   });
   configureNodeHttpServer(server, { maxBodyBytes: 10 });
-
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
+  await listen(server);
 
   try {
-    const response = await new Promise((resolve, reject) => {
-      const outgoing = httpRequest({
-        host: "127.0.0.1",
-        port: server.address().port,
-        path: "/upload",
-        method: "POST",
-        headers: {
-          Expect: "100-continue",
-          "Content-Length": "4"
-        }
-      }, (incoming) => {
-        let body = "";
-        incoming.setEncoding("utf8");
-        incoming.on("data", (chunk) => { body += chunk; });
-        incoming.on("end", () => resolve({ statusCode: incoming.statusCode, body }));
-      });
-      outgoing.once("error", reject);
-      outgoing.flushHeaders();
-      outgoing.on("continue", () => outgoing.end("safe"));
+    const outgoing = httpRequest({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path: "/upload",
+      method: "POST",
+      headers: { Expect: "100-continue", "Content-Length": "4" }
     });
-
-    assert.deepEqual(response, { statusCode: 200, body: "safe" });
+    const resultPromise = readResponse(outgoing);
+    outgoing.flushHeaders();
+    outgoing.on("continue", () => outgoing.end("safe"));
+    const result = await resultPromise;
+    assert.deepEqual({ statusCode: result.statusCode, body: result.body }, { statusCode: 200, body: "safe" });
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await close(server);
   }
 });
-
 
 test("custom checkContinue listeners are not overwritten and failed configuration is atomic", () => {
   const server = createServer();

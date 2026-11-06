@@ -37,8 +37,31 @@ function headerValues(request, name) {
   return String(value).split(",").map((item) => item.trim());
 }
 
-function rejectExpectation(response, statusCode, error) {
+function getBodyPreflightFailure(request, maxBodyBytes) {
+  const contentLengths = headerValues(request, "content-length");
+  const transferEncodings = headerValues(request, "transfer-encoding");
+  if (contentLengths.length && transferEncodings.length) {
+    return { statusCode: 400, error: "ambiguous_message_framing" };
+  }
+  if (!contentLengths.length) return null;
+
+  if (new Set(contentLengths).size > 1 || contentLengths.some((value) => !/^\d+$/.test(value))) {
+    return { statusCode: 400, error: "invalid_content_length" };
+  }
+  const length = Number(contentLengths[0]);
+  if (!Number.isSafeInteger(length)) {
+    return { statusCode: 400, error: "invalid_content_length" };
+  }
+  if (length > maxBodyBytes) {
+    return { statusCode: 413, error: "request_body_too_large" };
+  }
+  return null;
+}
+
+function rejectRequest(request, response, statusCode, error) {
+  request.pause?.();
   if (response.headersSent || response.writableEnded) {
+    request.socket?.destroy();
     response.destroy?.();
     return;
   }
@@ -50,17 +73,65 @@ function rejectExpectation(response, statusCode, error) {
   response.end(JSON.stringify({
     error,
     message: "Request rejected by server security policy"
-  }));
+  }), () => {
+    // Do not keep reading an attacker-controlled body after returning 4xx.
+    request.socket?.destroy();
+  });
+}
+
+function installRequestBodyLimit(server, maxBodyBytes) {
+  const onRequest = (request, response) => {
+    const preflightFailure = getBodyPreflightFailure(request, maxBodyBytes);
+    if (preflightFailure) {
+      rejectRequest(request, response, preflightFailure.statusCode, preflightFailure.error);
+      return;
+    }
+
+    let receivedBytes = 0;
+    let rejected = false;
+
+    const cleanup = () => {
+      request.removeListener("data", onData);
+      request.removeListener("end", cleanup);
+      request.removeListener("close", cleanup);
+      request.removeListener("error", cleanup);
+    };
+
+    const onData = (chunk) => {
+      if (rejected) return;
+      const chunkBytes = Buffer.isBuffer(chunk)
+        ? chunk.length
+        : Buffer.byteLength(String(chunk));
+      receivedBytes += chunkBytes;
+      if (receivedBytes > maxBodyBytes) {
+        rejected = true;
+        cleanup();
+        rejectRequest(request, response, 413, "request_body_too_large");
+      }
+    };
+
+    // This listener is installed with prependListener so it counts bytes before
+    // application body parsers/handlers attach their own data listeners.
+    request.on("data", onData);
+    request.once("end", cleanup);
+    request.once("close", cleanup);
+    request.once("error", cleanup);
+  };
+
+  server.prependListener("request", onRequest);
+  return onRequest;
 }
 
 /**
  * Configure conservative Node.js HTTP/HTTPS server limits before listen().
- * This does not replace framework-level streamed-body or file-upload limits.
+ * Enforces maxBodyBytes against Content-Length and streamed/chunked request data.
+ * Configure this before application request handlers and body parsers.
  */
 export function configureNodeHttpServer(server, options = {}) {
   if (!server || typeof server !== "object" ||
       typeof server.on !== "function" ||
       typeof server.emit !== "function" ||
+      typeof server.prependListener !== "function" ||
       typeof server.listenerCount !== "function") {
     throw new TypeError("server must be a Node.js HTTP or HTTPS Server instance");
   }
@@ -111,7 +182,8 @@ export function configureNodeHttpServer(server, options = {}) {
     throw new TypeError("A checkContinue listener already exists; configure it explicitly or set handleExpectContinue to false");
   }
 
-  // Node enforces these timeouts at the HTTP parser/socket boundary, before app middleware.
+  // Validate all options before mutating the server. Node enforces these
+  // parser/socket limits before application middleware is entered.
   server.headersTimeout = settings.headersTimeout;
   server.requestTimeout = settings.requestTimeout;
   server.keepAliveTimeout = settings.keepAliveTimeout;
@@ -119,36 +191,20 @@ export function configureNodeHttpServer(server, options = {}) {
   server.maxRequestsPerSocket = settings.maxRequestsPerSocket;
   server.maxHeadersCount = settings.maxHeadersCount;
 
+  installRequestBodyLimit(server, settings.maxBodyBytes);
+
   if (settings.handleExpectContinue) {
     server.on("checkContinue", (request, response) => {
-      const contentLengths = headerValues(request, "content-length");
-      const transferEncodings = headerValues(request, "transfer-encoding");
-
-      if (contentLengths.length && transferEncodings.length) {
-        rejectExpectation(response, 400, "ambiguous_message_framing");
+      const failure = getBodyPreflightFailure(request, settings.maxBodyBytes);
+      if (failure) {
+        rejectRequest(request, response, failure.statusCode, failure.error);
         return;
-      }
-
-      if (contentLengths.length) {
-        if (new Set(contentLengths).size > 1 ||
-            contentLengths.some((value) => !/^\d+$/.test(value))) {
-          rejectExpectation(response, 400, "invalid_content_length");
-          return;
-        }
-        const length = Number(contentLengths[0]);
-        if (!Number.isSafeInteger(length)) {
-          rejectExpectation(response, 400, "invalid_content_length");
-          return;
-        }
-        if (length > settings.maxBodyBytes) {
-          rejectExpectation(response, 413, "request_body_too_large");
-          return;
-        }
       }
 
       response.writeContinue();
       // When checkContinue is handled, Node does not emit request automatically.
-      // Re-emit it after sending 100 Continue so the normal application handler runs.
+      // Re-emit it after sending 100 Continue so the body limit listener and
+      // normal application request handler both receive the request.
       server.emit("request", request, response);
     });
   }
