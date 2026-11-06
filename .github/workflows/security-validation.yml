@@ -53,6 +53,15 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Audit resolved dependency tree for high and critical vulnerabilities
         run: npm audit --audit-level=high
+      - name: Generate CycloneDX software bill of materials
+        run: npm sbom --sbom-format cyclonedx > security-sbom.cdx.json
+      - name: Archive dependency SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: security-sbom-node-${{ matrix.node-version }}
+          path: security-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js
