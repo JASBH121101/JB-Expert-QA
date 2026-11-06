@@ -166,3 +166,19 @@ Guard exposes a separate origin-allowlist middleware for cookie-authenticated br
 ## Session-bound CSRF tokens
 
 Guard includes an optional HMAC synchronizer-token helper bound to the host application's session identifier. It rejects unsafe methods without a valid session-bound token, does not store session state, and emits sanitized events. It requires a stable secret and the host application's session manager; it does not replace secure cookies, session rotation, authorization, or XSS prevention.
+
+## AST-based request data-flow analysis
+
+The local security audit now parses supported JavaScript files with Acorn and performs bounded, same-file variable-alias tracking. It follows values originating from request query, body, route parameters, headers, and cookies into selected security-sensitive sinks.
+
+Current sink coverage includes outbound HTTP clients (SSRF), redirect destinations, dynamic code execution, process execution, query-like database calls, and HTML DOM insertion (innerHTML, outerHTML, and insertAdjacentHTML). Findings include source file and line locations and are marked for manual review.
+
+Coverage boundaries are explicit:
+
+- Supported parser extensions are `.js`, `.mjs`, and `.cjs`; TypeScript, JSX, Vue, Svelte, and other languages are not parsed by this AST pass.
+- Tracking is intra-file and alias-based. It does not yet perform interprocedural, cross-file, path-sensitive, or full control-flow analysis.
+- Sanitizer semantics, framework middleware, ORM parameter binding, and trusted URL allowlists are not inferred. Query-like findings require manual confirmation that values are not already safely parameterized.
+- Parser failures are surfaced as findings and mark the security assessment incomplete rather than silently treating the file as clean.
+- The analyzer parses source only. It does not execute inspected project code, make outbound requests, or connect to application databases.
+
+This is a deeper static-analysis layer, not a substitute for runtime testing or a security review.
