@@ -64,12 +64,10 @@ test("server hardening validates configuration and must run before listen", () =
 });
 
 test("oversized Content-Length requests are rejected before application body handling", async () => {
-  let applicationCompleted = false;
+  let applicationReached = false;
   const server = createServer((request, response) => {
-    request.on("end", () => {
-      applicationCompleted = true;
-      response.end("accepted");
-    });
+    applicationReached = true;
+    request.on("end", () => response.end("accepted"));
     request.resume();
   });
   configureNodeHttpServer(server, { maxBodyBytes: 5 });
@@ -91,7 +89,7 @@ test("oversized Content-Length requests are rejected before application body han
     assert.equal(result.headers.connection, "close");
     assert.equal(result.headers["cache-control"], "no-store");
     assert.equal(JSON.parse(result.body).error, "request_body_too_large");
-    assert.equal(applicationCompleted, false);
+    assert.equal(applicationReached, false);
   } finally {
     await close(server);
   }
@@ -127,7 +125,7 @@ test("chunked bodies are counted and rejected after the configured streamed byte
     assert.equal(result.headers.connection, "close");
     assert.equal(JSON.parse(result.body).error, "request_body_too_large");
     assert.equal(applicationCompleted, false);
-    assert.ok(applicationBytes <= 8, "only the chunk crossing the limit may reach a streaming application listener");
+    assert.ok(applicationBytes <= 5, "the chunk that would cross the limit must not reach application listeners");
   } finally {
     await close(server);
   }

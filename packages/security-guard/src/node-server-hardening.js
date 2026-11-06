@@ -80,46 +80,62 @@ function rejectRequest(request, response, statusCode, error) {
 }
 
 function installRequestBodyLimit(server, maxBodyBytes) {
-  const onRequest = (request, response) => {
-    const preflightFailure = getBodyPreflightFailure(request, maxBodyBytes);
-    if (preflightFailure) {
-      rejectRequest(request, response, preflightFailure.statusCode, preflightFailure.error);
-      return;
+  const originalServerEmit = server.emit;
+
+  server.emit = function guardedServerEmit(eventName, ...args) {
+    if (eventName === "request") {
+      const [request, response] = args;
+      const preflightFailure = getBodyPreflightFailure(request, maxBodyBytes);
+      if (preflightFailure) {
+        // Returning before EventEmitter dispatch prevents any application
+        // request listener from observing a body already known to be oversized.
+        rejectRequest(request, response, preflightFailure.statusCode, preflightFailure.error);
+        return true;
+      }
+
+      const originalRequestEmit = request.emit;
+      const hadOwnEmit = Object.hasOwn(request, "emit");
+      let receivedBytes = 0;
+      let rejected = false;
+      let restored = false;
+
+      const restoreRequestEmit = () => {
+        if (restored) return;
+        restored = true;
+        if (hadOwnEmit) request.emit = originalRequestEmit;
+        else delete request.emit;
+      };
+
+      request.emit = function guardedRequestEmit(requestEvent, ...eventArgs) {
+        if (requestEvent === "data" && !rejected) {
+          const chunk = eventArgs[0];
+          const chunkBytes = Buffer.isBuffer(chunk)
+            ? chunk.length
+            : Buffer.byteLength(String(chunk));
+          if (receivedBytes + chunkBytes > maxBodyBytes) {
+            rejected = true;
+            request.pause();
+            rejectRequest(request, response, 413, "request_body_too_large");
+            return false;
+          }
+          receivedBytes += chunkBytes;
+        }
+
+        // A truncated stream must never emit "end" to downstream parsers.
+        if (rejected && requestEvent === "end") return false;
+
+        try {
+          return originalRequestEmit.call(this, requestEvent, ...eventArgs);
+        } finally {
+          if (requestEvent === "end" || requestEvent === "close" || requestEvent === "error") {
+            restoreRequestEmit();
+          }
+        }
+      };
     }
 
-    let receivedBytes = 0;
-    let rejected = false;
-
-    const cleanup = () => {
-      request.removeListener("data", onData);
-      request.removeListener("end", cleanup);
-      request.removeListener("close", cleanup);
-      request.removeListener("error", cleanup);
-    };
-
-    const onData = (chunk) => {
-      if (rejected) return;
-      const chunkBytes = Buffer.isBuffer(chunk)
-        ? chunk.length
-        : Buffer.byteLength(String(chunk));
-      receivedBytes += chunkBytes;
-      if (receivedBytes > maxBodyBytes) {
-        rejected = true;
-        cleanup();
-        rejectRequest(request, response, 413, "request_body_too_large");
-      }
-    };
-
-    // This listener is installed with prependListener so it counts bytes before
-    // application body parsers/handlers attach their own data listeners.
-    request.on("data", onData);
-    request.once("end", cleanup);
-    request.once("close", cleanup);
-    request.once("error", cleanup);
+    return originalServerEmit.call(this, eventName, ...args);
   };
-
-  server.prependListener("request", onRequest);
-  return onRequest;
 }
 
 /**

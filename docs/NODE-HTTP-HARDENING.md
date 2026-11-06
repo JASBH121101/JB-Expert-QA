@@ -9,7 +9,7 @@
 - Maximum request body bytes, enforced both from a valid `Content-Length` header and by counting actual streamed bytes. This includes chunked transfer-encoded requests.
 - Early rejection of oversized `Expect: 100-continue` requests before sending the continue response.
 
-The streamed-body listener is prepended to the server's `request` event so it observes bytes before ordinary application request handlers register their body-parser listeners. On violation, Guard pauses the incoming request, returns HTTP 413 with `Connection: close`, and closes the socket after the response is flushed.
+The streamed-body listener is prepended to the server's `request` event so it observes bytes before ordinary application request handlers register their body-parser listeners. On an oversized declared body, Guard rejects the request before dispatching it to application request listeners. For streamed/chunked bodies, it checks each data event before dispatching that chunk to downstream parsers; the chunk that would cross the limit is withheld. Guard pauses the incoming request, returns HTTP 413 with `Connection: close`, and closes the socket after the response is flushed.
 
 ## Integration example
 
