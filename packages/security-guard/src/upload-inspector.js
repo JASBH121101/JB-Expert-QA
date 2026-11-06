@@ -51,6 +51,7 @@ const ERROR_MESSAGES = Object.freeze({
   EXTENSION_MISMATCH: "File extension does not match its content",
   UPLOAD_TOO_LARGE: "Upload exceeds the configured size limit",
   STORAGE_UNAVAILABLE: "Quarantine storage is unavailable",
+  STORAGE_TIMEOUT: "Quarantine storage adapter did not respond in time",
   INGEST_FAILED: "Upload could not be safely quarantined",
   INGEST_TIMEOUT: "Upload stream exceeded its ingestion time limit",
   SCANNER_UNAVAILABLE: "Malware scanner is unavailable",
@@ -226,10 +227,46 @@ function validateScanner(scanner) {
 }
 
 async function deleteQuarantine(store, uploadId, onEvent) {
+  let timeoutHandle;
+  const deletePromise = Promise.resolve().then(() => store.delete({ uploadId }));
+  deletePromise.catch(() => {});
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error("cleanup timeout")), 5_000);
+  });
   try {
-    await store.delete({ uploadId });
+    await Promise.race([deletePromise, timeoutPromise]);
   } catch {
     safeNotify(onEvent, "cleanup_failed", "quarantine_delete_failed");
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
+async function runAdapterOperation(operation, timeoutMs, onLateValue) {
+  let timeoutHandle;
+  let timedOut = false;
+  const operationPromise = Promise.resolve().then(operation);
+  operationPromise.then((value) => {
+    if (!timedOut || typeof onLateValue !== "function") return;
+    try {
+      const cleanup = onLateValue(value);
+      if (cleanup && typeof cleanup.then === "function") cleanup.catch(() => {});
+    } catch {
+      // Late adapter cleanup must not create an unhandled rejection.
+    }
+  }, () => {});
+
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      reject(new UploadInspectionError("STORAGE_TIMEOUT"));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operationPromise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 
@@ -361,8 +398,19 @@ export function createUploadInspector(options = {}) {
       quarantineAttempted = true;
       let quarantineWriter;
       try {
-        quarantineWriter = await store.createWriteStream({ uploadId });
-      } catch {
+        quarantineWriter = await runAdapterOperation(
+          () => store.createWriteStream({ uploadId }),
+          ingestTimeoutMs,
+          (lateWriter) => {
+            lateWriter?.destroy?.();
+            return deleteQuarantine(store, uploadId, onEvent);
+          }
+        );
+      } catch (error) {
+        if (error instanceof UploadInspectionError) {
+          source.destroy?.();
+          throw error;
+        }
         throw new UploadInspectionError("STORAGE_UNAVAILABLE");
       }
       if (!quarantineWriter || typeof quarantineWriter.write !== "function" ||
@@ -394,9 +442,14 @@ export function createUploadInspector(options = {}) {
       const sha256 = hash.digest("hex");
       let scanStream;
       try {
-        scanStream = await store.createReadStream({ uploadId });
-      } catch {
+        scanStream = await runAdapterOperation(
+          () => store.createReadStream({ uploadId }),
+          ingestTimeoutMs,
+          (lateStream) => lateStream?.destroy?.()
+        );
+      } catch (error) {
         retainQuarantine = true;
+        if (error instanceof UploadInspectionError) throw error;
         throw new UploadInspectionError("SCANNER_UNAVAILABLE");
       }
       if (!scanStream || typeof scanStream.pipe !== "function" || typeof scanStream.on !== "function") {
