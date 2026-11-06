@@ -131,7 +131,7 @@ function analyzeFile(file) {
   try {
     ast = parse(file.content, {
       ecmaVersion: "latest",
-      sourceType: "unambiguous",
+      sourceType: "module",
       locations: true,
       allowHashBang: true,
       allowReturnOutsideFunction: true
