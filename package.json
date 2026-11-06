@@ -20,7 +20,8 @@
     "audit:security": "node src/security-cli.js",
     "autopilot": "node src/autopilot-cli.js",
     "audit:security:url": "node src/security-url-cli.js",
-    "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js"
+    "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js",
+    "benchmark:guard": "node bench/security-guard.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
