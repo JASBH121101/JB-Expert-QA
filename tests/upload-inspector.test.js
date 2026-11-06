@@ -162,17 +162,37 @@ test("uploads exceeding the streaming byte cap are stopped and removed from quar
   assert.equal(store.quarantine.size, 0);
 });
 
-test("scanner stream bytes must match the original quarantined upload hash and size", async () => {
+test("scanner stream digest must match even when tampered content has the same size", async () => {
   const store = createMemoryStore();
   store.createReadStream = async ({ uploadId }) => {
-    const original = store.quarantine.get(uploadId);
-    return Readable.from([Buffer.concat([original, Buffer.from("tampered")])]);
+    const tampered = Buffer.from(store.quarantine.get(uploadId));
+    tampered[tampered.length - 1] ^= 0x01;
+    return Readable.from([tampered]);
   };
 
   await assert.rejects(
     inspector(store).inspect({
       source: Readable.from([PNG]),
       fileName: "tampered-in-quarantine.png"
+    }),
+    (error) => error.code === "INVALID_SCAN_RESULT"
+  );
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
+
+test("scanner stream cannot contain more bytes than the original upload", async () => {
+  const store = createMemoryStore();
+  store.createReadStream = async ({ uploadId }) => {
+    const original = store.quarantine.get(uploadId);
+    return Readable.from([Buffer.concat([original, Buffer.from("extra")])]);
+  };
+
+  await assert.rejects(
+    inspector(store).inspect({
+      source: Readable.from([PNG]),
+      fileName: "extended-in-quarantine.png"
     }),
     (error) => error.code === "INVALID_SCAN_RESULT"
   );
