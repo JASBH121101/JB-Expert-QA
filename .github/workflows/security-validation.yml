@@ -34,7 +34,7 @@ jobs:
   security-tests:
     name: Deterministic security-profile tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +80,9 @@ jobs:
           node --check packages/security-guard/src/distributed-rate-limit.js
           node --check packages/security-guard/src/distributed-auth-protection.js
           node --check packages/security-guard/src/upload-inspector.js
+          node --check packages/malware-engine/src/index.js
+          node --check packages/malware-engine/src/pe-analyzer.js
+          node --check packages/malware-engine/src/archive-analyzer.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js
@@ -88,7 +91,7 @@ jobs:
           node --check tests/security-headers.test.js
           node --check packages/security-guard/testing/recovery-adapters.js
           node --check tests/upload-inspector.test.js
-      - name: Run security QA and Guard tests
-        run: |
-          node --test tests/security-qa.test.js
-          npm run test:security-guard
+      - name: Run JB Expert QA and Security Guard suites
+        run: npm test
+      - name: Run Malware Engine suite
+        run: npm run test:malware-engine
