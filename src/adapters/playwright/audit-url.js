@@ -261,7 +261,9 @@ export async function auditViewports(url, {
   const results = [];
   if (updateBaselines && !baselineDir) throw new TypeError("baselineDir is required when updating visual baselines");
   if (baselineDir && !screenshotDir) throw new TypeError("screenshotDir is required when comparing visual baselines");
-  for (const viewport of viewports) {
+
+  // Validate the complete matrix before launching Chromium or writing any artifacts.
+  const validatedViewports = viewports.map((viewport) => {
     if (!viewport || typeof viewport.name !== "string" || !viewport.name.trim() ||
         viewport.name.length > 80 || /[\\u0000-\\u001f\\u007f]/.test(viewport.name) ||
         !Number.isSafeInteger(viewport.width) || !Number.isSafeInteger(viewport.height) ||
@@ -280,6 +282,10 @@ export async function auditViewports(url, {
       throw new Error("Viewport names collide after filename normalization: " + viewport.name);
     }
     seenSafeNames.add(normalizedSafeName);
+    return { viewport, safeName };
+  });
+
+  for (const { viewport, safeName } of validatedViewports) {
     const screenshotPath = screenshotDir ? join(screenshotDir, safeName + ".png") : null;
     const report = await auditUrl(url, {
       ...options,
