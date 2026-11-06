@@ -4,8 +4,10 @@ import { pipeline } from "node:stream/promises";
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
+const DEFAULT_INGEST_TIMEOUT_MS = 30_000;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_SCANNER_TIMEOUT_MS = 120_000;
+const MAX_INGEST_TIMEOUT_MS = 300_000;
 const MAX_SIGNATURE_BYTES = 8_192;
 
 const TYPE_DEFINITIONS = Object.freeze({
@@ -50,6 +52,7 @@ const ERROR_MESSAGES = Object.freeze({
   UPLOAD_TOO_LARGE: "Upload exceeds the configured size limit",
   STORAGE_UNAVAILABLE: "Quarantine storage is unavailable",
   INGEST_FAILED: "Upload could not be safely quarantined",
+  INGEST_TIMEOUT: "Upload stream exceeded its ingestion time limit",
   SCANNER_UNAVAILABLE: "Malware scanner is unavailable",
   SCANNER_TIMEOUT: "Malware scan exceeded its time limit",
   SCAN_NOT_CLEAN: "File did not receive an explicit clean verdict",
@@ -230,6 +233,33 @@ async function deleteQuarantine(store, uploadId, onEvent) {
   }
 }
 
+async function runIngest(source, transform, writer, timeoutMs) {
+  let timeoutHandle;
+  let timedOut = false;
+  const ingestPromise = pipeline(source, transform, writer);
+  // A timeout can win the race; keep later pipeline rejection observed.
+  ingestPromise.catch(() => {});
+
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      source.destroy?.();
+      transform.destroy?.();
+      writer.destroy?.();
+      reject(new UploadInspectionError("INGEST_TIMEOUT"));
+    }, timeoutMs);
+  });
+
+  try {
+    await Promise.race([ingestPromise, timeoutPromise]);
+  } catch (error) {
+    if (timedOut) throw new UploadInspectionError("INGEST_TIMEOUT");
+    throw error;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 async function runScanner(scanner, input, timeoutMs) {
   const controller = new AbortController();
   let timeoutHandle;
@@ -277,7 +307,7 @@ export function createUploadInspector(options = {}) {
   if (!isRecord(options)) throw new TypeError("upload inspector options must be an object");
 
   const allowedOptions = new Set([
-    "store", "scanner", "maxBytes", "scannerTimeoutMs", "allowedMimeTypes", "onEvent"
+    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "allowedMimeTypes", "onEvent"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown upload inspector option: " + key);
@@ -297,6 +327,11 @@ export function createUploadInspector(options = {}) {
     options.scannerTimeoutMs ?? DEFAULT_SCANNER_TIMEOUT_MS,
     "scannerTimeoutMs",
     MAX_SCANNER_TIMEOUT_MS
+  );
+  const ingestTimeoutMs = positiveInteger(
+    options.ingestTimeoutMs ?? DEFAULT_INGEST_TIMEOUT_MS,
+    "ingestTimeoutMs",
+    MAX_INGEST_TIMEOUT_MS
   );
 
   const allowedMimeTypes = Object.freeze([...(options.allowedMimeTypes ?? Object.keys(TYPE_DEFINITIONS))]);
@@ -338,7 +373,7 @@ export function createUploadInspector(options = {}) {
       const hash = createHash("sha256");
       const inspector = makeInspector(maxBytes, hash);
       try {
-        await pipeline(source, inspector.transform, quarantineWriter);
+        await runIngest(source, inspector.transform, quarantineWriter, ingestTimeoutMs);
       } catch (error) {
         if (error instanceof UploadInspectionError) throw error;
         throw new UploadInspectionError("INGEST_FAILED");
