@@ -142,6 +142,10 @@ export async function auditSecurityUrl(url, {
       runtimeAssessment: Object.freeze({
         mode: "passive-browser-observation",
         requestsMadeByAuditor: true,
+        networkDnsPolicy: Object.freeze({
+          dnsRevalidatedBeforeEachHttpRequest: true,
+          browserConnectionDnsPinned: false
+        }),
         exploitPayloadsSent: false,
         authenticatedSessionUsed: false,
         databaseConnections: 0,
@@ -152,6 +156,7 @@ export async function auditSecurityUrl(url, {
           "This check loads the page normally and inspects the main document response; it does not attempt exploitation.",
           "It does not authenticate, submit forms, crawl linked pages, or test role-based access controls.",
           "Browser and CDN behavior can vary by region, user agent, and cache state; findings should be confirmed against the deployed response configuration.",
+          "DNS answers are revalidated before requests, but Chromium performs its own connection-time resolution; this adapter does not pin the browser connection to the validated IP and cannot claim complete DNS-rebinding/TOCTOU prevention.",
           "It observes only response headers and cookies visible to the browser for the main document, not every API endpoint or subresource response."
         ])
       })
