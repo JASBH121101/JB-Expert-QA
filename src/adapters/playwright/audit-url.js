@@ -265,7 +265,7 @@ export async function auditViewports(url, {
   // Validate the complete matrix before launching Chromium or writing any artifacts.
   const validatedViewports = viewports.map((viewport) => {
     if (!viewport || typeof viewport.name !== "string" || !viewport.name.trim() ||
-        viewport.name.length > 80 || /[\\u0000-\\u001f\\u007f]/.test(viewport.name) ||
+        viewport.name.length > 80 || /[\u0000-\u001f\u007f]/.test(viewport.name) ||
         !Number.isSafeInteger(viewport.width) || !Number.isSafeInteger(viewport.height) ||
         viewport.width < 1 || viewport.height < 1 ||
         viewport.width > 8192 || viewport.height > 8192 ||
