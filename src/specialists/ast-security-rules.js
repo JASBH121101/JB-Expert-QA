@@ -84,7 +84,7 @@ function expressionIsTainted(node, tainted, taintedMembers = new Set()) {
     case "ArrayExpression":
       return node.elements.some((item) => expressionIsTainted(item, tainted, taintedMembers));
     case "ObjectExpression":
-      return node.properties.some((item) => expressionIsTainted(item.value, tainted, taintedMembers));
+      return node.properties.some((item) => expressionIsTainted(item.value ?? item.argument, tainted, taintedMembers));
     case "CallExpression":
     case "NewExpression":
       return node.arguments.some((item) => expressionIsTainted(item, tainted, taintedMembers));
@@ -229,7 +229,7 @@ function analyzeFile(file) {
           "high",
           { sink: name }
         ));
-      } else if (firstTainted && !isRequestSource(first) && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request)$/.test(name)) {
+      } else if (firstTainted && !isRequestSource(first) && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request|http\.(?:get|post)|https\.(?:get|post)|WebSocket)$/.test(name)) {
         add(makeFinding(
           file, node, "SSRF", "Request-controlled data reaches an outbound HTTP client",
           "A value originating from request query, body, route, header, or cookie data reaches an outbound HTTP request through a direct expression or variable alias. This may permit server-side request forgery.",
@@ -237,7 +237,7 @@ function analyzeFile(file) {
           "critical",
           { sink: name, taintedVariables: [...tainted].slice(0, 12) }
         ));
-      } else if (firstTainted && !isRequestSource(first) && (/^(?:res|response|reply)\.redirect$/.test(name) || name === "redirect")) {
+      } else if (firstTainted && !isRequestSource(first) && (name === "redirect" || name.endsWith(".redirect"))) {
         add(makeFinding(
           file, node, "REDIRECT", "Request-controlled data reaches a redirect sink",
           "A value derived from request input flows through a variable into a redirect destination, which may enable an open redirect.",
@@ -245,7 +245,7 @@ function analyzeFile(file) {
           "high",
           { sink: name, taintedVariables: [...tainted].slice(0, 12) }
         ));
-      } else if (anyArgumentTainted && /^(?:eval|Function)$/.test(name)) {
+      } else if (anyArgumentTainted && /^(?:eval|Function|vm\.runInNewContext|vm\.runInThisContext|runInNewContext|runInThisContext)$/.test(name)) {
         add(makeFinding(
           file, node, "CODE", "Request-controlled data reaches dynamic code execution",
           "A value derived from request input reaches eval or the Function constructor. This can enable arbitrary code execution.",
@@ -253,7 +253,15 @@ function analyzeFile(file) {
           "critical",
           { sink: name }
         ));
-      } else if (anyArgumentTainted && /^(?:exec|execSync|spawn|spawnSync)$/.test(name)) {
+      } else if (firstTainted && /^(?:open|readFile|readFileSync|createReadStream|writeFile|writeFileSync|unlink|unlinkSync|rm|rmSync)$/.test(name.split(".").at(-1))) {
+        add(makeFinding(
+          file, node, "PATH", "Request-controlled data reaches a filesystem path operation",
+          "A value derived from request input reaches a filesystem path argument. Without strict path confinement this may permit path traversal or unauthorized file access.",
+          "Resolve paths against a fixed trusted root, reject traversal and symlink escapes, and enforce authorization independently of the requested filename.",
+          "high",
+          { sink: name }
+        ));
+      } else if (anyArgumentTainted && /^(?:exec|execSync|execFile|execFileSync|spawn|spawnSync|child_process\.(?:exec|execSync|execFile|execFileSync|spawn|spawnSync))$/.test(name)) {
         add(makeFinding(
           file, node, "COMMAND", "Request-controlled data reaches a process execution sink",
           "A value derived from request input reaches a process execution API. Shell interpretation can turn this into command injection.",
@@ -261,7 +269,7 @@ function analyzeFile(file) {
           "critical",
           { sink: name }
         ));
-      } else if (firstTainted && /^(?:query|execute|raw)$/.test(name.split(".").at(-1))) {
+      } else if (firstTainted && /^(?:query|execute|raw|\$queryRawUnsafe|\$executeRawUnsafe)$/.test(name.split(".").at(-1))) {
         add(makeFinding(
           file, node, "SQL", "Request-controlled data reaches a database query string",
           "A request-derived value flows into a query-like API. If it is interpolated into SQL rather than passed as a bound parameter, SQL injection may result.",
