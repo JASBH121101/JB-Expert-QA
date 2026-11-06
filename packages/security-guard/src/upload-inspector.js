@@ -60,6 +60,9 @@ const ERROR_MESSAGES = Object.freeze({
   INVALID_SCAN_RESULT: "Malware scanner returned an invalid result",
   MALWARE_DETECTED: "File was rejected by malware scanning",
   APPROVAL_FAILED: "File could not be promoted to approved storage",
+  BRIDGE_UNAVAILABLE: "Coordinated security decision is unavailable",
+  BRIDGE_REVIEW_REQUIRED: "The other security filter has not approved this object",
+  BRIDGE_BLOCKED: "The coordinated security decision blocked this object",
   PROCESSING_FAILED: "Upload could not be approved"
 });
 
@@ -344,7 +347,8 @@ export function createUploadInspector(options = {}) {
   if (!isRecord(options)) throw new TypeError("upload inspector options must be an object");
 
   const allowedOptions = new Set([
-    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "allowedMimeTypes", "onEvent"
+    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "allowedMimeTypes", "onEvent",
+    "securityBridge"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown upload inspector option: " + key);
@@ -381,8 +385,13 @@ export function createUploadInspector(options = {}) {
 
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
+  const securityBridge = options.securityBridge ?? null;
+  if (securityBridge !== null && (!isRecord(securityBridge) ||
+      typeof securityBridge.submitAssessment !== "function")) {
+    throw new TypeError("securityBridge must implement submitAssessment(input)");
+  }
 
-  async function inspect({ source, fileName, declaredMimeType } = {}) {
+  async function inspect({ source, fileName, declaredMimeType, correlationId } = {}) {
     if (!source || typeof source.pipe !== "function" || typeof source.on !== "function" ||
         source.readable === false || source.readableFlowing === true) {
       throw new UploadInspectionError("INVALID_INPUT");
@@ -390,6 +399,11 @@ export function createUploadInspector(options = {}) {
 
     const extension = getFileExtension(fileName);
     const declaredType = normalizeDeclaredMimeType(declaredMimeType);
+    if (securityBridge && (typeof correlationId !== "string" ||
+        correlationId.length < 8 || correlationId.length > 128 ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(correlationId))) {
+      throw new UploadInspectionError("INVALID_INPUT");
+    }
     const uploadId = randomUUID();
     let quarantineAttempted = false;
     let retainQuarantine = false;
@@ -493,15 +507,63 @@ export function createUploadInspector(options = {}) {
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
       }
       if (scanResult.verdict === "malicious") {
+        if (securityBridge) {
+          try {
+            await securityBridge.submitAssessment({
+              correlationId,
+              verdict: "block",
+              severity: "critical",
+              reasonCode: "JBG-MALWARE-001",
+              evidence: { sha256 }
+            });
+          } catch {
+            // Local malware rejection remains effective if telemetry is unavailable.
+          }
+        }
         throw new UploadInspectionError("MALWARE_DETECTED");
       }
       if (scanResult.verdict !== "clean") {
         retainQuarantine = true;
+        if (securityBridge) {
+          try {
+            await securityBridge.submitAssessment({
+              correlationId,
+              verdict: "quarantine",
+              severity: "high",
+              reasonCode: "JBG-SCAN-UNKNOWN",
+              evidence: { sha256 }
+            });
+          } catch {
+            // The object remains quarantined even when the bridge is unavailable.
+          }
+        }
         throw new UploadInspectionError("SCAN_NOT_CLEAN");
       }
       if (!validScannerLabel(scanResult.engine) || !validScannerLabel(scanResult.version)) {
         retainQuarantine = true;
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
+      }
+
+      if (securityBridge) {
+        let decision;
+        try {
+          decision = await securityBridge.submitAssessment({
+            correlationId,
+            verdict: "pass",
+            severity: "low",
+            reasonCode: "JBG-UPLOAD-SCAN-PASS",
+            evidence: { sha256 }
+          });
+        } catch {
+          retainQuarantine = true;
+          throw new UploadInspectionError("BRIDGE_UNAVAILABLE");
+        }
+        if (!decision || decision.action !== "allow" || decision.status !== "complete") {
+          retainQuarantine = true;
+          throw new UploadInspectionError(decision?.action === "block"
+            ? "BRIDGE_BLOCKED"
+            : "BRIDGE_REVIEW_REQUIRED");
+        }
       }
 
       const metadata = Object.freeze({

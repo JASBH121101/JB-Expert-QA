@@ -610,3 +610,5 @@ export function createSecurityGuard(options = {}) {
     })
   });
 }
+
+export { createSecurityBridgeClient, SecurityBridgeClientError } from "./security-bridge.js";
