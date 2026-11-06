@@ -62,6 +62,11 @@ export async function auditSecurityProject(rootPath, {
     dependencyAdvisoryScan: dependencyAdvisories
   });
 
+  const astParseSkips = report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length;
+  if (astParseSkips > 0) {
+    incompleteReasons.push(astParseSkips + " JavaScript file(s) could not be parsed for AST analysis");
+  }
+
   return Object.freeze({
     ...report,
     engine: "JB Expert QA — Security Auditor",
@@ -75,6 +80,13 @@ export async function auditSecurityProject(rootPath, {
       incompleteReasons: Object.freeze(incompleteReasons),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,
       onlineDependencyAdvisories: dependencyAdvisories.enabled,
+      astAnalysis: Object.freeze({
+        parser: "Acorn",
+        extensions: Object.freeze([".js", ".mjs", ".cjs"]),
+        parseSkips: astParseSkips,
+        dataFlow: "intra-file variable alias tracking",
+        interprocedural: false
+      }),
       databaseConnections: 0,
       projectCodeExecuted: false,
       credentialContentsRead: false,
@@ -86,7 +98,8 @@ export async function auditSecurityProject(rootPath, {
           ...(dependencyAdvisories.complete ? [] : ["Dependency advisory coverage is incomplete; inspect dependencyAdvisories before relying on the score."])
         ] : ["Online OSV.dev dependency lookup is disabled unless explicitly enabled."]),
         "A clean static report is not proof that the application is secure; deployment configuration and runtime controls require separate validation.",
-        "Multi-line data flow, framework middleware, and controls implemented in external services may not be fully visible to the analyzer."
+        "AST data-flow currently covers JavaScript .js, .mjs, and .cjs files and tracks simple same-file aliases; it does not yet model cross-file or interprocedural flows, TypeScript/JSX syntax, or sanitizer semantics.",
+        "Framework middleware and controls implemented in external services may not be fully visible to the analyzer."
       ])
     })
   });
