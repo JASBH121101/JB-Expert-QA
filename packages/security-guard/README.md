@@ -139,7 +139,7 @@ const approved = await uploads.inspect({
 
 The storage adapter must create a private quarantine write stream, return a read stream for scanning, atomically promote only after a clean verdict, and delete rejected temporary objects. The scanner must consume the entire quarantined stream and return an explicit verdict plus engine and version. Timeouts, outages, malformed results, unknown verdicts and promotion errors never result in approval; uncertain objects remain private in quarantine.
 
-The built-in signature allowlist is intentionally narrow: JPEG, PNG, GIF, WebP and PDF. SVG, HTML, XML, ZIP, executables and arbitrary MIME types are not accepted. application/octet-stream is treated only as an unspecified client hint; Guard still verifies the signature. The default per-file cap is 5 MiB and the scan timeout is 15 seconds.
+The built-in signature allowlist is intentionally narrow: JPEG, PNG, GIF, WebP and PDF. SVG, HTML, XML, ZIP, executables and arbitrary MIME types are not accepted. application/octet-stream is treated only as an unspecified client hint; Guard still verifies the signature. The default per-file cap is 5 MiB, the upload-ingestion timeout is 30 seconds (configurable up to 5 minutes), and the scan timeout is 15 seconds.
 
 A production integration still needs a real scanner, private storage adapter, bounded multipart parser, quarantine retention/cleanup policy, download authorization and operational alerts. See docs/FILE-UPLOAD-SECURITY.md for adapter contracts and acceptance criteria. The in-memory test fixtures are not production services.
 ## Account recovery: verified email and SMS
