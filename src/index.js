@@ -47,6 +47,7 @@ export {
   SECURITY_BRIDGE_PRODUCERS,
   SecurityBridgeError,
   createSecurityAssessment,
+  createExpertQAAssessment,
   validateSecurityAssessment,
   signSecurityAssessment,
   verifySecurityAssessmentEnvelope,
