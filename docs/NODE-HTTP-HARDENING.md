@@ -4,7 +4,7 @@
 
 ## Controls
 
-- Header parsing timeout, total request-receive timeout, keep-alive timeout and socket inactivity timeout.
+- Header parsing timeout, total request-receive timeout, keep-alive timeout and socket inactivity timeout. Guard explicitly destroys sockets when the inactivity timeout fires, including when the host application has registered its own server-level `timeout` listener.
 - Maximum requests per persistent socket and maximum header count.
 - Maximum request body bytes, enforced both from a valid `Content-Length` header and by counting actual streamed bytes. This includes chunked transfer-encoded requests.
 - Early rejection of oversized `Expect: 100-continue` requests before sending the continue response.

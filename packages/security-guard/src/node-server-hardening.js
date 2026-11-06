@@ -219,6 +219,12 @@ export function configureNodeHttpServer(server, options = {}) {
   server.requestTimeout = settings.requestTimeout;
   server.keepAliveTimeout = settings.keepAliveTimeout;
   server.timeout = settings.socketTimeout;
+  // A server-level timeout listener disables Node's implicit no-listener
+  // socket destruction behavior, so Guard must explicitly close timed-out
+  // idle sockets even when the host application later adds its own listener.
+  server.on("timeout", (socket) => {
+    if (socket && typeof socket.destroy === "function") socket.destroy();
+  });
   server.maxRequestsPerSocket = settings.maxRequestsPerSocket;
   server.maxHeadersCount = settings.maxHeadersCount;
 

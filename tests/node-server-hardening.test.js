@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, request as httpRequest } from "node:http";
+import { connect as netConnect } from "node:net";
 import { configureNodeHttpServer } from "@jb/security-guard";
 
 function listen(server) {
@@ -49,6 +50,37 @@ test("Node HTTP server receives conservative timeout and connection limits", () 
   assert.equal(server.maxHeadersCount, 100);
   assert.equal(server.listenerCount("checkContinue"), 1);
   server.close();
+});
+
+test("idle TCP sockets are destroyed at socketTimeout even when the app adds a timeout listener", async () => {
+  const server = createServer();
+  configureNodeHttpServer(server, {
+    headersTimeout: 500,
+    requestTimeout: 1_000,
+    socketTimeout: 150
+  });
+  // Any server timeout listener changes Node's default timeout handling;
+  // Guard's own listener must still ensure the socket is closed.
+  server.on("timeout", () => {});
+  await listen(server);
+
+  try {
+    const startedAt = Date.now();
+    await new Promise((resolve, reject) => {
+      const client = netConnect(server.address().port, "127.0.0.1");
+      client.setTimeout(2_000);
+      client.once("connect", () => {});
+      client.once("close", resolve);
+      client.once("error", reject);
+      client.once("timeout", () => {
+        client.destroy();
+        reject(new Error("Server did not close the idle socket before the client timeout"));
+      });
+    });
+    assert.ok(Date.now() - startedAt < 1_500, "server should close the inactive socket promptly");
+  } finally {
+    await close(server);
+  }
 });
 
 test("server hardening validates configuration and must run before listen", () => {
