@@ -257,17 +257,29 @@ export async function auditViewports(url, {
     throw new TypeError("At least one viewport is required");
   }
   const seen = new Set();
+  const seenSafeNames = new Set();
   const results = [];
   if (updateBaselines && !baselineDir) throw new TypeError("baselineDir is required when updating visual baselines");
   if (baselineDir && !screenshotDir) throw new TypeError("screenshotDir is required when comparing visual baselines");
   for (const viewport of viewports) {
-    if (!viewport.name || !Number.isFinite(viewport.width) ||
-        !Number.isFinite(viewport.height) || viewport.width <= 0 || viewport.height <= 0) {
-      throw new TypeError("Each viewport requires a name and positive numeric width and height");
+    if (!viewport || typeof viewport.name !== "string" || !viewport.name.trim() ||
+        viewport.name.length > 80 || /[\\u0000-\\u001f\\u007f]/.test(viewport.name) ||
+        !Number.isSafeInteger(viewport.width) || !Number.isSafeInteger(viewport.height) ||
+        viewport.width < 1 || viewport.height < 1 ||
+        viewport.width > 8192 || viewport.height > 8192 ||
+        viewport.width * viewport.height > 33_554_432) {
+      throw new TypeError("Each viewport requires a safe name and integer dimensions within the 32-megapixel budget");
     }
-    if (seen.has(viewport.name)) throw new Error("Duplicate viewport name: " + viewport.name);
-    seen.add(viewport.name);
-    const safeName = viewport.name.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+    const normalizedName = viewport.name.trim().toLowerCase();
+    if (seen.has(normalizedName)) throw new Error("Duplicate viewport name: " + viewport.name);
+    seen.add(normalizedName);
+    const safeName = viewport.name.trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+    const normalizedSafeName = safeName.toLowerCase();
+    if (!safeName) throw new TypeError("Viewport name must contain at least one safe filename character");
+    if (seenSafeNames.has(normalizedSafeName)) {
+      throw new Error("Viewport names collide after filename normalization: " + viewport.name);
+    }
+    seenSafeNames.add(normalizedSafeName);
     const screenshotPath = screenshotDir ? join(screenshotDir, safeName + ".png") : null;
     const report = await auditUrl(url, {
       ...options,
