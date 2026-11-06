@@ -65,6 +65,7 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js
+          node --check src/specialists/ast-security-rules.js
           node --check src/adapters/filesystem/audit-security-project.js
           node --check src/security-cli.js
           node --check src/specialists/runtime-security-rules.js
