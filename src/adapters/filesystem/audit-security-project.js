@@ -8,6 +8,7 @@ import { scanProject } from "./scan-project.js";
 import { codeQualityRules, securityRules, dependencyRules } from "../../specialists/project-rules.js";
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { securityDefenseRules } from "../../specialists/security-rules.js";
+import { astSecurityRules } from "../../specialists/ast-security-rules.js";
 
 export async function auditSecurityProject(rootPath, {
   config = securityConfig,
@@ -47,6 +48,7 @@ export async function auditSecurityProject(rootPath, {
   registry.register(codeQualityRules[0]);
   for (const rule of securityRules) registry.register(rule);
   for (const rule of securityDefenseRules) registry.register(rule);
+  for (const rule of astSecurityRules) registry.register(rule);
   for (const rule of dependencyRules) registry.register(rule);
 
   const report = await new ExpertQAEngine({
