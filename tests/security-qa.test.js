@@ -330,7 +330,8 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
       "exec(command);",
       "const statement = req.body.statement;",
       "database.query(statement);",
-      "element.insertAdjacentHTML('beforeend', html);"
+      "element.insertAdjacentHTML('beforeend', html);",
+      "element.innerHTML = req.body.rawHtml;"
     ].join("\\n"));
 
     const report = await auditSecurityProject(root);
@@ -339,7 +340,7 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
 
     assert.ok(ids.some((id) => id.startsWith("AST-SSRF-")));
     assert.ok(ids.some((id) => id.startsWith("AST-REDIRECT-")));
-    assert.ok(ids.filter((id) => id.startsWith("AST-DOM-XSS-")).length >= 2);
+    assert.ok(ids.filter((id) => id.startsWith("AST-DOM-XSS-")).length >= 3);
     assert.ok(ids.some((id) => id.startsWith("AST-COMMAND-")));
     assert.ok(ids.some((id) => id.startsWith("AST-SQL-")));
     assert.ok(findings.every((item) => item.metadata.analysis === "intra-file variable alias tracking"));
