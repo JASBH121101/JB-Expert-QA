@@ -183,15 +183,15 @@ function analyzeFile(file) {
           "high",
           { sink: name }
         ));
-      } else if (firstTainted && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request)$/.test(name)) {
+      } else if (firstTainted && !isRequestSource(first) && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request)$/.test(name)) {
         add(makeFinding(
           file, node, "SSRF", "Request-controlled data reaches an outbound HTTP client",
-          "A value originating from request query, body, route, header, or cookie data is assigned to a variable and later reaches an outbound HTTP request. This may permit server-side request forgery.",
+          "A value originating from request query, body, route, header, or cookie data reaches an outbound HTTP request through a direct expression or variable alias. This may permit server-side request forgery.",
           "Validate destinations against a strict hostname allowlist, resolve and reject private/link-local IP ranges, re-check every redirect, and constrain protocols and ports.",
           "critical",
           { sink: name, taintedVariables: [...tainted].slice(0, 12) }
         ));
-      } else if (firstTainted && (/^(?:res|response|reply)\.redirect$/.test(name) || name === "redirect")) {
+      } else if (firstTainted && !isRequestSource(first) && (/^(?:res|response|reply)\.redirect$/.test(name) || name === "redirect")) {
         add(makeFinding(
           file, node, "REDIRECT", "Request-controlled data reaches a redirect sink",
           "A value derived from request input flows through a variable into a redirect destination, which may enable an open redirect.",
