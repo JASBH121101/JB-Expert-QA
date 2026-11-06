@@ -41,3 +41,15 @@ export { reviewScreenshot, reviewViewportScreenshots, validateVisualReview } fro
 export { createRemediationPlan, validateRemediationPlan } from "./ai/remediation-plan.js";
 export { runAutopilot } from "./agent/autopilot.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
+export {
+  SECURITY_BRIDGE_PROTOCOL,
+  SECURITY_BRIDGE_DECISION_SCHEMA,
+  SECURITY_BRIDGE_PRODUCERS,
+  SecurityBridgeError,
+  createSecurityAssessment,
+  validateSecurityAssessment,
+  signSecurityAssessment,
+  verifySecurityAssessmentEnvelope,
+  createSecurityBridgeCoordinator,
+  createSecurityBridgeServer
+} from "./security-bridge/index.js";
