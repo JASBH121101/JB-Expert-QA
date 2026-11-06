@@ -68,3 +68,34 @@ test("multi-viewport audit identifies a defect only at mobile width", { timeout:
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("rejects viewport names that collide after screenshot filename normalization", async () => {
+  await assert.rejects(
+    auditViewports("http://127.0.0.1/", {
+      viewports: [
+        { name: "mobile/tablet", width: 390, height: 844 },
+        { name: "mobile:tablet", width: 768, height: 1024 }
+      ],
+      allowPrivateNetworks: true
+    }),
+    /collide after filename normalization/
+  );
+});
+
+test("rejects unsafe viewport dimensions and names before launching a browser", async () => {
+  await assert.rejects(
+    auditViewports("http://127.0.0.1/", {
+      viewports: [{ name: "!!!", width: 390, height: 844 }],
+      allowPrivateNetworks: true
+    }),
+    /safe filename/
+  );
+  await assert.rejects(
+    auditViewports("http://127.0.0.1/", {
+      viewports: [{ name: "oversized", width: 8192, height: 8192 }],
+      allowPrivateNetworks: true
+    }),
+    /32-megapixel budget/
+  );
+});
