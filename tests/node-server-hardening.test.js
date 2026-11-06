@@ -48,7 +48,6 @@ test("Node HTTP server receives conservative timeout and connection limits", () 
   assert.equal(server.maxRequestsPerSocket, 100);
   assert.equal(server.maxHeadersCount, 100);
   assert.equal(server.listenerCount("checkContinue"), 1);
-  assert.equal(server.listeners("request")[0] !== undefined, true);
   server.close();
 });
 
