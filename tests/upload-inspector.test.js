@@ -448,3 +448,32 @@ test("a quarantine writer that resolves after timeout is destroyed and cleaned u
   assert.equal(store.approved.size, 0);
   assert.ok(store.calls.filter(([name]) => name === "delete").length >= 2);
 });
+
+
+test("a quarantine read stream that resolves after timeout is destroyed", async () => {
+  const store = createMemoryStore();
+  let uploadId;
+  let resolveLateStream;
+  const lateStreamPromise = new Promise((resolve) => { resolveLateStream = resolve; });
+  store.createReadStream = async (input) => {
+    uploadId = input.uploadId;
+    return lateStreamPromise;
+  };
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { ingestTimeoutMs: 50 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "late-read-stream.png"
+    }),
+    (error) => error.code === "STORAGE_TIMEOUT"
+  );
+
+  const lateStream = Readable.from([store.quarantine.get(uploadId)]);
+  resolveLateStream(lateStream);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(lateStream.destroyed, true);
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.has(uploadId), true);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
