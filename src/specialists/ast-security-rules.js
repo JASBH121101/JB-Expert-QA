@@ -1,6 +1,7 @@
 import { parse } from "acorn";
 
 const JS_EXTENSIONS = new Set([".js", ".mjs", ".cjs"]);
+const UNSUPPORTED_CODE_EXTENSIONS = new Set([".jsx", ".ts", ".tsx", ".vue", ".svelte"]);
 
 function slug(value) {
   return String(value).replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
@@ -52,40 +53,47 @@ function walk(node, visit) {
   }
 }
 
-function expressionIsTainted(node, tainted) {
+function expressionIsTainted(node, tainted, taintedMembers = new Set()) {
   if (!node || typeof node !== "object") return false;
   if (isRequestSource(node)) return true;
   switch (node.type) {
     case "Identifier":
       return tainted.has(node.name);
-    case "MemberExpression":
-      return expressionIsTainted(node.object, tainted);
+    case "MemberExpression": {
+      const parts = memberPath(node);
+      if (parts) {
+        for (let index = 1; index <= parts.length; index += 1) {
+          if (taintedMembers.has(parts.slice(0, index).join("."))) return true;
+        }
+      }
+      return expressionIsTainted(node.object, tainted, taintedMembers);
+    }
     case "TemplateLiteral":
-      return node.expressions.some((item) => expressionIsTainted(item, tainted));
+      return node.expressions.some((item) => expressionIsTainted(item, tainted, taintedMembers));
     case "BinaryExpression":
     case "LogicalExpression":
-      return expressionIsTainted(node.left, tainted) || expressionIsTainted(node.right, tainted);
+      return expressionIsTainted(node.left, tainted, taintedMembers) || expressionIsTainted(node.right, tainted, taintedMembers);
     case "ConditionalExpression":
-      return expressionIsTainted(node.test, tainted) ||
-        expressionIsTainted(node.consequent, tainted) ||
-        expressionIsTainted(node.alternate, tainted);
+      return expressionIsTainted(node.test, tainted, taintedMembers) ||
+        expressionIsTainted(node.consequent, tainted, taintedMembers) ||
+        expressionIsTainted(node.alternate, tainted, taintedMembers);
     case "AssignmentExpression":
-      return expressionIsTainted(node.right, tainted);
+      return expressionIsTainted(node.right, tainted, taintedMembers);
     case "SequenceExpression":
-      return node.expressions.some((item) => expressionIsTainted(item, tainted));
+      return node.expressions.some((item) => expressionIsTainted(item, tainted, taintedMembers));
     case "ArrayExpression":
-      return node.elements.some((item) => expressionIsTainted(item, tainted));
+      return node.elements.some((item) => expressionIsTainted(item, tainted, taintedMembers));
     case "ObjectExpression":
-      return node.properties.some((item) => expressionIsTainted(item.value, tainted));
+      return node.properties.some((item) => expressionIsTainted(item.value, tainted, taintedMembers));
     case "CallExpression":
     case "NewExpression":
-      return node.arguments.some((item) => expressionIsTainted(item, tainted));
+      return node.arguments.some((item) => expressionIsTainted(item, tainted, taintedMembers));
     case "AwaitExpression":
     case "UnaryExpression":
     case "UpdateExpression":
-      return expressionIsTainted(node.argument, tainted);
+      return expressionIsTainted(node.argument, tainted, taintedMembers);
     case "ChainExpression":
-      return expressionIsTainted(node.expression, tainted);
+      return expressionIsTainted(node.expression, tainted, taintedMembers);
     default:
       return false;
   }
@@ -96,6 +104,20 @@ function callName(node) {
   if (node.type === "Identifier") return node.name;
   if (node.type === "MemberExpression") return memberPath(node)?.join(".") ?? "";
   return "";
+}
+
+function patternIdentifiers(pattern) {
+  if (!pattern || typeof pattern !== "object") return [];
+  if (pattern.type === "Identifier") return [pattern.name];
+  if (pattern.type === "RestElement") return patternIdentifiers(pattern.argument);
+  if (pattern.type === "AssignmentPattern") return patternIdentifiers(pattern.left);
+  if (pattern.type === "ArrayPattern") return pattern.elements.flatMap(patternIdentifiers);
+  if (pattern.type === "ObjectPattern") {
+    return pattern.properties.flatMap((property) =>
+      property.type === "RestElement" ? patternIdentifiers(property.argument) : patternIdentifiers(property.value)
+    );
+  }
+  return [];
 }
 
 function makeFinding(file, node, kind, title, description, recommendation, severity = "high", metadata = {}) {
@@ -142,20 +164,43 @@ function analyzeFile(file) {
   }
 
   const tainted = new Set();
-  for (let pass = 0; pass < 8; pass += 1) {
+  const taintedMembers = new Set();
+  let declarationCount = 0;
+  walk(ast, (node) => {
+    if (node.type === "VariableDeclarator" || node.type === "AssignmentExpression") declarationCount += 1;
+  });
+  const maxPasses = Math.min(128, Math.max(8, declarationCount + 1));
+  let taintStillChanging = false;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
     let changed = false;
     walk(ast, (node) => {
-      if (node.type === "VariableDeclarator" && node.id?.type === "Identifier" &&
-          expressionIsTainted(node.init, tainted) && !tainted.has(node.id.name)) {
-        tainted.add(node.id.name);
-        changed = true;
+      if (node.type === "VariableDeclarator" &&
+          expressionIsTainted(node.init, tainted, taintedMembers)) {
+        for (const name of patternIdentifiers(node.id)) {
+          if (!tainted.has(name)) {
+            tainted.add(name);
+            changed = true;
+          }
+        }
       }
-      if (node.type === "AssignmentExpression" && node.left?.type === "Identifier" &&
-          expressionIsTainted(node.right, tainted) && !tainted.has(node.left.name)) {
-        tainted.add(node.left.name);
-        changed = true;
+      if (node.type === "AssignmentExpression" &&
+          expressionIsTainted(node.right, tainted, taintedMembers)) {
+        if (node.left?.type === "Identifier" && !tainted.has(node.left.name)) {
+          tainted.add(node.left.name);
+          changed = true;
+        } else if (node.left?.type === "MemberExpression") {
+          const parts = memberPath(node.left);
+          if (parts) {
+            const key = parts.join(".");
+            if (!taintedMembers.has(key)) {
+              taintedMembers.add(key);
+              changed = true;
+            }
+          }
+        }
       }
     });
+    taintStillChanging = changed;
     if (!changed) break;
   }
 
@@ -171,9 +216,10 @@ function analyzeFile(file) {
     if (node.type === "CallExpression" || node.type === "NewExpression") {
       const name = callName(node.callee);
       const first = node.arguments?.[0];
-      const firstTainted = expressionIsTainted(first, tainted);
+      const firstTainted = expressionIsTainted(first, tainted, taintedMembers);
       const second = node.arguments?.[1];
-      const secondTainted = expressionIsTainted(second, tainted);
+      const secondTainted = expressionIsTainted(second, tainted, taintedMembers);
+      const anyArgumentTainted = node.arguments.some((argument) => expressionIsTainted(argument, tainted, taintedMembers));
 
       if (name.endsWith(".insertAdjacentHTML") && secondTainted) {
         add(makeFinding(
@@ -199,7 +245,7 @@ function analyzeFile(file) {
           "high",
           { sink: name, taintedVariables: [...tainted].slice(0, 12) }
         ));
-      } else if (firstTainted && /^(?:eval|Function)$/.test(name)) {
+      } else if (anyArgumentTainted && /^(?:eval|Function)$/.test(name)) {
         add(makeFinding(
           file, node, "CODE", "Request-controlled data reaches dynamic code execution",
           "A value derived from request input reaches eval or the Function constructor. This can enable arbitrary code execution.",
@@ -207,7 +253,7 @@ function analyzeFile(file) {
           "critical",
           { sink: name }
         ));
-      } else if (firstTainted && /^(?:exec|execSync|spawn|spawnSync)$/.test(name)) {
+      } else if (anyArgumentTainted && /^(?:exec|execSync|spawn|spawnSync)$/.test(name)) {
         add(makeFinding(
           file, node, "COMMAND", "Request-controlled data reaches a process execution sink",
           "A value derived from request input reaches a process execution API. Shell interpretation can turn this into command injection.",
@@ -229,7 +275,7 @@ function analyzeFile(file) {
     if (node.type === "AssignmentExpression" && node.left?.type === "MemberExpression") {
       const property = propertyName(node.left);
       if (["innerHTML", "outerHTML"].includes(property) &&
-          expressionIsTainted(node.right, tainted)) {
+          expressionIsTainted(node.right, tainted, taintedMembers)) {
         add(makeFinding(
           file, node, "DOM-XSS", "Request-controlled data is assigned to an HTML DOM sink",
           "A request-derived value flows through a variable into innerHTML or outerHTML, where it is interpreted as markup.",
@@ -241,6 +287,19 @@ function analyzeFile(file) {
     }
   });
 
+  if (taintStillChanging) {
+    add(makeFinding(
+      file,
+      { loc: { start: { line: 1 } } },
+      "TAINT-LIMIT",
+      "AST data-flow propagation reached its safety limit",
+      "The analyzer stopped alias propagation at its configured pass limit. This file may contain additional tainted flows that were not resolved.",
+      "Split complex data flows into clearer local assignments or extend the analyzer's bounded propagation strategy; do not treat this file as fully covered.",
+      "low",
+      { maxPasses, taintedIdentifierCount: tainted.size, taintedMemberCount: taintedMembers.size }
+    ));
+  }
+
   return findings;
 }
 
@@ -250,8 +309,20 @@ export const astSecurityRules = Object.freeze([{
   evaluate(context) {
     const findings = [];
     for (const file of context.projectFiles ?? []) {
-      if (!JS_EXTENSIONS.has(file.extension)) continue;
-      findings.push(...analyzeFile(file));
+      if (JS_EXTENSIONS.has(file.extension)) {
+        findings.push(...analyzeFile(file));
+      } else if (UNSUPPORTED_CODE_EXTENSIONS.has(file.extension)) {
+        findings.push(makeFinding(
+          file,
+          { loc: { start: { line: 1 } } },
+          "UNSUPPORTED",
+          "AST data-flow analysis does not support this source language",
+          "This code file was included in the project scan but is not parsed by the JavaScript AST analyzer.",
+          "Add a language-specific parser and data-flow rules before treating this file as covered by AST security analysis.",
+          "low",
+          { extension: file.extension, parserCoverage: false }
+        ));
+      }
     }
     return findings;
   }
