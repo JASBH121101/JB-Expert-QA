@@ -322,17 +322,24 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
       "const target = req.query.url;",
       "const redirectTarget = target;",
       "fetch(redirectTarget);",
+      "const { apiEndpoint } = req.query;",
+      "fetch(apiEndpoint);",
+      "const mutable = {};",
+      "mutable.endpoint = req.body.endpoint;",
+      "fetch(mutable.endpoint);",
       "const next = req.body.next;",
       "res.redirect(next);",
       "const html = req.body.html;",
       "document.querySelector('#preview').innerHTML = html;",
       "const command = req.query.command;",
       "exec(command);",
+      "spawn('node', [command]);",
+      "new Function(command);",
       "const statement = req.body.statement;",
       "database.query(statement);",
       "element.insertAdjacentHTML('beforeend', html);",
       "element.innerHTML = req.body.rawHtml;"
-    ].join("\\n"));
+    ].join("\n"));
 
     const report = await auditSecurityProject(root);
     const findings = report.diagnostics.filter((item) => item.id.startsWith("AST-"));
@@ -341,7 +348,8 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
     assert.ok(ids.some((id) => id.startsWith("AST-SSRF-")));
     assert.ok(ids.some((id) => id.startsWith("AST-REDIRECT-")));
     assert.ok(ids.filter((id) => id.startsWith("AST-DOM-XSS-")).length >= 3);
-    assert.ok(ids.some((id) => id.startsWith("AST-COMMAND-")));
+    assert.ok(ids.filter((id) => id.startsWith("AST-COMMAND-")).length >= 2);
+    assert.ok(ids.some((id) => id.startsWith("AST-CODE-")));
     assert.ok(ids.some((id) => id.startsWith("AST-SQL-")));
     assert.ok(findings.every((item) => item.metadata.analysis === "intra-file variable alias tracking"));
   });
@@ -354,7 +362,7 @@ test("AST data-flow analysis does not flag trusted constants as request-tainted"
       "fetch(target);",
       "const label = req.body.label;",
       "document.querySelector('#label').textContent = label;"
-    ].join("\\n"));
+    ].join("\n"));
 
     const report = await auditSecurityProject(root);
     assert.equal(report.diagnostics.some((item) => item.id.startsWith("AST-")), false);
@@ -370,5 +378,32 @@ test("AST parser gaps are reported as incomplete analysis instead of silently pa
     assert.equal(report.securityAssessment.astAnalysis.parseSkips, 1);
     assert.ok(report.securityAssessment.incompleteReasons.some((reason) => reason.includes("AST analysis")));
     assert.ok(report.diagnostics.some((item) => item.id.startsWith("AST-PARSE-")));
+  });
+});
+
+
+test("unsupported TypeScript and JSX files are recorded as uncovered AST input", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "endpoint.ts"), "const target: string = req.query.url;");
+    await writeFile(join(root, "src", "widget.jsx"), "const target = req.query.url;");
+    const report = await auditSecurityProject(root);
+    assert.equal(report.securityAssessment.complete, false);
+    assert.equal(report.securityAssessment.astAnalysis.unsupportedFiles, 2);
+    assert.ok(report.securityAssessment.incompleteReasons.some((reason) => reason.includes("not yet supported")));
+    assert.equal(report.diagnostics.filter((item) => item.id.startsWith("AST-UNSUPPORTED-")).length, 2);
+  });
+});
+
+test("AST data-flow follows more than eight aliases and member assignments", async () => {
+  await withProject(async (root) => {
+    const lines = ["const source = req.query.target;"];
+    for (let index = 0; index < 16; index += 1) {
+      lines.push("const alias" + index + " = " + (index === 0 ? "source" : "alias" + (index - 1)) + ";");
+    }
+    lines.push("fetch(alias15);");
+    await writeFile(join(root, "src", "long-alias.js"), lines.join("\n"));
+    const report = await auditSecurityProject(root);
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("AST-SSRF-")));
+    assert.equal(report.securityAssessment.astAnalysis.propagationLimitFiles, 0);
   });
 });
