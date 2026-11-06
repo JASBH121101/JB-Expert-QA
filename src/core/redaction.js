@@ -21,7 +21,11 @@ export function redactUrlForReport(input) {
   if (typeof input !== "string" || !input) return input ?? "";
   let parsed;
   try { parsed = new URL(input); }
-  catch { return input.length > 2048 ? input.slice(0, 2048) + "…" : input; }
+  catch {
+    // Never echo an unparseable URL that may contain credentials or secret query values.
+    return /^[a-z][a-z0-9+.-]*:/i.test(input) ? "[UNPARSEABLE_URL]" :
+      (input.length > 2048 ? input.slice(0, 2048) + "…" : input);
+  }
 
   if (["data:", "blob:", "javascript:"].includes(parsed.protocol)) return parsed.protocol + "[omitted]";
   if (parsed.username) parsed.username = "[REDACTED]";
@@ -41,7 +45,7 @@ export function redactUrlForReport(input) {
 
 export function redactUrlsInText(value) {
   return String(value ?? "").replace(
-    /\bhttps?:\/\/[^\s"'<>]+/gi,
+    /\b(?:https?|wss?):\/\/[^\s"'<>]+/gi,
     (url) => redactUrlForReport(url)
   );
 }
