@@ -201,3 +201,22 @@ test("Expert QA report assessment rejects malformed report data", () => {
     report: { diagnostics: "none", scoring: { passed: true } }
   }), (error) => error.code === "INVALID_EXPERT_QA_REPORT");
 });
+
+
+test("an identical Security Bridge event replay is idempotent and conflicting event-ID reuse is rejected", () => {
+  const coordinator = createSecurityBridgeCoordinator();
+  const item = assessment("jb-security-guard", "asset-82345678");
+  const first = coordinator.submit(item);
+  const replay = coordinator.submit(item);
+
+  assert.deepEqual(replay, first);
+  assert.equal(coordinator.getStats().seenEvents, 1);
+
+  assert.throws(() => coordinator.submit({
+    ...item,
+    verdict: "block",
+    severity: "critical",
+    reasonCode: "JBG-MALWARE-001"
+  }), (error) => error.code === "EVENT_ID_CONFLICT");
+  assert.equal(coordinator.getStats().seenEvents, 1);
+});
