@@ -359,3 +359,15 @@ test("AST data-flow analysis does not flag trusted constants as request-tainted"
     assert.equal(report.diagnostics.some((item) => item.id.startsWith("AST-")), false);
   });
 });
+
+
+test("AST parser gaps are reported as incomplete analysis instead of silently passing", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "unsupported.js"), "const = invalid javascript;");
+    const report = await auditSecurityProject(root);
+    assert.equal(report.securityAssessment.complete, false);
+    assert.equal(report.securityAssessment.astAnalysis.parseSkips, 1);
+    assert.ok(report.securityAssessment.incompleteReasons.some((reason) => reason.includes("AST analysis")));
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("AST-PARSE-")));
+  });
+});
