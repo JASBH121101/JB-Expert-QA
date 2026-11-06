@@ -419,3 +419,32 @@ test("quarantine read-stream initialization is bounded and the upload remains qu
   assert.equal(store.quarantine.size, 1);
   assert.equal(store.calls.some(([name]) => name === "promote"), false);
 });
+
+
+test("a quarantine writer that resolves after timeout is destroyed and cleaned up", async () => {
+  const store = createMemoryStore();
+  const createWriter = store.createWriteStream.bind(store);
+  let uploadId;
+  let resolveLateWriter;
+  const lateWriterPromise = new Promise((resolve) => { resolveLateWriter = resolve; });
+  store.createWriteStream = async (input) => {
+    uploadId = input.uploadId;
+    return lateWriterPromise;
+  };
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { ingestTimeoutMs: 50 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "late-writer.png"
+    }),
+    (error) => error.code === "STORAGE_TIMEOUT"
+  );
+
+  const lateWriter = await createWriter({ uploadId });
+  resolveLateWriter(lateWriter);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(lateWriter.destroyed, true);
+  assert.equal(store.approved.size, 0);
+  assert.ok(store.calls.filter(([name]) => name === "delete").length >= 2);
+});
