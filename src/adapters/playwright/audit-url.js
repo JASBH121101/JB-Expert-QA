@@ -222,6 +222,10 @@ export async function auditUrl(url, {
         httpErrors: runtimeIssues.httpErrors.length,
         blockedRequests: runtimeIssues.blockedRequests.length,
         sameOriginOnly,
+        networkDnsPolicy: Object.freeze({
+          dnsRevalidatedBeforeEachHttpRequest: true,
+          browserConnectionDnsPinned: false
+        }),
         interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
         interactionStatesChecked: context.interactionExploration?.statesCaptured ?? 0,
         interactionCandidates: context.interactionExploration?.candidatesDiscovered ?? 0,
