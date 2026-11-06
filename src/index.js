@@ -50,6 +50,8 @@ export {
   validateSecurityAssessment,
   signSecurityAssessment,
   verifySecurityAssessmentEnvelope,
+  signSecurityBridgeDecision,
+  verifySecurityBridgeDecisionResponse,
   createSecurityBridgeCoordinator,
   createSecurityBridgeServer
 } from "./security-bridge/index.js";

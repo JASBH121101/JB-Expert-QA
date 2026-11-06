@@ -148,6 +148,68 @@ export function verifySecurityAssessmentEnvelope(envelope, secret, {
   return assessment;
 }
 
+export function signSecurityBridgeDecision(decision, secret, sentAt = new Date().toISOString()) {
+  validateSecret(secret);
+  if (!isRecord(decision) ||
+      decision.schema !== SECURITY_BRIDGE_DECISION_SCHEMA ||
+      !validIdentifier(decision.correlationId) ||
+      !["allow", "block", "quarantine", "review"].includes(decision.action) ||
+      !["complete", "pending"].includes(decision.status) ||
+      !Array.isArray(decision.missingProducers) ||
+      !Array.isArray(decision.assessments) ||
+      !validTimestamp(sentAt)) {
+    throw new SecurityBridgeError("INVALID_DECISION");
+  }
+  const signature = createHmac("sha256", secret)
+    .update(Buffer.from(JSON.stringify({ decision, sentAt }), "utf8"))
+    .digest("hex");
+  return Object.freeze({ decision, sentAt, signature });
+}
+
+export function verifySecurityBridgeDecisionResponse(envelope, secret, {
+  now = Date.now(),
+  maxClockSkewMs = 60_000
+} = {}) {
+  validateSecret(secret);
+  exactKeys(envelope, ["decision", "sentAt", "signature"], "decision_envelope");
+  const { decision, sentAt, signature } = envelope;
+  if (!isRecord(decision) ||
+      decision.schema !== SECURITY_BRIDGE_DECISION_SCHEMA ||
+      !validIdentifier(decision.correlationId) ||
+      !["allow", "block", "quarantine", "review"].includes(decision.action) ||
+      !["complete", "pending"].includes(decision.status) ||
+      !Array.isArray(decision.requiredProducers) ||
+      !Array.isArray(decision.missingProducers) ||
+      !Array.isArray(decision.assessments) ||
+      !validTimestamp(sentAt) ||
+      typeof signature !== "string" ||
+      !/^[a-f0-9]{64}$/.test(signature)) {
+    throw new SecurityBridgeError("INVALID_DECISION");
+  }
+  if (!Number.isSafeInteger(now) || !Number.isSafeInteger(maxClockSkewMs) || maxClockSkewMs < 0 ||
+      Math.abs(now - Date.parse(sentAt)) > maxClockSkewMs) {
+    throw new SecurityBridgeError("EXPIRED_DECISION");
+  }
+  const expected = createHmac("sha256", secret)
+    .update(Buffer.from(JSON.stringify({ decision, sentAt }), "utf8"))
+    .digest();
+  const supplied = Buffer.from(signature, "hex");
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+    throw new SecurityBridgeError("INVALID_DECISION_SIGNATURE");
+  }
+  if (decision.action === "allow") {
+    const passed = new Set(decision.assessments
+      .filter((item) => item && item.verdict === "pass" && item.severity !== "high" && item.severity !== "critical")
+      .map((item) => item.producer));
+    if (decision.status !== "complete" ||
+        decision.missingProducers.length !== 0 ||
+        SECURITY_BRIDGE_PRODUCERS.some((producer) => !passed.has(producer))) {
+      throw new SecurityBridgeError("INVALID_ALLOW_DECISION");
+    }
+  }
+  return decision;
+}
+
 function safeNotify(callback, value) {
   try {
     const result = callback(value);
@@ -402,7 +464,7 @@ export function createSecurityBridgeServer(options = {}) {
         maxClockSkewMs
       });
       const decision = options.coordinator.submit(assessment);
-      sendJson(response, 200, { decision });
+      sendJson(response, 200, signSecurityBridgeDecision(decision, secret));
     } catch (error) {
       const code = error instanceof SecurityBridgeError ? error.code : "INTERNAL_ERROR";
       const status = code === "INVALID_SIGNATURE" || code === "EXPIRED_ENVELOPE" ? 401
