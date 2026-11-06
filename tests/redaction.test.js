@@ -26,3 +26,19 @@ test("URL text redaction handles inline URLs and non-network resources", () => {
   assert.equal(redactUrlForReport("data:text/plain,private-content"), "data:[omitted]");
   assert.equal(redactUrlForReport("blob:https://example.com/1234"), "blob:[omitted]");
 });
+
+
+test("redacts WebSocket credentials and secret query values in URL text", () => {
+  const result = redactUrlsInText(
+    "Socket failed: wss://operator:password@example.com/socket?auth_token=socket-secret"
+  );
+  assert.equal(result.includes("password"), false);
+  assert.equal(result.includes("socket-secret"), false);
+  assert.match(result, /wss:\/\/\[REDACTED\]:\[REDACTED\]@example\.com/);
+});
+
+test("omits malformed absolute URLs rather than echoing possible secrets", () => {
+  const result = redactUrlForReport("https://example.com:bad/?access_token=malformed-secret");
+  assert.equal(result, "[UNPARSEABLE_URL]");
+  assert.equal(result.includes("malformed-secret"), false);
+});
