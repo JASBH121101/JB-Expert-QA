@@ -53,7 +53,7 @@ test("redacts unquoted environment and YAML secrets before AI source review", ()
     "Authorization: Bearer bearer-secret-value",
     "const token = 'quoted-token-secret';",
     "const ordinary = 'keep this non-secret value';"
-  ].join("\\n");
+  ].join("\n");
 
   const result = redactSourceForAI(source);
   for (const secret of [
