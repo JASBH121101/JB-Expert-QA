@@ -383,3 +383,39 @@ test("upload events never include original filenames or storage/scanner errors",
   assert.equal(events.some((event) => JSON.stringify(event).includes("secret scanner endpoint")), false);
   assert.equal(events.at(-1).action, "quarantined");
 });
+
+
+test("storage writer initialization is bounded and fails closed when the adapter never responds", async () => {
+  const store = createMemoryStore();
+  store.createWriteStream = () => new Promise(() => {});
+  const source = Readable.from([PNG]);
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { ingestTimeoutMs: 50 }).inspect({
+      source,
+      fileName: "storage-timeout.png"
+    }),
+    (error) => error.code === "STORAGE_TIMEOUT"
+  );
+
+  assert.equal(source.destroyed, true);
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.calls.some(([name]) => name === "delete"), true);
+});
+
+test("quarantine read-stream initialization is bounded and the upload remains quarantined", async () => {
+  const store = createMemoryStore();
+  store.createReadStream = () => new Promise(() => {});
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { ingestTimeoutMs: 50 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "read-timeout.png"
+    }),
+    (error) => error.code === "STORAGE_TIMEOUT"
+  );
+
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
