@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
-import { ExpertQAEngine, RuleRegistry } from "../src/index.js";
+import { ExpertQAEngine } from "../src/core/engine.js";
+import { RuleRegistry } from "../src/core/rule-registry.js";
 
 const MiB = 1024 * 1024;
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS ?? 12);
