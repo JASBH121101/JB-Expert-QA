@@ -26,17 +26,6 @@ function parseSetCookie(value) {
   };
 }
 
-const MAX_REDIRECT_HOPS = 10;
-
-function countRedirectHops(request) {
-  let count = 0;
-  for (let previous = request.redirectedFrom(); previous; previous = previous.redirectedFrom()) {
-    count += 1;
-    if (count > MAX_REDIRECT_HOPS) break;
-  }
-  return count;
-}
-
 function normalizeHeaders(entries) {
   const result = {};
   for (const entry of entries) {
@@ -74,9 +63,6 @@ export async function auditSecurityUrl(url, {
       const request = route.request();
       const requestUrl = request.url();
       try {
-        if (countRedirectHops(request) > MAX_REDIRECT_HOPS) {
-          throw new TypeError(`HTTP redirect chain exceeded the ${MAX_REDIRECT_HOPS}-hop safety limit`);
-        }
         const protocol = new URL(requestUrl).protocol;
         if (protocol === "http:" || protocol === "https:") {
           await assertSafeUrl(requestUrl);
@@ -163,7 +149,8 @@ export async function auditSecurityUrl(url, {
         requestsMadeByAuditor: true,
         networkDnsPolicy: Object.freeze({
           dnsRevalidatedBeforeEachHttpRequest: true,
-          browserConnectionDnsPinned: false
+          browserConnectionDnsPinned: false,
+          redirectHopsFullyInspected: false
         }),
         exploitPayloadsSent: false,
         authenticatedSessionUsed: false,
@@ -176,6 +163,7 @@ export async function auditSecurityUrl(url, {
           "It does not authenticate, submit forms, crawl linked pages, or test role-based access controls.",
           "Browser and CDN behavior can vary by region, user agent, and cache state; findings should be confirmed against the deployed response configuration.",
           "DNS answers are revalidated before requests, but Chromium performs its own connection-time resolution; this adapter does not pin the browser connection to the validated IP and cannot claim complete DNS-rebinding/TOCTOU prevention.",
+          "Playwright routes a request and its redirect chain as one unit; this adapter cannot validate every intermediate redirect hop with route.continue(). Use a dedicated egress proxy for redirect-hop isolation.",
           "It observes only response headers and cookies visible to the browser for the main document, not every API endpoint or subresource response."
         ])
       })

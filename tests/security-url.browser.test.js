@@ -43,21 +43,15 @@ test("runtime URL auditor can inspect a controlled local HTTP fixture without ex
 });
 
 
-test("runtime URL auditor caps redirect chains before following excessive hops", async () => {
+test("runtime URL auditor follows redirects and reports the redirect-inspection limitation", async () => {
   const server = createServer((request, response) => {
     if (request.url === "/") {
-      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      response.end("<!doctype html><html><body><script>fetch('/redirect/0').catch(() => {});</script>Fixture</body></html>");
-      return;
-    }
-    if (request.url?.startsWith("/redirect/")) {
-      const hop = Number(request.url.split("/").at(-1));
-      response.writeHead(302, { location: "/redirect/" + (hop + 1) });
+      response.writeHead(302, { location: "/final" });
       response.end();
       return;
     }
-    response.writeHead(404);
-    response.end();
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><html><body>Final fixture</body></html>");
   });
 
   server.listen(0, "127.0.0.1");
@@ -68,10 +62,10 @@ test("runtime URL auditor caps redirect chains before following excessive hops",
       allowPrivateNetworks: true,
       timeout: 15000
     });
-    assert.ok(report.runtimeAssessment.blockedRequests.some((item) =>
-      item.reason.includes("redirect chain exceeded the 10-hop safety limit")
-    ));
     assert.equal(report.target.status, 200);
+    assert.ok(report.target.finalUrl.endsWith("/final"));
+    assert.equal(report.runtimeAssessment.networkDnsPolicy.redirectHopsFullyInspected, false);
+    assert.ok(report.runtimeAssessment.limitations.some((item) => item.includes("redirect chain")));
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
