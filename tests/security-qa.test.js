@@ -337,6 +337,9 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
       "new Function(command);",
       "const statement = req.body.statement;",
       "database.query(statement);",
+      "const filePath = req.query.file;",
+      "readFile(filePath);",
+      "axios.request({ url: target });",
       "element.insertAdjacentHTML('beforeend', html);",
       "element.innerHTML = req.body.rawHtml;"
     ].join("\n"));
@@ -351,6 +354,7 @@ test("AST data-flow analysis follows request-controlled aliases into critical si
     assert.ok(ids.filter((id) => id.startsWith("AST-COMMAND-")).length >= 2);
     assert.ok(ids.some((id) => id.startsWith("AST-CODE-")));
     assert.ok(ids.some((id) => id.startsWith("AST-SQL-")));
+    assert.ok(ids.some((id) => id.startsWith("AST-PATH-")));
     assert.ok(findings.every((item) => item.metadata.analysis === "intra-file variable alias tracking"));
   });
 });
@@ -397,7 +401,7 @@ test("unsupported TypeScript and JSX files are recorded as uncovered AST input",
 test("AST data-flow follows more than eight aliases and member assignments", async () => {
   await withProject(async (root) => {
     const lines = ["const source = req.query.target;"];
-    for (let index = 0; index < 16; index += 1) {
+    for (let index = 15; index >= 0; index -= 1) {
       lines.push("const alias" + index + " = " + (index === 0 ? "source" : "alias" + (index - 1)) + ";");
     }
     lines.push("fetch(alias15);");
