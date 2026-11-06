@@ -287,6 +287,7 @@ const report = {
     v8: process.versions.v8,
     platform: process.platform,
     architecture: process.arch,
+    runnerImage: process.env.ImageOS ?? process.env.RUNNER_OS ?? "local",
     cpuModel: cpus[0]?.model ?? "unknown",
     logicalCpus: cpus.length
   },
