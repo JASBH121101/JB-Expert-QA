@@ -92,5 +92,7 @@ jobs:
           node --check tests/security-headers.test.js
           node --check packages/security-guard/testing/recovery-adapters.js
           node --check tests/upload-inspector.test.js
+          node --check bench/expert-qa.js
+          node --check bench/record-engine-history.js
       - name: Run all three engine test suites
         run: npm run test:all-engines
