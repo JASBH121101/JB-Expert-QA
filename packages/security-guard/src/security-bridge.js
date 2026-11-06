@@ -194,7 +194,19 @@ export function createSecurityBridgeClient(options = {}) {
       } catch {
         throw new SecurityBridgeClientError("INVALID_RESPONSE");
       }
-      return verifyDecisionEnvelope(body, options.secret, clock(), maxClockSkewMs);
+      const decision = verifyDecisionEnvelope(body, options.secret, clock(), maxClockSkewMs);
+      if (decision.correlationId !== assessment.correlationId) {
+        throw new SecurityBridgeClientError("CORRELATION_MISMATCH");
+      }
+      if (decision.action === "allow") {
+        const guardResult = decision.assessments.find((item) =>
+          item.producer === "jb-security-guard"
+        );
+        if (!guardResult || guardResult.evidence?.sha256 !== assessment.evidence.sha256) {
+          throw new SecurityBridgeClientError("RESOURCE_MISMATCH");
+        }
+      }
+      return decision;
     } finally {
       clearTimeout(timer);
     }
