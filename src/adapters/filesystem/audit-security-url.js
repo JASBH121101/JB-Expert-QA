@@ -26,6 +26,17 @@ function parseSetCookie(value) {
   };
 }
 
+const MAX_REDIRECT_HOPS = 10;
+
+function countRedirectHops(request) {
+  let count = 0;
+  for (let previous = request.redirectedFrom(); previous; previous = previous.redirectedFrom()) {
+    count += 1;
+    if (count > MAX_REDIRECT_HOPS) break;
+  }
+  return count;
+}
+
 function normalizeHeaders(entries) {
   const result = {};
   for (const entry of entries) {
@@ -59,11 +70,19 @@ export async function auditSecurityUrl(url, {
     const page = await browserContext.newPage();
     const httpSubresources = [];
     const blockedRequests = [];
-    await page.route("**/*", async (route) => {
-      const requestUrl = route.request().url();
+    await browserContext.route("**/*", async (route) => {
+      const request = route.request();
+      const requestUrl = request.url();
       try {
+        if (countRedirectHops(request) > MAX_REDIRECT_HOPS) {
+          throw new TypeError(`HTTP redirect chain exceeded the ${MAX_REDIRECT_HOPS}-hop safety limit`);
+        }
         const protocol = new URL(requestUrl).protocol;
-        if (protocol === "http:" || protocol === "https:") await assertSafeUrl(requestUrl);
+        if (protocol === "http:" || protocol === "https:") {
+          await assertSafeUrl(requestUrl);
+        } else if (!["about:", "data:", "blob:"].includes(protocol)) {
+          throw new TypeError("Browser request protocol is not allowed");
+        }
         await route.continue();
       } catch (error) {
         blockedRequests.push({
@@ -73,7 +92,7 @@ export async function auditSecurityUrl(url, {
         await route.abort("blockedbyclient").catch(() => {});
       }
     });
-    await page.routeWebSocket("**/*", async (socket) => {
+    await browserContext.routeWebSocket("**/*", async (socket) => {
       try {
         await assertSafeWebSocketUrl(socket.url(), assertSafeUrl);
         socket.connectToServer();

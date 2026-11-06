@@ -41,3 +41,38 @@ test("runtime URL auditor can inspect a controlled local HTTP fixture without ex
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+
+test("runtime URL auditor caps redirect chains before following excessive hops", async () => {
+  const server = createServer((request, response) => {
+    if (request.url === "/") {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end("<!doctype html><html><body><script>fetch('/redirect/0').catch(() => {});</script>Fixture</body></html>");
+      return;
+    }
+    if (request.url?.startsWith("/redirect/")) {
+      const hop = Number(request.url.split("/").at(-1));
+      response.writeHead(302, { location: "/redirect/" + (hop + 1) });
+      response.end();
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  });
+
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  try {
+    const report = await auditSecurityUrl("http://127.0.0.1:" + address.port + "/", {
+      allowPrivateNetworks: true,
+      timeout: 15000
+    });
+    assert.ok(report.runtimeAssessment.blockedRequests.some((item) =>
+      item.reason.includes("redirect chain exceeded the 10-hop safety limit")
+    ));
+    assert.equal(report.target.status, 200);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
