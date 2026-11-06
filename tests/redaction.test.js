@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { redactUrlForReport, redactUrlsInText } from "../src/core/redaction.js";
+import { redactSourceForAI } from "../src/agent/policy.js";
 
 test("URL reports redact sensitive query values and remove fragments", () => {
   const secret = "very-secret-token-value";
@@ -42,4 +43,27 @@ test("omits malformed absolute URLs rather than echoing possible secrets", () =>
   const result = redactUrlForReport("https://example.com:bad/?access_token=malformed-secret");
   assert.equal(result, "[UNPARSEABLE_URL]");
   assert.equal(result.includes("malformed-secret"), false);
+});
+
+
+test("redacts unquoted environment and YAML secrets before AI source review", () => {
+  const source = [
+    "API_KEY=plain-env-secret-value",
+    "password: plain yaml password with spaces",
+    "Authorization: Bearer bearer-secret-value",
+    "const token = 'quoted-token-secret';",
+    "const ordinary = 'keep this non-secret value';"
+  ].join("\\n");
+
+  const result = redactSourceForAI(source);
+  for (const secret of [
+    "plain-env-secret-value",
+    "plain yaml password with spaces",
+    "bearer-secret-value",
+    "quoted-token-secret"
+  ]) {
+    assert.equal(result.includes(secret), false, secret);
+  }
+  assert.equal(result.includes("keep this non-secret value"), true);
+  assert.equal(result.includes("[REDACTED]"), true);
 });
