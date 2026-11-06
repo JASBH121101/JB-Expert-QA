@@ -1,27 +1,36 @@
-name: JB Security Guard Performance Benchmark
+name: JB Engines Permanent Benchmark
 
 on:
   push:
-    branches: ["feature/**"]
+    branches: [main, "feature/**"]
     paths:
-      - "packages/security-guard/**"
-      - "bench/**"
-      - "package.json"
+      - "src/**"
+      - "packages/**"
+      - "bench/*.js"
       - ".github/workflows/benchmark-security-guard.yml"
+      - ".github/workflows/malware-engine-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "packages/**"
+      - "bench/*.js"
+      - ".github/workflows/benchmark-security-guard.yml"
+      - ".github/workflows/malware-engine-validation.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: benchmark-security-guard-${{ github.ref }}
-  cancel-in-progress: true
+  group: jb-engines-benchmark-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   benchmark:
-    name: Upload inspection benchmark
+    name: Benchmark all three engines
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -32,17 +41,67 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Run benchmark
+      - name: Install root dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Benchmark JB Expert QA
+        env:
+          EXPERT_QA_BENCH_ITERATIONS: "5"
+          EXPERT_QA_BENCH_OUTPUT_DIR: benchmark-results/expert-qa
+        run: node bench/expert-qa.js
+      - name: Benchmark Security Guard
         env:
           BENCH_ITERATIONS: "10"
-          BENCH_OUTPUT_DIR: benchmark-results
+          BENCH_OUTPUT_DIR: benchmark-results/security-guard
         run: node bench/security-guard.js
-      - name: Add report to workflow summary
-        run: cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload benchmark report
+      - name: Benchmark Malware Engine
+        env:
+          BENCH_ITERATIONS: "5"
+          BENCH_OUTPUT_DIR: benchmark-results/malware-engine
+        run: node packages/malware-engine/bench/run.js
+      - name: Preview comparison with the permanent history
+        run: node bench/record-engine-history.js --input benchmark-results --history bench/history/history.jsonl --preview
+      - name: Upload benchmark reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: security-guard-benchmark-${{ github.run_number }}
+          name: jb-engine-benchmarks-${{ github.run_id }}
           path: benchmark-results/
           if-no-files-found: error
           retention-days: 30
+
+  persist-history:
+    name: Persist benchmark history in Git
+    needs: benchmark
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout current branch head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Download benchmark reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: jb-engine-benchmarks-${{ github.run_id }}
+          path: benchmark-results
+      - name: Append permanent history and compare with the previous run
+        run: node bench/record-engine-history.js --input benchmark-results --history bench/history/history.jsonl
+      - name: Commit the append-only benchmark record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/history/history.jsonl
+          if git diff --cached --quiet; then
+            echo "No new benchmark history record to commit."
+          else
+            git commit -m "chore(bench): record engine benchmark history"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
