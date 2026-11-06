@@ -258,6 +258,22 @@ test("unknown scan verdicts remain quarantined and cannot be promoted", async ()
   assert.equal(store.calls.some(([name]) => name === "promote"), false);
 });
 
+test("stalled upload streams time out and are removed from quarantine", async () => {
+  const store = createMemoryStore();
+  const source = new Readable({ read() {} });
+  await assert.rejects(
+    inspector(store, cleanScanner(), { ingestTimeoutMs: 20 }).inspect({
+      source,
+      fileName: "stalled.png"
+    }),
+    (error) => error.code === "INGEST_TIMEOUT"
+  );
+  assert.equal(source.destroyed, true);
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 0);
+  assert.ok(store.calls.some(([name]) => name === "delete"));
+});
+
 test("scanner outages fail closed and leave the object quarantined", async () => {
   const store = createMemoryStore();
   const scanner = { async scan() { throw new Error("private scanner details"); } };
