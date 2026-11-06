@@ -108,7 +108,7 @@ Events contain only a rule ID, scope names, timestamp, action, severity, and coo
 ## Important deployment notes
 
 - Register the middleware before body parsers and application routes.
-- This first version does not read or inspect request bodies. Enforce streamed/chunked body limits in the framework/server body parser as well.
+- The Express-compatible middleware does not read request bodies. Configure configureNodeHttpServer() before listen() for a Node HTTP/HTTPS server-level streamed body cap, and keep framework parser and multipart limits enabled as a second boundary.
 - The rate limiter is local to one Node.js process. Multi-instance deployments need a shared atomic store (for example Redis) before treating limits as global.
 - Forwarded IP headers are not trusted by default. Supply a `keyGenerator` only when the application has a narrowly configured trusted-proxy chain.
 - Signature detection is heuristic and can produce false positives or miss novel attacks. It is not a replacement for parameterized database queries, output encoding, authorization checks, a WAF, or a controlled security assessment.
@@ -116,6 +116,32 @@ Events contain only a rule ID, scope names, timestamp, action, severity, and coo
 - Monitor mode is recommended for baseline observation before enabling blocking.
 
 
+## Upload inspection and malware quarantine
+
+The upload inspector provides a fail-closed pipeline after a bounded multipart parser has yielded one individual file stream. It does not parse multipart requests itself and does not include a production malware scanner or storage client.
+
+~~~js
+import { createUploadInspector } from "@jb/security-guard";
+
+const uploads = createUploadInspector({
+  store: privateQuarantineAdapter,
+  scanner: malwareScannerAdapter,
+  maxBytes: 5 * 1024 * 1024,
+  scannerTimeoutMs: 15_000
+});
+
+const approved = await uploads.inspect({
+  source: fileStream,
+  fileName: upload.originalName,
+  declaredMimeType: upload.mimeType
+});
+~~~
+
+The storage adapter must create a private quarantine write stream, return a read stream for scanning, atomically promote only after a clean verdict, and delete rejected temporary objects. The scanner must consume the entire quarantined stream and return an explicit verdict plus engine and version. Timeouts, outages, malformed results, unknown verdicts and promotion errors never result in approval; uncertain objects remain private in quarantine.
+
+The built-in signature allowlist is intentionally narrow: JPEG, PNG, GIF, WebP and PDF. SVG, HTML, XML, ZIP, executables and arbitrary MIME types are not accepted. application/octet-stream is treated only as an unspecified client hint; Guard still verifies the signature. The default per-file cap is 5 MiB and the scan timeout is 15 seconds.
+
+A production integration still needs a real scanner, private storage adapter, bounded multipart parser, quarantine retention/cleanup policy, download authorization and operational alerts. See docs/FILE-UPLOAD-SECURITY.md for adapter contracts and acceptance criteria. The in-memory test fixtures are not production services.
 ## Account recovery: verified email and SMS
 
 ~~~js

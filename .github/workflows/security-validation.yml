@@ -70,6 +70,7 @@ jobs:
           node --check packages/security-guard/src/csrf-protection.js
           node --check packages/security-guard/src/distributed-rate-limit.js
           node --check packages/security-guard/src/distributed-auth-protection.js
+          node --check packages/security-guard/src/upload-inspector.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js
@@ -77,6 +78,7 @@ jobs:
           node --check tests/node-server-hardening.test.js
           node --check tests/security-headers.test.js
           node --check packages/security-guard/testing/recovery-adapters.js
+          node --check tests/upload-inspector.test.js
       - name: Run security QA and Guard tests
         run: |
           node --test tests/security-qa.test.js
