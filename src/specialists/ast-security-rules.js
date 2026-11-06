@@ -98,14 +98,6 @@ function callName(node) {
   return "";
 }
 
-function containsTaintedAlias(node, tainted) {
-  let found = false;
-  walk(node, (child) => {
-    if (child.type === "Identifier" && tainted.has(child.name)) found = true;
-  });
-  return found;
-}
-
 function makeFinding(file, node, kind, title, description, recommendation, severity = "high", metadata = {}) {
   const line = node.loc?.start?.line ?? null;
   return {
@@ -167,7 +159,6 @@ function analyzeFile(file) {
     if (!changed) break;
   }
 
-  if (!tainted.size) return [];
   const findings = [];
   const seen = new Set();
   const add = (finding) => {
@@ -180,9 +171,9 @@ function analyzeFile(file) {
     if (node.type === "CallExpression" || node.type === "NewExpression") {
       const name = callName(node.callee);
       const first = node.arguments?.[0];
-      const firstTainted = expressionIsTainted(first, tainted) && containsTaintedAlias(first, tainted);
+      const firstTainted = expressionIsTainted(first, tainted);
       const second = node.arguments?.[1];
-      const secondTainted = expressionIsTainted(second, tainted) && containsTaintedAlias(second, tainted);
+      const secondTainted = expressionIsTainted(second, tainted);
 
       if (name.endsWith(".insertAdjacentHTML") && secondTainted) {
         add(makeFinding(
@@ -238,8 +229,7 @@ function analyzeFile(file) {
     if (node.type === "AssignmentExpression" && node.left?.type === "MemberExpression") {
       const property = propertyName(node.left);
       if (["innerHTML", "outerHTML"].includes(property) &&
-          expressionIsTainted(node.right, tainted) &&
-          containsTaintedAlias(node.right, tainted)) {
+          expressionIsTainted(node.right, tainted)) {
         add(makeFinding(
           file, node, "DOM-XSS", "Request-controlled data is assigned to an HTML DOM sink",
           "A request-derived value flows through a variable into innerHTML or outerHTML, where it is interpreted as markup.",
