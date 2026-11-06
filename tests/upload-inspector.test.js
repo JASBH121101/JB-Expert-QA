@@ -223,6 +223,26 @@ test("scanner timeouts abort the scan and leave the object quarantined", async (
   assert.equal(store.quarantine.size, 1);
 });
 
+test("scanner cannot approve a file without consuming the complete quarantined stream", async () => {
+  const store = createMemoryStore();
+  const scanner = {
+    async scan() {
+      return { verdict: "clean", engine: "MockAV", version: "1.0" };
+    }
+  };
+
+  await assert.rejects(
+    inspector(store, scanner).inspect({
+      source: Readable.from([PNG]),
+      fileName: "not-fully-scanned.png"
+    }),
+    (error) => error.code === "INVALID_SCAN_RESULT"
+  );
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
+
 test("malformed clean verdicts and missing scanner identity fail closed", async () => {
   const store = createMemoryStore();
   const scanner = {

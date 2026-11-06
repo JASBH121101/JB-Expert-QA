@@ -9,7 +9,7 @@
 - Maximum request body bytes, enforced both from a valid `Content-Length` header and by counting actual streamed bytes. This includes chunked transfer-encoded requests.
 - Early rejection of oversized `Expect: 100-continue` requests before sending the continue response.
 
-The streamed-body listener is prepended to the server's `request` event so it observes bytes before ordinary application request handlers register their body-parser listeners. On an oversized declared body, Guard rejects the request before dispatching it to application request listeners. For streamed/chunked bodies, it counts bytes at the IncomingMessage readable-stream boundary before exposing them to application consumers. This covers flowing data listeners and paused/readable consumers using read(), pipe() or async iteration; the chunk that would cross the limit is withheld. Guard pauses the incoming request, returns HTTP 413 with `Connection: close`, and closes the socket after the response is flushed.
+The server-level request hook installs a byte counter on each `IncomingMessage` readable-stream boundary before ordinary application request handlers register their body-parser listeners. On an oversized declared body, Guard rejects the request before dispatching it to application request listeners. For streamed/chunked bodies, it counts bytes before exposing each chunk to application consumers. This covers flowing `data` listeners and paused/readable consumers using `read()`, `pipe()` or async iteration; the chunk that would cross the limit is withheld. Guard pauses the incoming request, returns HTTP 413 with `Connection: close`, and closes the socket after the response is flushed.
 
 ## Integration example
 
@@ -36,7 +36,7 @@ Do not perform irreversible application actions while consuming an unvalidated s
 ## Important boundaries
 
 - The byte cap is per HTTP request body, not a complete upload-scanning solution.
-- A streaming handler can observe the chunk that crosses the threshold before the connection is closed. It must not commit side effects until the complete request has passed validation.
+- The chunk that would cross the configured threshold is withheld from downstream readable-stream consumers. Application handlers must still treat aborted requests as incomplete and must not commit side effects until the complete request has passed all route-specific validation.
 - Reverse proxies/CDNs should enforce compatible limits and timeouts at the edge.
 - HTTP/2 servers need protocol-specific configuration; this helper targets Node HTTP/HTTPS Server instances.
 - Tune limits for the application's legitimate payloads. Large file uploads should use dedicated, bounded storage flows rather than raising the global body limit indiscriminately.
