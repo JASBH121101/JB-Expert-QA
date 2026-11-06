@@ -91,7 +91,5 @@ jobs:
           node --check tests/security-headers.test.js
           node --check packages/security-guard/testing/recovery-adapters.js
           node --check tests/upload-inspector.test.js
-      - name: Run JB Expert QA and Security Guard suites
-        run: npm test
-      - name: Run Malware Engine suite
-        run: npm run test:malware-engine
+      - name: Run all three engine test suites
+        run: npm run test:all-engines
