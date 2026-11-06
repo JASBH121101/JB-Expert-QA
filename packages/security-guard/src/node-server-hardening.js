@@ -95,25 +95,32 @@ function installRequestBodyLimit(server, maxBodyBytes) {
         return true;
       }
 
-      const originalRequestEmit = request.emit;
-      const hadOwnEmit = Object.hasOwn(request, "emit");
+      // Count bytes at the IncomingMessage readable-stream boundary, not only
+      // in "data" events. Consumers using "readable", read(), pipe(), or async
+      // iteration must all pass through push() before application code sees data.
+      const originalRequestPush = request.push;
+      const hadOwnPush = Object.hasOwn(request, "push");
       let receivedBytes = 0;
       let rejected = false;
       let restored = false;
 
-      const restoreRequestEmit = () => {
+      const restoreRequestPush = () => {
         if (restored) return;
         restored = true;
-        if (hadOwnEmit) request.emit = originalRequestEmit;
-        else delete request.emit;
+        if (hadOwnPush) request.push = originalRequestPush;
+        else delete request.push;
       };
 
-      request.emit = function guardedRequestEmit(requestEvent, ...eventArgs) {
-        if (requestEvent === "data" && !rejected) {
-          const chunk = eventArgs[0];
+      request.once("close", restoreRequestPush);
+      request.once("error", restoreRequestPush);
+
+      request.push = function guardedRequestPush(chunk, encoding) {
+        if (chunk !== null && !rejected) {
           const chunkBytes = Buffer.isBuffer(chunk)
             ? chunk.length
-            : Buffer.byteLength(String(chunk));
+            : typeof chunk === "string"
+              ? Buffer.byteLength(chunk, encoding)
+              : 0;
           if (receivedBytes + chunkBytes > maxBodyBytes) {
             rejected = true;
             request.pause();
@@ -123,15 +130,16 @@ function installRequestBodyLimit(server, maxBodyBytes) {
           receivedBytes += chunkBytes;
         }
 
-        // A truncated stream must never emit "end" to downstream parsers.
-        if (rejected && requestEvent === "end") return false;
+        // Never signal a complete/truncated body to downstream parsers after rejection.
+        if (rejected) return false;
 
         try {
-          return originalRequestEmit.call(this, requestEvent, ...eventArgs);
-        } finally {
-          if (requestEvent === "end" || requestEvent === "close" || requestEvent === "error") {
-            restoreRequestEmit();
-          }
+          const result = originalRequestPush.call(this, chunk, encoding);
+          if (chunk === null) restoreRequestPush();
+          return result;
+        } catch (error) {
+          restoreRequestPush();
+          throw error;
         }
       };
     }
