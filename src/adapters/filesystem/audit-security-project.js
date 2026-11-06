@@ -63,8 +63,16 @@ export async function auditSecurityProject(rootPath, {
   });
 
   const astParseSkips = report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length;
+  const astUnsupportedFiles = report.diagnostics.filter((item) => item.id.startsWith("AST-UNSUPPORTED-")).length;
+  const astPropagationLimits = report.diagnostics.filter((item) => item.id.startsWith("AST-TAINT-LIMIT-")).length;
   if (astParseSkips > 0) {
     incompleteReasons.push(astParseSkips + " JavaScript file(s) could not be parsed for AST analysis");
+  }
+  if (astUnsupportedFiles > 0) {
+    incompleteReasons.push(astUnsupportedFiles + " code file(s) use a language not yet supported by AST analysis");
+  }
+  if (astPropagationLimits > 0) {
+    incompleteReasons.push(astPropagationLimits + " JavaScript file(s) reached the AST data-flow propagation limit");
   }
 
   return Object.freeze({
@@ -84,6 +92,9 @@ export async function auditSecurityProject(rootPath, {
         parser: "Acorn",
         extensions: Object.freeze([".js", ".mjs", ".cjs"]),
         parseSkips: astParseSkips,
+        unsupportedFiles: astUnsupportedFiles,
+        propagationLimitFiles: astPropagationLimits,
+        complete: astParseSkips === 0 && astUnsupportedFiles === 0 && astPropagationLimits === 0,
         dataFlow: "intra-file variable alias tracking",
         interprocedural: false
       }),
