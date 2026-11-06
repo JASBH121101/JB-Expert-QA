@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { Readable, Writable } from "node:stream";
 import {
   createSecurityAssessment,
@@ -277,6 +277,78 @@ test("client rejects public endpoints and unsigned decisions", async () => {
     reasonCode: "JBG-TEST-001"
   }), (error) => error instanceof SecurityBridgeClientError &&
     error.code === "INVALID_DECISION_SIGNATURE");
+});
+
+test("the client rejects a signed allow decision for a different correlation ID", async () => {
+  const sentAt = new Date().toISOString();
+  const decision = {
+    schema: "jb.security.decision/v1",
+    correlationId: "other-resource-123456",
+    action: "allow",
+    status: "complete",
+    requiredProducers: ["jb-expert-qa", "jb-security-guard"],
+    missingProducers: [],
+    assessments: [
+      { producer: "jb-expert-qa", verdict: "pass", severity: "low", evidence: {} },
+      { producer: "jb-security-guard", verdict: "pass", severity: "low", evidence: { sha256: "a".repeat(64) } }
+    ],
+    evaluatedAt: sentAt
+  };
+  const signature = createHmac("sha256", SECRET)
+    .update(Buffer.from(JSON.stringify({ decision, sentAt }), "utf8"))
+    .digest("hex");
+  const client = createSecurityBridgeClient({
+    url: "http://127.0.0.1:3100",
+    secret: SECRET,
+    fetchImpl: async () => ({
+      ok: true,
+      async json() { return { decision, sentAt, signature }; }
+    })
+  });
+
+  await assert.rejects(client.submitAssessment({
+    correlationId: "this-resource-123456",
+    verdict: "pass",
+    severity: "low",
+    reasonCode: "JBG-TEST-002",
+    evidence: { sha256: "a".repeat(64) }
+  }), (error) => error.code === "CORRELATION_MISMATCH");
+});
+
+test("the client rejects an allow decision whose Guard hash differs from the submitted file", async () => {
+  const sentAt = new Date().toISOString();
+  const decision = {
+    schema: "jb.security.decision/v1",
+    correlationId: "same-resource-123456",
+    action: "allow",
+    status: "complete",
+    requiredProducers: ["jb-expert-qa", "jb-security-guard"],
+    missingProducers: [],
+    assessments: [
+      { producer: "jb-expert-qa", verdict: "pass", severity: "low", evidence: {} },
+      { producer: "jb-security-guard", verdict: "pass", severity: "low", evidence: { sha256: "b".repeat(64) } }
+    ],
+    evaluatedAt: sentAt
+  };
+  const signature = createHmac("sha256", SECRET)
+    .update(Buffer.from(JSON.stringify({ decision, sentAt }), "utf8"))
+    .digest("hex");
+  const client = createSecurityBridgeClient({
+    url: "http://127.0.0.1:3100",
+    secret: SECRET,
+    fetchImpl: async () => ({
+      ok: true,
+      async json() { return { decision, sentAt, signature }; }
+    })
+  });
+
+  await assert.rejects(client.submitAssessment({
+    correlationId: "same-resource-123456",
+    verdict: "pass",
+    severity: "low",
+    reasonCode: "JBG-TEST-003",
+    evidence: { sha256: "a".repeat(64) }
+  }), (error) => error.code === "RESOURCE_MISMATCH");
 });
 
 test("bridge-enabled upload requires a valid shared correlation ID", async () => {
