@@ -58,3 +58,19 @@ The bridge does not treat Malware Engine no_match as clean. The existing scanner
 ## Operational limits
 
 This is an initial local coordination layer, not an endpoint firewall, VPN, Wi-Fi security product, durable incident database or security certification. It coordinates the two products' decisions but does not inspect encrypted traffic or independently stop network traffic. JB Expert QA's egress proxy and other browser controls remain separate enforcement components.
+
+
+## Calling the filters
+
+JB Expert QA should submit its real runtime audit result first:
+
+```js
+import { auditSecurityUrl, createExpertQAAssessment, createSecurityBridgeCoordinator } from "jb-expert-qa";
+
+const coordinator = createSecurityBridgeCoordinator();
+const audit = await auditSecurityUrl(targetUrl);
+const qaAssessment = createExpertQAAssessment({ correlationId: resourceCorrelationId, report: audit });
+coordinator.submit(qaAssessment);
+```
+
+JB Security Guard uses a `createSecurityBridgeClient` instance as the upload inspector's `securityBridge` option. Pass the same `resourceCorrelationId` to `inspect`. If Expert QA has not submitted, the object remains quarantined. Never reuse a correlation ID for another file or download.

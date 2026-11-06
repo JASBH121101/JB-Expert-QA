@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import {
   createSecurityAssessment,
+  createExpertQAAssessment,
   createSecurityBridgeCoordinator,
   createSecurityBridgeServer,
   signSecurityAssessment
@@ -144,4 +145,59 @@ test("invalid producer, identifiers and evidence are rejected", () => {
     severity: "low",
     reasonCode: "QA-001"
   }), (error) => error.code === "INVALID_ASSESSMENT");
+});
+
+
+test("Expert QA report maps critical and blocked-network findings to non-allow decisions", () => {
+  const correlationId = "site-audit-123456";
+  const critical = createExpertQAAssessment({
+    correlationId,
+    report: {
+      diagnostics: [{ severity: "critical" }],
+      scoring: { passed: false },
+      summary: { rulesWithErrors: 0 }
+    }
+  });
+  assert.equal(critical.verdict, "block");
+  assert.equal(critical.severity, "critical");
+
+  const networkBlocked = createExpertQAAssessment({
+    correlationId,
+    report: {
+      diagnostics: [],
+      scoring: { passed: true },
+      runtimeAssessment: { blockedRequests: [{ reason: "private-address" }] }
+    }
+  });
+  assert.equal(networkBlocked.verdict, "block");
+  assert.equal(networkBlocked.reasonCode, "QAX-NETWORK-BLOCK");
+});
+
+test("Expert QA report only emits pass when scoring passed with no high findings or execution errors", () => {
+  const correlationId = "site-audit-223456";
+  const passed = createExpertQAAssessment({
+    correlationId,
+    report: { diagnostics: [], scoring: { passed: true }, summary: { rulesWithErrors: 0 } }
+  });
+  assert.equal(passed.verdict, "pass");
+
+  const high = createExpertQAAssessment({
+    correlationId,
+    report: { diagnostics: [{ severity: "high" }], scoring: { passed: true } }
+  });
+  assert.equal(high.verdict, "review");
+  assert.equal(high.severity, "high");
+
+  const executionError = createExpertQAAssessment({
+    correlationId,
+    report: { diagnostics: [], scoring: { passed: true }, summary: { rulesWithErrors: 1 } }
+  });
+  assert.equal(executionError.verdict, "review");
+});
+
+test("Expert QA report assessment rejects malformed report data", () => {
+  assert.throws(() => createExpertQAAssessment({
+    correlationId: "site-audit-323456",
+    report: { diagnostics: "none", scoring: { passed: true } }
+  }), (error) => error.code === "INVALID_EXPERT_QA_REPORT");
 });

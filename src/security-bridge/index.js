@@ -69,6 +69,68 @@ export function createSecurityAssessment(input = {}) {
   return validateSecurityAssessment(assessment);
 }
 
+export function createExpertQAAssessment({ correlationId, report } = {}) {
+  if (!validIdentifier(correlationId) || !isRecord(report) ||
+      !Array.isArray(report.diagnostics) || !isRecord(report.scoring)) {
+    throw new SecurityBridgeError("INVALID_EXPERT_QA_REPORT");
+  }
+
+  const diagnostics = report.diagnostics;
+  const blockedRequests = report.runtimeAssessment?.blockedRequests;
+  if (blockedRequests !== undefined && !Array.isArray(blockedRequests)) {
+    throw new SecurityBridgeError("INVALID_EXPERT_QA_REPORT");
+  }
+
+  const hasCritical = diagnostics.some((item) => item?.severity === "critical");
+  const hasHigh = diagnostics.some((item) => item?.severity === "high");
+  const hasExecutionErrors = Number(report.summary?.rulesWithErrors ?? 0) > 0;
+  const hasBlockedRequests = (blockedRequests?.length ?? 0) > 0;
+
+  if (hasBlockedRequests) {
+    return createSecurityAssessment({
+      correlationId,
+      producer: "jb-expert-qa",
+      verdict: "block",
+      severity: "high",
+      reasonCode: "QAX-NETWORK-BLOCK"
+    });
+  }
+  if (hasCritical) {
+    return createSecurityAssessment({
+      correlationId,
+      producer: "jb-expert-qa",
+      verdict: "block",
+      severity: "critical",
+      reasonCode: "QAX-CRITICAL-FINDING"
+    });
+  }
+  if (hasHigh || hasExecutionErrors) {
+    return createSecurityAssessment({
+      correlationId,
+      producer: "jb-expert-qa",
+      verdict: "review",
+      severity: "high",
+      reasonCode: hasExecutionErrors ? "QAX-RULE-EXECUTION-ERROR" : "QAX-HIGH-FINDING"
+    });
+  }
+  if (report.scoring.passed === true) {
+    return createSecurityAssessment({
+      correlationId,
+      producer: "jb-expert-qa",
+      verdict: "pass",
+      severity: "low",
+      reasonCode: "QAX-RUNTIME-PASS"
+    });
+  }
+  return createSecurityAssessment({
+    correlationId,
+    producer: "jb-expert-qa",
+    verdict: "review",
+    severity: "medium",
+    reasonCode: "QAX-RUNTIME-REVIEW"
+  });
+}
+
 export function validateSecurityAssessment(input) {
   exactKeys(input, [
     "schema", "eventId", "correlationId", "producer", "verdict",
