@@ -93,6 +93,9 @@ jobs:
           node --check packages/malware-engine/src/index.js
           node --check packages/malware-engine/src/pe-analyzer.js
           node --check packages/malware-engine/src/archive-analyzer.js
+          node --check packages/malware-engine/src/lnk-analyzer.js
+          node --check packages/malware-engine/src/rtf-analyzer.js
+          node --check packages/malware-engine/src/iso-analyzer.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js
