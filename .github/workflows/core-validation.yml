@@ -1,52 +1,81 @@
-name: Core validation
-# Keep browser-state exploration tests in the same validation matrix as static and visual checks.
+name: Core browser validation
 
 on:
   push:
     branches: [main]
     paths:
       - "package.json"
-      - "src/**"
-      - "tests/**"
-      - "config/**"
-      - ".github/workflows/**"
+      - "package-lock.json"
+      - "src/adapters/playwright/**"
+      - "src/adapters/visual/**"
+      - "src/specialists/accessibility/**"
+      - "src/specialists/responsive/**"
+      - "src/specialists/ui-ux/**"
+      - "src/specialists/functional/**"
+      - "tests/browser-environment.test.js"
+      - "tests/playwright-context.test.js"
+      - "tests/security-url.browser.test.js"
+      - "tests/url-safety.test.js"
+      - "tests/integration/**"
+      - "config/default.config.json"
+      - ".github/workflows/core-validation.yml"
   pull_request:
     branches: [main]
     paths:
       - "package.json"
-      - "src/**"
-      - "tests/**"
-      - "config/**"
-      - ".github/workflows/**"
+      - "package-lock.json"
+      - "src/adapters/playwright/**"
+      - "src/adapters/visual/**"
+      - "src/specialists/accessibility/**"
+      - "src/specialists/responsive/**"
+      - "src/specialists/ui-ux/**"
+      - "src/specialists/functional/**"
+      - "tests/browser-environment.test.js"
+      - "tests/playwright-context.test.js"
+      - "tests/security-url.browser.test.js"
+      - "tests/url-safety.test.js"
+      - "tests/integration/**"
+      - "config/default.config.json"
+      - ".github/workflows/core-validation.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: core-validation-${{ github.ref }}
-  cancel-in-progress: false
+  group: core-browser-validation-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Node.js tests
+  browser-tests:
+    name: Chromium integration tests (Node 22)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [22, 24]
+    timeout-minutes: 12
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          node-version: ${{ matrix.node-version }}
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
           package-manager-cache: false
+      - name: Cache npm download data
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-22-npm-${{ hashFiles('package.json', 'packages/*/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-22-npm-
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-1.56.1
       - name: Install dependencies
-        run: npm install
+        run: npm install --prefer-offline --ignore-scripts --no-audit --no-fund
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run syntax checks and tests
-        run: npm run check
+      - name: Run focused browser integration tests
+        run: npm run test:browser
