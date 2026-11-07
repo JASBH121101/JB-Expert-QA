@@ -9,7 +9,7 @@ import { scanNpmAdvisories } from "../advisories/osv.js";
 import { projectRules } from "../../specialists/project-rules.js";
 import { deadCodeRules } from "../../specialists/dead-code-rules.js";
 
-export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
+export async function auditProject(rootPath, { config = projectConfig, scanOptions = {}, ruleIds } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) throw new TypeError("A project directory path is required");
   const root = resolve(rootPath);
   const validatedConfig = validateEngineConfig(config);
@@ -33,7 +33,9 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     thresholds: validatedConfig.thresholds,
     dependencyAdvisoryScan: dependencyAdvisories
   };
-  const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
+  const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context, {
+    ...(ruleIds === undefined ? {} : { ruleIds })
+  });
   const deadCodeWarnings = report.diagnostics.filter((item) =>
     item.id === "CODE-DEAD-EXPORT-PARSE-SKIPPED" ||
     item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"
