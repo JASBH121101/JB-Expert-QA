@@ -456,3 +456,55 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
 test("project audit rejects an empty path", async () => {
   await assert.rejects(auditProject(" "), /directory path is required/);
 });
+
+
+test("project audit identifies only review-candidate exports without static in-repository importers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-dead-exports-"));
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "utilities.js"), [
+      "export function usedInProject(value) { return value + 1; }",
+      "export function possibleOrphan(value) { return value * 2; }"
+    ].join("\\n"));
+    await writeFile(join(root, "src", "app.js"), [
+      'import { usedInProject } from "./utilities.js";',
+      "export const result = usedInProject(41);"
+    ].join("\\n"));
+    await writeFile(join(root, "src", "index.js"), [
+      "export { possiblePublicApi } from './public-api.js';"
+    ].join("\\n"));
+    await writeFile(join(root, "src", "public-api.js"), "export const possiblePublicApi = true;");
+
+    const report = await auditProject(root);
+    const candidates = report.diagnostics.filter((item) => item.id.startsWith("CODE-DEAD-EXPORT-") &&
+      item.id !== "CODE-DEAD-EXPORT-PARSE-SKIPPED" &&
+      item.id !== "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED");
+    assert.equal(candidates.length, 2);
+    assert.ok(candidates.every((item) => item.severity === "info"));
+    assert.ok(candidates.some((item) => item.evidence.exportName === "possibleOrphan"));
+    assert.ok(candidates.some((item) => item.evidence.exportName === "possiblePublicApi"));
+    assert.ok(candidates.every((item) => item.metadata.safeToDeleteAutomatically === false));
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "heuristic-complete");
+    assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedExports, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("dynamic module loading suppresses dead-export claims and reports reduced coverage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-dynamic-imports-"));
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "utilities.js"), "export const possibleOrphan = true;");
+    await writeFile(join(root, "src", "loader.js"), "const moduleName = getModuleName(); await import(moduleName);");
+
+    const report = await auditProject(root);
+    assert.equal(report.diagnostics.some((item) => item.id.startsWith("CODE-DEAD-EXPORT-") &&
+      item.id !== "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"), false);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"));
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "partial");
+    assert.equal(report.analysisScope.deadCodeAnalysis.coverageWarnings, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
