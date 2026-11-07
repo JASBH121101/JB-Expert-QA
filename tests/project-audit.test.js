@@ -437,7 +437,7 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 19);
+    assert.equal(report.summary.rulesExecuted, 28);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);
@@ -465,14 +465,14 @@ test("project audit identifies only review-candidate exports without static in-r
     await writeFile(join(root, "src", "utilities.js"), [
       "export function usedInProject(value) { return value + 1; }",
       "export function possibleOrphan(value) { return value * 2; }"
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(join(root, "src", "app.js"), [
       'import { usedInProject } from "./utilities.js";',
       "export const result = usedInProject(41);"
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(join(root, "src", "index.js"), [
       "export { possiblePublicApi } from './public-api.js';"
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(join(root, "src", "public-api.js"), "export const possiblePublicApi = true;");
 
     const report = await auditProject(root);
