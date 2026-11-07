@@ -229,7 +229,7 @@ function analyzeFile(file) {
           "high",
           { sink: name }
         ));
-      } else if (firstTainted && !isRequestSource(first) && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request|http\.(?:get|post)|https\.(?:get|post)|WebSocket)$/.test(name)) {
+      } else if (firstTainted && /^(?:fetch|axios\.(?:get|post|put|patch|delete|request)|got|request|http\.request|https\.request|http\.(?:get|post)|https\.(?:get|post)|WebSocket)$/.test(name)) {
         add(makeFinding(
           file, node, "SSRF", "Request-controlled data reaches an outbound HTTP client",
           "A value originating from request query, body, route, header, or cookie data reaches an outbound HTTP request through a direct expression or variable alias. This may permit server-side request forgery.",
@@ -237,7 +237,7 @@ function analyzeFile(file) {
           "critical",
           { sink: name, taintedVariables: [...tainted].slice(0, 12) }
         ));
-      } else if (firstTainted && !isRequestSource(first) && (name === "redirect" || name.endsWith(".redirect"))) {
+      } else if (firstTainted && (name === "redirect" || name.endsWith(".redirect"))) {
         add(makeFinding(
           file, node, "REDIRECT", "Request-controlled data reaches a redirect sink",
           "A value derived from request input flows through a variable into a redirect destination, which may enable an open redirect.",
