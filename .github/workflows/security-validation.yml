@@ -80,6 +80,8 @@ jobs:
           node --check src/adapters/filesystem/reverify-project.js
           node --check src/core/reverification.js
           node --check src/specialists/project-rules.js
+          node --check tests/project-audit.test.js
+          node --check tests/reverification-workflow.test.js
           node --check src/security-cli.js
           node --check src/specialists/runtime-security-rules.js
           node --check src/adapters/filesystem/audit-security-url.js
