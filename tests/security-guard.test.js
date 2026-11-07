@@ -610,7 +610,7 @@ test("does not block ordinary search text containing common SQL vocabulary", asy
     assert.equal(events.length, 0);
   });
 });
-\n
+
 
 test("normalizes full-width separators before path traversal inspection", async () => {
   await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
