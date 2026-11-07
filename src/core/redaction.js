@@ -58,7 +58,7 @@ export function redactUrlsInText(value) {
 export function redactSensitiveText(input) {
   const source = String(input ?? "").slice(0, 2048);
   return redactUrlsInText(source)
-    .replace(/\\b(bearer|basic)\\s+[a-z0-9._~+\\/-]+=*/gi, "$1 [REDACTED]")
-    .replace(/\\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|password|passwd|secret|authorization)\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s,;]+)/gi, "$1[REDACTED]")
+    .replace(/\b(bearer|basic)\s+[a-z0-9._~+\/-]+=*/gi, "$1 [REDACTED]")
+    .replace(/\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|password|passwd|secret|authorization)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1[REDACTED]")
     .slice(0, 512);
 }
