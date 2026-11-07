@@ -199,6 +199,34 @@ test("database checks flag destructive SQL, SECURITY DEFINER and unsafe raw-quer
   assert.equal(report.diagnostics.some((item) => item.id.startsWith("DB-RAW-")), true);
 });
 
+test("JavaScript unsafe raw database query APIs are detected from AST calls, including computed properties", async () => {
+  const report = await runRules({
+    projectFiles: [{
+      path: "src/database.js",
+      extension: ".js",
+      lineCount: 5,
+      content: [
+        "// prisma.$queryRawUnsafe(query);",
+        "const rows = await prisma.$queryRawUnsafe(query);",
+        'const result = await prisma["$executeRawUnsafe"](query);',
+        'const safe = await prisma.$queryRaw("SELECT * FROM users WHERE id = ?", [id]);'
+      ].join("\n")
+    }],
+    projectScan: { lockFiles: [], environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+
+  const rawFindings = report.diagnostics.filter((item) => item.id.startsWith("DB-RAW-AST-"));
+  assert.equal(rawFindings.length, 2);
+  assert.deepEqual(rawFindings.map((item) => item.metadata.sink).sort(), [
+    "$executeRawUnsafe",
+    "$queryRawUnsafe"
+  ]);
+  assert.ok(rawFindings.every((item) => item.metadata.parser === "Acorn"));
+  assert.ok(rawFindings.every((item) => item.metadata.requiresManualReview === true));
+});
+
+
 test("Prisma relation fields without a supporting leading index are reported", async () => {
   const report = await runRules({
     projectFiles: [{
