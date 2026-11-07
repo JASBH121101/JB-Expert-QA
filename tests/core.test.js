@@ -180,18 +180,18 @@ test("engine can re-run only selected rule IDs without evaluating unrelated rule
     type: "targeted-rules",
     ruleIds: ["security.rule-two"]
   });
-  assert.throws(() => new ExpertQAEngine({ registry, config }).audit({}, {
+  await assert.rejects(new ExpertQAEngine({ registry, config }).audit({}, {
     ruleIds: ["security.missing"]
   }), /Unknown rule ID/);
-  assert.throws(() => new ExpertQAEngine({ registry, config }).audit({}, {
+  await assert.rejects(new ExpertQAEngine({ registry, config }).audit({}, {
     ruleIds: ["security.rule-one", "security.rule-one"]
   }), /unique rule IDs/);
 });
 
 test("re-verification comparison identifies resolved, unchanged and new findings", () => {
-  const finding = (id, location) => ({
+  const finding = (id, location, ruleId = "security.sample") => ({
     id,
-    ruleId: "security.sample",
+    ruleId,
     location,
     title: id,
     severity: "medium"
@@ -200,7 +200,7 @@ test("re-verification comparison identifies resolved, unchanged and new findings
     diagnostics: [
       finding("OLD-001", "src/old.js:3"),
       finding("KEEP-001", "src/app.js:8"),
-      finding("OUT-OF-SCOPE", "src/other.js:1")
+      finding("OUT-OF-SCOPE", "src/other.js:1", "security.other")
     ]
   };
   const current = {
@@ -214,13 +214,13 @@ test("re-verification comparison identifies resolved, unchanged and new findings
     ruleIds: ["security.sample"]
   });
   assert.deepEqual(diff.summary, {
-    previous: 3,
+    previous: 2,
     current: 2,
-    resolved: 2,
+    resolved: 1,
     unchanged: 1,
     newFindings: 1
   });
-  assert.deepEqual(diff.resolved.map((item) => item.id).sort(), ["OLD-001", "OUT-OF-SCOPE"]);
+  assert.deepEqual(diff.resolved.map((item) => item.id), ["OLD-001"]);
   assert.deepEqual(diff.unchanged.map((item) => item.id), ["KEEP-001"]);
   assert.deepEqual(diff.newFindings.map((item) => item.id), ["NEW-001"]);
   assert.throws(() => compareReverification(previous, current, { ruleIds: ["", "security.sample"] }), /unique non-empty/);
