@@ -23,6 +23,7 @@ export {
 export { deadCodeRules } from "./specialists/dead-code-rules.js";
 export { scanProject } from "./adapters/filesystem/scan-project.js";
 export { auditProject } from "./adapters/filesystem/audit-project.js";
+export { reverifyProject, reverifySecurityProject } from "./adapters/filesystem/reverify-project.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";
 
 export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";
