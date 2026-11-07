@@ -53,10 +53,15 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
           try {
             const matched = Boolean(document.querySelector(selector));
             if (cssSelectorCoverage.selectorEvaluations.length < MAX_CSS_EVALUATIONS) {
+              const stylesheet = rule.parentStyleSheet;
+              const stylesheetHref = stylesheet?.href ?? null;
+              const stylesheetKey = stylesheetHref ||
+                (stylesheet?.ownerNode?.id ? "style#" + stylesheet.ownerNode.id : "inline:" + sheetIndex);
               cssSelectorCoverage.selectorEvaluations.push({
                 selector: selector.slice(0, 300),
                 stylesheetIndex: sheetIndex,
-                stylesheetHref: rule.parentStyleSheet?.href ?? null,
+                stylesheetHref,
+                stylesheetKey,
                 ruleIndex,
                 matched
               });
@@ -69,6 +74,8 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
                   selector: selector.slice(0, 300),
                   stylesheetIndex: sheetIndex,
                   stylesheetHref: rule.parentStyleSheet?.href ?? null,
+                  stylesheetKey: rule.parentStyleSheet?.href ||
+                    (rule.parentStyleSheet?.ownerNode?.id ? "style#" + rule.parentStyleSheet.ownerNode.id : "inline:" + sheetIndex),
                   ruleIndex
                 });
               } else {
