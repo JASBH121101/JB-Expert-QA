@@ -611,3 +611,23 @@ test("does not block ordinary search text containing common SQL vocabulary", asy
   });
 });
 \n
+
+test("normalizes full-width separators before path traversal inspection", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const response = await request("/files/%EF%BC%8E%EF%BC%8E%EF%BC%8Fprivate.txt");
+    assert.equal(response.statusCode, 403);
+    assert.ok(events[0].ruleIds.includes("JBG-PATH-001"));
+  });
+});
+
+test("normalizes full-width SQL operators while preserving benign Unicode searches", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const attack = await request("/search?q=%EF%BC%87%20%EF%BC%AF%EF%BC%B2%20%EF%BC%91%EF%BC%9D%EF%BC%91");
+    assert.equal(attack.statusCode, 403);
+    assert.ok(events[0].ruleIds.includes("JBG-SQLI-001"));
+
+    const ordinary = await request("/search?q=caf%C3%A9%20select%20floral%20notes");
+    assert.equal(ordinary.statusCode, 200);
+    assert.equal(events.length, 1);
+  });
+});
