@@ -140,6 +140,7 @@ export async function exploreInteractionStates(page, {
   const originalOrigin = new URL(url).origin;
   const candidates = await discoverCandidates(page, maxActions);
   const states = [];
+  const cssSelectorCoverageStates = [];
   const interactiveElements = [];
   const interactiveOverlaps = [];
   const skipped = [];
@@ -169,6 +170,13 @@ export async function exploreInteractionStates(page, {
 
       const stateName = "interaction-" + (index + 1) + ": " + candidate.kind + " — " + candidate.label;
       const snapshot = await collectPageContext(page, { thresholds });
+      if (snapshot.cssSelectorCoverage) {
+        cssSelectorCoverageStates.push(Object.freeze({
+          name: stateName,
+          triggerSelector: candidate.selector,
+          coverage: snapshot.cssSelectorCoverage
+        }));
+      }
       const stateElements = (snapshot.interactiveElements ?? []).map((item) => ({
         ...item,
         state: stateName,
@@ -231,6 +239,7 @@ export async function exploreInteractionStates(page, {
     statesCaptured: states.length,
     overlapsFound: interactiveOverlaps.length,
     states: Object.freeze(states),
+    cssSelectorCoverageStates: Object.freeze(cssSelectorCoverageStates),
     skipped: Object.freeze(skipped),
     interactiveElements: Object.freeze(interactiveElements),
     interactiveOverlaps: Object.freeze(interactiveOverlaps)
