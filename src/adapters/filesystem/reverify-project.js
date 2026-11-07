@@ -75,7 +75,7 @@ async function runTargetedReverification(audit, rootPath, {
   return Object.freeze({
     engine: "JB Expert QA",
     profile,
-    status: currentReport.summary.rulesWithErrors > 0 ? "review-required" : "completed",
+    status: currentReport.summary.rulesWithErrors > 0 ? "review-required" : "partial",
     scope: "targeted-only",
     fullAuditRequired: true,
     generatedAt: new Date().toISOString(),
