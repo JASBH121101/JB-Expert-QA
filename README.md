@@ -26,36 +26,41 @@ The root package declares `packages/*` as npm workspaces, so internal packages a
 
 ## Run checks
 
+Install the workspace and dependencies from the repository root:
+
 ```bash
-# Full Node.js test discovery (all security engines and the recommender)
-npm test
+npm install
+```
 
-# Phone and perfume recommendation tests
-npm run test:recommendation-engine
+Run the complete Node.js test suite:
 
-# Android/Termux-compatible test selection (browser suites are explicitly excluded)
+```bash
+npm run test:all-engines
+```
+
+Run the Android/Termux-compatible subset. Browser-dependent Playwright tests are excluded and must be validated on a desktop browser runner:
+
+```bash
 npm run test:mobile
+```
 
-# Local-only Security Guard request demonstration
-npm run demo:security-guard
+Run focused suites and local demonstrations:
 
-# Focused security QA tests
+```bash
 npm run test:expert-qa
-
-# Security Guard package tests
 npm run test:security-guard
-
-# Malware Engine package tests
 npm run test:malware-engine
+npm run test:recommendation-engine
+npm run demo:security-guard
+```
 
-# Android-compatible subset for Termux (browser suites excluded)
-npm run test:mobile
+Install the pre-push hook:
 
-# Install the local pre-push hook
+```bash
 npm run hooks:install
 ```
 
-The pre-push hook runs `npm run test:mobile` when it detects Termux; on desktop it runs `npm run test:all-engines`. Browser-dependent Playwright suites remain unvalidated on Android. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
+The hook selects `test:mobile` in Termux and `test:all-engines` on desktop. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
 
 ## Recommendation Engine
 
