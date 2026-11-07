@@ -148,7 +148,7 @@ export const deadCodeRules = Object.freeze([
     evaluate(context) {
       const files = new Map((context.projectFiles ?? [])
         .filter((file) => JS_EXTENSIONS.has(file.extension))
-        .map((file) => [file.path.replace(/\\\\/g, "/"), file]));
+        .map((file) => [file.path, file]));
       const manifests = context.packageManifests ?? [];
       const entrypoints = packageEntrypoints(manifests);
       const modules = new Map();
