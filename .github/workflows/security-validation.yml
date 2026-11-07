@@ -2,7 +2,7 @@ name: Security QA
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/deep-analysis-cross-engine-upgrade]
     paths:
       - "package.json"
       - "packages/**"
