@@ -128,7 +128,8 @@ function detectRequestThreats(request, settings) {
     }
 
     const decoded = decodeForInspection(rawTarget);
-    // Unicode compatibility normalization makes full-width and compatibility forms\n    // visible to the same high-confidence signatures without changing the routed URL.\n    const inspectedTarget = decoded.value.slice(0, settings.maxRequestTargetLength).normalize("NFKC");
+    // Normalize compatibility characters for inspection only; the original request URL is routed unchanged.
+    const inspectedTarget = decoded.value.slice(0, settings.maxRequestTargetLength).normalize("NFKC");
     if (decoded.invalidUtf8) {
       findings.push({
         id: "JBG-REQ-003",
