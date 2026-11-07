@@ -48,6 +48,9 @@ test("security re-verification keeps the targeted security profile and resolves 
   assert.ok(result.selection.ruleIds.includes("security.dynamic-code"));
   assert.ok(result.summary.resolved >= 1);
   assert.equal(result.summary.currentExecutionErrors, 0);
+  assert.equal(result.currentReport.securityAssessment.astAnalysis.status, "not-run");
+  assert.equal(result.currentReport.securityAssessment.astAnalysis.complete, false);
+  assert.equal(result.currentReport.securityAssessment.complete, false);
 });
 
 test("re-verification returns not-needed when the previous report has no findings or execution errors", async (t) => {
