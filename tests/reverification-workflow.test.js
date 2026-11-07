@@ -27,6 +27,8 @@ test("project re-verification reruns only prior finding rules and reports resolv
 
   const result = await reverifyProject(root, { previousReport: previous });
   assert.equal(result.status, "completed");
+  assert.equal(result.scope, "targeted-only");
+  assert.equal(result.fullAuditRequired, true);
   assert.ok(result.selection.ruleIds.includes("security.dynamic-code"));
   assert.ok(result.selection.rulesExecuted < previous.summary.rulesExecuted);
   assert.ok(result.summary.resolved >= 1);
@@ -68,6 +70,10 @@ test("re-verification rejects malformed previous reports and invalid audit optio
   await assert.rejects(
     reverifyProject(root, { previousReport: {} }),
     /diagnostics array/
+  );
+  await assert.rejects(
+    reverifyProject(root, { previousReport: { diagnostics: [], execution: {} } }),
+    /execution must be an array/
   );
   await assert.rejects(
     reverifyProject(root, { previousReport: { diagnostics: [] }, auditOptions: [] }),
