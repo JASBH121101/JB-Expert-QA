@@ -68,6 +68,7 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
 
         if (!rule.cssRules) continue;
         const ruleType = rule.constructor?.name ?? "";
+        if (["CSSKeyframesRule", "CSSFontFaceRule", "CSSNamespaceRule"].includes(ruleType)) continue;
         if (ruleType === "CSSMediaRule" && !window.matchMedia(rule.conditionText).matches) continue;
         if (ruleType === "CSSSupportsRule" && typeof CSS !== "undefined" &&
             typeof CSS.supports === "function" && !CSS.supports(rule.conditionText)) continue;
