@@ -594,3 +594,20 @@ test("authentication configuration rejects unknown options, duplicate severities
     socket: { remoteAddress: "192.0.2.22" }
   }), /non-negative safe integer timestamp/);
 });
+
+test("normalizes Unicode compatibility forms before high-confidence request inspection", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const fullWidthXss = await request("/search?q=%EF%BC%9Cscript%EF%BC%9Ealert(1)");
+    assert.equal(fullWidthXss.statusCode, 403);
+    assert.ok(events[0].ruleIds.includes("JBG-XSS-001"));
+  });
+});
+
+test("does not block ordinary search text containing common SQL vocabulary", async () => {
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    const response = await request("/search?q=select%20a%20perfume%20with%20union%20of%20floral%20notes");
+    assert.equal(response.statusCode, 200);
+    assert.equal(events.length, 0);
+  });
+});
+\n
