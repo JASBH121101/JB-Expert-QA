@@ -20,6 +20,7 @@ export {
   databaseRules,
   projectRules
 } from "./specialists/project-rules.js";
+export { deadCodeRules } from "./specialists/dead-code-rules.js";
 export { scanProject } from "./adapters/filesystem/scan-project.js";
 export { auditProject } from "./adapters/filesystem/audit-project.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";
