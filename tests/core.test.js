@@ -4,7 +4,8 @@ import {
   ExpertQAEngine,
   RuleRegistry,
   createDiagnostic,
-  calculateScore
+  calculateScore,
+  compareReverification
 } from "../src/index.js";
 
 const config = {
@@ -151,4 +152,76 @@ test("rule execution errors are reported without crashing the audit", async () =
   const report = await new ExpertQAEngine({ registry, config }).audit();
   assert.equal(report.summary.rulesWithErrors, 1);
   assert.equal(report.execution[0].status, "error");
+});
+
+
+test("engine can re-run only selected rule IDs without evaluating unrelated rules", async () => {
+  const registry = new RuleRegistry();
+  let firstCalls = 0;
+  let secondCalls = 0;
+  registry.register({
+    id: "security.rule-one",
+    specialist: "security",
+    evaluate: () => { firstCalls += 1; return []; }
+  });
+  registry.register({
+    id: "security.rule-two",
+    specialist: "security",
+    evaluate: () => { secondCalls += 1; return []; }
+  });
+
+  const report = await new ExpertQAEngine({ registry, config }).audit({}, {
+    ruleIds: ["security.rule-two"]
+  });
+  assert.equal(firstCalls, 0);
+  assert.equal(secondCalls, 1);
+  assert.equal(report.summary.rulesExecuted, 1);
+  assert.deepEqual(report.summary.selection, {
+    type: "targeted-rules",
+    ruleIds: ["security.rule-two"]
+  });
+  assert.throws(() => new ExpertQAEngine({ registry, config }).audit({}, {
+    ruleIds: ["security.missing"]
+  }), /Unknown rule ID/);
+  assert.throws(() => new ExpertQAEngine({ registry, config }).audit({}, {
+    ruleIds: ["security.rule-one", "security.rule-one"]
+  }), /unique rule IDs/);
+});
+
+test("re-verification comparison identifies resolved, unchanged and new findings", () => {
+  const finding = (id, location) => ({
+    id,
+    ruleId: "security.sample",
+    location,
+    title: id,
+    severity: "medium"
+  });
+  const previous = {
+    diagnostics: [
+      finding("OLD-001", "src/old.js:3"),
+      finding("KEEP-001", "src/app.js:8"),
+      finding("OUT-OF-SCOPE", "src/other.js:1")
+    ]
+  };
+  const current = {
+    diagnostics: [
+      finding("KEEP-001", "src/app.js:8"),
+      finding("NEW-001", "src/app.js:12")
+    ]
+  };
+
+  const diff = compareReverification(previous, current, {
+    ruleIds: ["security.sample"]
+  });
+  assert.deepEqual(diff.summary, {
+    previous: 3,
+    current: 2,
+    resolved: 2,
+    unchanged: 1,
+    newFindings: 1
+  });
+  assert.deepEqual(diff.resolved.map((item) => item.id).sort(), ["OLD-001", "OUT-OF-SCOPE"]);
+  assert.deepEqual(diff.unchanged.map((item) => item.id), ["KEEP-001"]);
+  assert.deepEqual(diff.newFindings.map((item) => item.id), ["NEW-001"]);
+  assert.throws(() => compareReverification(previous, current, { ruleIds: ["", "security.sample"] }), /unique non-empty/);
 });
