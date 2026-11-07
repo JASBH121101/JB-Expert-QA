@@ -20,7 +20,9 @@
     "test:security-guard": "node --test tests/account-recovery.test.js tests/csrf-protection.test.js tests/distributed-auth-protection.test.js tests/distributed-rate-limit.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/security-bridge.test.js tests/security-bridge-integration.test.js tests/security-guard.test.js tests/security-headers.test.js tests/upload-inspector.test.js",
     "test:all-engines": "npm test",
     "benchmark:expert-qa": "node bench/expert-qa.js",
-    "hooks:install": "node scripts/install-git-hooks.js"
+    "hooks:install": "node scripts/install-git-hooks.js",
+    "test:mobile": "node scripts/run-mobile-tests.js",
+    "demo:security-guard": "node examples/security-guard-demo.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -29,5 +31,8 @@
     "pngjs": "7.0.0",
     "acorn": "8.15.0"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/*"
+  ]
 }
