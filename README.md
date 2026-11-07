@@ -61,6 +61,17 @@ The pre-push hook runs `npm run test:mobile` when it detects Termux; on desktop 
 
 The rule-based phone/perfume recommender consumes a supplied catalog and explicit customer priorities. It does not fetch live prices or stock, convert currencies, or invent missing specifications. Unknown availability is returned as unverified. Its score measures weighted fit against supplied attributes, not guaranteed product quality.
 
+## Targeted re-verification
+
+After a project or security audit, save its JSON report and rerun only the rules that produced findings or execution errors:
+
+```bash
+npm run reverify -- ./path/to/project --previous=./reports/previous-audit.json --profile=project --output=./reports/reverification.json
+npm run reverify -- ./path/to/project --previous=./reports/previous-security-audit.json --profile=security --output=./reports/security-reverification.json
+```
+
+The result reports resolved, unchanged, and new findings, plus previous/current rule execution errors. It is a targeted check, not a replacement for a fresh full audit. In particular, security AST coverage and other unselected rules are explicitly marked as not run.
+
 ## Benchmarks
 
 ```bash
