@@ -622,7 +622,7 @@ export const databaseRules = [
     specialist: "database",
     evaluate(context) {
       const findings = [];
-      const unsafe = /\\$(?:query|execute)RawUnsafe\\s*\\(/;
+      const unsafe = /\$(?:query|execute)RawUnsafe\s*\(/;
       for (const file of context.projectFiles ?? []) {
         const extension = (file.extension || file.path.slice(file.path.lastIndexOf("."))).toLowerCase();
         if (AST_JAVASCRIPT_EXTENSIONS.has(extension)) {
@@ -632,8 +632,8 @@ export const databaseRules = [
 
         // TypeScript/TSX remain on a conservative lexical fallback until a
         // TypeScript parser is introduced; their AST coverage is not claimed.
-        if (!/\\.[cm]?[jt]sx?$/i.test(file.path)) continue;
-        const sourceLines = file.content.split(/\\r\\n|\\n|\\r/);
+        if (!/\.[cm]?[jt]sx?$/i.test(file.path)) continue;
+        const sourceLines = file.content.split(/\r\n|\n|\r/);
         for (let index = 0; index < sourceLines.length; index += 1) {
           if (commentLine(sourceLines[index]) || !unsafe.test(sourceLines[index])) continue;
           findings.push(finding(
