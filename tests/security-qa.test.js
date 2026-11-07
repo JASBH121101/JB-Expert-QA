@@ -45,6 +45,12 @@ test("security profile detects multiple high-risk patterns in a controlled fixtu
     assert.ok(ids.some((id) => id.startsWith("SEC-JWT-")));
     assert.ok(ids.some((id) => id.startsWith("SEC-REDIRECT-")));
     assert.ok(ids.some((id) => id.startsWith("SEC-SSRF-")));
+    assert.ok(report.diagnostics.some((item) =>
+      item.metadata?.detector === "ast-taint-analysis" && item.id.startsWith("AST-SSRF-")
+    ), "AST analysis should detect direct request-to-fetch data flow");
+    assert.ok(report.diagnostics.some((item) =>
+      item.metadata?.detector === "ast-taint-analysis" && item.id.startsWith("AST-REDIRECT-")
+    ), "AST analysis should detect direct request-to-redirect data flow");
     assert.equal(report.securityAssessment.mode, "local-static");
     assert.equal(report.securityAssessment.networkRequests, 0);
     assert.equal(report.securityAssessment.databaseConnections, 0);
