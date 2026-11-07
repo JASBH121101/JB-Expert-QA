@@ -4,12 +4,21 @@ set -eu
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if [ -n "${TERMUX_VERSION:-}" ] || case "${PREFIX:-}" in /data/data/com.termux*) true ;; *) false ;; esac; then
-  printf '%s\n' "JB Expert QA: running Android-compatible test suite before push..."
+IS_TERMUX=0
+if [ -n "${TERMUX_VERSION:-}" ]; then
+  IS_TERMUX=1
+else
+  case "${PREFIX:-}" in
+    /data/data/com.termux*) IS_TERMUX=1 ;;
+  esac
+fi
+
+if [ "$IS_TERMUX" -eq 1 ]; then
+  printf "%s\\n" "JB Expert QA: running Android-compatible test suite before push..."
   npm run test:mobile
 else
-  printf '%s\n' "JB Expert QA: running complete engine test suite before push..."
+  printf "%s\\n" "JB Expert QA: running complete engine test suite before push..."
   npm run test:all-engines
 fi
 
-printf '%s\n' "JB Expert QA: pre-push validation passed."
+printf "%s\\n" "JB Expert QA: pre-push validation passed."
