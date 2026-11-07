@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+printf '%s\n' "JB Expert QA: running all engine tests before push..."
+npm run test:all-engines
+printf '%s\n' "JB Expert QA: pre-push validation passed."
