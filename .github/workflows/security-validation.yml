@@ -20,6 +20,8 @@ on:
       - "packages/**"
       - "src/**"
       - "tests/**"
+      - ".githooks/**"
+      - "scripts/**"
       - "config/security-audit.config.json"
       - "config/security-url.config.json"
       - ".github/workflows/security-validation.yml"
@@ -55,7 +57,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('package.json') }}
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('package.json', 'packages/*/package.json') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
       - name: Install dependencies without running package install scripts
@@ -75,10 +77,13 @@ jobs:
         run: |
           node --check src/specialists/security-rules.js
           node --check src/specialists/ast-security-rules.js
+          node --check src/specialists/dead-code-rules.js
           node --check src/adapters/filesystem/audit-security-project.js
           node --check src/adapters/filesystem/audit-project.js
           node --check src/adapters/filesystem/reverify-project.js
           node --check src/core/reverification.js
+          node --check packages/recommendation-engine/src/index.js
+          node --check packages/recommendation-engine/tests/recommendation.test.js
           node --check src/specialists/project-rules.js
           node --check tests/project-audit.test.js
           node --check tests/reverification-workflow.test.js
@@ -113,5 +118,7 @@ jobs:
           node --check tests/upload-inspector.test.js
           node --check bench/expert-qa.js
           node --check bench/record-engine-history.js
-      - name: Run all three engine test suites
+      - name: Run all engine and core test suites
         run: npm run test:all-engines
+      - name: Run explicit phone and perfume recommendation tests
+        run: npm run test:recommendation-engine
