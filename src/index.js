@@ -37,3 +37,4 @@ export { reviewScreenshot, reviewViewportScreenshots, validateVisualReview } fro
 export { createRemediationPlan, validateRemediationPlan } from "./ai/remediation-plan.js";
 export { runAutopilot } from "./agent/autopilot.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
+export { compareReverification } from "./core/reverification.js";
