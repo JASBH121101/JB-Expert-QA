@@ -86,6 +86,7 @@ jobs:
           node --check packages/recommendation-engine/tests/recommendation.test.js
           node --check src/specialists/project-rules.js
           node --check tests/project-audit.test.js
+          node --check tests/reverification.test.js
           node --check tests/reverification-workflow.test.js
           node --check src/security-cli.js
           node --check src/reverify-cli.js
@@ -108,6 +109,9 @@ jobs:
           node --check packages/malware-engine/src/lnk-analyzer.js
           node --check packages/malware-engine/src/rtf-analyzer.js
           node --check packages/malware-engine/src/iso-analyzer.js
+          node --check packages/malware-engine/tests/lnk-analyzer.test.js
+          node --check packages/malware-engine/tests/rtf-analyzer.test.js
+          node --check packages/malware-engine/tests/iso-analyzer.test.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js
@@ -118,7 +122,5 @@ jobs:
           node --check tests/upload-inspector.test.js
           node --check bench/expert-qa.js
           node --check bench/record-engine-history.js
-      - name: Run all engine and core test suites
-        run: npm run test:all-engines
-      - name: Run explicit phone and perfume recommendation tests
-        run: npm run test:recommendation-engine
+      - name: Run non-browser core and engine test suites
+        run: npm run test:mobile
