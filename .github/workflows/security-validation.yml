@@ -49,8 +49,15 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
+      - name: Cache npm download data
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
       - name: Install dependencies without running package install scripts
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm install --prefer-offline --ignore-scripts --no-audit --no-fund
       - name: Audit resolved dependency tree for high and critical vulnerabilities
         run: npm audit --audit-level=high
       - name: Generate CycloneDX software bill of materials
