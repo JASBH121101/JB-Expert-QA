@@ -36,6 +36,8 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context, {
     ...(ruleIds === undefined ? {} : { ruleIds })
   });
+  const deadCodeSelected = ruleIds === undefined ||
+    ruleIds.includes("code-quality.possibly-unused-exports");
   const deadCodeWarnings = report.diagnostics.filter((item) =>
     item.id === "CODE-DEAD-EXPORT-PARSE-SKIPPED" ||
     item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"
@@ -64,9 +66,9 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
       }),
       filesAnalyzed: scan.summary.filesRead,
       deadCodeAnalysis: Object.freeze({
-        status: deadCodeWarnings.length ? "partial" : "heuristic-complete",
+        status: !deadCodeSelected ? "not-run" : deadCodeWarnings.length ? "partial" : "heuristic-complete",
         coverageWarnings: deadCodeWarnings.length,
-        possibleUnusedExports: possibleUnusedExports.length
+        possibleUnusedExports: deadCodeSelected ? possibleUnusedExports.length : null
       }),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,
       dependencyAdvisoryLookup: dependencyAdvisories.enabled,
