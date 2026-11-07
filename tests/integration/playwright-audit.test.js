@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
 const html = `<!doctype html>
@@ -39,6 +42,8 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
 
   const address = server.address();
   const url = "http://127.0.0.1:" + address.port + "/";
+  const screenshotRoot = await mkdtemp(path.join(os.tmpdir(), "jb-qa-annotated-"));
+  const screenshotPath = path.join(screenshotRoot, "initial.png");
   const config = {
     profile: "playwright-integration",
     weights: { responsive: 20, "ui-ux": 20, accessibility: 20, performance: 20, functional: 20 },
@@ -57,7 +62,8 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
       config,
       viewport: { width: 390, height: 844 },
       timeout: 10000,
-      allowPrivateNetworks: true
+      allowPrivateNetworks: true,
+      screenshotPath
     });
 
     const ids = report.diagnostics.map((item) => item.id);
@@ -79,10 +85,15 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
     assert.ok(ids.some((id) => id.startsWith("A11Y-AXE-")), "should include axe-core findings");
     assert.ok(ids.some((id) => id.startsWith("FUNC-003")), "should detect HTTP error");
     assert.ok(report.evidence.axeViolations > 0);
+    assert.ok(report.evidence.diagnosticScreenshotPath, "should produce a separate annotated screenshot");
+    assert.ok(report.evidence.diagnosticMarkers > 0, "should mark the overlapping and overflowing controls");
+    await access(screenshotPath);
+    await access(report.evidence.diagnosticScreenshotPath);
     assert.ok(report.summary.rulesExecuted >= 18);
     assert.equal(report.target.url, url);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    await rm(screenshotRoot, { recursive: true, force: true });
   }
 });
 
