@@ -83,6 +83,7 @@ jobs:
           node --check tests/project-audit.test.js
           node --check tests/reverification-workflow.test.js
           node --check src/security-cli.js
+          node --check src/reverify-cli.js
           node --check src/specialists/runtime-security-rules.js
           node --check src/adapters/filesystem/audit-security-url.js
           node --check src/security-url-cli.js
