@@ -642,7 +642,7 @@ test("benign marketplace and application traffic stays unblocked across a normal
     "/search?q=and+or+but",
     "/products/iphone-18-pro?color=black&storage=256",
     "/search?q=caf%C3%A9+con+leche",
-    "/search?q=東京+camera",
+    "/search?q=%E6%9D%B1%E4%BA%AC+camera",
     "/catalog/perfumes?sort=price-asc&page=2",
     "/catalog/phones?brand=samsung&min=100&max=500",
     "/checkout?step=shipping&method=pickup",
