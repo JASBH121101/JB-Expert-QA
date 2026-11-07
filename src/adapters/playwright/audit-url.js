@@ -228,6 +228,11 @@ export async function auditUrl(url, {
     }));
 
     let interactionResult = null;
+    const cssSelectorCoverageStates = [{
+      name: "initial",
+      triggerSelector: null,
+      coverage: context.cssSelectorCoverage ?? null
+    }];
     if (interactionExploration) {
       interactionResult = await exploreInteractionStates(page, {
         url: parsed.href,
@@ -255,6 +260,7 @@ export async function auditUrl(url, {
         states: interactionResult.states,
         skipped: interactionResult.skipped
       };
+      cssSelectorCoverageStates.push(...(interactionResult.cssSelectorCoverageStates ?? []));
     } else {
       context.interactionExploration = {
         enabled: false,
@@ -267,6 +273,7 @@ export async function auditUrl(url, {
       };
     }
 
+    context.cssSelectorCoverageStates = cssSelectorCoverageStates;
     Object.assign(context, runtimeIssues);
 
     if (runAxe) {
