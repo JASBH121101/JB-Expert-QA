@@ -33,7 +33,7 @@ async function collectTests(directory) {
   return results;
 }
 
-const testRoots = ["tests", "packages/malware-engine/tests"];
+const testRoots = ["tests", "packages/malware-engine/tests", "packages/recommendation-engine/tests"];
 const testFiles = [];
 for (const directory of testRoots) {
   testFiles.push(...await collectTests(join(root, directory)));
@@ -48,6 +48,7 @@ if (testFiles.length === 0) {
 console.log("JB Expert QA mobile validation");
 console.log("Selected test files: " + testFiles.length);
 console.log("Excluded browser-dependent suites: browser-environment, Playwright context, URL browser, and integration tests.");
+console.log("Included package suites: Malware Engine and Recommendation Engine.");
 console.log("Playwright browser coverage remains pending for a desktop/browser runner.");
 
 const result = spawnSync(process.execPath, ["--test", ...testFiles], {
