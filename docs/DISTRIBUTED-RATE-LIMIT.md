@@ -62,3 +62,5 @@ Denied requests receive HTTP 429, `Retry-After`, and `Cache-Control: no-store`. 
 - The included in-memory test adapter is only a deterministic test fixture, not a production shared store.
 
 Before production, implement and test a concrete adapter (for example, a Redis atomic script or a database transaction/upsert with appropriate locking), run concurrency tests against the actual service, define TTL and outage behavior, and monitor store capacity and latency.
+
+Store operations are bounded by `storeTimeoutMs` (default 3 seconds, maximum 60 seconds). A stalled or unavailable store fails closed with a generic 503 unless fail-open is explicitly enabled. Configure the backend adapter with its own command deadline as well: the middleware timeout does not cancel a command already running in the adapter.

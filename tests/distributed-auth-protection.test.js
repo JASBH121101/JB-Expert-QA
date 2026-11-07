@@ -141,3 +141,37 @@ test("invalid injected clock fails closed without throwing from middleware error
   assert.equal(result.response.statusCode, 503);
   assert.equal(result.nextCount, 0);
 });
+
+test("stalled distributed authentication stores fail closed and bound direct store calls", async () => {
+  const store = {
+    getStatus() { return new Promise(() => {}); },
+    recordFailure() { return new Promise(() => {}); },
+    clearFailures() { return new Promise(() => {}); }
+  };
+  const guard = createDistributedAuthProtection({
+    store,
+    secret: SECRET,
+    identityKeyGenerator: r => r.account,
+    mode: "balanced",
+    storeTimeoutMs: 5
+  });
+
+  const started = Date.now();
+  const result = await invoke(guard.middleware, req());
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(result.nextCount, 0);
+  assert.equal(guard.getStats().storeErrors, 1);
+  await assert.rejects(guard.recordFailure(req()), /timed out/);
+  await assert.rejects(guard.recordSuccess(req()), /timed out/);
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("distributed authentication store timeout configuration is validated", () => {
+  const store = atomicStore();
+  assert.throws(() => createDistributedAuthProtection({
+    store, secret: SECRET, identityKeyGenerator: r => r.account, storeTimeoutMs: 0
+  }), /storeTimeoutMs/);
+  assert.throws(() => createDistributedAuthProtection({
+    store, secret: SECRET, identityKeyGenerator: r => r.account, storeTimeoutMs: 60001
+  }), /storeTimeoutMs/);
+});

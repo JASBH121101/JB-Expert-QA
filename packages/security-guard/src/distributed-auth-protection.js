@@ -38,6 +38,21 @@ function normalizePolicies(input = {}) {
   return Object.freeze(output);
 }
 
+
+async function withTimeout(operation, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Distributed store operation timed out")), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function notify(onEvent, event) {
   try {
     const result = onEvent(Object.freeze({ ...event, ruleIds: Object.freeze([...event.ruleIds]), scopes: Object.freeze([...event.scopes]) }));
@@ -66,7 +81,7 @@ function respondUnavailable(response) {
  */
 export function createDistributedAuthProtection(options = {}) {
   if (!isRecord(options)) throw new TypeError("Distributed authentication options must be an object");
-  const allowed = new Set(["store", "secret", "identityKeyGenerator", "clientKeyGenerator", "namespace", "mode", "blockSeverities", "policies", "windowMs", "resetAfterMs", "clock", "onEvent"]);
+  const allowed = new Set(["store", "secret", "identityKeyGenerator", "clientKeyGenerator", "namespace", "mode", "blockSeverities", "policies", "windowMs", "resetAfterMs", "storeTimeoutMs", "clock", "onEvent"]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw new TypeError("Unknown distributed authentication option: " + key);
 
   const store = options.store;
@@ -94,6 +109,7 @@ export function createDistributedAuthProtection(options = {}) {
   const policies = normalizePolicies(options.policies);
   const windowMs = positiveInteger(options.windowMs ?? 600_000, "windowMs", 7 * 86_400_000);
   const resetAfterMs = positiveInteger(options.resetAfterMs ?? 3_600_000, "resetAfterMs", 30 * 86_400_000);
+  const storeTimeoutMs = positiveInteger(options.storeTimeoutMs ?? 3000, "storeTimeoutMs", 60_000);
   const clock = options.clock ?? Date.now;
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
   const onEvent = options.onEvent ?? (() => {});
@@ -147,7 +163,10 @@ export function createDistributedAuthProtection(options = {}) {
     const timestamp = now();
     const keys = activeKeys(getKeys(request));
     if (keys.length === 0) return Object.freeze({ blocked: false, retryAfterMs: 0, scopes: Object.freeze([]) });
-    const result = await store.getStatus({ keys, now: timestamp, resetAfterMs });
+    const result = await withTimeout(
+      () => store.getStatus({ keys, now: timestamp, resetAfterMs }),
+      storeTimeoutMs
+    );
     if (!isRecord(result) || typeof result.blocked !== "boolean" ||
         !Array.isArray(result.scopes) || result.scopes.some((scope) => !SCOPES.includes(scope)) ||
         !Number.isFinite(result.retryAfterMs) || result.retryAfterMs < 0) {
@@ -167,9 +186,9 @@ export function createDistributedAuthProtection(options = {}) {
     const keys = activeKeys(getKeys(request));
     const triggered = [];
     const statuses = await Promise.all(keys.map(async ({ scope, key }) => {
-      const result = await store.recordFailure({
+      const result = await withTimeout(() => store.recordFailure({
         key, scope, now: timestamp, windowMs, resetAfterMs, ...policies[scope]
-      });
+      }), storeTimeoutMs);
       if (!isRecord(result) || typeof result.blocked !== "boolean" ||
           !Number.isFinite(result.retryAfterMs) || result.retryAfterMs < 0 ||
           (result.triggered !== undefined && typeof result.triggered !== "boolean")) {
@@ -204,7 +223,10 @@ export function createDistributedAuthProtection(options = {}) {
     if (!request || typeof request !== "object") throw new TypeError("recordSuccess requires the authentication request");
     const keys = getKeys(request);
     const clear = activeKeys({ ip: null, accountIp: keys.accountIp, account: keys.account });
-    if (clear.length) await store.clearFailures({ keys: clear, now: now(), resetAfterMs });
+    if (clear.length) await withTimeout(
+      () => store.clearFailures({ keys: clear, now: now(), resetAfterMs }),
+      storeTimeoutMs
+    );
   }
 
   async function middleware(request, response, next) {

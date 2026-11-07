@@ -390,3 +390,7 @@ See [Distributed authentication protection](../../docs/DISTRIBUTED-AUTH-PROTECTI
 ## Node.js HTTP server hardening
 
 `configureNodeHttpServer(server, options)` enforces parser timeouts, connection limits and an actual byte limit for both `Content-Length` and streamed/chunked request bodies. See [Node HTTP server hardening](../../docs/NODE-HTTP-HARDENING.md) for configuration, integration and streaming-handler safety requirements.
+
+### Distributed-store timeout
+
+The distributed rate-limit and authentication controls accept `storeTimeoutMs` (default `3000`, maximum `60000`). Each store operation is bounded by this timeout. Middleware requests fail closed with a generic `503` when the shared store is unavailable, returns an invalid result, or does not respond in time. The adapter's atomicity and cross-instance consistency requirements still apply; a timeout does not cancel a backend operation that is already running, so adapters should also enforce their own connection and command deadlines.

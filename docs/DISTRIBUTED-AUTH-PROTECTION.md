@@ -33,3 +33,5 @@ This API is asynchronous; callers must await `recordFailure` and `recordSuccess`
 ## Limitations
 
 No Redis, SQL, Neon or external service client is included. The test adapter is process-local and is not suitable for production. Store atomicity, consistency, TTL and outage handling must be tested against the selected backend before production. This does not replace MFA, secure password hashing, session revocation, account recovery, edge rate limiting or authorization checks.
+
+All distributed store calls use the bounded `storeTimeoutMs` option (default 3 seconds, maximum 60 seconds). A stalled status lookup causes middleware to fail closed with a generic 503. Failure recording and success cleanup also reject after the configured deadline so host routes cannot wait forever. The adapter should enforce its own database/Redis command timeout because the application timeout cannot cancel an already-issued backend operation.

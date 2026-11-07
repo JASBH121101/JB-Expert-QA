@@ -139,3 +139,26 @@ test("invalid injected clock fails closed with 503 instead of rejecting middlewa
   assert.equal(result.continued, 0);
   assert.equal(limiter.getStats().storeErrors, 1);
 });
+
+test("a stalled distributed store fails closed after the configured timeout", async () => {
+  const limiter = createDistributedRateLimit({
+    store: { consumeLimit() { return new Promise(() => {}); } },
+    secret: SECRET,
+    storeTimeoutMs: 5
+  });
+  const started = Date.now();
+  const result = await invoke(limiter.middleware);
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(result.continued, 0);
+  assert.equal(limiter.getStats().storeErrors, 1);
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("store timeout configuration is validated", () => {
+  assert.throws(() => createDistributedRateLimit({
+    store: createAtomicMemoryStore(), secret: SECRET, storeTimeoutMs: 0
+  }), /storeTimeoutMs/);
+  assert.throws(() => createDistributedRateLimit({
+    store: createAtomicMemoryStore(), secret: SECRET, storeTimeoutMs: 60001
+  }), /storeTimeoutMs/);
+});

@@ -10,6 +10,21 @@ function positiveInteger(value, name, maximum) {
   return value;
 }
 
+
+async function withTimeout(operation, timeoutMs) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Distributed store operation timed out")), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function notify(onEvent, event) {
   try {
     const result = onEvent(Object.freeze({ ...event, ruleIds: Object.freeze([...event.ruleIds]) }));
@@ -35,7 +50,7 @@ function respond(response, statusCode, payload, headers = {}) {
  */
 export function createDistributedRateLimit(options = {}) {
   if (!isRecord(options)) throw new TypeError("Distributed rate-limit options must be an object");
-  const allowed = new Set(["store", "secret", "keyGenerator", "namespace", "windowMs", "maxRequests", "clock", "failClosed", "onEvent"]);
+  const allowed = new Set(["store", "secret", "keyGenerator", "namespace", "windowMs", "maxRequests", "storeTimeoutMs", "clock", "failClosed", "onEvent"]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("Unknown distributed rate-limit option: " + key);
   }
@@ -56,6 +71,7 @@ export function createDistributedRateLimit(options = {}) {
   }
   const windowMs = positiveInteger(options.windowMs ?? 60_000, "windowMs", 86_400_000);
   const maxRequests = positiveInteger(options.maxRequests ?? 120, "maxRequests", 1_000_000);
+  const storeTimeoutMs = positiveInteger(options.storeTimeoutMs ?? 3000, "storeTimeoutMs", 60_000);
   const clock = options.clock ?? Date.now;
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
   const failClosed = options.failClosed ?? true;
@@ -96,7 +112,10 @@ export function createDistributedRateLimit(options = {}) {
     let result;
     try {
       now = readNow();
-      result = await store.consumeLimit({ key: makeKey(request), now, windowMs, maxRequests });
+      result = await withTimeout(
+        () => store.consumeLimit({ key: makeKey(request), now, windowMs, maxRequests }),
+        storeTimeoutMs
+      );
       if (!isRecord(result) || typeof result.allowed !== "boolean" ||
           (result.count !== undefined && (!Number.isSafeInteger(result.count) || result.count < 1)) ||
           (result.retryAfterMs !== undefined && (!Number.isFinite(result.retryAfterMs) || result.retryAfterMs < 0))) {
