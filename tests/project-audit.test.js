@@ -479,7 +479,7 @@ test("project audit identifies only review-candidate exports without static in-r
     const candidates = report.diagnostics.filter((item) => item.id.startsWith("CODE-DEAD-EXPORT-") &&
       item.id !== "CODE-DEAD-EXPORT-PARSE-SKIPPED" &&
       item.id !== "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED");
-    assert.equal(candidates.length, 1);
+    assert.equal(candidates.length, 1, JSON.stringify(candidates.map((item) => ({ id: item.id, location: item.location, exportName: item.evidence.exportName }))));
     assert.ok(candidates.every((item) => item.severity === "info"));
     assert.ok(candidates.some((item) => item.evidence.exportName === "possibleOrphan"));
     assert.equal(candidates.some((item) => item.evidence.exportName === "possiblePublicApi"), false);
