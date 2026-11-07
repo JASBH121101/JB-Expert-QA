@@ -6,6 +6,9 @@ function requiredReport(report) {
   if (!report || typeof report !== "object" || !Array.isArray(report.diagnostics)) {
     throw new TypeError("previousReport must contain a diagnostics array");
   }
+  if (report.execution !== undefined && !Array.isArray(report.execution)) {
+    throw new TypeError("previousReport.execution must be an array when provided");
+  }
 }
 
 function selectedRuleIds(report) {
@@ -43,6 +46,8 @@ async function runTargetedReverification(audit, rootPath, {
       engine: "JB Expert QA",
       profile,
       status: "not-needed",
+      scope: "targeted-only",
+      fullAuditRequired: true,
       generatedAt: new Date().toISOString(),
       selection: Object.freeze({ type: "targeted-rules", ruleIds: Object.freeze([]) }),
       summary: Object.freeze({
@@ -71,6 +76,8 @@ async function runTargetedReverification(audit, rootPath, {
     engine: "JB Expert QA",
     profile,
     status: currentReport.summary.rulesWithErrors > 0 ? "review-required" : "completed",
+    scope: "targeted-only",
+    fullAuditRequired: true,
     generatedAt: new Date().toISOString(),
     selection: Object.freeze({
       type: "targeted-rules",
