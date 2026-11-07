@@ -631,3 +631,37 @@ test("normalizes full-width SQL operators while preserving benign Unicode search
     assert.equal(events.length, 1);
   });
 });
+
+
+test("benign marketplace and application traffic stays unblocked across a normal-input corpus", async () => {
+  const benignPaths = [
+    "/search?q=select+the+best+perfume",
+    "/search?q=union+of+floral+notes",
+    "/search?q=O%27Reilly+travel+adapter",
+    "/search?q=drop+off+delivery+point",
+    "/search?q=and+or+but",
+    "/products/iphone-18-pro?color=black&storage=256",
+    "/search?q=caf%C3%A9+con+leche",
+    "/search?q=東京+camera",
+    "/catalog/perfumes?sort=price-asc&page=2",
+    "/catalog/phones?brand=samsung&min=100&max=500",
+    "/checkout?step=shipping&method=pickup",
+    "/help?topic=account+recovery",
+    "/search?q=100%25+cotton+shirt",
+    "/search?q=rock+%26+roll+headphones",
+    "/search?q=kids%27+school+backpack",
+    "/products/laptop?description=select+your+preferred+storage",
+    "/search?q=union+membership+benefits",
+    "/search?q=drop+shipping+explained",
+    "/search?q=or+and+not+keywords",
+    "/health?verbose=false&format=json"
+  ];
+
+  await withGuard({ mode: "balanced", rateLimit: { enabled: false } }, async ({ events, request }) => {
+    for (const path of benignPaths) {
+      const response = await request(path);
+      assert.equal(response.statusCode, 200, "Benign request must remain available: " + path);
+    }
+    assert.equal(events.length, 0, "Normal corpus must not generate security incidents");
+  });
+});
