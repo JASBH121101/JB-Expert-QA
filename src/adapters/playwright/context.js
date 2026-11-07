@@ -15,6 +15,96 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
     };
     const textOf = (element) => (element?.textContent ?? "").replace(/\s+/g, " ").trim();
 
+    // Runtime CSS reachability is a review signal, not proof that a selector is dead.
+    // Rules tied to interaction pseudo-classes and pseudo-elements are excluded because
+    // their matching state cannot be inferred from one captured DOM state.
+    const cssSelectorCoverage = {
+      stylesheetsSeen: document.styleSheets.length,
+      stylesheetsScanned: 0,
+      inaccessibleStylesheets: 0,
+      rulesScanned: 0,
+      unmatchedSelectors: [],
+      dynamicSelectorsSkipped: 0,
+      invalidSelectorsSkipped: 0,
+      groupingRulesSkipped: 0,
+      truncated: false
+    };
+    const dynamicCssState = /:(?:hover|focus(?:-within|-visible)?|active|visited|checked|indeterminate|disabled|enabled|valid|invalid|required|optional|target|open|popover-open|modal|fullscreen)(?:\b|\()/i;
+    const MAX_CSS_RULES = 5000;
+    const MAX_UNMATCHED_CSS = 300;
+
+    function visitCssRules(rules, sheetIndex) {
+      for (let ruleIndex = 0; ruleIndex < rules.length; ruleIndex += 1) {
+        const rule = rules[ruleIndex];
+        if (cssSelectorCoverage.rulesScanned >= MAX_CSS_RULES) {
+          cssSelectorCoverage.truncated = true;
+          return;
+        }
+
+        if (typeof rule.selectorText === "string") {
+          cssSelectorCoverage.rulesScanned += 1;
+          const selector = rule.selectorText.trim();
+          if (!selector || selector.includes("::") || dynamicCssState.test(selector)) {
+            cssSelectorCoverage.dynamicSelectorsSkipped += 1;
+            continue;
+          }
+          try {
+            if (!document.querySelector(selector)) {
+              if (cssSelectorCoverage.unmatchedSelectors.length < MAX_UNMATCHED_CSS) {
+                cssSelectorCoverage.unmatchedSelectors.push({
+                  selector: selector.slice(0, 300),
+                  stylesheetIndex: sheetIndex,
+                  ruleIndex
+                });
+              } else {
+                cssSelectorCoverage.truncated = true;
+              }
+            }
+          } catch {
+            cssSelectorCoverage.invalidSelectorsSkipped += 1;
+          }
+          continue;
+        }
+
+        if (!rule.cssRules) continue;
+        const ruleType = rule.constructor?.name ?? "";
+        if (ruleType === "CSSMediaRule" && !window.matchMedia(rule.conditionText).matches) continue;
+        if (ruleType === "CSSSupportsRule" && typeof CSS !== "undefined" &&
+            typeof CSS.supports === "function" && !CSS.supports(rule.conditionText)) continue;
+        if (ruleType === "CSSContainerRule" || ruleType === "CSSScopeRule") {
+          cssSelectorCoverage.groupingRulesSkipped += 1;
+          continue;
+        }
+        if (ruleType === "CSSLayerBlockRule" || ruleType === "CSSMediaRule" ||
+            ruleType === "CSSSupportsRule") {
+          visitCssRules(rule.cssRules, sheetIndex);
+        } else {
+          cssSelectorCoverage.groupingRulesSkipped += 1;
+        }
+        if (cssSelectorCoverage.truncated) return;
+      }
+    }
+
+    for (let sheetIndex = 0; sheetIndex < document.styleSheets.length; sheetIndex += 1) {
+      const sheet = document.styleSheets[sheetIndex];
+      if (sheet.disabled) continue;
+      try {
+        const rules = sheet.cssRules;
+        cssSelectorCoverage.stylesheetsScanned += 1;
+        visitCssRules(rules, sheetIndex);
+      } catch {
+        // Cross-origin stylesheets can intentionally prevent CSSOM inspection.
+        cssSelectorCoverage.inaccessibleStylesheets += 1;
+      }
+      if (cssSelectorCoverage.truncated) break;
+    }
+    cssSelectorCoverage.unmatchedSelectorCount = cssSelectorCoverage.unmatchedSelectors.length;
+    cssSelectorCoverage.complete =
+      cssSelectorCoverage.inaccessibleStylesheets === 0 &&
+      cssSelectorCoverage.groupingRulesSkipped === 0 &&
+      !cssSelectorCoverage.truncated;
+
+
     const elements = [...document.body.querySelectorAll("*")].filter(visible).slice(0, 1500).map((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -283,6 +373,7 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
       headings,
       resources,
       cards,
+      cssSelectorCoverage,
       thresholds: settings.thresholds
     };
   }, { thresholds });
