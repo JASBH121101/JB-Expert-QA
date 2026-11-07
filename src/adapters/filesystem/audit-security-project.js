@@ -67,6 +67,12 @@ export async function auditSecurityProject(rootPath, {
 
   const astAnalysisSelected = ruleIds === undefined ||
     ruleIds.includes("security.ast-taint-analysis");
+  if (ruleIds !== undefined) {
+    incompleteReasons.push("targeted rule execution; security rules outside the selected set were not run");
+  }
+  if (!astAnalysisSelected) {
+    incompleteReasons.push("AST taint analysis was not run in this targeted verification");
+  }
   const astParseSkips = astAnalysisSelected
     ? report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length
     : 0;
