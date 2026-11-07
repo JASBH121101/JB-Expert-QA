@@ -10,7 +10,7 @@ import {
 
 const config = {
   profile: "test",
-  weights: { "ui-ux": 50, responsive: 50 },
+  weights: { "ui-ux": 50, responsive: 50, security: 0 },
   severityPenalties: { critical: 25, high: 12, medium: 5, low: 2, info: 0 },
   thresholds: { failOnCritical: true }
 };
