@@ -39,11 +39,14 @@ npm run test:security-guard
 # Malware Engine package tests
 npm run test:malware-engine
 
+# Android-compatible subset for Termux (browser suites excluded)
+npm run test:mobile
+
 # Install the local pre-push hook
 npm run hooks:install
 ```
 
-The pre-push hook runs `npm run test:all-engines` before a push. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
+The pre-push hook runs `npm run test:mobile` when it detects Termux; on desktop it runs `npm run test:all-engines`. Browser-dependent Playwright suites remain unvalidated on Android. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
 
 ## Benchmarks
 
