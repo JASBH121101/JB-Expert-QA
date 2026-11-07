@@ -7,6 +7,7 @@ import projectConfig from "../../../config/project-audit.config.json" with { typ
 import { scanProject } from "./scan-project.js";
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { projectRules } from "../../specialists/project-rules.js";
+import { securityDefenseRules } from "../../specialists/security-rules.js";
 import { deadCodeRules } from "../../specialists/dead-code-rules.js";
 
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {}, ruleIds } = {}) {
@@ -18,6 +19,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   const dependencyAdvisories = await scanNpmAdvisories(scan, validatedConfig.advisories);
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
+  for (const rule of securityDefenseRules) registry.register(rule);
   for (const rule of deadCodeRules) registry.register(rule);
 
   const incompleteReasons = [];
