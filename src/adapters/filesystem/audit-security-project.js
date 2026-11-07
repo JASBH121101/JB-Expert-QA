@@ -65,16 +65,24 @@ export async function auditSecurityProject(rootPath, {
     ...(ruleIds === undefined ? {} : { ruleIds })
   });
 
-  const astParseSkips = report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length;
-  const astUnsupportedFiles = report.diagnostics.filter((item) => item.id.startsWith("AST-UNSUPPORTED-")).length;
-  const astPropagationLimits = report.diagnostics.filter((item) => item.id.startsWith("AST-TAINT-LIMIT-")).length;
-  if (astParseSkips > 0) {
+  const astAnalysisSelected = ruleIds === undefined ||
+    ruleIds.includes("security.ast-taint-analysis");
+  const astParseSkips = astAnalysisSelected
+    ? report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length
+    : 0;
+  const astUnsupportedFiles = astAnalysisSelected
+    ? report.diagnostics.filter((item) => item.id.startsWith("AST-UNSUPPORTED-")).length
+    : 0;
+  const astPropagationLimits = astAnalysisSelected
+    ? report.diagnostics.filter((item) => item.id.startsWith("AST-TAINT-LIMIT-")).length
+    : 0;
+  if (astAnalysisSelected && astParseSkips > 0) {
     incompleteReasons.push(astParseSkips + " JavaScript file(s) could not be parsed for AST analysis");
   }
-  if (astUnsupportedFiles > 0) {
+  if (astAnalysisSelected && astUnsupportedFiles > 0) {
     incompleteReasons.push(astUnsupportedFiles + " code file(s) use a language not yet supported by AST analysis");
   }
-  if (astPropagationLimits > 0) {
+  if (astAnalysisSelected && astPropagationLimits > 0) {
     incompleteReasons.push(astPropagationLimits + " JavaScript file(s) reached the AST data-flow propagation limit");
   }
 
@@ -97,7 +105,8 @@ export async function auditSecurityProject(rootPath, {
         parseSkips: astParseSkips,
         unsupportedFiles: astUnsupportedFiles,
         propagationLimitFiles: astPropagationLimits,
-        complete: astParseSkips === 0 && astUnsupportedFiles === 0 && astPropagationLimits === 0,
+        complete: astAnalysisSelected && astParseSkips === 0 && astUnsupportedFiles === 0 && astPropagationLimits === 0,
+        status: astAnalysisSelected ? "completed" : "not-run",
         dataFlow: "intra-file variable alias tracking",
         interprocedural: false
       }),
