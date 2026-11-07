@@ -30,9 +30,9 @@ test("project re-verification reruns only the rule IDs represented in the previo
     assert.equal(result.status, "partial");
     assert.equal(result.scope, "targeted-only");
     assert.equal(result.fullAuditRequired, true);
-    assert.deepEqual(result.selection.ruleIds, ["database.raw-query"]);
+    assert.deepEqual(result.selection.ruleIds, ["code-quality.test-presence", "database.raw-query"]);
     assert.equal(result.selection.rulesExecuted, 1);
-    assert.equal(result.summary.unchanged, 1);
+    assert.equal(result.summary.unchanged, 2);
     assert.equal(result.summary.resolved, 0);
     assert.equal(result.summary.newFindings, 0);
     assert.equal(result.currentReport.summary.selection.type, "targeted-rules");
