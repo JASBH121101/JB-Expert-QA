@@ -13,6 +13,8 @@ async function fixture(t, source) {
   const root = await mkdtemp(path.join(os.tmpdir(), "jb-reverify-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, "src"), { recursive: true });
+  await mkdir(path.join(root, "tests"), { recursive: true });
+  await writeFile(path.join(root, "tests", "fixture.test.js"), "");
   await writeFile(path.join(root, "src", "app.js"), source);
   return root;
 }
@@ -26,7 +28,7 @@ test("project re-verification reruns only prior finding rules and reports resolv
     "export function run(input) { return String(input); }\n");
 
   const result = await reverifyProject(root, { previousReport: previous });
-  assert.equal(result.status, "completed");
+  assert.equal(result.status, "partial");
   assert.equal(result.scope, "targeted-only");
   assert.equal(result.fullAuditRequired, true);
   assert.ok(result.selection.ruleIds.includes("security.dynamic-code"));
