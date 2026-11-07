@@ -152,6 +152,7 @@ export const deadCodeRules = Object.freeze([
       const manifests = context.packageManifests ?? [];
       const entrypoints = packageEntrypoints(manifests);
       const modules = new Map();
+      const parseSkipped = [];
       let dynamicResolutionPresent = false;
 
       for (const [modulePath, file] of files) {
@@ -160,11 +161,22 @@ export const deadCodeRules = Object.freeze([
           modules.set(modulePath, analysis);
           if (analysis.dynamicModuleReference) dynamicResolutionPresent = true;
         } catch {
-          // Unparseable modules are omitted from this heuristic; no deletion recommendation is made.
+          parseSkipped.push(modulePath);
         }
       }
 
-      if (dynamicResolutionPresent) return [];
+      if (dynamicResolutionPresent) {
+        return [{
+          id: "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED",
+          title: "Unused-export analysis skipped because dynamic module loading is present",
+          description: "At least one non-literal import() or require() prevents a reliable static module graph. No exports were labelled unused.",
+          severity: "info",
+          location: ".",
+          recommendation: "Provide literal module specifiers where practical, or review export reachability manually.",
+          evidence: { dynamicModuleLoadingDetected: true },
+          metadata: { detector: "static-module-graph", confidence: "coverage-warning" }
+        }];
+      }
       const usedExports = new Map();
       for (const modulePath of files.keys()) usedExports.set(modulePath, new Set());
       for (const [importerPath, analysis] of modules) {
@@ -183,6 +195,18 @@ export const deadCodeRules = Object.freeze([
       }
 
       const findings = [];
+      if (parseSkipped.length) {
+        findings.push({
+          id: "CODE-DEAD-EXPORT-PARSE-SKIPPED",
+          title: "Some modules could not be parsed for export reachability",
+          description: parseSkipped.length + " JavaScript module(s) could not be parsed, so their exports were not assessed.",
+          severity: "info",
+          location: parseSkipped.slice(0, 8).join(", "),
+          recommendation: "Resolve parse errors or use a compatible parser before treating export reachability as complete.",
+          evidence: { parseSkippedCount: parseSkipped.length, paths: parseSkipped.slice(0, 20) },
+          metadata: { detector: "static-module-graph", confidence: "coverage-warning" }
+        });
+      }
       for (const [modulePath, analysis] of modules) {
         if (!analysis.exports.size || analysis.commonJsBoundary || analysis.reExportsAll ||
             INDEX_NAMES.has(path.posix.basename(modulePath)) || entrypoints.has(modulePath)) continue;
