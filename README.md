@@ -26,41 +26,21 @@ The root package declares `packages/*` as npm workspaces, so internal packages a
 
 ## Run checks
 
-Install the workspace and dependencies from the repository root:
-
 ```bash
-npm install
-```
-
-Run the complete Node.js test suite:
-
-```bash
+# Full Node.js test discovery (all engines and the recommender)
 npm run test:all-engines
-```
 
-Run the Android/Termux-compatible subset. Browser-dependent Playwright tests are excluded and must be validated on a desktop browser runner:
-
-```bash
+# Android/Termux-compatible subset (browser suites are explicitly excluded)
 npm run test:mobile
-```
 
-Run focused suites and local demonstrations:
-
-```bash
+# Focused suites
 npm run test:expert-qa
 npm run test:security-guard
 npm run test:malware-engine
 npm run test:recommendation-engine
-npm run demo:security-guard
 ```
 
-Install the pre-push hook:
-
-```bash
-npm run hooks:install
-```
-
-The hook selects `test:mobile` in Termux and `test:all-engines` on desktop. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
+Install the local pre-push hook with `npm run hooks:install`. It runs `test:mobile` in Termux and `test:all-engines` on desktop. Browser-dependent Playwright suites must be validated on a desktop browser runner. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
 
 ## Recommendation Engine
 
@@ -75,7 +55,7 @@ npm run reverify -- ./path/to/project --previous=./reports/previous-audit.json -
 npm run reverify -- ./path/to/project --previous=./reports/previous-security-audit.json --profile=security --output=./reports/security-reverification.json
 ```
 
-The result reports resolved, unchanged, and new findings, plus previous/current rule execution errors. It is a targeted check, not a replacement for a fresh full audit. In particular, security AST coverage and other unselected rules are explicitly marked as not run.
+The result compares resolved, unchanged, and new findings and reports execution errors. A successful targeted run has `status: "partial"`, because unselected rules were deliberately not rerun. A `review-required` result means one or more selected rules failed to execute. A `not-needed` result means the previous report contained no rule IDs to rerun. Targeted re-verification is not a replacement for a fresh full audit; complete all full project and security audits before release.
 
 ## Benchmarks
 
@@ -116,27 +96,3 @@ Benchmarks should be compared only across equivalent environments and fixture ve
 Development work is performed on feature branches. Do not push directly to `main` or merge a feature branch without an explicit release decision. Keep secrets, credentials, real customer data, and proprietary malware samples out of commits, fixtures, screenshots, and test logs.
 
 See [SECURITY.md](SECURITY.md) for reporting security issues and [docs/VALIDATION-AND-CALIBRATION.md](docs/VALIDATION-AND-CALIBRATION.md) for the validation strategy.
-
-## Targeted re-verification
-
-After fixing findings, re-run only the rule IDs that produced findings or execution errors in a previous JSON audit report. This avoids repeating unrelated checks and returns a comparison of resolved, unchanged, and newly introduced findings.
-
-```js
-import { readFile } from "node:fs/promises";
-import { reverifyProject, reverifySecurityProject } from "./src/index.js";
-
-const previousReport = JSON.parse(
-  await readFile("./reports/previous-audit.json", "utf8")
-);
-
-const projectResult = await reverifyProject("./", { previousReport });
-console.log(projectResult.summary);
-
-const securityResult = await reverifySecurityProject("./", {
-  previousReport: previousReport,
-  auditOptions: { onlineAdvisories: false }
-});
-console.log(securityResult.summary);
-```
-
-A result with `status: "not-needed"` means the previous report contained no rule IDs to re-run. A `review-required` result means one or more selected rules failed to execute. Re-verification is not a full audit: rules that did not produce findings or execution errors in the previous report are intentionally not run. Run a fresh full audit before release.
