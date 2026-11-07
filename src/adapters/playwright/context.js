@@ -23,6 +23,7 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
       stylesheetsScanned: 0,
       inaccessibleStylesheets: 0,
       rulesScanned: 0,
+      selectorEvaluations: [],
       unmatchedSelectors: [],
       dynamicSelectorsSkipped: 0,
       invalidSelectorsSkipped: 0,
@@ -31,6 +32,7 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
     };
     const dynamicCssState = /:(?:hover|focus(?:-within|-visible)?|active|visited|checked|indeterminate|disabled|enabled|valid|invalid|required|optional|target|open|popover-open|modal|fullscreen)(?:\b|\()/i;
     const MAX_CSS_RULES = 5000;
+    const MAX_CSS_EVALUATIONS = 300;
     const MAX_UNMATCHED_CSS = 300;
 
     function visitCssRules(rules, sheetIndex) {
@@ -49,11 +51,24 @@ export async function collectPageContext(page, { thresholds = {} } = {}) {
             continue;
           }
           try {
-            if (!document.querySelector(selector)) {
+            const matched = Boolean(document.querySelector(selector));
+            if (cssSelectorCoverage.selectorEvaluations.length < MAX_CSS_EVALUATIONS) {
+              cssSelectorCoverage.selectorEvaluations.push({
+                selector: selector.slice(0, 300),
+                stylesheetIndex: sheetIndex,
+                stylesheetHref: rule.parentStyleSheet?.href ?? null,
+                ruleIndex,
+                matched
+              });
+            } else {
+              cssSelectorCoverage.truncated = true;
+            }
+            if (!matched) {
               if (cssSelectorCoverage.unmatchedSelectors.length < MAX_UNMATCHED_CSS) {
                 cssSelectorCoverage.unmatchedSelectors.push({
                   selector: selector.slice(0, 300),
                   stylesheetIndex: sheetIndex,
+                  stylesheetHref: rule.parentStyleSheet?.href ?? null,
                   ruleIndex
                 });
               } else {
