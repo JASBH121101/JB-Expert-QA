@@ -18,9 +18,24 @@ export class ExpertQAEngine {
       throw new TypeError("options.specialist must be a non-empty specialist id");
     }
 
-    const rules = this.registry.list(
+    const availableRules = this.registry.list(
       options.specialist ? { specialist: options.specialist } : {}
     );
+    let rules = availableRules;
+    if (options.ruleIds !== undefined) {
+      if (!Array.isArray(options.ruleIds) || options.ruleIds.length === 0 ||
+          options.ruleIds.some((id) => typeof id !== "string" || !id.trim()) ||
+          new Set(options.ruleIds).size !== options.ruleIds.length) {
+        throw new TypeError("options.ruleIds must be a non-empty array of unique rule IDs");
+      }
+      const requestedIds = new Set(options.ruleIds);
+      const knownIds = new Set(availableRules.map((rule) => rule.id));
+      const unknownIds = options.ruleIds.filter((id) => !knownIds.has(id));
+      if (unknownIds.length) {
+        throw new TypeError("Unknown rule ID(s) for this audit selection: " + unknownIds.join(", "));
+      }
+      rules = availableRules.filter((rule) => requestedIds.has(rule.id));
+    }
     const diagnostics = [];
     const execution = [];
 
@@ -76,7 +91,10 @@ export class ExpertQAEngine {
         rulesExecuted: execution.length,
         rulesWithErrors: execution.filter((item) => item.status === "error").length,
         findings: diagnostics.length,
-        specialists: Object.freeze(includedSpecialists)
+        specialists: Object.freeze(includedSpecialists),
+        selection: options.ruleIds === undefined
+          ? Object.freeze({ type: options.specialist ? "specialist" : "full", specialist: options.specialist ?? null })
+          : Object.freeze({ type: "targeted-rules", ruleIds: Object.freeze(rules.map((rule) => rule.id)) })
       }),
       scoring,
       diagnostics: Object.freeze(diagnostics),
