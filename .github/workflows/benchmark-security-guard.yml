@@ -2,7 +2,7 @@ name: JB Engines Permanent Benchmark
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/deep-analysis-cross-engine-upgrade]
     paths:
       - "src/**"
       - "packages/**"
