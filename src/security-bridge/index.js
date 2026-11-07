@@ -388,7 +388,7 @@ export function createSecurityBridgeCoordinator(options = {}) {
     const seen = seenEvents.get(assessment.eventId);
     if (seen) {
       if (seen.digest !== digest) throw new SecurityBridgeError("EVENT_ID_CONFLICT");
-      return getDecision(assessment.correlationId);
+      return seen.decision;
     }
     if (seenEvents.size >= maxEvents) throw new SecurityBridgeError("CAPACITY_REACHED");
 
@@ -418,9 +418,8 @@ export function createSecurityBridgeCoordinator(options = {}) {
       current ? compareAssessment(current, assessment) : assessment
     );
     record.lastSeenAt = now;
-    seenEvents.set(assessment.eventId, { digest, expiresAt: now + retentionMs });
-
     const decision = buildDecision(record, requiredProducers, now);
+    seenEvents.set(assessment.eventId, { digest, expiresAt: now + retentionMs, decision });
     safeNotify(onDecision, decision);
     return decision;
   }
