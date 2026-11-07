@@ -22,13 +22,22 @@ From the repository root:
 npm install
 ```
 
-The root package currently pins its direct dependencies, but a root `package-lock.json` is not yet checked in. Until the lockfile is generated and committed, transitive dependency resolution is not fully reproducible. Do not use this repository's current dependency installation as a production supply-chain guarantee.
+The root package declares `packages/*` as npm workspaces, so internal packages are linked locally by `npm install`. The root package currently pins its direct dependencies, but a root `package-lock.json` is not yet checked in. Until the lockfile is generated and committed, transitive dependency resolution is not fully reproducible. Do not use this repository's current dependency installation as a production supply-chain guarantee.
 
 ## Run checks
 
 ```bash
-# Full Node.js test discovery
+# Full Node.js test discovery (all security engines and the recommender)
 npm test
+
+# Phone and perfume recommendation tests
+npm run test:recommendation-engine
+
+# Android/Termux-compatible test selection (browser suites are explicitly excluded)
+npm run test:mobile
+
+# Local-only Security Guard request demonstration
+npm run demo:security-guard
 
 # Focused security QA tests
 npm run test:expert-qa
@@ -47,6 +56,10 @@ npm run hooks:install
 ```
 
 The pre-push hook runs `npm run test:mobile` when it detects Termux; on desktop it runs `npm run test:all-engines`. Browser-dependent Playwright suites remain unvalidated on Android. Hooks are local safeguards and can be bypassed; CI and independent review remain necessary.
+
+## Recommendation Engine
+
+The rule-based phone/perfume recommender consumes a supplied catalog and explicit customer priorities. It does not fetch live prices or stock, convert currencies, or invent missing specifications. Unknown availability is returned as unverified. Its score measures weighted fit against supplied attributes, not guaranteed product quality.
 
 ## Benchmarks
 
