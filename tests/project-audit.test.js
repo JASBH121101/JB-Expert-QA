@@ -468,7 +468,7 @@ test("project audit identifies only review-candidate exports without static in-r
     ].join("\n"));
     await writeFile(join(root, "src", "app.js"), [
       'import { usedInProject } from "./utilities.js";',
-      "export const result = usedInProject(41);"
+      "const result = usedInProject(41);"
     ].join("\n"));
     await writeFile(join(root, "src", "index.js"), [
       "export { possiblePublicApi } from './public-api.js';"
@@ -479,7 +479,7 @@ test("project audit identifies only review-candidate exports without static in-r
     const candidates = report.diagnostics.filter((item) => item.id.startsWith("CODE-DEAD-EXPORT-") &&
       item.id !== "CODE-DEAD-EXPORT-PARSE-SKIPPED" &&
       item.id !== "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED");
-    assert.equal(candidates.length, 1, JSON.stringify(candidates.map((item) => ({ id: item.id, location: item.location, exportName: item.evidence.exportName }))));
+    assert.equal(candidates.length, 1);
     assert.ok(candidates.every((item) => item.severity === "info"));
     assert.ok(candidates.some((item) => item.evidence.exportName === "possibleOrphan"));
     assert.equal(candidates.some((item) => item.evidence.exportName === "possiblePublicApi"), false);
