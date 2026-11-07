@@ -14,7 +14,8 @@ export async function auditSecurityProject(rootPath, {
   config = securityConfig,
   scanOptions = {},
   onlineAdvisories = false,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  ruleIds
 } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) {
     throw new TypeError("A project directory path is required");
@@ -60,6 +61,8 @@ export async function auditSecurityProject(rootPath, {
     projectScan: scan,
     thresholds: validatedConfig.thresholds,
     dependencyAdvisoryScan: dependencyAdvisories
+  }, {
+    ...(ruleIds === undefined ? {} : { ruleIds })
   });
 
   const astParseSkips = report.diagnostics.filter((item) => item.id.startsWith("AST-PARSE-")).length;
