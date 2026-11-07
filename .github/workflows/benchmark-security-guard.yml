@@ -41,8 +41,15 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+      - name: Cache npm download data
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-22-npm-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-22-npm-
       - name: Install root dependencies without lifecycle scripts
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm install --prefer-offline --ignore-scripts --no-audit --no-fund
       - name: Benchmark JB Expert QA
         env:
           EXPERT_QA_BENCH_ITERATIONS: "5"
