@@ -22,7 +22,8 @@
     "benchmark:expert-qa": "node bench/expert-qa.js",
     "hooks:install": "node scripts/install-git-hooks.js",
     "test:mobile": "node scripts/run-mobile-tests.js",
-    "demo:security-guard": "node examples/security-guard-demo.js"
+    "demo:security-guard": "node examples/security-guard-demo.js",
+    "test:browser": "node --test tests/browser-environment.test.js tests/playwright-context.test.js tests/security-url.browser.test.js tests/url-safety.test.js tests/integration/interaction-exploration.test.js tests/integration/playwright-audit.test.js tests/integration/viewport-matrix.test.js tests/integration/visual-baseline.test.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
