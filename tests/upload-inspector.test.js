@@ -477,3 +477,44 @@ test("a quarantine read stream that resolves after timeout is destroyed", async 
   assert.equal(store.quarantine.has(uploadId), true);
   assert.equal(store.calls.some(([name]) => name === "promote"), false);
 });
+
+
+test("accumulates file signatures across arbitrary stream chunk boundaries", async () => {
+  const store = createMemoryStore();
+  const chunks = Array.from({ length: PNG.length }, (_, index) => PNG.subarray(index, index + 1));
+  const result = await inspector(store).inspect({
+    source: Readable.from(chunks),
+    fileName: "split-signature.png",
+    declaredMimeType: "image/png"
+  });
+  assert.equal(result.status, "approved");
+  assert.equal(result.mimeType, "image/png");
+  assert.equal(store.approved.get(result.uploadId).bytes.equals(PNG), true);
+});
+
+test("rejects a deterministic malformed upload-signature corpus without promotion", async () => {
+  let seed = 0x4a42554c;
+  for (let sampleIndex = 0; sampleIndex < 64; sampleIndex += 1) {
+    const store = createMemoryStore();
+    const bytes = Buffer.alloc(32);
+    for (let index = 0; index < bytes.length; index += 1) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      bytes[index] = seed >>> 24;
+    }
+    // Keep the first byte outside every supported signature so the corpus is deterministic.
+    bytes[0] = 0x42;
+
+    await assert.rejects(
+      inspector(store).inspect({
+        source: Readable.from([bytes]),
+        fileName: "mutated-" + sampleIndex + ".png",
+        declaredMimeType: "image/png"
+      }),
+      (error) => error instanceof UploadInspectionError && error.code === "UNSUPPORTED_TYPE"
+    );
+    assert.equal(store.approved.size, 0);
+    assert.equal(store.quarantine.size, 0);
+    assert.equal(store.calls.some(([name]) => name === "promote"), false);
+    assert.ok(store.calls.some(([name]) => name === "delete"));
+  }
+});
