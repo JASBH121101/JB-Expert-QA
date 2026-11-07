@@ -320,6 +320,17 @@ export async function auditUrl(url, {
         blockedRequests: runtimeIssues.blockedRequests.length,
         sameOriginOnly,
         interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
+        cssSelectorCoverage: context.cssSelectorCoverage ? {
+          complete: context.cssSelectorCoverage.complete,
+          stylesheetsSeen: context.cssSelectorCoverage.stylesheetsSeen,
+          stylesheetsScanned: context.cssSelectorCoverage.stylesheetsScanned,
+          inaccessibleStylesheets: context.cssSelectorCoverage.inaccessibleStylesheets,
+          rulesScanned: context.cssSelectorCoverage.rulesScanned,
+          unmatchedSelectors: context.cssSelectorCoverage.unmatchedSelectorCount,
+          dynamicSelectorsSkipped: context.cssSelectorCoverage.dynamicSelectorsSkipped,
+          groupingRulesSkipped: context.cssSelectorCoverage.groupingRulesSkipped,
+          truncated: context.cssSelectorCoverage.truncated
+        } : null,
         interactionStatesChecked: context.interactionExploration?.statesCaptured ?? 0,
         interactionCandidates: context.interactionExploration?.candidatesDiscovered ?? 0,
         interactionActionsAttempted: context.interactionExploration?.actionsAttempted ?? 0,
