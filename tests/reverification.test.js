@@ -11,6 +11,8 @@ async function withProject(run) {
   const root = await mkdtemp(join(tmpdir(), "jb-reverify-"));
   try {
     await mkdir(join(root, "src"), { recursive: true });
+    await mkdir(join(root, "tests"), { recursive: true });
+    await writeFile(join(root, "tests", "fixture.test.js"), "");
     await run(root);
   } finally {
     await rm(root, { recursive: true, force: true });
