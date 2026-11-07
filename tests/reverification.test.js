@@ -25,7 +25,9 @@ test("project re-verification reruns only the rule IDs represented in the previo
     assert.ok(previous.diagnostics.some((item) => item.ruleId === "database.raw-query"));
 
     const result = await reverifyProject(root, { previousReport: previous });
-    assert.equal(result.status, "completed");
+    assert.equal(result.status, "partial");
+    assert.equal(result.scope, "targeted-only");
+    assert.equal(result.fullAuditRequired, true);
     assert.deepEqual(result.selection.ruleIds, ["database.raw-query"]);
     assert.equal(result.selection.rulesExecuted, 1);
     assert.equal(result.summary.unchanged, 1);
@@ -56,6 +58,8 @@ test("security re-verification accepts the previous audit options and remains of
     const result = await reverifySecurityProject(root, { previousReport: previous });
 
     assert.equal(result.profile, "security");
+    assert.equal(result.status, "partial");
+    assert.equal(result.fullAuditRequired, true);
     assert.deepEqual(result.selection.ruleIds, [...new Set(previous.diagnostics.map((item) => item.ruleId))].sort());
     assert.equal(result.currentReport.dependencyAdvisories.status, "disabled");
     assert.equal(result.currentReport.securityAssessment.networkRequests, 0);
