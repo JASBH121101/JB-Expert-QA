@@ -1,3 +1,5 @@
+import { parse } from "acorn";
+
 function finding(id, title, description, severity, path, recommendation, metadata = {}, line = null) {
   return {
     id, title, description, severity,
@@ -499,6 +501,74 @@ export const dependencyRules = [
   }
 ];
 
+const AST_JAVASCRIPT_EXTENSIONS = new Set([".js", ".mjs", ".cjs"]);
+const UNSAFE_RAW_QUERY_METHODS = new Set(["$queryRawUnsafe", "$executeRawUnsafe"]);
+
+function walkAst(node, visit) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const item of node) walkAst(item, visit);
+    return;
+  }
+  if (typeof node.type === "string") visit(node);
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "loc" || key === "start" || key === "end") continue;
+    if (value && typeof value === "object") walkAst(value, visit);
+  }
+}
+
+function staticMemberProperty(node) {
+  if (node?.type !== "MemberExpression") return null;
+  if (!node.computed && node.property?.type === "Identifier") return node.property.name;
+  if (node.computed && node.property?.type === "Literal" &&
+      typeof node.property.value === "string") return node.property.value;
+  return null;
+}
+
+function unsafeRawQueryAstFindings(file) {
+  let ast;
+  try {
+    ast = parse(file.content, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      locations: true,
+      allowHashBang: true,
+      allowReturnOutsideFunction: true
+    });
+  } catch {
+    // Parse coverage is reported by the dedicated AST security analyzer.
+    return [];
+  }
+
+  const findings = [];
+  walkAst(ast, (node) => {
+    if (node.type !== "CallExpression" && node.type !== "NewExpression") return;
+    const method = staticMemberProperty(node.callee);
+    if (!UNSAFE_RAW_QUERY_METHODS.has(method)) return;
+
+    const line = node.loc?.start?.line ?? 1;
+    const column = node.loc?.start?.column ?? 0;
+    const safePath = file.path.replace(/[^a-z0-9]+/gi, "-");
+    findings.push(finding(
+      "DB-RAW-AST-" + safePath + "-" + line + "-" + column,
+      "Unsafe raw database query API",
+      "An unsafe raw-query API was identified from the JavaScript AST. The call requires review because interpolated values can alter SQL structure; this API name alone does not prove that untrusted input reaches it.",
+      "high",
+      file.path,
+      "Prefer parameterized query APIs. If a raw query is unavoidable, keep SQL structure static, bind values separately, and allowlist any dynamic identifiers.",
+      {
+        requiresManualReview: true,
+        parser: "Acorn",
+        detection: "AST call-expression sink identification",
+        sink: method,
+        column
+      },
+      line
+    ));
+  });
+  return findings;
+}
+
 export const databaseRules = [
   {
     id: "database.destructive-sql",
@@ -552,18 +622,30 @@ export const databaseRules = [
     specialist: "database",
     evaluate(context) {
       const findings = [];
-      const unsafe = /\$(?:query|execute)RawUnsafe\s*\(/;
+      const unsafe = /\\$(?:query|execute)RawUnsafe\\s*\\(/;
       for (const file of context.projectFiles ?? []) {
-        if (!/\.[cm]?[jt]sx?$/i.test(file.path)) continue;
-        const lines = file.content.split(/\r\n|\n|\r/);
-        for (let index = 0; index < lines.length; index += 1) {
-          if (commentLine(lines[index]) || !unsafe.test(lines[index])) continue;
-          findings.push(finding("DB-RAW-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1),
+        const extension = (file.extension || file.path.slice(file.path.lastIndexOf("."))).toLowerCase();
+        if (AST_JAVASCRIPT_EXTENSIONS.has(extension)) {
+          findings.push(...unsafeRawQueryAstFindings(file));
+          continue;
+        }
+
+        // TypeScript/TSX remain on a conservative lexical fallback until a
+        // TypeScript parser is introduced; their AST coverage is not claimed.
+        if (!/\\.[cm]?[jt]sx?$/i.test(file.path)) continue;
+        const sourceLines = file.content.split(/\\r\\n|\\n|\\r/);
+        for (let index = 0; index < sourceLines.length; index += 1) {
+          if (commentLine(sourceLines[index]) || !unsafe.test(sourceLines[index])) continue;
+          findings.push(finding(
+            "DB-RAW-LEXICAL-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1),
             "Unsafe raw database query API",
-            "An unsafe raw-query API was detected. Static analysis cannot determine whether all interpolated values are trusted.",
-            "high", file.path,
+            "An unsafe raw-query API was found by a line-based fallback because this source language is not parsed by the JavaScript AST rule.",
+            "high",
+            file.path,
             "Prefer parameterized query APIs and verify that untrusted values cannot alter SQL structure.",
-            { requiresManualReview: true }, index + 1));
+            { requiresManualReview: true, parser: "line-based-fallback", parserCoverage: false },
+            index + 1
+          ));
         }
       }
       return findings;
