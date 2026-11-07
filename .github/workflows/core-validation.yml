@@ -19,6 +19,7 @@ on:
       - "tests/integration/**"
       - "config/default.config.json"
       - ".github/workflows/core-validation.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
     paths:
@@ -37,6 +38,7 @@ on:
       - "tests/integration/**"
       - "config/default.config.json"
       - ".github/workflows/core-validation.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
