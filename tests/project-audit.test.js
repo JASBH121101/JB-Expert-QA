@@ -479,13 +479,13 @@ test("project audit identifies only review-candidate exports without static in-r
     const candidates = report.diagnostics.filter((item) => item.id.startsWith("CODE-DEAD-EXPORT-") &&
       item.id !== "CODE-DEAD-EXPORT-PARSE-SKIPPED" &&
       item.id !== "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED");
-    assert.equal(candidates.length, 2);
+    assert.equal(candidates.length, 1);
     assert.ok(candidates.every((item) => item.severity === "info"));
     assert.ok(candidates.some((item) => item.evidence.exportName === "possibleOrphan"));
-    assert.ok(candidates.some((item) => item.evidence.exportName === "possiblePublicApi"));
+    assert.equal(candidates.some((item) => item.evidence.exportName === "possiblePublicApi"), false);
     assert.ok(candidates.every((item) => item.metadata.safeToDeleteAutomatically === false));
     assert.equal(report.analysisScope.deadCodeAnalysis.status, "heuristic-complete");
-    assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedExports, 2);
+    assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedExports, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
