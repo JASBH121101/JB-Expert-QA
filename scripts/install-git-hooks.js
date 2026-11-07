@@ -21,7 +21,7 @@ try {
     stdio: "inherit"
   });
   console.log("Installed JB Expert QA pre-push hook.");
-  console.log("Every git push will run: npm run test:all-engines");
+  console.log("Termux pushes run test:mobile; desktop pushes run test:all-engines.");
 } catch (error) {
   console.error("Could not install the Git hook. Ensure Git is installed and run this inside the repository.");
   console.error(error.message);
