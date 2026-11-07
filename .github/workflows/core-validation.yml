@@ -2,7 +2,7 @@ name: Core browser validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/deep-analysis-cross-engine-upgrade]
     paths:
       - "package.json"
       - "package-lock.json"
