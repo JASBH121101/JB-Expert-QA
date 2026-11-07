@@ -8,6 +8,8 @@ on:
       - "packages/**"
       - "src/**"
       - "tests/**"
+      - ".githooks/**"
+      - "scripts/**"
       - "config/security-audit.config.json"
       - "config/security-url.config.json"
       - ".github/workflows/security-validation.yml"
