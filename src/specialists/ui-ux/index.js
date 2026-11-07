@@ -113,5 +113,54 @@ export const uiUxRules = [
           };
         });
     }
+
+  },
+  {
+    id: "ui-ux.unmatched-css-selectors",
+    specialist: "ui-ux",
+    evaluate(context) {
+      const coverage = context.cssSelectorCoverage;
+      const unmatched = Array.isArray(coverage?.unmatchedSelectors) ? coverage.unmatchedSelectors : [];
+      const findings = unmatched.map((item, index) => ({
+        id: "UIUX-005-" + (index + 1),
+        title: "CSS selector did not match the captured DOM",
+        description: "The selector " + item.selector + " did not match any element in the captured page state. It may be obsolete, or it may belong to a different route, deferred component, or UI state.",
+        severity: "info",
+        location: item.selector,
+        evidence: {
+          selector: item.selector,
+          stylesheetIndex: item.stylesheetIndex,
+          ruleIndex: item.ruleIndex,
+          capturedState: "initial"
+        },
+        recommendation: "Search all routes, component templates, dynamically generated class names, and interaction states before removing this rule. This is a review candidate only; it is not safe to delete automatically.",
+        metadata: {
+          detector: "runtime-css-selector-coverage",
+          confidence: "review-only",
+          safeToDeleteAutomatically: false
+        }
+      }));
+      if (coverage && !coverage.complete) {
+        findings.push({
+          id: "UIUX-005-COVERAGE",
+          title: "CSS selector coverage is incomplete",
+          description: "Some stylesheets or grouping rules could not be checked, or the selector scan reached its safety limit.",
+          severity: "info",
+          location: "document.stylesheets",
+          evidence: {
+            stylesheetsSeen: coverage.stylesheetsSeen,
+            stylesheetsScanned: coverage.stylesheetsScanned,
+            inaccessibleStylesheets: coverage.inaccessibleStylesheets,
+            rulesScanned: coverage.rulesScanned,
+            dynamicSelectorsSkipped: coverage.dynamicSelectorsSkipped,
+            groupingRulesSkipped: coverage.groupingRulesSkipped,
+            truncated: coverage.truncated
+          },
+          recommendation: "Review inaccessible cross-origin stylesheets and skipped conditional CSS before using unmatched-selector counts as a coverage estimate.",
+          metadata: { detector: "runtime-css-selector-coverage", confidence: "coverage-warning" }
+        });
+      }
+      return findings;
+    }
   }
 ];
