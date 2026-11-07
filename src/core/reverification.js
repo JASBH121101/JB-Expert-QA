@@ -22,7 +22,7 @@ export function compareReverification(previousReport, currentReport, { ruleIds }
   const current = asFindings(currentReport, "current");
 
   if (ruleIds !== undefined && (
-    !Array.isArray(ruleIds) ||
+    !Array.isArray(ruleIds) || ruleIds.length === 0 ||
     ruleIds.some((id) => typeof id !== "string" || !id.trim()) ||
     new Set(ruleIds).size !== ruleIds.length
   )) {
