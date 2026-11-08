@@ -1,0 +1,63 @@
+name: Security QA
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "package.json"
+      - "src/**"
+      - "tests/**"
+      - "config/security-audit.config.json"
+      - "config/security-url.config.json"
+      - ".github/workflows/security-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "src/**"
+      - "tests/**"
+      - "config/security-audit.config.json"
+      - "config/security-url.config.json"
+      - ".github/workflows/security-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jb-security-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-tests:
+    name: Deterministic security-profile tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+      - name: Install dependencies without running package install scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Audit resolved dependency tree for high and critical vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Validate JavaScript syntax
+        run: |
+          node --check src/specialists/security-rules.js
+          node --check src/adapters/filesystem/audit-security-project.js
+          node --check src/security-cli.js
+          node --check src/specialists/runtime-security-rules.js
+          node --check src/adapters/filesystem/audit-security-url.js
+          node --check src/security-url-cli.js
+      - name: Run security QA tests
+        run: node --test tests/security-qa.test.js

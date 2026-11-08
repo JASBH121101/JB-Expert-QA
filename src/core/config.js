@@ -104,6 +104,21 @@ export function validateEngineConfig(input = {}) {
   }
   const advisories = { ...advisoryDefaults, ...suppliedAdvisories };
 
+  const suppliedExecution = input.execution ?? {};
+  if (!isRecord(suppliedExecution)) {
+    throw new TypeError("config.execution must be an object");
+  }
+  const executionDefaults = { ruleTimeoutMs: 15000 };
+  for (const [name, value] of Object.entries(suppliedExecution)) {
+    if (!Object.hasOwn(executionDefaults, name)) {
+      throw new TypeError("Unknown execution option: \"" + name + "\"");
+    }
+    if (!Number.isInteger(value) || value < 1 || value > 120000) {
+      throw new TypeError("config.execution." + name + " must be an integer between 1 and 120000");
+    }
+  }
+  const execution = { ...executionDefaults, ...suppliedExecution };
+
   const profile = input.profile ?? "custom";
   if (typeof profile !== "string" || !profile.trim()) {
     throw new TypeError("config.profile must be a non-empty string");
@@ -123,6 +138,7 @@ export function validateEngineConfig(input = {}) {
       failOnCritical
     }),
     scan: Object.freeze({ ...scanDefaults, ...scan }),
-    advisories: Object.freeze(advisories)
+    advisories: Object.freeze(advisories),
+    execution: Object.freeze(execution)
   });
 }

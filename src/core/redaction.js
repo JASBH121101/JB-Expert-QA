@@ -49,3 +49,16 @@ export function redactUrlsInText(value) {
     (url) => redactUrlForReport(url)
   );
 }
+
+/**
+ * Sanitizes rule execution errors before they are included in audit reports.
+ * Error text is treated as untrusted data and is bounded to avoid leaking
+ * credentials or allowing oversized exception messages to inflate reports.
+ */
+export function redactSensitiveText(input) {
+  const source = String(input ?? "").slice(0, 2048);
+  return redactUrlsInText(source)
+    .replace(/\b(bearer|basic)\s+[a-z0-9._~+\/-]+=*/gi, "$1 [REDACTED]")
+    .replace(/\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|password|passwd|secret|authorization)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "$1[REDACTED]")
+    .slice(0, 512);
+}

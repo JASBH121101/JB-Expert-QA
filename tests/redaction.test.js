@@ -67,3 +67,13 @@ test("redacts unquoted environment and YAML secrets before AI source review", ()
   assert.equal(result.includes("keep this non-secret value"), true);
   assert.equal(result.includes("[REDACTED]"), true);
 });
+
+test("malformed URLs are omitted instead of echoing possible credentials", () => {
+  const malformed = "https://user:password-secret@%zz/path?access_token=leaked-token";
+  const result = redactUrlForReport(malformed);
+  assert.equal(result, "[UNPARSEABLE_URL]");
+  assert.equal(result.includes("password-secret"), false);
+  assert.equal(result.includes("leaked-token"), false);
+  assert.equal(redactUrlsInText("Request failed: " + malformed).includes("leaked-token"), false);
+});
+
