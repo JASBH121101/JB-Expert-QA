@@ -50,25 +50,29 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
       - name: Get UTC quota day
         id: quota_day
         run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - name: Restore daily AI quota circuit breaker
         id: ai_quota_cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .jbqa-ai-quota
           key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 24
           package-manager-cache: false
       - name: Install dependencies
-        run: npm install
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Audit resolved dependency tree for high and critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
       - name: Run website audit
         id: run_audit
         continue-on-error: true
@@ -143,17 +147,16 @@ jobs:
             "--output=reports/jb-expert-qa-report.$extension"
       - name: Persist daily AI quota circuit breaker
         if: always() && steps.ai_quota_cache.outputs.cache-hit != 'true' && hashFiles('.jbqa-ai-quota/provider-quota.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .jbqa-ai-quota
           key: jbqa-ai-quota-${{ steps.quota_day.outputs.day }}
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jb-expert-qa-report
           path: reports/
-          archive: false
           if-no-files-found: error
           retention-days: 7
       - name: Mark audit result

@@ -1,3 +1,5 @@
+import { securityDefenseRules } from "./security-rules.js";
+
 function finding(id, title, description, severity, path, recommendation, metadata = {}, line = null) {
   return {
     id, title, description, severity,
@@ -418,6 +420,13 @@ export const dependencyRules = [
     evaluate(context) {
       const scan = context.dependencyAdvisoryScan;
       if (!scan?.enabled) return [];
+      const hasDeclaredNpmDependencies = (context.packageManifests ?? []).some((manifest) =>
+        manifest.path === "package.json" && manifest.data &&
+        ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((section) =>
+          Object.keys(manifest.data[section] ?? {}).length > 0
+        )
+      );
+      if (scan.status === "skipped-no-resolved-versions" && !hasDeclaredNpmDependencies) return [];
       const findings = [];
 
       if (scan.status === "unavailable") {
@@ -890,6 +899,6 @@ export const postgresMigrationRules = [
 ];
 
 export const projectRules = Object.freeze([
-  ...codeQualityRules, ...securityRules, ...dependencyRules, ...databaseRules, ...postgresPrismaRules,
-  ...postgresMigrationRules
+  ...codeQualityRules, ...securityRules, ...securityDefenseRules, ...dependencyRules, ...databaseRules,
+  ...postgresPrismaRules, ...postgresMigrationRules
 ]);

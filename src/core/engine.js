@@ -2,6 +2,7 @@ import { createDiagnostic } from "./diagnostic.js";
 import { validateEngineConfig } from "./config.js";
 import { ENGINE_VERSION } from "./version.js";
 import { calculateScore } from "./scoring.js";
+import { redactSensitiveText } from "./redaction.js";
 
 export class ExpertQAEngine {
   constructor({ registry, config = {} } = {}) {
@@ -27,7 +28,24 @@ export class ExpertQAEngine {
     for (const rule of rules) {
       const startedAt = Date.now();
       try {
-        const result = await rule.evaluate(context);
+        const controller = new AbortController();
+        let timeoutHandle;
+        const timeoutMs = this.config.execution.ruleTimeoutMs;
+        const timeout = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            controller.abort();
+            reject(new Error("Rule evaluation timed out after " + timeoutMs + " ms"));
+          }, timeoutMs);
+        });
+        let result;
+        try {
+          result = await Promise.race([
+            Promise.resolve().then(() => rule.evaluate(context, { signal: controller.signal })),
+            timeout
+          ]);
+        } finally {
+          clearTimeout(timeoutHandle);
+        }
         const findings = result == null ? [] : Array.isArray(result) ? result : [result];
 
         for (const finding of findings) {
@@ -52,7 +70,7 @@ export class ExpertQAEngine {
           specialist: rule.specialist,
           status: "error",
           durationMs: Date.now() - startedAt,
-          error: error instanceof Error ? error.message : String(error)
+          error: redactSensitiveText(error instanceof Error ? error.message : String(error))
         });
       }
     }

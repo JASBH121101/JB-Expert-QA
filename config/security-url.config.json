@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "profile": "security-runtime",
+  "weights": {
+    "security-runtime": 100
+  },
+  "severityPenalties": {
+    "critical": 25,
+    "high": 12,
+    "medium": 5,
+    "low": 2,
+    "info": 0
+  },
+  "thresholds": {
+    "minimumScore": 90,
+    "failOnCritical": true
+  }
+}

@@ -152,3 +152,61 @@ test("rule execution errors are reported without crashing the audit", async () =
   assert.equal(report.summary.rulesWithErrors, 1);
   assert.equal(report.execution[0].status, "error");
 });
+
+test("rule timeouts bound stalled asynchronous specialists and fail the audit closed", async () => {
+  const registry = new RuleRegistry();
+  let receivedSignal;
+  registry.register({
+    id: "test.stalled",
+    specialist: "ui-ux",
+    evaluate(_context, { signal }) {
+      receivedSignal = signal;
+      return new Promise(() => {});
+    }
+  });
+
+  const report = await new ExpertQAEngine({
+    registry,
+    config: { weights: { "ui-ux": 100 }, execution: { ruleTimeoutMs: 10 } }
+  }).audit();
+
+  assert.equal(report.summary.rulesWithErrors, 1);
+  assert.equal(report.execution[0].status, "error");
+  assert.match(report.execution[0].error, /timed out after 10 ms/);
+  assert.equal(receivedSignal.aborted, true);
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
+  assert.equal(report.scoring.passed, false);
+});
+
+test("rule execution errors redact credentials and bound report text", async () => {
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.secret-error",
+    specialist: "ui-ux",
+    evaluate() {
+      throw new Error("failed https://example.invalid/path?token=url-secret Authorization: Bearer bearer-secret api_key=key-secret " + "x".repeat(2000));
+    }
+  });
+  const report = await new ExpertQAEngine({
+    registry,
+    config: { weights: { "ui-ux": 100 } }
+  }).audit();
+
+  const error = report.execution[0].error;
+  assert.equal(error.includes("url-secret"), false);
+  assert.equal(error.includes("bearer-secret"), false);
+  assert.equal(error.includes("key-secret"), false);
+  assert.ok(error.length <= 512);
+  assert.match(error, /REDACTED/);
+});
+
+test("execution timeout configuration is validated and bounded", () => {
+  assert.throws(() => new ExpertQAEngine({
+    registry: new RuleRegistry(),
+    config: { execution: { ruleTimeoutMs: 0 } }
+  }), /between 1 and 120000/);
+  assert.throws(() => new ExpertQAEngine({
+    registry: new RuleRegistry(),
+    config: { execution: { unexpected: true } }
+  }), /Unknown execution option/);
+});

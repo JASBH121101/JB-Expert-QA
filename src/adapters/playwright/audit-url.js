@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { createBrowserEnvironment } from "./browser-environment.js";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { comparePngFiles } from "../visual/png-diff.js";
@@ -56,7 +57,7 @@ export async function auditUrl(url, {
   const assertSafeUrl = createUrlSafetyGuard({ allowPrivateNetworks });
   const parsed = await assertSafeUrl(url);
 
-  const browser = await chromium.launch({ headless });
+  const browser = await chromium.launch({ headless, env: createBrowserEnvironment(process.env) });
   let browserContext;
   try {
     browserContext = await browser.newContext({ viewport, serviceWorkers: "block" });
@@ -221,6 +222,10 @@ export async function auditUrl(url, {
         httpErrors: runtimeIssues.httpErrors.length,
         blockedRequests: runtimeIssues.blockedRequests.length,
         sameOriginOnly,
+        networkDnsPolicy: Object.freeze({
+          dnsRevalidatedBeforeEachHttpRequest: true,
+          browserConnectionDnsPinned: false
+        }),
         interactiveOverlaps: context.interactiveOverlaps?.length ?? 0,
         interactionStatesChecked: context.interactionExploration?.statesCaptured ?? 0,
         interactionCandidates: context.interactionExploration?.candidatesDiscovered ?? 0,

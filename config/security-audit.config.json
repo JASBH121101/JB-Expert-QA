@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "profile": "security-static",
+  "weights": {
+    "code-quality": 0,
+    "security": 80,
+    "dependencies": 20
+  },
+  "severityPenalties": {
+    "critical": 25,
+    "high": 12,
+    "medium": 5,
+    "low": 2,
+    "info": 0
+  },
+  "thresholds": {
+    "minimumScore": 90,
+    "failOnCritical": true
+  },
+  "scan": {
+    "maxFiles": 2500,
+    "maxFileBytes": 1000000,
+    "maxTotalBytes": 20000000,
+    "maxDepth": 20
+  },
+  "advisories": {
+    "enabled": false,
+    "required": false,
+    "provider": "osv",
+    "maxPackages": 1000,
+    "batchSize": 100,
+    "maxVulnerabilities": 200,
+    "timeoutMs": 8000
+  }
+}

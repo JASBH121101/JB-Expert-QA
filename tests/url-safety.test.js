@@ -113,3 +113,27 @@ test("WebSocket destinations are checked with the HTTP network policy", async ()
     /Private destination blocked/
   );
 });
+
+
+test("URL guard bounds DNS resolution and refuses to contact an unresolved target", async () => {
+  const guard = createUrlSafetyGuard({
+    dnsTimeoutMs: 20,
+    dnsLookup: () => new Promise(() => {})
+  });
+
+  await assert.rejects(
+    guard("https://unresponsive-dns.example/"),
+    /DNS resolution timed out/
+  );
+});
+
+test("URL guard validates the DNS timeout configuration", () => {
+  assert.throws(
+    () => createUrlSafetyGuard({ dnsTimeoutMs: 0 }),
+    /dnsTimeoutMs/
+  );
+  assert.throws(
+    () => createUrlSafetyGuard({ dnsTimeoutMs: 30_001 }),
+    /dnsTimeoutMs/
+  );
+});
