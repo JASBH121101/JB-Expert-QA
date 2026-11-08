@@ -84,6 +84,85 @@ npm run audit:security:url -- https://example.com
 
 It performs a normal page load using Chromium and inspects the main document response for HTTPS, HSTS, enforced CSP quality, MIME sniffing protection, anti-framing controls, Referrer-Policy, Permissions-Policy, CORS response consistency, authentication-cookie attributes, and mixed content. It does not submit forms, authenticate, crawl linked pages, or send exploit payloads.
 
-The auditor reuses the URL safety guard: localhost, private, link-local, and reserved network destinations are blocked by default, including redirects and browser subrequests. The scan does not bypass certificate validation. Reports include only cookie names and security attributes, never cookie values. DNS answers are revalidated before each HTTP request, but Chromium performs its own connection-time resolution; this integration does not pin the browser socket to the validated IP and therefore cannot claim complete DNS-rebinding/TOCTOU prevention. For high-risk assessments, run the browser in a network-isolated environment or behind an egress proxy that enforces destination policy.
+The auditor reuses the URL safety guard: localhost, private, link-local, and reserved network destinations are blocked by default, including redirects and browser subrequests. The scan does not bypass certificate validation. Reports include only cookie names and security attributes, never cookie values.
 
 The runtime result is an observation of one page load, not a complete assessment of every API route, authenticated screen, CDN response, or infrastructure setting. A clean response does not certify the entire site.
+
+## JB Security Guard — runtime protection package
+
+The separate `@jb/security-guard` workspace package provides server-side HTTP middleware for Node.js applications. It is independent of the audit commands: it continues to enforce its configured policy without JB Expert QA running.
+
+```js
+import { createSecurityGuard } from "@jb/security-guard";
+
+const guard = createSecurityGuard({
+  mode: process.env.JB_GUARD_MODE ?? "monitor",
+  onEvent: (incident) => logger.warn(incident)
+});
+
+app.use(guard.middleware);
+```
+
+Register it before body parsers and application routes. The initial release supports:
+
+- `monitor`: record observations and allow requests; default mode.
+- `balanced`: block high- and critical-severity detections.
+- `strict`: also block medium-severity detections.
+- `custom`: select severities through `blockSeverities`.
+
+The initial rules inspect request targets for common high-confidence XSS, SQL-injection, and path-traversal signatures; enforce request-target, header, and declared Content-Length limits; and apply a per-process in-memory rate limit. Block responses are generic and use `Cache-Control: no-store`.
+
+Events intentionally omit request bodies, query strings, header values, cookies, and client IP addresses. A path is included only when `includePath: true` is explicitly configured.
+
+### Authentication brute-force protection
+
+Security Guard exposes `guard.createAuthProtection({ identityKeyGenerator })` for login routes. The application must call `recordFailure(request)` only after credentials actually fail and `recordSuccess(request)` after successful authentication. Mount `auth.middleware` after the request body parser and before the login handler.
+
+The default policy throttles an account-client pair after 5 failures in 10 minutes, a client after 20 failures in 10 minutes, and an account across clients after 12 failures in 10 minutes. Cooldowns increase progressively but have per-scope caps. A successful authentication clears the account and account-client buckets, not the client-wide bucket.
+
+Identity and client keys are HMAC-derived with an in-memory process secret; event records contain no raw account identifier or client address. The default client resolver uses the socket peer address and ignores forwarded headers. Use a custom client resolver only behind a specifically trusted proxy.
+
+`monitor` observes but does not enforce throttles. `balanced` and `strict` enforce them. The application must return a generic authentication response, set `Retry-After` to `attempt.retryAfterSeconds` when enforcing a threshold-reaching failure, and must not reveal whether an account exists.
+
+Important boundaries:
+
+- This version does not inspect request bodies. Enforce actual streamed/chunked body limits in the framework or server body parser too.
+- The rate limiter is local to one Node.js process. Clustered or multi-region deployments need a shared atomic store before limits are global.
+- Forwarded IP headers are not trusted by default. A custom `keyGenerator` must be based only on a narrowly configured trusted-proxy chain.
+- Pattern detection is heuristic. It is not a replacement for parameterized queries, output encoding, application authorization, a WAF, or security testing.
+- Guard must run on the server; it is not a frontend JavaScript security library.
+- The package is a workspace source package and is not yet published to a public npm registry.
+
+
+### Account recovery by verified email or SMS
+
+The runtime package also exposes guard.createAccountRecovery({ secret, emailProvider, smsProvider }). Email challenges use a random 256-bit token; SMS challenges use a six-digit OTP. Both are single-use, expire by default after 15 minutes (email) or 5 minutes (SMS), and permit at most five failed verification attempts.
+
+The module stores a keyed HMAC digest rather than the raw token or code. A new challenge replaces the previous one for the same account and channel. The default throttles are 10 requests per IP per 15 minutes, 3 per account per 15 minutes, 3 per destination per hour, and 20 verification attempts per IP per 15 minutes. Unknown accounts, unverified contacts, missing providers, and rate-limited requests return the same generic accepted response. Audit events omit account IDs, destination values, credentials, and provider error details.
+
+The application must resolve accounts server-side, pass only an opaque internal account ID and an already-verified email address or E.164 phone number, hash the replacement password with Argon2id (or another approved password hash), and revoke all existing sessions after a successful reset. Email reset links should carry credentials in the URL fragment rather than query parameters; the reset page should clear the fragment immediately and submit the token in an HTTPS POST. The module does not itself prove ownership of a contact or perform the database password update.
+
+Email and SMS delivery are dispatched asynchronously through provider adapters supplied by the host application; vendor credentials must remain in the host application's secret manager. The default memory store is bounded but process-local and resets on restart. Clustered deployments require an external adapter with atomic putChallenge, consumeChallenge, consumeLimit, and deleteChallenge operations shared by every instance. This package does not claim distributed protection until such an adapter is configured.
+
+
+
+## Guard request-boundary hardening
+
+Guard now inspects up to eight decoding rounds of request targets, rejects malformed percent/UTF-8 sequences and encoded control characters, and checks request framing ambiguity when the host HTTP adapter exposes raw headers. Conflicting Content-Length values and Content-Length combined with Transfer-Encoding are rejected with a generic 400 response in enforcing modes. These checks complement—not replace—the Node.js HTTP parser and upstream proxy controls.
+
+The middleware still does not consume request bodies. Every host application must enforce streamed/chunked request limits at the framework parser and upload layer. Guard also rejects unknown configuration keys for its HTTP, authentication, and recovery factories so misspelled security options cannot be silently ignored.
+
+
+## Node.js server boundary controls
+
+Guard now exports configureNodeHttpServer() for Node.js HTTP/HTTPS Server instances. It applies bounded header/request/socket timeouts, keep-alive reuse limits, header-count limits, and an early Expect: 100-continue Content-Length gate. It must run before listen(). It does not apply to HTTP/2 or external edge platforms, and chunked payloads still need framework body-parser limits.
+
+
+## Browser origin validation
+
+Guard exposes a separate origin-allowlist middleware for cookie-authenticated browser routes. Unsafe methods require an exact configured Origin by default; missing Origin, null Origin, malformed Origin, and untrusted origins are rejected. Referer fallback and missing-origin allowance are opt-in. This is defense in depth against cross-site request forgery, not a CSRF-token replacement and not a CORS policy.
+
+
+## Session-bound CSRF tokens
+
+Guard includes an optional HMAC synchronizer-token helper bound to the host application's session identifier. It rejects unsafe methods without a valid session-bound token, does not store session state, and emits sanitized events. It requires a stable secret and the host application's session manager; it does not replace secure cookies, session rotation, authorization, or XSS prevention.
