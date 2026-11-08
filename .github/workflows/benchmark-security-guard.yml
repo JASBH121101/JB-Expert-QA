@@ -2,7 +2,7 @@ name: JB Security Guard Performance Benchmark
 
 on:
   push:
-    branches: [feature/jb-security-guard]
+    branches: [feature/jb-security-guard, "integration/**"]
     paths:
       - "packages/security-guard/**"
       - "bench/**"
