@@ -58,3 +58,39 @@ The bridge does not treat Malware Engine no_match as clean. The existing scanner
 ## Operational limits
 
 This is an initial local coordination layer, not an endpoint firewall, VPN, Wi-Fi security product, durable incident database or security certification. It coordinates the two products' decisions but does not inspect encrypted traffic or independently stop network traffic. JB Expert QA's egress proxy and other browser controls remain separate enforcement components.
+
+
+## Calling the filters
+
+JB Expert QA should submit its real runtime audit result first:
+
+```js
+import { auditSecurityUrl, createExpertQAAssessment, createSecurityBridgeCoordinator } from "jb-expert-qa";
+
+const coordinator = createSecurityBridgeCoordinator();
+const audit = await auditSecurityUrl(targetUrl);
+const qaAssessment = createExpertQAAssessment({ correlationId: resourceCorrelationId, report: audit });
+coordinator.submit(qaAssessment);
+```
+
+The Expert QA process owns the coordinator and local receiver. It must start the receiver with a dedicated Guard secret supplied at runtime (at least 32 random bytes; never commit it):
+
+```js
+import {
+  createSecurityBridgeCoordinator,
+  createSecurityBridgeServer
+} from "jb-expert-qa";
+
+const coordinator = createSecurityBridgeCoordinator();
+const server = createSecurityBridgeServer({
+  coordinator,
+  secrets: {
+    "jb-security-guard": process.env.JB_SECURITY_BRIDGE_GUARD_SECRET
+  }
+});
+const address = await server.listen(); // binds only to 127.0.0.1
+```
+
+After the audit, Expert QA converts and submits the actual report using `createExpertQAAssessment`. The Guard process creates `createSecurityBridgeClient({ url: `http://127.0.0.1:${address.port}`, secret: process.env.JB_SECURITY_BRIDGE_GUARD_SECRET })` and supplies it to the upload inspector as its `securityBridge` option. Pass the same `resourceCorrelationId` to `inspect`. If Expert QA has not submitted, the object remains quarantined. Never reuse a correlation ID for another file or download.
+
+Both processes must run on the same host for this v1 loopback transport. Do not expose this receiver publicly or use it between separate hosts/containers; that requires a separately designed HTTPS/mTLS transport.

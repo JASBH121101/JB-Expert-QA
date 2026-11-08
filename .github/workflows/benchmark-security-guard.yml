@@ -1,0 +1,48 @@
+name: JB Security Guard Performance Benchmark
+
+on:
+  push:
+    branches: [feature/jb-security-guard, "integration/**"]
+    paths:
+      - "packages/security-guard/**"
+      - "bench/**"
+      - "package.json"
+      - ".github/workflows/benchmark-security-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-security-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Upload inspection benchmark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Run benchmark
+        env:
+          BENCH_ITERATIONS: "10"
+          BENCH_OUTPUT_DIR: benchmark-results
+        run: node bench/security-guard.js
+      - name: Add report to workflow summary
+        run: cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: security-guard-benchmark-${{ github.run_number }}
+          path: benchmark-results/
+          if-no-files-found: error
+          retention-days: 30

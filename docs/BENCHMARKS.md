@@ -1,13 +1,15 @@
-# JB Expert QA benchmark
+# JB Security Guard benchmark
 
 Run locally from the repository root:
 
 ```sh
-BENCH_ITERATIONS=12 BENCH_OUTPUT_DIR=benchmark-results node bench/run.js
+BENCH_ITERATIONS=10 BENCH_OUTPUT_DIR=benchmark-results node bench/security-guard.js
 ```
 
-The benchmark exercises the real `ExpertQAEngine`, `RuleRegistry`, diagnostic creation, and scoring pipeline using deterministic synthetic rules and in-memory text fixtures. It records mean, median, p95, p99, throughput, CPU time, and sampled peak RSS.
+The benchmark uses the real `createUploadInspector` pipeline with deterministic in-memory storage and scanner adapters. It records sequential upload performance at three sizes and a six-upload concurrency scenario. Metrics include mean, median, p95, p99, upload throughput, CPU time, and sampled peak RSS.
 
-The workflow runs automatically when Expert QA source or benchmark files change on `feature/jb-security-qa`. It can also be started manually from GitHub Actions. Each run publishes JSON and Markdown reports as an artifact for 30 days and adds the Markdown report to the workflow summary.
+Fixtures contain a PNG signature followed by inert bytes. They are synthetic pipeline fixtures, not valid image files and not malware samples. The adapters are test doubles, so the benchmark isolates Security Guard overhead rather than remote scanner or storage latency. The live Expert QA Security Bridge is not included in this initial benchmark.
 
-No network calls, paid APIs, browser launches, external databases, or third-party benchmark packages are used. Metrics are informational; compare runs only when the runner image, Node version, architecture, and workload match.
+The workflow runs automatically when `packages/security-guard/**` or benchmark files change on `feature/jb-security-guard`. It can also be started manually from GitHub Actions. JSON and Markdown reports are uploaded for 30 days and the Markdown report is added to the workflow summary.
+
+No paid services, external network calls, cloud storage, or third-party benchmark packages are used. Results are informational and must be compared on equivalent runners and Node versions.
