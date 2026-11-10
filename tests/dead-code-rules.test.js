@@ -239,7 +239,7 @@ test("reports unreferenced functions and classes but ignores recursion, exports,
     "function _intentionallyKept() {}",
     "function duplicateName() {}",
     "{ function duplicateName() {} }"
-  ].join("\\n"))] });
+  ].join("\n"))] });
   const names = findings.map((item) => item.evidence.declarationName).sort();
   assert.deepEqual(names, ["DeadCache", "caller", "deadFunction", "recursiveOnly"]);
   assert.ok(findings.every((item) => item.metadata.confidence === "review-only"));
@@ -250,7 +250,7 @@ test("abstains from function and class analysis when direct eval can inspect loc
   const findings = evaluateDeclarations({ projectFiles: [file("src/reflection.js", [
     "function mayBeLoadedByName() {}",
     'eval("mayBeLoadedByName()");'
-  ].join("\\n"))] });
+  ].join("\n"))] });
   assert.equal(findings.length, 1);
   assert.equal(findings[0].id, "CODE-DEAD-FUNCTION-CLASS-ANALYSIS-SKIPPED");
   assert.equal(findings[0].metadata.confidence, "coverage-warning");
@@ -265,7 +265,7 @@ test("reports missing relative imports but resolves extensionless, TypeScript, J
       'import config from "./config.json";',
       'import pkg from "./pkg";',
       'import external from "external-package";'
-    ].join("\\n")),
+    ].join("\n")),
     { path: "src/helper.mjs", extension: ".mjs", content: "export default true;" },
     { path: "src/typed.ts", extension: ".ts", content: "export default true;" },
     { path: "src/config.json", extension: ".json", content: "{}" },
@@ -331,7 +331,7 @@ test("project audit exposes unused declarations, unresolved imports, and depende
       'import missing from "./missing.js";',
       "function abandonedTask() {}",
       "class OldCache {}"
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(join(root, "src", "a.js"), 'import "./b.js";');
     await writeFile(join(root, "src", "b.js"), 'import "./a.js";');
     const report = await auditProject(root);
