@@ -1,45 +1,102 @@
-# JB Expert QA — Architecture
+# JB Engines — Repository Architecture
 
-## Design goals
+## Architectural principle
 
-- Private, independently versioned project.
-- Portable Node.js engine with no mandatory hosted AI service.
-- Deterministic, evidence-based diagnostics.
-- Replaceable adapters and extensible specialist modules.
-- Machine-readable reports and reproducible tests.
+This repository hosts three **distinct engines with separate responsibilities**. It is a shared code repository, not a single combined engine. Each engine retains its own API boundary, configuration, version, tests, release criteria, and failure semantics.
 
-## Layers
+The engines may exchange normalized findings through explicit, versioned adapters. They must not share internal state or silently inherit one another's authority. The interoperability contracts in [SECURITY-INTEROPERABILITY.md](./SECURITY-INTEROPERABILITY.md) and [SECURITY-BRIDGE.md](./SECURITY-BRIDGE.md) define the permitted coordination.
 
-1. **Core engine** — coordinates rules and creates audit reports.
-2. **Rule registry** — validates and stores built-in and project-specific specialist rules.
-3. **Specialists** — browser specialists for UI/UX, responsive, accessibility, performance, functional, and consistency; static project specialists for code quality, security, dependencies, and database review.
-4. **Adapters** — Playwright browser adapter and read-only local filesystem adapter.
-5. **Visual regression adapter** — PNG capture and local pixel comparison against explicit baselines.
-6. **Optional AI layer** — replaceable Gemini provider for screenshot critique and structured remediation planning.
-7. **Supervised agent** — isolated local Git worktree, allowlisted patches, bounded test/verification attempts.
-8. **Profiles** — project-specific thresholds, weights, and rule configuration.
-9. **Reporters** — JSON, Markdown, and HTML report output.
+## Engine boundaries
 
-## Diagnostic contract
+### 1. JB Expert QA
 
-Each finding has an identifier, specialist, title, description, severity, optional evidence, recommendation, location, and metadata.
+**Primary responsibility:** evaluate software and application quality.
 
-## Scoring
+- Static project and code-quality analysis.
+- Browser-based functional, responsive, accessibility, performance, and consistency audits.
+- Security-oriented source and URL checks within its configured audit scope.
+- Visual regression, deterministic diagnostics, scoring, and machine-readable reports.
+- Optional, replaceable AI assistance and supervised local remediation.
 
-Scores are weighted across the specialists actually included in an audit. Each active specialist must have a configured weight. A critical finding can block approval independently of the numeric score. Rule execution errors also block approval. Weights and penalties are configuration, not universal design truths.
+**Decision boundary:** an Expert QA score or passing site audit is not a malware verdict, does not authorize an uploaded file, and is not a substitute for runtime request authorization.
 
-## Privacy and execution
+The Expert QA core is the repository root package. Its browser and filesystem adapters remain explicit and bounded. Project auditing must not execute the audited project's code or access production credentials and databases by default.
 
-The core does not require an external AI API. Browser audits use the URL safety guard. Local project audits read supported text files only, skip environment and credential files, do not follow symlinks, and do not execute project code, install dependencies, or connect to databases. Reports intentionally omit project source contents and detected credential values.
+### 2. JB Security Guard
 
-## Current scope: 0.4.0
+**Primary responsibility:** enforce runtime application and request security policies.
 
-Implemented: extensible rule registry, validated engine configuration, deterministic scoring, six browser specialists, four static project specialists, Playwright Chromium adapter, safe local filesystem scanner, responsive multi-viewport matrix, PNG screenshots, explicit pixel-diff baselines, optional Gemini screenshot review, structured remediation planning, local worktree-based low-risk repair with explicit opt-ins, JSON/Markdown/HTML reports, and automated tests.
+- HTTP request and header hardening.
+- Origin and CSRF protections.
+- Authentication and account-recovery protections.
+- Rate limiting and bounded distributed-store operations.
+- Upload inspection orchestration and quarantine lifecycle.
+- Sanitized security events and configurable monitor/block policies.
 
-Planned: syntax-aware static analysis, dependency advisory integration under an explicitly approved no-cost strategy, live database schema inspection with read-only credentials, a review dashboard, broader browser-engine coverage, and packaging.
+**Decision boundary:** Security Guard owns request-policy enforcement and the quarantine-to-approved transition. A file can only be promoted by its storage adapter after the configured scan and integrity checks succeed. Missing, inconclusive, malformed, timed-out, or failed checks must fail closed.
 
-AI is optional. Deterministic rules and pixel comparisons continue to work without model credentials. AI responses never approve releases. Auto-repair is restricted to low-risk source files in src/, requires an explicit source-upload opt-in and an explicit test-run opt-in, creates a local worktree, and never pushes, opens a PR, merges or deploys.
+The current package targets Node.js and its documented Express-compatible middleware interface. This does **not** establish compatibility with Cloudflare Workers or other runtimes. Any such deployment requires a runtime-native adapter and its own tests; do not import Node/Express middleware into a Worker and assume it is compatible.
 
-## Heuristic limitations
+### 3. JB Malware Engine
 
-Automated checks identify measurable risks, not absolute truth. Static rules are pattern-based and can miss vulnerabilities or produce false positives. Dependency checks do not query a vulnerability database or determine whether versions are current. Database rules review source files only; they do not inspect a live database or validate migration state. Findings require human review before changes are made.
+**Primary responsibility:** inspect files for malware indicators and configured signatures.
+
+- Streaming hashing and exact hash/byte-signature matching.
+- Bounded static analysis of supported executable, archive, Office, OLE, and PDF formats.
+- Conservative heuristic triage and structured scan reports.
+- Explicit local quarantine support for authentic confirmed detections under its own policy.
+
+**Decision boundary:** Malware Engine is a distinct inspection engine, not an HTTP authorization engine or storage-promotion authority. Its verdicts retain their exact meaning:
+
+| Verdict | Meaning |
+| --- | --- |
+| `malicious` | A configured exact signature matched. |
+| `suspicious` | Heuristic evidence warrants review; this is not a confirmed detection. |
+| `no_match` | No configured detection matched; this does not prove the file is safe. |
+| `unknown` | Coverage was incomplete or insufficient. |
+| `error` | A file-level scan error occurred. |
+
+When used by Security Guard, Malware Engine is invoked through the documented scanner adapter. A Malware Engine `no_match` or `suspicious` result must never be converted into a clean/approved result. Security Guard remains responsible for the upload policy and storage promotion.
+
+The engine is local-first and is not a certified antivirus or a replacement for Microsoft Defender.
+
+## Permitted coordination
+
+Coordination is an interoperability layer, not a merger:
+
+1. Each engine keeps its native report, internal model, rules, and tests.
+2. An engine may additionally publish a normalized finding conforming to the versioned shared contract.
+3. Findings must identify their producer and preserve evidence provenance. Secrets, credentials, tokens, full request bodies, and URL query strings must be redacted before export.
+4. Cross-engine adapters must validate input, bound payload size and execution time, handle cancellation, and fail safely.
+5. Correlation IDs may relate observations about the same resource or transaction; they must not be reused for unrelated resources.
+6. A result from one engine must not be relabeled as another engine's verdict or used to bypass the receiving engine's policy.
+
+The current Security Bridge is a local coordination protocol between Expert QA and Security Guard. Malware Engine remains an independent file-analysis component used through the Guard scanner contract. This distinction preserves three engine boundaries while keeping the upload decision in one accountable place.
+
+## Versioning, testing, and release gates
+
+- Version each engine independently. A change to one engine does not imply a release of the other two.
+- Keep engine-specific unit tests, integration tests, benchmarks, and validation workflows. A combined CI run may orchestrate these jobs, but it must report their outcomes separately.
+- Run contract tests for each adapter independently of the producing engine's internal implementation.
+- Require cross-engine tests for correlation, malformed findings, mismatched hashes, partial streams, timeouts, cancellation, and unavailable adapters.
+- Do not automatically merge feature branches that contain overlapping histories. Compare each branch against current `main`, then integrate only reviewed, non-duplicated changes.
+- A passing CI run demonstrates only that the configured checks passed. It is not a security certification, antivirus certification, penetration test, or production-readiness attestation.
+
+## Runtime and data isolation
+
+- No engine receives production secrets, production databases, or production storage access by default.
+- Do not share signing keys, authentication secrets, quarantine credentials, or private state between engines.
+- Malware scanning uses bounded local processing unless a separately reviewed adapter explicitly provides another backend.
+- Security Guard's in-memory rate limits are process-local; global multi-instance enforcement requires a reviewed shared atomic store.
+- Expert QA is primarily a development/CI audit engine, not a middleware to run on every ERP request.
+- ERP, Cloudflare Pages/Workers, Neon, and R2 integrations require separate compatibility, authorization, data-retention, and quota reviews before deployment.
+
+## Existing Expert QA capabilities
+
+The Expert QA core includes an extensible rule registry, validated engine configuration, deterministic scoring, browser specialists, static project specialists, Playwright-based browser auditing, responsive multi-viewport checks, PNG screenshots, explicit pixel-diff baselines, optional AI screenshot review, structured remediation planning, JSON/Markdown/HTML reports, and automated tests.
+
+The optional AI layer is replaceable and not required for deterministic checks. AI output never approves a release. Any automated repair remains supervised, constrained to allowlisted low-risk files in an isolated local worktree, requires explicit opt-ins, and does not push, open a PR, merge, or deploy.
+
+## Known limitations
+
+Automated checks can miss vulnerabilities and produce false positives. Static analysis is not a substitute for a maintained vulnerability database or independent security assessment. Malware Engine's heuristic and `no_match` results do not prove safety. Security Guard's Node/Express implementation is not a Cloudflare Worker adapter. Upload inspection still requires a production-grade scanner and private storage adapter with a documented retention and cleanup policy before customer uploads can be treated as production-protected.
