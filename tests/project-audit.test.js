@@ -469,7 +469,10 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     assert.equal(serialized.includes("not-read"), false);
     assert.equal(report.projectScan.environmentFiles, 1);
     assert.equal(report.analysisScope.networkRequests, 0);
-    assert.equal(report.analysisScope.assessmentStatus, "scanned");
+    assert.equal(report.analysisScope.assessmentStatus, "partial");
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "partial");
+    assert.ok(report.analysisScope.deadCodeAnalysis.coverageWarnings > 0);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-DEAD-FUNCTION-CLASS-ANALYSIS-SKIPPED"));
     assert.ok(report.analysisScope.sourceFiles >= 2);
     assert.ok(report.analysisScope.scannedExtensions.includes(".js"));
     assert.deepEqual(report.analysisScope.languageCoverage.javascriptModuleGraph.supportedExtensions, [".js", ".mjs", ".cjs"]);
