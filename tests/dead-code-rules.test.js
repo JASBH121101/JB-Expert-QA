@@ -129,6 +129,9 @@ test("project audit exposes dead-code analysis coverage and candidate counts", a
 
 const evaluateBindings = deadCodeRules.find((rule) => rule.id === "code-quality.possibly-unused-bindings").evaluate;
 const evaluateCss = deadCodeRules.find((rule) => rule.id === "code-quality.possibly-unused-css-selectors").evaluate;
+const evaluateDeclarations = deadCodeRules.find((rule) => rule.id === "code-quality.possibly-unused-declarations").evaluate;
+const evaluateImports = deadCodeRules.find((rule) => rule.id === "code-quality.unresolved-relative-imports").evaluate;
+const evaluateCycles = deadCodeRules.find((rule) => rule.id === "code-quality.circular-dependencies").evaluate;
 
 test("reports unused imports and local variables as review-only candidates", () => {
   const findings = evaluateBindings({ projectFiles: [file("src/app.js", [
@@ -218,4 +221,125 @@ test("project audit reports binding and CSS candidate counts", async () => {
     assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedBindings, 2);
     assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedCssSelectors, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+test("reports unreferenced functions and classes but ignores recursion, exports, references, and duplicate names", () => {
+  const findings = evaluateDeclarations({ projectFiles: [file("src/declarations.js", [
+    "function deadFunction() { return 1; }",
+    "function recursiveOnly() { return recursiveOnly(); }",
+    "class DeadCache {}",
+    "function usedFunction() {}",
+    "function caller() { usedFunction(); }",
+    "class UsedCache {}",
+    "new UsedCache();",
+    "export function publicFunction() {}",
+    "function exportedByList() {}",
+    "export { exportedByList as publicAlias };",
+    "function _intentionallyKept() {}",
+    "function duplicateName() {}",
+    "{ function duplicateName() {} }"
+  ].join("\\n"))] });
+  const names = findings.map((item) => item.evidence.declarationName).sort();
+  assert.deepEqual(names, ["DeadCache", "caller", "deadFunction", "recursiveOnly"]);
+  assert.ok(findings.every((item) => item.metadata.confidence === "review-only"));
+  assert.ok(findings.every((item) => item.metadata.safeToDeleteAutomatically === false));
+});
+
+test("abstains from function and class analysis when direct eval can inspect local names", () => {
+  const findings = evaluateDeclarations({ projectFiles: [file("src/reflection.js", [
+    "function mayBeLoadedByName() {}",
+    'eval("mayBeLoadedByName()");'
+  ].join("\\n"))] });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].id, "CODE-DEAD-FUNCTION-CLASS-ANALYSIS-SKIPPED");
+  assert.equal(findings[0].metadata.confidence, "coverage-warning");
+});
+
+test("reports missing relative imports but resolves extensionless, TypeScript, JSON, and package-entry paths", () => {
+  const files = [
+    file("src/consumer.js", [
+      'import missing from "./missing.js";',
+      'import helper from "./helper";',
+      'import typed from "./typed.js";',
+      'import config from "./config.json";',
+      'import pkg from "./pkg";',
+      'import external from "external-package";'
+    ].join("\\n")),
+    { path: "src/helper.mjs", extension: ".mjs", content: "export default true;" },
+    { path: "src/typed.ts", extension: ".ts", content: "export default true;" },
+    { path: "src/config.json", extension: ".json", content: "{}" },
+    { path: "src/pkg/package.json", extension: ".json", content: '{"main":"./entry.js"}' },
+    file("src/pkg/entry.js", "export default true;")
+  ];
+  const findings = evaluateImports({
+    projectFiles: files,
+    packageManifests: [{ path: "src/pkg/package.json", data: { main: "./entry.js" }, parseError: null }]
+  });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].evidence.importer, "src/consumer.js");
+  assert.equal(findings[0].evidence.specifier, "./missing.js");
+  assert.equal(findings[0].severity, "warning");
+  assert.equal(findings[0].metadata.confidence, "review-required");
+});
+
+test("does not call paths outside the scan root unresolved and reports parse or dynamic coverage gaps", () => {
+  const outside = evaluateImports({ projectFiles: [
+    file("consumer.js", 'import shared from "../shared.js";')
+  ] });
+  assert.deepEqual(outside, []);
+
+  const partial = evaluateImports({ projectFiles: [
+    file("src/broken.js", "import { x } from ;"),
+    file("src/dynamic.js", 'import("./modules/" + name);')
+  ] });
+  assert.ok(partial.some((item) => item.id === "CODE-IMPORT-RESOLUTION-PARSE-SKIPPED"));
+  assert.ok(partial.some((item) => item.id === "CODE-IMPORT-RESOLUTION-DYNAMIC-SKIPPED"));
+  assert.equal(partial.some((item) => item.id.startsWith("CODE-IMPORT-UNRESOLVED-")), false);
+});
+
+test("detects a multi-module circular dependency and ignores acyclic dependencies", () => {
+  const findings = evaluateCycles({ projectFiles: [
+    file("src/a.js", 'import "./b.js";'),
+    file("src/b.js", 'import "./c.js";'),
+    file("src/c.js", 'import "./a.js";'),
+    file("src/main.js", 'import "./a.js";'),
+    file("src/leaf.js", "export const leaf = true;")
+  ] });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].evidence.cycleSize, 3);
+  assert.deepEqual(findings[0].evidence.modules, ["src/a.js", "src/b.js", "src/c.js"]);
+  assert.equal(findings[0].metadata.confidence, "review-only");
+  assert.equal(findings[0].metadata.safeToDeleteAutomatically, false);
+});
+
+test("detects a CommonJS self-cycle and marks cycles with dynamic loading as partial", () => {
+  const findings = evaluateCycles({ projectFiles: [
+    { path: "src/self.cjs", extension: ".cjs", content: 'require("./self.cjs");' },
+    file("src/loader.js", 'import("./" + moduleName);')
+  ] });
+  assert.ok(findings.some((item) => item.id.startsWith("CODE-CYCLE-") && item.evidence.cycleSize === 1));
+  assert.ok(findings.some((item) => item.id === "CODE-CYCLE-ANALYSIS-PARTIAL"));
+});
+
+test("project audit exposes unused declarations, unresolved imports, and dependency cycle counts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-graph-analysis-"));
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "graph-analysis-fixture" }));
+    await writeFile(join(root, "src", "app.js"), [
+      'import missing from "./missing.js";',
+      "function abandonedTask() {}",
+      "class OldCache {}"
+    ].join("\\n"));
+    await writeFile(join(root, "src", "a.js"), 'import "./b.js";');
+    await writeFile(join(root, "src", "b.js"), 'import "./a.js";');
+    const report = await auditProject(root);
+    assert.equal(report.summary.rulesExecuted, 33);
+    assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedDeclarations, 2);
+    assert.equal(report.analysisScope.deadCodeAnalysis.unresolvedRelativeImports, 1);
+    assert.equal(report.analysisScope.deadCodeAnalysis.dependencyCycles, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
