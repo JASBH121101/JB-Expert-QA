@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { deadCodeRules } from "../src/specialists/dead-code-rules.js";
 import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 
-const evaluate = deadCodeRules[0].evaluate;
+const evaluate = deadCodeRules.find((rule) => rule.id === "code-quality.possibly-unused-exports").evaluate;
 
 function file(path, content) {
   return { path, extension: ".js", content };

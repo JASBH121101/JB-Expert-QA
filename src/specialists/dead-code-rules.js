@@ -242,7 +242,7 @@ const DYNAMIC_CLASS_PATTERNS = [
   /\.classList\s*\.\s*(?:add|toggle|remove)\s*\(\s*[A-Za-z_$][\w$]*/,
   /\.setAttribute\s*\(\s*["']class["']\s*,\s*[A-Za-z_$][\w$]*/
 ];
-function escapeRegExp(value) { return value.replace(/[.*+?^$()|[\]\\]/g, "\\export const deadCodeRules = Object.freeze(["); }
+function escapeRegExp(value) { return value; }
 function cssSelectorNames(content) {
   const withoutComments = content.replace(/\/\*[\s\S]*?\*\//g, " ");
   const withoutStrings = withoutComments.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, " ");
