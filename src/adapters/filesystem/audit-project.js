@@ -97,7 +97,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
           scannedFiles: scan.files.filter((file) => [".js", ".mjs", ".cjs"].includes(file.extension)).length,
           unsupportedModuleFiles: scan.files.filter((file) =>
             [".jsx", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte"].includes(file.extension) &&
-            /\b(?:import|export)\\b/.test(file.content)
+            /\b(?:import|export)\b/.test(file.content)
           ).length
         }),
         cssSelectors: Object.freeze({
