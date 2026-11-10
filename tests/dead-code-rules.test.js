@@ -256,6 +256,14 @@ test("abstains from function and class analysis when direct eval can inspect loc
   assert.equal(findings[0].metadata.confidence, "coverage-warning");
 });
 
+test("skips a declaration when an arrow parameter shadows its name", () => {
+  const findings = evaluateDeclarations({ projectFiles: [file("src/shadow.js", [
+    "function localHandler() {}",
+    "const callback = (localHandler) => localHandler;"
+  ].join("\n"))] });
+  assert.equal(findings.some((item) => item.evidence?.declarationName === "localHandler"), false);
+});
+
 test("reports missing relative imports but resolves extensionless, TypeScript, JSON, and package-entry paths", () => {
   const files = [
     file("src/consumer.js", [
@@ -296,6 +304,17 @@ test("does not call paths outside the scan root unresolved and reports parse or 
   assert.ok(partial.some((item) => item.id === "CODE-IMPORT-RESOLUTION-PARSE-SKIPPED"));
   assert.ok(partial.some((item) => item.id === "CODE-IMPORT-RESOLUTION-DYNAMIC-SKIPPED"));
   assert.equal(partial.some((item) => item.id.startsWith("CODE-IMPORT-UNRESOLVED-")), false);
+});
+
+test("marks TypeScript and framework import syntax as uncovered by the JavaScript-only graph", () => {
+  const files = [
+    { path: "src/component.tsx", extension: ".tsx", content: 'import View from "./view"; export default View;' },
+    file("src/main.js", 'import "./component.tsx";')
+  ];
+  const importFindings = evaluateImports({ projectFiles: files });
+  assert.ok(importFindings.some((item) => item.id === "CODE-IMPORT-RESOLUTION-UNSUPPORTED-SOURCES"));
+  const cycleFindings = evaluateCycles({ projectFiles: files });
+  assert.ok(cycleFindings.some((item) => item.id === "CODE-CYCLE-ANALYSIS-PARTIAL"));
 });
 
 test("detects a multi-module circular dependency and ignores acyclic dependencies", () => {
