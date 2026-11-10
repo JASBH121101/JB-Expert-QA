@@ -397,6 +397,23 @@ test("empty and documentation-only projects cannot receive a source-quality pass
   }
 });
 
+test("TypeScript module syntax is counted as unsupported module-graph coverage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-ts-coverage-"));
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "ts-coverage-fixture" }));
+    await writeFile(join(root, "src", "library.js"), "export const candidate = true;");
+    await writeFile(join(root, "src", "component.tsx"), 'import { candidate } from "./library.js"; export default candidate;');
+    const report = await auditProject(root);
+    assert.equal(report.analysisScope.languageCoverage.javascriptModuleGraph.unsupportedModuleFiles, 1);
+    assert.equal(report.analysisScope.assessmentStatus, "partial");
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "partial");
+    assert.equal(report.diagnostics.some((item) => item.id === "CODE-DEAD-EXPORT-SCAN-PARTIAL"), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("skipped source symlinks make project coverage incomplete and block a pass", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-symlink-gap-"));
   const outside = await mkdtemp(join(tmpdir(), "jbqa-symlink-outside-"));
