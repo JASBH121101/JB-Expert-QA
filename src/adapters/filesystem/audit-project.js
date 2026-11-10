@@ -24,6 +24,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
   if (scan.summary.oversizedFiles > 0) incompleteReasons.push(scan.summary.oversizedFiles + " oversized file(s) skipped");
   if (scan.summary.unreadableFiles > 0) incompleteReasons.push(scan.summary.unreadableFiles + " unreadable file(s) skipped");
+  if (scan.summary.skippedSymlinks > 0) incompleteReasons.push(scan.summary.skippedSymlinks + " symbolic link(s) not followed");
   const scanComplete = incompleteReasons.length === 0;
 
   const context = {
@@ -34,6 +35,18 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     dependencyAdvisoryScan: dependencyAdvisories
   };
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
+  const hasSourceFiles = scan.files.some((file) => [
+    ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte",
+    ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
+    ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
+    ".cs", ".graphql", ".gql"
+  ].includes(file.extension));
+  const scoring = hasSourceFiles ? report.scoring : Object.freeze({
+    ...report.scoring,
+    passed: false,
+    blockedByCoverage: true
+  });
+  const diagnostics = report.diagnostics;
 
   const deadCodeRuleIds = new Set([
     "code-quality.possibly-unused-exports",
@@ -54,6 +67,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
 
   return Object.freeze({
     ...report,
+    scoring,
     engine: "JB Expert QA — Project Auditor",
     version: ENGINE_VERSION,
     target: Object.freeze({ project: basename(root) }),
@@ -66,9 +80,42 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
       coverage: Object.freeze({
         truncated: scan.summary.truncated,
         oversizedFiles: scan.summary.oversizedFiles,
-        unreadableFiles: scan.summary.unreadableFiles
+        unreadableFiles: scan.summary.unreadableFiles,
+        skippedSymlinks: scan.summary.skippedSymlinks
       }),
       filesAnalyzed: scan.summary.filesRead,
+      sourceFiles: scan.files.filter((file) => [
+        ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte",
+        ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
+        ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
+        ".cs", ".graphql", ".gql"
+      ].includes(file.extension)).length,
+      scannedExtensions: Object.freeze(Object.keys(scan.summary.languageCounts).sort()),
+      assessmentStatus: !hasSourceFiles ? "insufficient-source" : (!scanComplete || deadCodeWarnings.length ? "partial" : "scanned"),
+      languageCoverage: Object.freeze({
+        javascriptModuleGraph: Object.freeze({
+          supportedExtensions: Object.freeze([".js", ".mjs", ".cjs"]),
+          scannedFiles: scan.files.filter((file) => [".js", ".mjs", ".cjs"].includes(file.extension)).length,
+          unsupportedModuleFiles: scan.files.filter((file) =>
+            [".jsx", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte"].includes(file.extension) &&
+            /\\b(?:import|export)\\b/.test(file.content)
+          ).length
+        }),
+        cssSelectors: Object.freeze({
+          parsedExtensions: Object.freeze([".css", ".scss", ".less"]),
+          scannedFiles: scan.files.filter((file) => [".css", ".scss", ".sass", ".less"].includes(file.extension)).length,
+          indentedSassFiles: scan.files.filter((file) => file.extension === ".sass").length
+        }),
+        database: Object.freeze({
+          supportedExtensions: Object.freeze([".sql", ".prisma"]),
+          scannedFiles: scan.files.filter((file) => [".sql", ".prisma"].includes(file.extension)).length
+        }),
+        dependencyAdvisories: Object.freeze({
+          ecosystem: "npm",
+          supportedLockfiles: Object.freeze(["package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"]),
+          scannedLockfiles: scan.summary.lockFiles
+        })
+      }),
       deadCodeAnalysis: Object.freeze({
         status: deadCodeWarnings.length || !scanComplete ? "partial" : "heuristic-complete",
         coverageWarnings: deadCodeWarnings.length,
