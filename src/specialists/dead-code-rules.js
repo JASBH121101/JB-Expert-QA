@@ -601,7 +601,9 @@ function cssSelectorNames(content) {
 function analyzeCssSelectors(projectFiles) {
   const styleFiles = projectFiles.filter((file) => CSS_EXTENSIONS.has(file.extension));
   if (!styleFiles.length) return [];
-  const dynamicFiles = projectFiles.filter((file) => !CSS_EXTENSIONS.has(file.extension) && DYNAMIC_CLASS_PATTERNS.some((pattern) => pattern.test(file.content)));
+  const dynamicFiles = projectFiles.filter((file) =>
+    !CSS_EXTENSIONS.has(file.extension) && DYNAMIC_CLASS_PATTERNS.some((pattern) => pattern.test(file.content))
+  );
   if (dynamicFiles.length) return [{
     id: "CODE-DEAD-CSS-ANALYSIS-SKIPPED",
     title: "CSS selector reachability skipped because dynamic class assignment is present",
@@ -612,14 +614,11 @@ function analyzeCssSelectors(projectFiles) {
     evidence: { dynamicClassFiles: dynamicFiles.length },
     metadata: { detector: "static-css-selector-reachability", confidence: "coverage-warning" }
   }];
-  const tokenCounts = new Map();
-  const tokensByPath = new Map();
-  for (const file of projectFiles) {
-    const tokens = new Set([...file.content.matchAll(/\b[_a-zA-Z][\w-]*\b/g)].map((match) => match[0]));
-    tokensByPath.set(file.path, tokens);
-    for (const token of tokens) tokenCounts.set(token, (tokenCounts.get(token) ?? 0) + 1);
-  }
+
   const findings = [];
+  const selectorsByPath = new Map();
+  const candidateNames = new Set();
+
   for (const styleFile of styleFiles) {
     if (styleFile.extension === ".sass") {
       findings.push({
@@ -647,8 +646,30 @@ function analyzeCssSelectors(projectFiles) {
       });
       continue;
     }
-    for (const selector of cssSelectorNames(styleFile.content)) {
-      const ownTokens = tokensByPath.get(styleFile.path);
+    const selectors = cssSelectorNames(styleFile.content);
+    selectorsByPath.set(styleFile.path, selectors);
+    for (const selector of selectors) candidateNames.add(selector.name);
+  }
+
+  // Index only tokens that can satisfy a selector, keeping memory proportional to
+  // the selector inventory rather than every identifier in the whole codebase.
+  const tokenCounts = new Map();
+  const tokensByPath = new Map();
+  if (candidateNames.size) {
+    for (const file of projectFiles) {
+      const tokens = new Set();
+      for (const match of file.content.matchAll(/\b[_a-zA-Z][\w-]*\b/g)) {
+        if (candidateNames.has(match[0])) tokens.add(match[0]);
+      }
+      tokensByPath.set(file.path, tokens);
+      for (const token of tokens) tokenCounts.set(token, (tokenCounts.get(token) ?? 0) + 1);
+    }
+  }
+
+  for (const styleFile of styleFiles) {
+    const selectors = selectorsByPath.get(styleFile.path) ?? [];
+    const ownTokens = tokensByPath.get(styleFile.path);
+    for (const selector of selectors) {
       const referencesInOtherFiles = (tokenCounts.get(selector.name) ?? 0) - (ownTokens?.has(selector.name) ? 1 : 0);
       if (referencesInOtherFiles > 0) continue;
       findings.push({
