@@ -7,7 +7,7 @@ const IGNORED_DIRECTORIES = new Set([
   "vendor", "playwright-report", "test-results"
 ]);
 const TEXT_EXTENSIONS = new Set([
-  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte",
   ".html", ".htm", ".css", ".scss", ".sass", ".less", ".json",
   ".md", ".mdx", ".yml", ".yaml", ".toml", ".sql", ".prisma",
   ".xml", ".svg", ".sh", ".ps1", ".py", ".rb", ".php", ".java",
