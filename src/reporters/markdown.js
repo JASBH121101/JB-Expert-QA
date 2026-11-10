@@ -100,6 +100,23 @@ export function formatMarkdownReport(report) {
     if (report.analysisScope.incompleteReasons?.length) {
       lines.push("- Scan gaps: " + cell(report.analysisScope.incompleteReasons.join("; ")), "");
     }
+
+    const deadCode = report.analysisScope.deadCodeAnalysis;
+    if (deadCode) {
+      lines.push(
+        "### Dead-code and dependency analysis",
+        "",
+        "- Analysis status: " + cell(deadCode.status ?? "unknown"),
+        "- Coverage warnings: " + cell(deadCode.coverageWarnings ?? 0),
+        "- Possible unused exports: " + cell(deadCode.possibleUnusedExports ?? 0),
+        "- Possible unused bindings: " + cell(deadCode.possibleUnusedBindings ?? 0),
+        "- Possible unused CSS selectors: " + cell(deadCode.possibleUnusedCssSelectors ?? 0),
+        "- Possible unused declarations: " + cell(deadCode.possibleUnusedDeclarations ?? 0),
+        "- Unresolved relative imports: " + cell(deadCode.unresolvedRelativeImports ?? 0),
+        "- Dependency cycles: " + cell(deadCode.dependencyCycles ?? 0),
+        ""
+      );
+    }
   }
 
   if (Array.isArray(report.viewports) &&
