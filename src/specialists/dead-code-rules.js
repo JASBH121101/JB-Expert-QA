@@ -397,7 +397,7 @@ function scanCoverageGaps(context) {
 }
 
 function unsupportedModuleSources(projectFiles) {
-  const unsupportedExtensions = new Set([".jsx", ".ts", ".tsx", ".vue", ".svelte"]);
+  const unsupportedExtensions = new Set([".jsx", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte"]);
   return projectFiles.filter((file) =>
     unsupportedExtensions.has(file.extension) && /\b(?:import|export)\b/.test(file.content)
   ).map((file) => file.path);
