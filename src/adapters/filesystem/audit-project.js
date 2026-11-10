@@ -7,6 +7,7 @@ import projectConfig from "../../../config/project-audit.config.json" with { typ
 import { scanProject } from "./scan-project.js";
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { projectRules } from "../../specialists/project-rules.js";
+import { deadCodeRules } from "../../specialists/dead-code-rules.js";
 
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) throw new TypeError("A project directory path is required");
@@ -17,6 +18,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   const dependencyAdvisories = await scanNpmAdvisories(scan, validatedConfig.advisories);
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
+  for (const rule of deadCodeRules) registry.register(rule);
 
   const incompleteReasons = [];
   if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
@@ -32,6 +34,16 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     dependencyAdvisoryScan: dependencyAdvisories
   };
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
+
+  const deadCodeWarnings = report.diagnostics.filter((item) =>
+    item.id === "CODE-DEAD-EXPORT-PARSE-SKIPPED" ||
+    item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"
+  );
+  const possibleUnusedExports = report.diagnostics.filter((item) =>
+    item.ruleId === "code-quality.possibly-unused-exports" &&
+    item.id.startsWith("CODE-DEAD-EXPORT-") &&
+    !deadCodeWarnings.includes(item)
+  );
 
   return Object.freeze({
     ...report,
@@ -50,12 +62,18 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
         unreadableFiles: scan.summary.unreadableFiles
       }),
       filesAnalyzed: scan.summary.filesRead,
+      deadCodeAnalysis: Object.freeze({
+        status: deadCodeWarnings.length ? "partial" : "heuristic-complete",
+        coverageWarnings: deadCodeWarnings.length,
+        possibleUnusedExports: possibleUnusedExports.length
+      }),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,
       dependencyAdvisoryLookup: dependencyAdvisories.enabled,
       dependencyAdvisoryStatus: dependencyAdvisories.status,
       secretsCopiedToReport: false,
       limitations: Object.freeze([
         "Static pattern checks require manual review and can produce false positives.",
+        "Unused-export reachability is a conservative review heuristic over statically resolvable JavaScript module imports; external consumers, dynamic loading, reflection, and framework entrypoints may be invisible.",
         "Dependency CVEs and current package versions are not checked because no advisory service is queried.",
         "The scanner does not execute project code, install dependencies, or connect to the database.",
         ...(dependencyAdvisories.enabled ? [

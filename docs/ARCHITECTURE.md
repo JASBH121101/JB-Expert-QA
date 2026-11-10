@@ -100,3 +100,12 @@ The optional AI layer is replaceable and not required for deterministic checks. 
 ## Known limitations
 
 Automated checks can miss vulnerabilities and produce false positives. Static analysis is not a substitute for a maintained vulnerability database or independent security assessment. Malware Engine's heuristic and `no_match` results do not prove safety. Security Guard's Node/Express implementation is not a Cloudflare Worker adapter. Upload inspection still requires a production-grade scanner and private storage adapter with a documented retention and cleanup policy before customer uploads can be treated as production-protected.
+
+
+## Static dead-export analysis
+
+JB Expert QA includes a conservative JavaScript export-reachability rule. It inspects statically resolvable relative imports and re-exports and reports exports with no importer inside the scanned project as **review-only candidates**. It does not prove that code is unused: external package consumers, dynamic loading, reflection, framework conventions, runtime entrypoints, generated files, and unsupported syntax can affect reachability.
+
+The detector deliberately emits coverage warnings or abstains when it sees non-literal dynamic module loading or parse failures. It skips index modules, declared package entrypoints, CommonJS boundaries, and export-star modules. It supports JavaScript \`.js\`, \`.mjs\`, and \`.cjs\` modules only; TypeScript, JSX, Vue, Svelte, CSS selectors, and CSS reachability are outside this rule's scope.
+
+Findings are informational and must be reviewed. The detector never deletes files, declarations, or exports and must never be used as an automatic deletion list. GitHub Actions validates its regression tests on Node.js 22 and 24.

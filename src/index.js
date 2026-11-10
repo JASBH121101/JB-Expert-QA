@@ -20,6 +20,7 @@ export {
   databaseRules,
   projectRules
 } from "./specialists/project-rules.js";
+export { deadCodeRules } from "./specialists/dead-code-rules.js";
 export { securityDefenseRules } from "./specialists/security-rules.js";
 export { securityRuntimeRules } from "./specialists/runtime-security-rules.js";
 export { scanProject } from "./adapters/filesystem/scan-project.js";
