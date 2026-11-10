@@ -428,7 +428,7 @@ function analyzeUnresolvedRelativeImports(context) {
         title: "Relative module import does not resolve inside the scanned project",
         description: "The relative module specifier " + reference.source + " from " + importerPath +
           " does not match a scanned file or supported directory entrypoint. Files outside the scan root and unscanned generated files are not validated.",
-        severity: "warning",
+        severity: "medium",
         location: importerPath + ":" + (reference.line ?? 1),
         recommendation: "Verify the relative path, filename casing, extension, package entrypoint, and build aliases before running or building the project.",
         evidence: { importer: importerPath, specifier: reference.source, candidatePaths: (resolution.candidates ?? []).slice(0, 12) },
@@ -527,7 +527,7 @@ function analyzeCircularDependencies(context) {
       title: "Circular module dependency detected across " + members.length + " module(s)",
       description: "The statically resolved module graph contains a strongly connected component: " + members.join(", ") +
         ". Cycles can create initialization-order and maintenance risks, but some project architectures intentionally use them.",
-      severity: "warning",
+      severity: "medium",
       location: members.join(", "),
       recommendation: "Review whether the modules can depend on a lower-level shared module or one-way interface; verify initialization behavior before refactoring.",
       evidence: { modules: members, cycleSize: members.length, staticallyResolved: true },
