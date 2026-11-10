@@ -24,11 +24,13 @@ test("scanner reads supported source/manifests and parses package metadata", asy
     await writeFile(join(root, "package.json"), JSON.stringify({ name: "fixture", dependencies: { example: "1.2.3" } }));
     await writeFile(join(root, "package-lock.json"), "{}");
     await writeFile(join(root, "src", "index.js"), "export const answer = 42;\n");
+    await writeFile(join(root, "src", "worker.mts"), "export const worker = true;\n");
     const scan = await scanProject(root);
-    assert.equal(scan.summary.filesRead, 3);
+    assert.equal(scan.summary.filesRead, 4);
     assert.equal(scan.manifests[0].data.name, "fixture");
     assert.deepEqual(scan.lockFiles, ["package-lock.json"]);
     assert.ok(scan.files.some((file) => file.path === "src/index.js"));
+    assert.ok(scan.files.some((file) => file.path === "src/worker.mts"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
