@@ -367,3 +367,53 @@ test("project audit exposes unused declarations, unresolved imports, and depende
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("unused-export analysis abstains when TSX importers or scan gaps may hide references", () => {
+  const unsupported = evaluate({
+    projectFiles: [
+      file("src/library.js", "export const publicCandidate = true;"),
+      { path: "src/view.tsx", extension: ".tsx", content: 'import { publicCandidate } from "./library.js"; export default publicCandidate;' }
+    ],
+    packageManifests: []
+  });
+  assert.equal(unsupported.length, 1);
+  assert.equal(unsupported[0].id, "CODE-DEAD-EXPORT-SCAN-PARTIAL");
+  assert.equal(unsupported[0].metadata.confidence, "coverage-warning");
+
+  const truncated = evaluate({
+    projectFiles: [file("src/library.js", "export const maybeImported = true;")],
+    packageManifests: [],
+    projectScan: { summary: { truncated: true, oversizedFiles: 0, unreadableFiles: 0, skippedSymlinks: 0 } }
+  });
+  assert.equal(truncated.length, 1);
+  assert.equal(truncated[0].id, "CODE-DEAD-EXPORT-SCAN-PARTIAL");
+});
+
+test("unresolved imports are not reported when scan omissions may contain their targets", () => {
+  const findings = evaluateImports({
+    projectFiles: [file("src/app.js", 'import missing from "./missing.js";')],
+    projectScan: { summary: { truncated: false, oversizedFiles: 1, unreadableFiles: 0, skippedSymlinks: 0 } }
+  });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].id, "CODE-IMPORT-RESOLUTION-SCAN-PARTIAL");
+  assert.equal(findings[0].metadata.confidence, "coverage-warning");
+});
+
+test("CSS reachability abstains on incomplete scans and indented Sass syntax", () => {
+  const partial = evaluateCss({
+    projectFiles: [
+      { path: "styles/site.css", extension: ".css", content: ".unused { color: red; }" }
+    ],
+    projectScan: { summary: { truncated: true, oversizedFiles: 0, unreadableFiles: 0, skippedSymlinks: 0 } }
+  });
+  assert.equal(partial.length, 1);
+  assert.equal(partial[0].id, "CODE-DEAD-CSS-ANALYSIS-SCAN-PARTIAL");
+
+  const sass = evaluateCss({ projectFiles: [
+    { path: "styles/legacy.sass", extension: ".sass", content: ".unused\n  color: red\n" }
+  ] });
+  assert.equal(sass.length, 1);
+  assert.equal(sass[0].id.startsWith("CODE-DEAD-CSS-ANALYSIS-SASS-"), true);
+  assert.equal(sass[0].metadata.confidence, "coverage-warning");
+});
