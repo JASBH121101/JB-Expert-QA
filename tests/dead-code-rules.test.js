@@ -284,11 +284,13 @@ test("reports missing relative imports but resolves extensionless, TypeScript, J
     projectFiles: files,
     packageManifests: [{ path: "src/pkg/package.json", data: { main: "./entry.js" }, parseError: null }]
   });
-  assert.equal(findings.length, 1, JSON.stringify(findings.map((item) => ({ id: item.id, specifier: item.evidence?.specifier }))));
-  assert.equal(findings[0].evidence.importer, "src/consumer.js");
-  assert.equal(findings[0].evidence.specifier, "./missing.js");
-  assert.equal(findings[0].severity, "warning");
-  assert.equal(findings[0].metadata.confidence, "review-required");
+  const unresolved = findings.filter((item) => item.id.startsWith("CODE-IMPORT-UNRESOLVED-"));
+  assert.equal(unresolved.length, 1);
+  assert.equal(unresolved[0].evidence.importer, "src/consumer.js");
+  assert.equal(unresolved[0].evidence.specifier, "./missing.js");
+  assert.equal(unresolved[0].severity, "medium");
+  assert.equal(unresolved[0].metadata.confidence, "review-required");
+  assert.ok(findings.some((item) => item.id === "CODE-IMPORT-RESOLUTION-UNSUPPORTED-SOURCES"));
 });
 
 test("does not call paths outside the scan root unresolved and reports parse or dynamic coverage gaps", () => {
