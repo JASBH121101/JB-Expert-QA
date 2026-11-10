@@ -379,6 +379,41 @@ test("an incomplete project scan blocks a passing result", async () => {
   }
 });
 
+test("empty and documentation-only projects cannot receive a source-quality pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-no-source-"));
+  try {
+    await writeFile(join(root, "README.md"), "# Documentation only\n");
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "docs-only" }));
+    const report = await auditProject(root);
+    assert.equal(report.analysisScope.sourceFiles, 0);
+    assert.equal(report.analysisScope.assessmentStatus, "insufficient-source");
+    assert.equal(report.scoring.passed, false);
+    assert.equal(report.scoring.blockedByCoverage, true);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-SCAN-002"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("skipped source symlinks make project coverage incomplete and block a pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-symlink-gap-"));
+  const outside = await mkdtemp(join(tmpdir(), "jbqa-symlink-outside-"));
+  try {
+    await writeFile(join(root, "src.js"), "export const ready = true;");
+    await writeFile(join(outside, "linked.js"), "export const omitted = true;");
+    await symlink(join(outside, "linked.js"), join(root, "linked.js"), "file");
+    const report = await auditProject(root);
+    assert.equal(report.projectScan.skippedSymlinks, 1);
+    assert.equal(report.analysisScope.complete, false);
+    assert.equal(report.analysisScope.coverage.skippedSymlinks, 1);
+    assert.equal(report.scoring.passed, false);
+    assert.equal(report.scoring.blockedByCritical, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
 test("oversized files also block a complete-pass result", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-oversized-"));
   try {
@@ -415,6 +450,12 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     assert.equal(serialized.includes("not-read"), false);
     assert.equal(report.projectScan.environmentFiles, 1);
     assert.equal(report.analysisScope.networkRequests, 0);
+    assert.equal(report.analysisScope.assessmentStatus, "scanned");
+    assert.ok(report.analysisScope.sourceFiles >= 2);
+    assert.ok(report.analysisScope.scannedExtensions.includes(".js"));
+    assert.deepEqual(report.analysisScope.languageCoverage.javascriptModuleGraph.supportedExtensions, [".js", ".mjs", ".cjs"]);
+    assert.ok(formatReport(report, "markdown").includes("Analysis coverage"));
+    assert.ok(formatReport(report, "html").includes("Analysis coverage"));
     assert.equal(report.analysisScope.dependencyAdvisoryLookup, false);
     assert.equal(report.dependencyAdvisories.status, "disabled");
     assert.equal(report.dependencyAdvisories.networkRequests, 0);
