@@ -284,7 +284,7 @@ test("reports missing relative imports but resolves extensionless, TypeScript, J
     projectFiles: files,
     packageManifests: [{ path: "src/pkg/package.json", data: { main: "./entry.js" }, parseError: null }]
   });
-  assert.equal(findings.length, 1);
+  assert.equal(findings.length, 1, JSON.stringify(findings.map((item) => ({ id: item.id, specifier: item.evidence?.specifier }))));
   assert.equal(findings[0].evidence.importer, "src/consumer.js");
   assert.equal(findings[0].evidence.specifier, "./missing.js");
   assert.equal(findings[0].severity, "warning");
@@ -356,7 +356,10 @@ test("project audit exposes unused declarations, unresolved imports, and depende
     const report = await auditProject(root);
     assert.equal(report.summary.rulesExecuted, 33);
     assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedDeclarations, 2);
-    assert.equal(report.analysisScope.deadCodeAnalysis.unresolvedRelativeImports, 1);
+    assert.equal(report.analysisScope.deadCodeAnalysis.unresolvedRelativeImports, 1, JSON.stringify({
+      diagnostics: report.diagnostics.map((item) => ({ id: item.id, ruleId: item.ruleId, location: item.location })),
+      execution: report.execution.filter((item) => item.ruleId === "code-quality.unresolved-relative-imports")
+    }));
     assert.equal(report.analysisScope.deadCodeAnalysis.dependencyCycles, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
