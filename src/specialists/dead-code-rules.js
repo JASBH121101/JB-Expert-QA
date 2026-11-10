@@ -249,6 +249,7 @@ function walkWithAncestors(node, visit, ancestors = []) {
 function analyzeUnusedFunctionsAndClasses(file) {
   const ast = parse(file.content, { ecmaVersion: "latest", sourceType: "module", locations: true, allowHashBang: true });
   const candidates = [];
+  const candidateByDeclaration = new Map();
   const declarationNodes = new Set();
   const parameterNodes = new Set();
   const boundCounts = new Map();
@@ -282,12 +283,18 @@ function analyzeUnusedFunctionsAndClasses(file) {
         }
       }
       if (node.type === "FunctionDeclaration" && node.id?.type === "Identifier") {
-        candidates.push({ name: node.id.name, node: node.id, declaration: node, parent });
+        const candidate = { name: node.id.name, node: node.id, declaration: node, parent };
+        candidates.push(candidate);
+        candidateByDeclaration.set(node, candidate);
       }
     }
     if (["ClassDeclaration", "ClassExpression"].includes(node.type) && node.id?.type === "Identifier") {
       addBinding(node.id);
-      if (node.type === "ClassDeclaration") candidates.push({ name: node.id.name, node: node.id, declaration: node, parent });
+      if (node.type === "ClassDeclaration") {
+        const candidate = { name: node.id.name, node: node.id, declaration: node, parent };
+        candidates.push(candidate);
+        candidateByDeclaration.set(node, candidate);
+      }
     }
     if (node.type === "CatchClause") {
       for (const identifier of collectPatternNodes(node.param)) {
@@ -298,19 +305,31 @@ function analyzeUnusedFunctionsAndClasses(file) {
   });
 
   if (dynamicScope) return { findings: [], skipped: true };
+
+  // Index references once. Recursive references inside a candidate's own declaration
+  // are excluded, while references from sibling declarations remain external uses.
+  const externalReferencesByName = new Map();
+  walkWithAncestors(ast, (node, parent, ancestors) => {
+    if (node.type !== "Identifier" || isNonReferenceIdentifier(node, parent, declarationNodes, parameterNodes)) return;
+    let insideOwnDeclaration = false;
+    for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+      const candidate = candidateByDeclaration.get(ancestors[index]);
+      if (candidate?.name === node.name) {
+        insideOwnDeclaration = true;
+        break;
+      }
+    }
+    if (!insideOwnDeclaration) {
+      externalReferencesByName.set(node.name, (externalReferencesByName.get(node.name) ?? 0) + 1);
+    }
+  });
+
   const findings = [];
   for (const candidate of candidates) {
     if (candidate.name.startsWith("_") || (boundCounts.get(candidate.name) ?? 0) !== 1) continue;
     if (candidate.parent?.type === "ExportNamedDeclaration" ||
         candidate.parent?.type === "ExportDefaultDeclaration") continue;
-
-    let referencedOutsideDeclaration = false;
-    walkWithAncestors(ast, (node, parent, ancestors) => {
-      if (referencedOutsideDeclaration || node.type !== "Identifier" || node.name !== candidate.name) return;
-      if (node === candidate.node || ancestors.includes(candidate.declaration)) return;
-      if (!isNonReferenceIdentifier(node, parent, declarationNodes, parameterNodes)) referencedOutsideDeclaration = true;
-    });
-    if (referencedOutsideDeclaration) continue;
+    if ((externalReferencesByName.get(candidate.name) ?? 0) > 0) continue;
 
     const line = candidate.node.loc?.start?.line ?? 1;
     const slug = file.path.replace(/[^a-z0-9]+/gi, "-");
@@ -328,7 +347,6 @@ function analyzeUnusedFunctionsAndClasses(file) {
   }
   return { findings, skipped: false };
 }
-
 const RESOLUTION_EXTENSIONS = [
   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss",
   ".sass", ".less", ".vue", ".svelte", ".html", ".htm"
