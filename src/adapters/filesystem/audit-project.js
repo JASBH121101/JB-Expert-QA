@@ -46,7 +46,6 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     passed: false,
     blockedByCoverage: true
   });
-  const diagnostics = report.diagnostics;
 
   const deadCodeRuleIds = new Set([
     "code-quality.possibly-unused-exports",
