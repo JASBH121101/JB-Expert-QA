@@ -110,12 +110,13 @@ function analyzeModule(file) {
   walk(ast, (node) => {
     if (node.type === "ExportAllDeclaration") {
       reExportsAll = true;
-      references.push({ source: literalModuleSource(node.source), names: null, all: true });
+      references.push({ source: literalModuleSource(node.source), names: null, all: true, line: node.loc?.start?.line ?? 1 });
     } else if (node.type === "ExportNamedDeclaration" && node.source) {
       references.push({
         source: literalModuleSource(node.source),
         names: (node.specifiers ?? []).map((item) => item.local?.name ?? item.local?.value).filter(Boolean),
-        all: false
+        all: false,
+        line: node.loc?.start?.line ?? 1
       });
     } else if (node.type === "ImportDeclaration") {
       const names = (node.specifiers ?? []).map((item) => {
@@ -123,11 +124,11 @@ function analyzeModule(file) {
         if (item.type === "ImportSpecifier") return item.imported?.name ?? item.imported?.value;
         return null;
       }).filter(Boolean);
-      references.push({ source: literalModuleSource(node.source), names, all: (node.specifiers ?? []).some((item) => item.type === "ImportNamespaceSpecifier") });
+      references.push({ source: literalModuleSource(node.source), names, all: (node.specifiers ?? []).some((item) => item.type === "ImportNamespaceSpecifier"), line: node.loc?.start?.line ?? 1 });
     } else if (node.type === "ImportExpression") {
       const source = literalModuleSource(node.source);
       if (source === null) dynamicModuleReference = true;
-      else references.push({ source, names: null, all: true });
+      else references.push({ source, names: null, all: true, line: node.loc?.start?.line ?? 1 });
     } else if (node.type === "CallExpression" && node.callee?.type === "Identifier" && node.callee.name === "require") {
       const source = literalModuleSource(node.arguments?.[0]);
       if (source === null) dynamicModuleReference = true;
@@ -233,6 +234,302 @@ function analyzeLocalBindings(file) {
   }
   return { findings, skipped: false };
 }
+function walkWithAncestors(node, visit, ancestors = []) {
+  if (!node || typeof node !== "object") return;
+  const parent = ancestors.length ? ancestors[ancestors.length - 1] : null;
+  if (typeof node.type === "string") visit(node, parent, ancestors);
+  const next = typeof node.type === "string" ? [...ancestors, node] : ancestors;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "loc" || key === "start" || key === "end") continue;
+    if (Array.isArray(value)) for (const child of value) walkWithAncestors(child, visit, next);
+    else if (value && typeof value === "object") walkWithAncestors(value, visit, next);
+  }
+}
+
+function analyzeUnusedFunctionsAndClasses(file) {
+  const ast = parse(file.content, { ecmaVersion: "latest", sourceType: "module", locations: true, allowHashBang: true });
+  const candidates = [];
+  const declarationNodes = new Set();
+  const parameterNodes = new Set();
+  const boundCounts = new Map();
+  let dynamicScope = false;
+  const addBinding = (identifier) => {
+    if (!identifier || identifier.type !== "Identifier" || declarationNodes.has(identifier)) return;
+    declarationNodes.add(identifier);
+    boundCounts.set(identifier.name, (boundCounts.get(identifier.name) ?? 0) + 1);
+  };
+
+  walkWithParents(ast, (node, parent) => {
+    if (node.type === "WithStatement" ||
+        (node.type === "CallExpression" && node.callee?.type === "Identifier" && node.callee.name === "eval")) dynamicScope = true;
+    if (node.type === "VariableDeclarator") {
+      for (const identifier of collectPatternNodes(node.id)) addBinding(identifier);
+    }
+    if (parent?.type === "ImportDeclaration") {
+      const local = node.type === "ImportSpecifier" ? node.local :
+        ["ImportDefaultSpecifier", "ImportNamespaceSpecifier"].includes(node.type) ? node.local : null;
+      if (local?.type === "Identifier") addBinding(local);
+    }
+    if (["FunctionDeclaration", "FunctionExpression"].includes(node.type)) {
+      if (node.id?.type === "Identifier") {
+        addBinding(node.id);
+        parameterNodes.add(node.id);
+      }
+      for (const parameter of node.params ?? []) {
+        for (const identifier of collectPatternNodes(parameter)) {
+          addBinding(identifier);
+          parameterNodes.add(identifier);
+        }
+      }
+      if (node.type === "FunctionDeclaration" && node.id?.type === "Identifier") {
+        candidates.push({ name: node.id.name, node: node.id, declaration: node, parent });
+      }
+    }
+    if (["ClassDeclaration", "ClassExpression"].includes(node.type) && node.id?.type === "Identifier") {
+      addBinding(node.id);
+      if (node.type === "ClassDeclaration") candidates.push({ name: node.id.name, node: node.id, declaration: node, parent });
+    }
+    if (node.type === "CatchClause") {
+      for (const identifier of collectPatternNodes(node.param)) {
+        addBinding(identifier);
+        parameterNodes.add(identifier);
+      }
+    }
+  });
+
+  if (dynamicScope) return { findings: [], skipped: true };
+  const findings = [];
+  for (const candidate of candidates) {
+    if (candidate.name.startsWith("_") || (boundCounts.get(candidate.name) ?? 0) !== 1) continue;
+    if (candidate.parent?.type === "ExportNamedDeclaration" ||
+        candidate.parent?.type === "ExportDefaultDeclaration") continue;
+
+    let referencedOutsideDeclaration = false;
+    walkWithAncestors(ast, (node, parent, ancestors) => {
+      if (referencedOutsideDeclaration || node.type !== "Identifier" || node.name !== candidate.name) return;
+      if (node === candidate.node || ancestors.includes(candidate.declaration)) return;
+      if (!isNonReferenceIdentifier(node, parent, declarationNodes, parameterNodes)) referencedOutsideDeclaration = true;
+    });
+    if (referencedOutsideDeclaration) continue;
+
+    const line = candidate.node.loc?.start?.line ?? 1;
+    const slug = file.path.replace(/[^a-z0-9]+/gi, "-");
+    findings.push({
+      id: "CODE-DEAD-DECLARATION-" + slug + "-" + candidate.name.replace(/[^a-z0-9]+/gi, "-"),
+      title: "Function or class declaration has no static external references",
+      description: "The " + (candidate.declaration.type === "ClassDeclaration" ? "class " : "function ") +
+        candidate.name + " has no statically observed references outside its own declaration. Reflection, string-based lookup, framework registration, and external consumers may still use it.",
+      severity: "info",
+      location: file.path + ":" + line,
+      recommendation: "Check framework registration, reflection, external entrypoints, and runtime behavior before removing this declaration.",
+      evidence: { path: file.path, declarationName: candidate.name, declarationKind: candidate.declaration.type, staticallyObservedExternalReferences: 0 },
+      metadata: { detector: "conservative-function-class-reference-check", confidence: "review-only", lexicalScopeResolution: "duplicate binding names skipped", safeToDeleteAutomatically: false }
+    });
+  }
+  return { findings, skipped: false };
+}
+
+const RESOLUTION_EXTENSIONS = [
+  ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss",
+  ".sass", ".less", ".vue", ".svelte", ".html", ".htm"
+];
+
+function candidateModulePaths(basePath) {
+  const candidates = [basePath];
+  const extension = path.posix.extname(basePath);
+  if (extension) {
+    if ([".js", ".mjs", ".cjs"].includes(extension)) {
+      const stem = basePath.slice(0, -extension.length);
+      for (const replacement of [".ts", ".tsx", ".jsx"]) candidates.push(stem + replacement);
+    }
+  } else {
+    for (const item of RESOLUTION_EXTENSIONS) candidates.push(basePath + item);
+    for (const item of RESOLUTION_EXTENSIONS.filter((value) => ![".json", ".html", ".htm"].includes(value))) {
+      candidates.push(path.posix.join(basePath, "index" + item));
+    }
+  }
+  return [...new Set(candidates)];
+}
+
+function collectManifestTargets(value, output = []) {
+  if (typeof value === "string" && value.startsWith("./")) output.push(value);
+  else if (Array.isArray(value)) for (const item of value) collectManifestTargets(item, output);
+  else if (value && typeof value === "object") {
+    for (const item of Object.values(value)) collectManifestTargets(item, output);
+  }
+  return output;
+}
+
+function resolveRelativeProjectPath(importerPath, specifier, knownPaths, manifests = []) {
+  if (typeof specifier !== "string" || !specifier.startsWith(".")) return { relative: false, target: null };
+  const cleanSpecifier = specifier.replace(/[?#].*$/, "");
+  const joined = path.posix.normalize(path.posix.join(path.posix.dirname(importerPath), cleanSpecifier));
+  if (path.posix.isAbsolute(joined) || joined === ".." || joined.startsWith("../")) {
+    return { relative: true, outside: true, target: null };
+  }
+  const directCandidates = candidateModulePaths(joined);
+  const direct = directCandidates.find((candidate) => knownPaths.has(candidate));
+  if (direct) return { relative: true, outside: false, target: direct, candidates: directCandidates };
+
+  const manifestPath = path.posix.join(joined, "package.json");
+  const manifest = manifests.find((item) => item.path === manifestPath && item.data && !item.parseError);
+  if (manifest) {
+    const targets = [manifest.data.module, manifest.data.main, manifest.data.browser, ...collectManifestTargets(manifest.data.exports)];
+    for (const target of targets) {
+      if (typeof target !== "string" || !target.startsWith("./")) continue;
+      const targetPath = path.posix.normalize(path.posix.join(joined, target));
+      const resolved = candidateModulePaths(targetPath).find((candidate) => knownPaths.has(candidate));
+      if (resolved) return { relative: true, outside: false, target: resolved, candidates: directCandidates };
+    }
+  }
+  return { relative: true, outside: false, target: null, candidates: directCandidates };
+}
+
+function parseProjectModules(projectFiles) {
+  const modules = new Map();
+  const parseSkipped = [];
+  const dynamicFiles = [];
+  for (const file of projectFiles) {
+    if (!JS_EXTENSIONS.has(file.extension)) continue;
+    try {
+      const analysis = analyzeModule(file);
+      modules.set(file.path, analysis);
+      if (analysis.dynamicModuleReference) dynamicFiles.push(file.path);
+    } catch { parseSkipped.push(file.path); }
+  }
+  return { modules, parseSkipped, dynamicFiles };
+}
+
+function analyzeUnresolvedRelativeImports(context) {
+  const projectFiles = context.projectFiles ?? [];
+  const knownPaths = new Set(projectFiles.map((file) => file.path));
+  const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
+  const manifests = context.packageManifests ?? [];
+  const findings = [];
+  const seen = new Set();
+  for (const [importerPath, analysis] of modules) {
+    for (const reference of analysis.references) {
+      if (typeof reference.source !== "string" || !reference.source.startsWith(".")) continue;
+      const resolution = resolveRelativeProjectPath(importerPath, reference.source, knownPaths, manifests);
+      if (resolution.outside || resolution.target) continue;
+      const key = importerPath + "::" + reference.source;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push({
+        id: "CODE-IMPORT-UNRESOLVED-" + importerPath.replace(/[^a-z0-9]+/gi, "-") + "-" + reference.source.replace(/[^a-z0-9]+/gi, "-"),
+        title: "Relative module import does not resolve inside the scanned project",
+        description: "The relative module specifier " + reference.source + " from " + importerPath +
+          " does not match a scanned file or supported directory entrypoint. Files outside the scan root and unscanned generated files are not validated.",
+        severity: "warning",
+        location: importerPath + ":" + (reference.line ?? 1),
+        recommendation: "Verify the relative path, filename casing, extension, package entrypoint, and build aliases before running or building the project.",
+        evidence: { importer: importerPath, specifier: reference.source, candidatePaths: (resolution.candidates ?? []).slice(0, 12) },
+        metadata: { detector: "static-relative-module-resolution", confidence: "review-required", safeToDeleteAutomatically: false }
+      });
+    }
+  }
+  if (parseSkipped.length) findings.push({
+    id: "CODE-IMPORT-RESOLUTION-PARSE-SKIPPED",
+    title: "Some JavaScript modules could not be checked for unresolved relative imports",
+    description: parseSkipped.length + " JavaScript module(s) could not be parsed, so their import paths were not validated.",
+    severity: "info",
+    location: parseSkipped.slice(0, 8).join(", "),
+    recommendation: "Resolve syntax errors or inspect these modules with a parser matching their syntax.",
+    evidence: { skippedFiles: parseSkipped.length, paths: parseSkipped.slice(0, 20) },
+    metadata: { detector: "static-relative-module-resolution", confidence: "coverage-warning" }
+  });
+  if (dynamicFiles.length) findings.push({
+    id: "CODE-IMPORT-RESOLUTION-DYNAMIC-SKIPPED",
+    title: "Dynamic module loading limits import-resolution coverage",
+    description: dynamicFiles.length + " JavaScript module(s) contain non-literal import() or require() calls that cannot be resolved statically.",
+    severity: "info",
+    location: dynamicFiles.slice(0, 8).join(", "),
+    recommendation: "Review dynamic module names and build-time aliases manually; no missing path is inferred from a non-literal expression.",
+    evidence: { dynamicFiles: dynamicFiles.length, paths: dynamicFiles.slice(0, 20) },
+    metadata: { detector: "static-relative-module-resolution", confidence: "coverage-warning" }
+  });
+  return findings;
+}
+
+function findStronglyConnectedComponents(graph) {
+  let nextIndex = 0;
+  const indices = new Map();
+  const lowLinks = new Map();
+  const stack = [];
+  const onStack = new Set();
+  const components = [];
+  function visit(node) {
+    indices.set(node, nextIndex);
+    lowLinks.set(node, nextIndex);
+    nextIndex += 1;
+    stack.push(node);
+    onStack.add(node);
+    for (const target of graph.get(node) ?? []) {
+      if (!indices.has(target)) {
+        visit(target);
+        lowLinks.set(node, Math.min(lowLinks.get(node), lowLinks.get(target)));
+      } else if (onStack.has(target)) lowLinks.set(node, Math.min(lowLinks.get(node), indices.get(target)));
+    }
+    if (lowLinks.get(node) === indices.get(node)) {
+      const component = [];
+      let member;
+      do {
+        member = stack.pop();
+        onStack.delete(member);
+        component.push(member);
+      } while (member !== node);
+      components.push(component);
+    }
+  }
+  for (const node of graph.keys()) if (!indices.has(node)) visit(node);
+  return components;
+}
+
+function analyzeCircularDependencies(context) {
+  const projectFiles = context.projectFiles ?? [];
+  const modulePaths = new Set(projectFiles.filter((file) => JS_EXTENSIONS.has(file.extension)).map((file) => file.path));
+  const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
+  const graph = new Map([...modules.keys()].map((modulePath) => [modulePath, new Set()]));
+  for (const [importerPath, analysis] of modules) {
+    for (const reference of analysis.references) {
+      if (typeof reference.source !== "string") continue;
+      const target = resolveRelativeModule(importerPath, reference.source, modulePaths);
+      if (target && graph.has(target)) graph.get(importerPath).add(target);
+    }
+  }
+  const findings = [];
+  for (const component of findStronglyConnectedComponents(graph)) {
+    const selfCycle = component.length === 1 && graph.get(component[0])?.has(component[0]);
+    if (component.length < 2 && !selfCycle) continue;
+    const members = component.slice().sort();
+    const slug = members.join("--").replace(/[^a-z0-9]+/gi, "-");
+    findings.push({
+      id: "CODE-CYCLE-" + slug,
+      title: "Circular module dependency detected across " + members.length + " module(s)",
+      description: "The statically resolved module graph contains a strongly connected component: " + members.join(", ") +
+        ". Cycles can create initialization-order and maintenance risks, but some project architectures intentionally use them.",
+      severity: "warning",
+      location: members.join(", "),
+      recommendation: "Review whether the modules can depend on a lower-level shared module or one-way interface; verify initialization behavior before refactoring.",
+      evidence: { modules: members, cycleSize: members.length, staticallyResolved: true },
+      metadata: { detector: "static-module-graph-tarjan", confidence: "review-only", safeToDeleteAutomatically: false }
+    });
+  }
+  if (parseSkipped.length || dynamicFiles.length) findings.push({
+    id: "CODE-CYCLE-ANALYSIS-PARTIAL",
+    title: "Circular dependency analysis has incomplete static coverage",
+    description: (parseSkipped.length ? parseSkipped.length + " unparseable JavaScript module(s); " : "") +
+      (dynamicFiles.length ? dynamicFiles.length + " module(s) with non-literal dynamic loading." : "") +
+      " Dependencies hidden by unsupported syntax or runtime-computed paths may not appear in the graph.",
+    severity: "info",
+    location: [...parseSkipped, ...dynamicFiles].slice(0, 8).join(", "),
+    recommendation: "Resolve parse gaps and review dynamic loading paths before treating the dependency graph as complete.",
+    evidence: { parseSkippedFiles: parseSkipped.length, dynamicFiles: dynamicFiles.length },
+    metadata: { detector: "static-module-graph-tarjan", confidence: "coverage-warning" }
+  });
+  return findings;
+}
+
 const CSS_EXTENSIONS = new Set([".css", ".scss", ".sass", ".less"]);
 const DYNAMIC_CLASS_PATTERNS = [
   /\bclassName\s*=\s*\{/,
@@ -338,6 +635,43 @@ export const deadCodeRules = Object.freeze([
     id: "code-quality.possibly-unused-css-selectors",
     specialist: "code-quality",
     evaluate(context) { return analyzeCssSelectors(context.projectFiles ?? []); }
+  },
+  {
+    id: "code-quality.possibly-unused-declarations",
+    specialist: "code-quality",
+    evaluate(context) {
+      const findings = [];
+      const skipped = [];
+      for (const file of context.projectFiles ?? []) {
+        if (!JS_EXTENSIONS.has(file.extension)) continue;
+        try {
+          const result = analyzeUnusedFunctionsAndClasses(file);
+          findings.push(...result.findings);
+          if (result.skipped) skipped.push(file.path);
+        } catch { skipped.push(file.path); }
+      }
+      if (skipped.length) findings.push({
+        id: "CODE-DEAD-FUNCTION-CLASS-ANALYSIS-SKIPPED",
+        title: "Function and class reachability skipped for some JavaScript files",
+        description: skipped.length + " file(s) could not be safely analyzed because of parse failures or dynamic scope.",
+        severity: "info",
+        location: skipped.slice(0, 8).join(", "),
+        recommendation: "Review unsupported syntax and dynamic scope manually; do not infer that declarations are unused.",
+        evidence: { skippedFiles: skipped.length, paths: skipped.slice(0, 20) },
+        metadata: { detector: "conservative-function-class-reference-check", confidence: "coverage-warning" }
+      });
+      return findings;
+    }
+  },
+  {
+    id: "code-quality.unresolved-relative-imports",
+    specialist: "code-quality",
+    evaluate(context) { return analyzeUnresolvedRelativeImports(context); }
+  },
+  {
+    id: "code-quality.circular-dependencies",
+    specialist: "code-quality",
+    evaluate(context) { return analyzeCircularDependencies(context); }
   },
   {
     id: "code-quality.possibly-unused-exports",
