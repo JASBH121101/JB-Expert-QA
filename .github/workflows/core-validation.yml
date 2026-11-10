@@ -3,7 +3,7 @@ name: Core validation
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "integration/**"]
     paths:
       - "package.json"
       - "src/**"
