@@ -35,12 +35,16 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
   };
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
 
+  const deadCodeRuleIds = new Set([
+    "code-quality.possibly-unused-exports",
+    "code-quality.possibly-unused-bindings",
+    "code-quality.possibly-unused-css-selectors",
+    "code-quality.possibly-unused-declarations",
+    "code-quality.unresolved-relative-imports",
+    "code-quality.circular-dependencies"
+  ]);
   const deadCodeWarnings = report.diagnostics.filter((item) =>
-    item.id === "CODE-DEAD-EXPORT-PARSE-SKIPPED" ||
-    item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED" ||
-    item.id === "CODE-DEAD-LOCAL-ANALYSIS-SKIPPED" ||
-    item.id === "CODE-DEAD-CSS-ANALYSIS-SKIPPED" ||
-    item.id.startsWith("CODE-DEAD-CSS-ANALYSIS-SKIPPED-")
+    deadCodeRuleIds.has(item.ruleId) && item.metadata?.confidence === "coverage-warning"
   );
   const possibleUnusedExports = report.diagnostics.filter((item) =>
     item.ruleId === "code-quality.possibly-unused-exports" &&
@@ -74,7 +78,16 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
           (item.id.startsWith("CODE-DEAD-IMPORT-") || item.id.startsWith("CODE-DEAD-BINDING-"))
         ).length,
         possibleUnusedCssSelectors: report.diagnostics.filter((item) =>
-          item.id.startsWith("CODE-DEAD-CSS-") && item.metadata?.confidence === "review-only"
+          item.ruleId === "code-quality.possibly-unused-css-selectors" && item.metadata?.confidence === "review-only"
+        ).length,
+        possibleUnusedDeclarations: report.diagnostics.filter((item) =>
+          item.ruleId === "code-quality.possibly-unused-declarations" && item.id.startsWith("CODE-DEAD-DECLARATION-")
+        ).length,
+        unresolvedRelativeImports: report.diagnostics.filter((item) =>
+          item.ruleId === "code-quality.unresolved-relative-imports" && item.id.startsWith("CODE-IMPORT-UNRESOLVED-")
+        ).length,
+        dependencyCycles: report.diagnostics.filter((item) =>
+          item.ruleId === "code-quality.circular-dependencies" && item.id.startsWith("CODE-CYCLE-") && item.metadata?.confidence === "review-only"
         ).length
       }),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,
