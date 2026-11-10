@@ -98,7 +98,16 @@ test("reporters do not display PASS when static analysis coverage is partial", (
       sourceFiles: 3,
       scannedExtensions: [".js", ".tsx"],
       incompleteReasons: [],
-      deadCodeAnalysis: { status: "partial" },
+      deadCodeAnalysis: {
+        status: "partial",
+        coverageWarnings: 2,
+        possibleUnusedExports: 4,
+        possibleUnusedBindings: 5,
+        possibleUnusedCssSelectors: 6,
+        possibleUnusedDeclarations: 3,
+        unresolvedRelativeImports: 2,
+        dependencyCycles: 1
+      },
       languageCoverage: {
         javascriptModuleGraph: { supportedExtensions: [".js", ".mjs", ".cjs"], unsupportedModuleFiles: 1 },
         cssSelectors: { parsedExtensions: [".css", ".scss", ".less"], indentedSassFiles: 0 },
@@ -112,4 +121,8 @@ test("reporters do not display PASS when static analysis coverage is partial", (
   assert.match(html, /REVIEW REQUIRED — PARTIAL COVERAGE/);
   assert.match(markdown, /unsupported module files: 1/);
   assert.match(html, /unsupported module files: 1/);
+  assert.match(markdown, /Possible unused declarations: 3/);
+  assert.match(html, /Possible unused declarations: 3/);
+  assert.match(markdown, /Dependency cycles: 1/);
+  assert.match(html, /Dependency cycles: 1/);
 });
