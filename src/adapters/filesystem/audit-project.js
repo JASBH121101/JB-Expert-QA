@@ -37,7 +37,10 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
 
   const deadCodeWarnings = report.diagnostics.filter((item) =>
     item.id === "CODE-DEAD-EXPORT-PARSE-SKIPPED" ||
-    item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED"
+    item.id === "CODE-DEAD-EXPORT-ANALYSIS-SKIPPED" ||
+    item.id === "CODE-DEAD-LOCAL-ANALYSIS-SKIPPED" ||
+    item.id === "CODE-DEAD-CSS-ANALYSIS-SKIPPED" ||
+    item.id.startsWith("CODE-DEAD-CSS-ANALYSIS-SKIPPED-")
   );
   const possibleUnusedExports = report.diagnostics.filter((item) =>
     item.ruleId === "code-quality.possibly-unused-exports" &&
@@ -63,9 +66,16 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
       }),
       filesAnalyzed: scan.summary.filesRead,
       deadCodeAnalysis: Object.freeze({
-        status: deadCodeWarnings.length ? "partial" : "heuristic-complete",
+        status: deadCodeWarnings.length || !scanComplete ? "partial" : "heuristic-complete",
         coverageWarnings: deadCodeWarnings.length,
-        possibleUnusedExports: possibleUnusedExports.length
+        possibleUnusedExports: possibleUnusedExports.length,
+        possibleUnusedBindings: report.diagnostics.filter((item) =>
+          item.ruleId === "code-quality.possibly-unused-bindings" &&
+          (item.id.startsWith("CODE-DEAD-IMPORT-") || item.id.startsWith("CODE-DEAD-BINDING-"))
+        ).length,
+        possibleUnusedCssSelectors: report.diagnostics.filter((item) =>
+          item.id.startsWith("CODE-DEAD-CSS-") && item.metadata?.confidence === "review-only"
+        ).length
       }),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,
       dependencyAdvisoryLookup: dependencyAdvisories.enabled,

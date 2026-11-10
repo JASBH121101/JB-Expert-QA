@@ -109,3 +109,12 @@ JB Expert QA includes a conservative JavaScript export-reachability rule. It ins
 The detector deliberately emits coverage warnings or abstains when it sees non-literal dynamic module loading or parse failures. It skips index modules, declared package entrypoints, CommonJS boundaries, and export-star modules. It supports JavaScript \`.js\`, \`.mjs\`, and \`.cjs\` modules only; TypeScript, JSX, Vue, Svelte, CSS selectors, and CSS reachability are outside this rule's scope.
 
 Findings are informational and must be reviewed. The detector never deletes files, declarations, or exports and must never be used as an automatic deletion list. GitHub Actions validates its regression tests on Node.js 22 and 24.
+
+
+## Extended dead-code review heuristics
+
+The static dead-code reviewer also checks JavaScript imports and local \`var\`/\`let\`/\`const\` bindings for identifiers with no observed reads. It skips duplicate names rather than guessing across lexical scopes, ignores parameters, and abstains for files using \`eval\` or \`with\`. Assignment-only writes do not count as reads. Findings remain informational; initializers can have side effects and are never automatically removed.
+
+For standalone CSS, SCSS, SASS, and Less stylesheets, it checks basic class and ID selectors against scanned project text. It abstains when dynamic class assignment or framework-specific selector scoping is detected. A text reference is not browser proof of use, and no text reference is not proof of dead CSS. CSS-in-JS, embedded component styles, runtime-generated selectors, and route/state coverage require separate browser-based analysis.
+
+Current static coverage remains limited to JavaScript modules Acorn can parse and basic standalone stylesheet selectors. TypeScript, TSX/JSX syntax, Vue/Svelte style blocks, CSS selector usage across runtime routes, and whole-program lexical scope resolution are not certified by these heuristics. All findings are review-only and no code is deleted automatically.
