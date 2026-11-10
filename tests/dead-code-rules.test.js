@@ -356,7 +356,7 @@ test("project audit exposes unused declarations, unresolved imports, and depende
     await writeFile(join(root, "src", "a.js"), 'import "./b.js";');
     await writeFile(join(root, "src", "b.js"), 'import "./a.js";');
     const report = await auditProject(root);
-    assert.equal(report.summary.rulesExecuted, 33);
+    assert.equal(report.summary.rulesExecuted, 34);
     assert.equal(report.analysisScope.deadCodeAnalysis.possibleUnusedDeclarations, 2);
     assert.equal(report.analysisScope.deadCodeAnalysis.unresolvedRelativeImports, 1, JSON.stringify({
       diagnostics: report.diagnostics.map((item) => ({ id: item.id, ruleId: item.ruleId, location: item.location })),
