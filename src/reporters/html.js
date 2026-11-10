@@ -70,6 +70,20 @@ export function formatHtmlReport(report) {
       ].map((value) => "<li>" + escapeHtml(value) + "</li>").join("") + "</ul>"
     : "";
 
+  const deadCode = report.analysisScope?.deadCodeAnalysis;
+  const deadCodeSection = deadCode
+    ? "<h2>Dead-code and dependency analysis</h2><ul>" + [
+        "Analysis status: " + (deadCode.status ?? "unknown"),
+        "Coverage warnings: " + (deadCode.coverageWarnings ?? 0),
+        "Possible unused exports: " + (deadCode.possibleUnusedExports ?? 0),
+        "Possible unused bindings: " + (deadCode.possibleUnusedBindings ?? 0),
+        "Possible unused CSS selectors: " + (deadCode.possibleUnusedCssSelectors ?? 0),
+        "Possible unused declarations: " + (deadCode.possibleUnusedDeclarations ?? 0),
+        "Unresolved relative imports: " + (deadCode.unresolvedRelativeImports ?? 0),
+        "Dependency cycles: " + (deadCode.dependencyCycles ?? 0)
+      ].map((value) => "<li>" + escapeHtml(value) + "</li>").join("") + "</ul>"
+    : "";
+
   const visualSection = Array.isArray(report.viewports) &&
     report.viewports.some((viewport) => viewport.visualComparison || viewport.screenshotPath)
     ? "<h2>Visual regression</h2><table><thead><tr><th>Viewport</th><th>Capture</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
@@ -134,6 +148,7 @@ export function formatHtmlReport(report) {
     '<p class="meta">Generated: ' + escapeHtml(report.generatedAt) + " · " + escapeHtml(summary) + "</p>",
     projectSummary,
     coverageSection,
+    deadCodeSection,
     visualSection,
     aiSection,
     "<h2>Findings</h2>",
