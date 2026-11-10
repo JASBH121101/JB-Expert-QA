@@ -132,7 +132,7 @@ function analyzeModule(file) {
     } else if (node.type === "CallExpression" && node.callee?.type === "Identifier" && node.callee.name === "require") {
       const source = literalModuleSource(node.arguments?.[0]);
       if (source === null) dynamicModuleReference = true;
-      else references.push({ source, names: null, all: true });
+      else references.push({ source, names: null, all: true, line: node.loc?.start?.line ?? 1 });
     } else if (node.type === "MemberExpression" && node.object?.type === "Identifier" &&
         (node.object.name === "exports" || (node.object.name === "module" && (node.property?.name === "exports" || node.property?.value === "exports")))) {
       commonJsBoundary = true;
@@ -270,7 +270,7 @@ function analyzeUnusedFunctionsAndClasses(file) {
         ["ImportDefaultSpecifier", "ImportNamespaceSpecifier"].includes(node.type) ? node.local : null;
       if (local?.type === "Identifier") addBinding(local);
     }
-    if (["FunctionDeclaration", "FunctionExpression"].includes(node.type)) {
+    if (["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(node.type)) {
       if (node.id?.type === "Identifier") {
         addBinding(node.id);
         parameterNodes.add(node.id);
@@ -376,13 +376,20 @@ function resolveRelativeProjectPath(importerPath, specifier, knownPaths, manifes
   if (manifest) {
     const targets = [manifest.data.module, manifest.data.main, manifest.data.browser, ...collectManifestTargets(manifest.data.exports)];
     for (const target of targets) {
-      if (typeof target !== "string" || !target.startsWith("./")) continue;
-      const targetPath = path.posix.normalize(path.posix.join(joined, target));
+      if (typeof target !== "string" || !target || target.startsWith("/")) continue;
+      const targetPath = path.posix.normalize(path.posix.join(joined, target.startsWith("./") ? target : "./" + target));
       const resolved = candidateModulePaths(targetPath).find((candidate) => knownPaths.has(candidate));
       if (resolved) return { relative: true, outside: false, target: resolved, candidates: directCandidates };
     }
   }
   return { relative: true, outside: false, target: null, candidates: directCandidates };
+}
+
+function unsupportedModuleSources(projectFiles) {
+  const unsupportedExtensions = new Set([".jsx", ".ts", ".tsx", ".vue", ".svelte"]);
+  return projectFiles.filter((file) =>
+    unsupportedExtensions.has(file.extension) && /\b(?:import|export)\b/.test(file.content)
+  ).map((file) => file.path);
 }
 
 function parseProjectModules(projectFiles) {
@@ -404,6 +411,7 @@ function analyzeUnresolvedRelativeImports(context) {
   const projectFiles = context.projectFiles ?? [];
   const knownPaths = new Set(projectFiles.map((file) => file.path));
   const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
+  const unsupportedFiles = unsupportedModuleSources(projectFiles);
   const manifests = context.packageManifests ?? [];
   const findings = [];
   const seen = new Set();
@@ -436,6 +444,16 @@ function analyzeUnresolvedRelativeImports(context) {
     location: parseSkipped.slice(0, 8).join(", "),
     recommendation: "Resolve syntax errors or inspect these modules with a parser matching their syntax.",
     evidence: { skippedFiles: parseSkipped.length, paths: parseSkipped.slice(0, 20) },
+    metadata: { detector: "static-relative-module-resolution", confidence: "coverage-warning" }
+  });
+  if (unsupportedFiles.length) findings.push({
+    id: "CODE-IMPORT-RESOLUTION-UNSUPPORTED-SOURCES",
+    title: "Some source-language module imports are outside the JavaScript parser scope",
+    description: unsupportedFiles.length + " TypeScript, JSX, Vue, or Svelte source file(s) contain import/export syntax and were not parsed by this JavaScript-only analyzer.",
+    severity: "info",
+    location: unsupportedFiles.slice(0, 8).join(", "),
+    recommendation: "Validate those imports with the project's TypeScript or framework-aware compiler and treat this static result as partial.",
+    evidence: { unsupportedFiles: unsupportedFiles.length, paths: unsupportedFiles.slice(0, 20) },
     metadata: { detector: "static-relative-module-resolution", confidence: "coverage-warning" }
   });
   if (dynamicFiles.length) findings.push({
@@ -489,6 +507,7 @@ function analyzeCircularDependencies(context) {
   const projectFiles = context.projectFiles ?? [];
   const modulePaths = new Set(projectFiles.filter((file) => JS_EXTENSIONS.has(file.extension)).map((file) => file.path));
   const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
+  const unsupportedFiles = unsupportedModuleSources(projectFiles);
   const graph = new Map([...modules.keys()].map((modulePath) => [modulePath, new Set()]));
   for (const [importerPath, analysis] of modules) {
     for (const reference of analysis.references) {
@@ -515,16 +534,17 @@ function analyzeCircularDependencies(context) {
       metadata: { detector: "static-module-graph-tarjan", confidence: "review-only", safeToDeleteAutomatically: false }
     });
   }
-  if (parseSkipped.length || dynamicFiles.length) findings.push({
+  if (parseSkipped.length || dynamicFiles.length || unsupportedFiles.length) findings.push({
     id: "CODE-CYCLE-ANALYSIS-PARTIAL",
     title: "Circular dependency analysis has incomplete static coverage",
     description: (parseSkipped.length ? parseSkipped.length + " unparseable JavaScript module(s); " : "") +
-      (dynamicFiles.length ? dynamicFiles.length + " module(s) with non-literal dynamic loading." : "") +
+      (dynamicFiles.length ? dynamicFiles.length + " module(s) with non-literal dynamic loading; " : "") +
+      (unsupportedFiles.length ? unsupportedFiles.length + " unsupported-language source module(s)." : "") +
       " Dependencies hidden by unsupported syntax or runtime-computed paths may not appear in the graph.",
     severity: "info",
-    location: [...parseSkipped, ...dynamicFiles].slice(0, 8).join(", "),
+    location: [...parseSkipped, ...dynamicFiles, ...unsupportedFiles].slice(0, 8).join(", "),
     recommendation: "Resolve parse gaps and review dynamic loading paths before treating the dependency graph as complete.",
-    evidence: { parseSkippedFiles: parseSkipped.length, dynamicFiles: dynamicFiles.length },
+    evidence: { parseSkippedFiles: parseSkipped.length, dynamicFiles: dynamicFiles.length, unsupportedSourceFiles: unsupportedFiles.length },
     metadata: { detector: "static-module-graph-tarjan", confidence: "coverage-warning" }
   });
   return findings;
