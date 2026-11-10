@@ -385,6 +385,17 @@ function resolveRelativeProjectPath(importerPath, specifier, knownPaths, manifes
   return { relative: true, outside: false, target: null, candidates: directCandidates };
 }
 
+function scanCoverageGaps(context) {
+  const summary = context.projectScan?.summary;
+  if (!summary) return [];
+  const gaps = [];
+  if (summary.truncated) gaps.push("scan limits truncated the file inventory");
+  if ((summary.oversizedFiles ?? 0) > 0) gaps.push(summary.oversizedFiles + " oversized file(s) were skipped");
+  if ((summary.unreadableFiles ?? 0) > 0) gaps.push(summary.unreadableFiles + " unreadable file(s) were skipped");
+  if ((summary.skippedSymlinks ?? 0) > 0) gaps.push(summary.skippedSymlinks + " symbolic link(s) were not followed");
+  return gaps;
+}
+
 function unsupportedModuleSources(projectFiles) {
   const unsupportedExtensions = new Set([".jsx", ".ts", ".tsx", ".vue", ".svelte"]);
   return projectFiles.filter((file) =>
@@ -408,6 +419,17 @@ function parseProjectModules(projectFiles) {
 }
 
 function analyzeUnresolvedRelativeImports(context) {
+  const scanGaps = scanCoverageGaps(context);
+  if (scanGaps.length) return [{
+    id: "CODE-IMPORT-RESOLUTION-SCAN-PARTIAL",
+    title: "Relative import resolution skipped because the project scan is incomplete",
+    description: "An omitted file could be the target of an import that otherwise appears missing: " + scanGaps.join("; ") + ".",
+    severity: "info",
+    location: ".",
+    recommendation: "Resolve scan omissions and rerun before treating any relative import as unresolved.",
+    evidence: { scanCoverageGaps: scanGaps },
+    metadata: { detector: "static-relative-module-resolution", confidence: "coverage-warning" }
+  }];
   const projectFiles = context.projectFiles ?? [];
   const knownPaths = new Set(projectFiles.map((file) => file.path));
   const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
@@ -508,6 +530,7 @@ function analyzeCircularDependencies(context) {
   const modulePaths = new Set(projectFiles.filter((file) => JS_EXTENSIONS.has(file.extension)).map((file) => file.path));
   const { modules, parseSkipped, dynamicFiles } = parseProjectModules(projectFiles);
   const unsupportedFiles = unsupportedModuleSources(projectFiles);
+  const scanGaps = scanCoverageGaps(context);
   const graph = new Map([...modules.keys()].map((modulePath) => [modulePath, new Set()]));
   for (const [importerPath, analysis] of modules) {
     for (const reference of analysis.references) {
@@ -534,17 +557,18 @@ function analyzeCircularDependencies(context) {
       metadata: { detector: "static-module-graph-tarjan", confidence: "review-only", safeToDeleteAutomatically: false }
     });
   }
-  if (parseSkipped.length || dynamicFiles.length || unsupportedFiles.length) findings.push({
+  if (parseSkipped.length || dynamicFiles.length || unsupportedFiles.length || scanGaps.length) findings.push({
     id: "CODE-CYCLE-ANALYSIS-PARTIAL",
     title: "Circular dependency analysis has incomplete static coverage",
     description: (parseSkipped.length ? parseSkipped.length + " unparseable JavaScript module(s); " : "") +
       (dynamicFiles.length ? dynamicFiles.length + " module(s) with non-literal dynamic loading; " : "") +
-      (unsupportedFiles.length ? unsupportedFiles.length + " unsupported-language source module(s)." : "") +
-      " Dependencies hidden by unsupported syntax or runtime-computed paths may not appear in the graph.",
+      (unsupportedFiles.length ? unsupportedFiles.length + " unsupported-language source module(s); " : "") +
+      (scanGaps.length ? scanGaps.join("; ") + ". " : "") +
+      "Dependencies hidden by unsupported syntax or runtime-computed paths may not appear in the graph.",
     severity: "info",
     location: [...parseSkipped, ...dynamicFiles, ...unsupportedFiles].slice(0, 8).join(", "),
     recommendation: "Resolve parse gaps and review dynamic loading paths before treating the dependency graph as complete.",
-    evidence: { parseSkippedFiles: parseSkipped.length, dynamicFiles: dynamicFiles.length, unsupportedSourceFiles: unsupportedFiles.length },
+    evidence: { parseSkippedFiles: parseSkipped.length, dynamicFiles: dynamicFiles.length, unsupportedSourceFiles: unsupportedFiles.length, scanCoverageGaps: scanGaps },
     metadata: { detector: "static-module-graph-tarjan", confidence: "coverage-warning" }
   });
   return findings;
@@ -559,7 +583,6 @@ const DYNAMIC_CLASS_PATTERNS = [
   /\.classList\s*\.\s*(?:add|toggle|remove)\s*\(\s*[A-Za-z_$][\w$]*/,
   /\.setAttribute\s*\(\s*["']class["']\s*,\s*[A-Za-z_$][\w$]*/
 ];
-function escapeRegExp(value) { return value; }
 function cssSelectorNames(content) {
   const withoutComments = content.replace(/\/\*[\s\S]*?\*\//g, " ");
   const withoutStrings = withoutComments.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, " ");
@@ -589,8 +612,28 @@ function analyzeCssSelectors(projectFiles) {
     evidence: { dynamicClassFiles: dynamicFiles.length },
     metadata: { detector: "static-css-selector-reachability", confidence: "coverage-warning" }
   }];
+  const tokenCounts = new Map();
+  const tokensByPath = new Map();
+  for (const file of projectFiles) {
+    const tokens = new Set([...file.content.matchAll(/\b[_a-zA-Z][\w-]*\b/g)].map((match) => match[0]));
+    tokensByPath.set(file.path, tokens);
+    for (const token of tokens) tokenCounts.set(token, (tokenCounts.get(token) ?? 0) + 1);
+  }
   const findings = [];
   for (const styleFile of styleFiles) {
+    if (styleFile.extension === ".sass") {
+      findings.push({
+        id: "CODE-DEAD-CSS-ANALYSIS-SASS-" + styleFile.path.replace(/[^a-z0-9]+/gi, "-"),
+        title: "Indented Sass selectors are outside the CSS reachability parser",
+        description: "This stylesheet uses the .sass extension. Its indentation-based syntax is not parsed by the brace-based selector scanner.",
+        severity: "info",
+        location: styleFile.path,
+        recommendation: "Use a Sass-aware parser or browser coverage before evaluating selector reachability in this file.",
+        evidence: { path: styleFile.path, extension: ".sass" },
+        metadata: { detector: "static-css-selector-reachability", confidence: "coverage-warning" }
+      });
+      continue;
+    }
     if (/:global\s*\(|:deep\s*\(|::slotted\s*\(|:local\s*\(/.test(styleFile.content)) {
       findings.push({
         id: "CODE-DEAD-CSS-ANALYSIS-SKIPPED-" + styleFile.path.replace(/[^a-z0-9]+/gi, "-"),
@@ -605,9 +648,9 @@ function analyzeCssSelectors(projectFiles) {
       continue;
     }
     for (const selector of cssSelectorNames(styleFile.content)) {
-      const tokenPattern = new RegExp("\\b" + escapeRegExp(selector.name) + "\\b");
-      const referenced = projectFiles.some((file) => file.path !== styleFile.path && tokenPattern.test(file.content));
-      if (referenced) continue;
+      const ownTokens = tokensByPath.get(styleFile.path);
+      const referencesInOtherFiles = (tokenCounts.get(selector.name) ?? 0) - (ownTokens?.has(selector.name) ? 1 : 0);
+      if (referencesInOtherFiles > 0) continue;
       findings.push({
         id: "CODE-DEAD-CSS-" + styleFile.path.replace(/[^a-z0-9]+/gi, "-") + "-" + selector.kind + "-" + selector.name,
         title: "CSS " + selector.kind + " selector has no scanned text reference",
@@ -654,7 +697,20 @@ export const deadCodeRules = Object.freeze([
   {
     id: "code-quality.possibly-unused-css-selectors",
     specialist: "code-quality",
-    evaluate(context) { return analyzeCssSelectors(context.projectFiles ?? []); }
+    evaluate(context) {
+      const gaps = scanCoverageGaps(context);
+      if (gaps.length) return [{
+        id: "CODE-DEAD-CSS-ANALYSIS-SCAN-PARTIAL",
+        title: "CSS selector reachability skipped because the project scan is incomplete",
+        description: "The scanner omitted files, so a selector that appears unreferenced could be used by an unscanned file: " + gaps.join("; ") + ".",
+        severity: "info",
+        location: ".",
+        recommendation: "Resolve scan omissions and rerun before reviewing unused CSS candidates.",
+        evidence: { scanCoverageGaps: gaps },
+        metadata: { detector: "static-css-selector-reachability", confidence: "coverage-warning" }
+      }];
+      return analyzeCssSelectors(context.projectFiles ?? []);
+    }
   },
   {
     id: "code-quality.possibly-unused-declarations",
@@ -697,6 +753,21 @@ export const deadCodeRules = Object.freeze([
     id: "code-quality.possibly-unused-exports",
     specialist: "code-quality",
     evaluate(context) {
+      const scanGaps = scanCoverageGaps(context);
+      const unsupportedFiles = unsupportedModuleSources(context.projectFiles ?? []);
+      if (scanGaps.length || unsupportedFiles.length) return [{
+        id: "CODE-DEAD-EXPORT-SCAN-PARTIAL",
+        title: "Unused-export analysis skipped because module coverage is incomplete",
+        description: [
+          ...scanGaps,
+          ...(unsupportedFiles.length ? [unsupportedFiles.length + " unsupported-language source module(s) contain import/export syntax"] : [])
+        ].join("; ") + ". An importer may exist outside the JavaScript modules that could be parsed.",
+        severity: "info",
+        location: unsupportedFiles.slice(0, 8).join(", ") || ".",
+        recommendation: "Resolve scan omissions or analyze TypeScript/framework modules with a compatible parser before reviewing unused exports.",
+        evidence: { scanCoverageGaps: scanGaps, unsupportedSourceFiles: unsupportedFiles.slice(0, 20) },
+        metadata: { detector: "static-module-graph", confidence: "coverage-warning" }
+      }];
       const files = new Map((context.projectFiles ?? [])
         .filter((file) => JS_EXTENSIONS.has(file.extension))
         .map((file) => [file.path, file]));
