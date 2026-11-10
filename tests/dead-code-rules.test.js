@@ -94,12 +94,15 @@ test("reports parse coverage warnings instead of treating unparsable modules as 
   assert.equal(findings.some((item) => item.evidence?.path === "src/broken.js"), false);
 });
 
-test("ignores non-JavaScript extensions instead of pretending they were analyzed", () => {
+test("reports unsupported TypeScript module syntax as an explicit coverage warning", () => {
   const findings = evaluate({
     projectFiles: [{ path: "src/component.ts", extension: ".ts", content: "export const component = true;" }],
     packageManifests: []
   });
-  assert.deepEqual(findings, []);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].id, "CODE-DEAD-EXPORT-SCAN-PARTIAL");
+  assert.equal(findings[0].metadata.confidence, "coverage-warning");
+  assert.deepEqual(findings[0].evidence.unsupportedSourceFiles, ["src/component.ts"]);
 });
 
 test("project audit exposes dead-code analysis coverage and candidate counts", async () => {
