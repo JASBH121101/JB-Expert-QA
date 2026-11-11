@@ -7,13 +7,10 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repositoryRoot = resolve(packageRoot, "../..");
-const buildScript = resolve(repositoryRoot, "scripts/build-expert-qa-package.js");
-const cliPath = resolve(packageRoot, "src/cli.js");
+const cliPath = resolve(packageRoot, "cli/package-cli.js");
 let tempRoot;
 
 before(async () => {
-  execFileSync(process.execPath, [buildScript], { cwd: repositoryRoot, stdio: "pipe" });
   tempRoot = await mkdtemp(resolve(tmpdir(), "jb-expert-qa-test-"));
 });
 
@@ -21,7 +18,7 @@ after(async () => {
   if (tempRoot) await rm(tempRoot, { recursive: true, force: true });
 });
 
-test("init creates offline config and does not overwrite an existing config", async () => {
+test("init creates an offline config and never overwrites an existing config by default", async () => {
   const project = resolve(tempRoot, "init-project");
   await mkdir(project, { recursive: true });
   const first = execFileSync(process.execPath, [cliPath, "init"], { cwd: project, encoding: "utf8" });
@@ -58,4 +55,14 @@ test("audit produces a local report, skips environment files and makes no adviso
   assert.equal(report.projectScan.environmentFiles, 1);
   assert.equal(serialized.includes("VERY_SECRET_VALUE_MUST_NOT_APPEAR"), false);
   assert.equal(typeof report.scoring.score, "number");
+});
+
+test("the package CLI advertises browser setup and the complete command set", () => {
+  const help = execFileSync(process.execPath, [cliPath, "--help"], { encoding: "utf8" });
+  assert.match(help, /jb-qa setup --browser chromium/);
+  assert.match(help, /jb-qa-url/);
+  assert.match(help, /jb-qa-security/);
+  assert.match(help, /jb-qa-autopilot/);
+  const version = execFileSync(process.execPath, [cliPath, "--version"], { encoding: "utf8" });
+  assert.match(version, /0\.2\.0/);
 });
