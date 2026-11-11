@@ -155,9 +155,10 @@ test("configuration rejects unknown options, unsafe scopes and missing policies"
   const limiter = createCloudflareWorkerRateLimit({
     policies: { general: { binding: createBinding() }, auth: { binding: createBinding() } }
   });
-  await assert.rejects(limiter.check({ identity: "" }), /identity/);
-  await assert.rejects(limiter.check({ identity: "opaque", scope: "../bad" }), /scope/);
-  await assert.rejects(limiter.check({ identity: "opaque", policy: "missing" }), /policy/);
+  await assert.rejects(limiter.check({ identity: "opaque" }), /policy/);
+  await assert.rejects(limiter.check({ policy: "general", identity: "" }), /identity/);
+  await assert.rejects(limiter.check({ policy: "general", identity: "opaque", scope: "../bad" }), /scope/);
+  await assert.rejects(limiter.check({ policy: "missing", identity: "opaque" }), /policy/);
   await assert.rejects(limiter.check({ identity: "opaque", extra: true }), /Unknown rate-limit check input/);
 });
 
