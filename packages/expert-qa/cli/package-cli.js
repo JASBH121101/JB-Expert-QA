@@ -4,9 +4,9 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { auditProject } from "../../src/adapters/filesystem/audit-project.js";
-import { formatReport } from "../../src/reporters/index.js";
-import { EXPERT_QA_PACKAGE_VERSION } from "../../package-version.js";
+import { auditProject } from "../src/adapters/filesystem/audit-project.js";
+import { formatReport } from "../src/reporters/index.js";
+import { EXPERT_QA_PACKAGE_VERSION } from "../package-version.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bundledConfigPath = resolve(packageRoot, "config/project-audit.config.json");
@@ -130,10 +130,10 @@ async function audit(tokens) {
 }
 
 function setup(tokens) {
-  const { options, positional } = parse(tokens, new Set(["--browser"]));
-  const withDeps = positional.includes("--with-deps");
-  const invalid = positional.filter((item) => item !== "--with-deps");
-  if (invalid.length) throw new TypeError("Unknown setup argument: " + invalid.join(" "));
+  const withDeps = tokens.includes("--with-deps");
+  const filteredTokens = tokens.filter((token) => token !== "--with-deps");
+  const { options, positional } = parse(filteredTokens, new Set(["--browser"]));
+  if (positional.length) throw new TypeError("setup does not accept positional arguments");
   const browser = options.get("--browser") ?? "chromium";
   if (!["chromium", "firefox", "webkit"].includes(browser)) {
     throw new TypeError("--browser must be chromium, firefox, or webkit");
