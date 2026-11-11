@@ -1,30 +1,48 @@
 {
   "name": "@jb/expert-qa",
-  "version": "0.1.0",
-  "description": "Local-first static project quality and code analysis for JavaScript and web projects.",
+  "version": "0.2.0",
+  "description": "Complete local-first web project quality, security, browser, accessibility and visual QA engine.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "bin": {
-    "jb-qa": "./src/cli.js"
+    "jb-qa": "./cli/package-cli.js",
+    "jb-qa-project": "./src/project-cli.js",
+    "jb-qa-url": "./src/cli.js",
+    "jb-qa-security": "./src/security-cli.js",
+    "jb-qa-security-url": "./src/security-url-cli.js",
+    "jb-qa-autopilot": "./src/autopilot-cli.js"
   },
   "exports": {
     ".": "./src/index.js",
-    "./cli": "./src/cli.js"
+    "./cli": "./cli/package-cli.js",
+    "./browser": "./src/adapters/playwright/audit-url.js",
+    "./visual": "./src/adapters/visual/png-diff.js",
+    "./ai": "./src/ai/provider-router.js",
+    "./autopilot": "./src/agent/autopilot.js",
+    "./security-bridge": "./src/security-bridge/index.js",
+    "./version": "./package-version.js"
   },
   "files": [
     "src/**",
-    "config/project-audit.config.json",
+    "cli/**",
+    "config/**",
+    "package-version.js",
     "README.md"
   ],
   "scripts": {
     "build": "node ../../scripts/build-expert-qa-package.js",
     "prepack": "npm run build",
-    "test": "npm run build && node --test"
+    "test": "npm run build && node --test",
+    "setup:browser": "node cli/package-cli.js setup --browser chromium"
   },
   "dependencies": {
-    "acorn": "8.15.0"
+    "acorn": "8.15.0",
+    "axe-core": "4.14.0",
+    "pixelmatch": "8.0.0",
+    "playwright": "1.56.1",
+    "pngjs": "7.0.0"
   },
   "repository": {
     "type": "git",
