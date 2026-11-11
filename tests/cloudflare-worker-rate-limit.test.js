@@ -173,7 +173,7 @@ test("telemetry callback failures cannot interrupt request handling", async () =
   assert.equal(result.exceeded, true);
 });
 
-test("Worker adapter uses only Web APIs and a route-independent opaque identity key", async () => {
+test("Worker adapter uses only Web APIs and generates route-scoped opaque keys", async () => {
   const binding = createBinding([{ success: true }, { success: true }]);
   const limiter = createCloudflareWorkerRateLimit({ binding });
   await limiter.check({ identity: "same-opaque-user", scope: "catalog-read" });

@@ -198,7 +198,7 @@ export function createCloudflareWorkerRateLimit(options = {}) {
         failureMode: policy.failureMode
       };
       notify(options.onEvent, event);
-      notify(policy.onEvent, event);
+      if (policy.onEvent !== options.onEvent) notify(policy.onEvent, event);
 
       const closed = policy.failureMode === "closed";
       return Object.freeze({
@@ -234,7 +234,7 @@ export function createCloudflareWorkerRateLimit(options = {}) {
       mode: policy.mode
     };
     notify(options.onEvent, event);
-    notify(policy.onEvent, event);
+    if (policy.onEvent !== options.onEvent) notify(policy.onEvent, event);
 
     return Object.freeze({
       allowed: !enforced,
