@@ -19,16 +19,16 @@ concurrency:
 
 jobs:
   pack-and-install:
-    name: Pack and install all JB engines
+    name: Pack, install and exercise all JB engines
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
         node-version: [22, 24]
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@fbc6f3992d24b796c4c66a329f273f7fcc4a7b6c09
         with:
           persist-credentials: false
       - name: Set up Node.js
