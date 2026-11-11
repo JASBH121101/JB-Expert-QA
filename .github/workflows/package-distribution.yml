@@ -1,0 +1,42 @@
+name: NPM package distribution validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "packages/**"
+      - "scripts/build-expert-qa-package.js"
+      - "scripts/verify-package-distributions.js"
+      - ".github/workflows/package-distribution.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pack-and-install:
+    name: Pack and install all JB engines
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+      - name: Install monorepo dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Pack, install and smoke-test all three packages
+        run: npm run test:package-distributions
