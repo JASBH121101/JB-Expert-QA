@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCloudflareWorkerRateLimit } from "../packages/security-guard/src/cloudflare-worker-rate-limit.js";
+import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit";
 
 function createBinding(answers = [{ success: true }]) {
   const keys = [];
