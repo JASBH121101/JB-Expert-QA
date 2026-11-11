@@ -80,6 +80,8 @@ jobs:
           node --check packages/security-guard/src/distributed-rate-limit.js
           node --check packages/security-guard/src/distributed-auth-protection.js
           node --check packages/security-guard/src/upload-inspector.js
+          node --check packages/security-guard/src/cloudflare-worker-rate-limit.js
+          node --check tests/cloudflare-worker-rate-limit.test.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js

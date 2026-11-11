@@ -4,7 +4,8 @@
   "description": "Runtime HTTP request protection middleware for Node.js applications.",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js"
   },
   "files": [
     "src",
