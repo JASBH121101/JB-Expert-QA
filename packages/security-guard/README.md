@@ -4,13 +4,11 @@ Runtime HTTP request protection middleware for Node.js applications (Node.js 22+
 
 ## Install
 
-The package is part of the JB Expert QA monorepo and is exposed as an npm workspace:
-
 ~~~bash
-npm install
+npm install @jb/security-guard
 ~~~
 
-After it is published as a standalone package, an application will be able to install the published package using its registry package name. It is not published yet.
+The package is distributed independently from the JB Expert QA monorepo.
 
 ## Use with Express-compatible middleware
 
@@ -32,6 +30,10 @@ app.use(guard.middleware);
 ~~~
 
 The returned object also exposes `getStats()` and `reset()`.
+
+## Runtime boundary
+
+This package targets Node.js 22+ HTTP applications and Express-compatible middleware. It is not a Cloudflare Workers adapter; Worker deployments need a runtime-native adapter and their own validation.
 
 ## Modes
 
