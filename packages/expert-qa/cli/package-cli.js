@@ -135,8 +135,8 @@ function setup(tokens) {
   const { options, positional } = parse(filteredTokens, new Set(["--browser"]));
   if (positional.length) throw new TypeError("setup does not accept positional arguments");
   const browser = options.get("--browser") ?? "chromium";
-  if (!["chromium", "firefox", "webkit"].includes(browser)) {
-    throw new TypeError("--browser must be chromium, firefox, or webkit");
+  if (browser !== "chromium") {
+    throw new TypeError("This engine build uses Chromium; --browser must be chromium.");
   }
   const playwrightEntry = require.resolve("playwright");
   const playwrightCli = resolve(dirname(playwrightEntry), "cli.js");
