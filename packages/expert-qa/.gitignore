@@ -1,4 +1,5 @@
 /config/
+/package-version.js
 /src/adapters/
 /src/agent/
 /src/ai/
@@ -6,6 +7,7 @@
 /src/reporters/
 /src/security-bridge/
 /src/specialists/
+/src/autopilot-cli.js
 /src/cli.js
 /src/index.js
 /src/project-cli.js
