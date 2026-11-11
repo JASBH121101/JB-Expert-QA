@@ -22,16 +22,27 @@ export function formatMarkdownReport(report) {
   const findings = findingsFor(report);
   const target = cell(report.target?.url ?? report.target?.project ?? "Not specified");
   const score = report.scoring?.score ?? null;
-  const passed = Array.isArray(report.viewports)
+  const basePassed = Array.isArray(report.viewports)
     ? report.passed
     : report.scoring?.passed;
+  const coverageIncomplete = Boolean(report.analysisScope && (
+    report.analysisScope.complete === false ||
+    ["partial", "insufficient-source"].includes(report.analysisScope.assessmentStatus) ||
+    report.analysisScope.deadCodeAnalysis?.status === "partial"
+  ));
+  const passed = Boolean(basePassed && !coverageIncomplete);
+  const statusLabel = passed
+    ? "PASS"
+    : coverageIncomplete
+      ? "REVIEW REQUIRED — PARTIAL COVERAGE"
+      : "REVIEW REQUIRED";
 
   const lines = [
     "# JB Expert QA report",
     "",
     "- **Target:** " + target,
     "- **Generated:** " + cell(report.generatedAt ?? "Unknown"),
-    "- **Status:** " + (passed ? "PASS" : "REVIEW REQUIRED"),
+    "- **Status:** " + statusLabel,
     "- **Score:** " + (score === null ? "Per viewport" : cell(score) + "/100"),
     "",
     "## Summary",
@@ -64,6 +75,48 @@ export function formatMarkdownReport(report) {
       "- Scan truncated: " + cell(report.projectScan.truncated ?? false),
       ""
     );
+  }
+
+  if (report.analysisScope) {
+    const coverage = report.analysisScope.languageCoverage ?? {};
+    const moduleGraph = coverage.javascriptModuleGraph ?? {};
+    const css = coverage.cssSelectors ?? {};
+    const database = coverage.database ?? {};
+    lines.push(
+      "## Analysis coverage",
+      "",
+      "- Assessment: " + cell(report.analysisScope.assessmentStatus ?? "unknown"),
+      "- Scan complete: " + cell(report.analysisScope.complete ?? false),
+      "- Source files analyzed: " + cell(report.analysisScope.sourceFiles ?? 0),
+      "- Extensions scanned: " + cell((report.analysisScope.scannedExtensions ?? []).join(", ") || "none"),
+      "- JavaScript module graph: " + cell((moduleGraph.supportedExtensions ?? []).join(", ") || "not configured") +
+        "; unsupported module files: " + cell(moduleGraph.unsupportedModuleFiles ?? 0),
+      "- CSS selector parsing: " + cell((css.parsedExtensions ?? []).join(", ") || "not configured") +
+        "; indented Sass files not parsed: " + cell(css.indentedSassFiles ?? 0),
+      "- SQL/Prisma analysis: " + cell((database.supportedExtensions ?? []).join(", ") || "not configured") +
+        "; scanned files: " + cell(database.scannedFiles ?? 0),
+      ""
+    );
+    if (report.analysisScope.incompleteReasons?.length) {
+      lines.push("- Scan gaps: " + cell(report.analysisScope.incompleteReasons.join("; ")), "");
+    }
+
+    const deadCode = report.analysisScope.deadCodeAnalysis;
+    if (deadCode) {
+      lines.push(
+        "### Dead-code and dependency analysis",
+        "",
+        "- Analysis status: " + cell(deadCode.status ?? "unknown"),
+        "- Coverage warnings: " + cell(deadCode.coverageWarnings ?? 0),
+        "- Possible unused exports: " + cell(deadCode.possibleUnusedExports ?? 0),
+        "- Possible unused bindings: " + cell(deadCode.possibleUnusedBindings ?? 0),
+        "- Possible unused CSS selectors: " + cell(deadCode.possibleUnusedCssSelectors ?? 0),
+        "- Possible unused declarations: " + cell(deadCode.possibleUnusedDeclarations ?? 0),
+        "- Unresolved relative imports: " + cell(deadCode.unresolvedRelativeImports ?? 0),
+        "- Dependency cycles: " + cell(deadCode.dependencyCycles ?? 0),
+        ""
+      );
+    }
   }
 
   if (Array.isArray(report.viewports) &&

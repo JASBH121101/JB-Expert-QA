@@ -19,8 +19,14 @@ function findingsFor(report) {
 
 export function formatHtmlReport(report) {
   const findings = findingsFor(report);
-  const passed = Array.isArray(report.viewports) ? report.passed : report.scoring?.passed;
-  const status = passed ? "PASS" : "REVIEW REQUIRED";
+  const basePassed = Array.isArray(report.viewports) ? report.passed : report.scoring?.passed;
+  const coverageIncomplete = Boolean(report.analysisScope && (
+    report.analysisScope.complete === false ||
+    ["partial", "insufficient-source"].includes(report.analysisScope.assessmentStatus) ||
+    report.analysisScope.deadCodeAnalysis?.status === "partial"
+  ));
+  const passed = Boolean(basePassed && !coverageIncomplete);
+  const status = passed ? "PASS" : coverageIncomplete ? "REVIEW REQUIRED — PARTIAL COVERAGE" : "REVIEW REQUIRED";
   const score = report.scoring?.score;
   const target = report.target?.url ?? report.target?.project ?? "Not specified";
   const rows = findings.length
@@ -42,6 +48,40 @@ export function formatHtmlReport(report) {
       " · Environment files skipped: " + escapeHtml(report.projectScan.environmentFiles) +
       " · Sensitive files skipped: " + escapeHtml(report.projectScan.sensitiveFiles) +
       " · Scan truncated: " + escapeHtml(report.projectScan.truncated) + "</p>"
+    : "";
+
+  const coverage = report.analysisScope?.languageCoverage ?? {};
+  const moduleGraph = coverage.javascriptModuleGraph ?? {};
+  const cssCoverage = coverage.cssSelectors ?? {};
+  const databaseCoverage = coverage.database ?? {};
+  const coverageSection = report.analysisScope
+    ? "<h2>Analysis coverage</h2><ul>" + [
+        "Assessment: " + (report.analysisScope.assessmentStatus ?? "unknown"),
+        "Scan complete: " + (report.analysisScope.complete ?? false),
+        "Source files analyzed: " + (report.analysisScope.sourceFiles ?? 0),
+        "Extensions scanned: " + ((report.analysisScope.scannedExtensions ?? []).join(", ") || "none"),
+        "JavaScript module graph: " + ((moduleGraph.supportedExtensions ?? []).join(", ") || "not configured") +
+          "; unsupported module files: " + (moduleGraph.unsupportedModuleFiles ?? 0),
+        "CSS selector parsing: " + ((cssCoverage.parsedExtensions ?? []).join(", ") || "not configured") +
+          "; indented Sass files not parsed: " + (cssCoverage.indentedSassFiles ?? 0),
+        "SQL/Prisma analysis: " + ((databaseCoverage.supportedExtensions ?? []).join(", ") || "not configured") +
+          "; scanned files: " + (databaseCoverage.scannedFiles ?? 0),
+        "Scan gaps: " + ((report.analysisScope.incompleteReasons ?? []).join("; ") || "none")
+      ].map((value) => "<li>" + escapeHtml(value) + "</li>").join("") + "</ul>"
+    : "";
+
+  const deadCode = report.analysisScope?.deadCodeAnalysis;
+  const deadCodeSection = deadCode
+    ? "<h2>Dead-code and dependency analysis</h2><ul>" + [
+        "Analysis status: " + (deadCode.status ?? "unknown"),
+        "Coverage warnings: " + (deadCode.coverageWarnings ?? 0),
+        "Possible unused exports: " + (deadCode.possibleUnusedExports ?? 0),
+        "Possible unused bindings: " + (deadCode.possibleUnusedBindings ?? 0),
+        "Possible unused CSS selectors: " + (deadCode.possibleUnusedCssSelectors ?? 0),
+        "Possible unused declarations: " + (deadCode.possibleUnusedDeclarations ?? 0),
+        "Unresolved relative imports: " + (deadCode.unresolvedRelativeImports ?? 0),
+        "Dependency cycles: " + (deadCode.dependencyCycles ?? 0)
+      ].map((value) => "<li>" + escapeHtml(value) + "</li>").join("") + "</ul>"
     : "";
 
   const visualSection = Array.isArray(report.viewports) &&
@@ -107,6 +147,8 @@ export function formatHtmlReport(report) {
     '<p class="meta">Target: <code>' + escapeHtml(target) + "</code></p>",
     '<p class="meta">Generated: ' + escapeHtml(report.generatedAt) + " · " + escapeHtml(summary) + "</p>",
     projectSummary,
+    coverageSection,
+    deadCodeSection,
     visualSection,
     aiSection,
     "<h2>Findings</h2>",

@@ -24,11 +24,13 @@ test("scanner reads supported source/manifests and parses package metadata", asy
     await writeFile(join(root, "package.json"), JSON.stringify({ name: "fixture", dependencies: { example: "1.2.3" } }));
     await writeFile(join(root, "package-lock.json"), "{}");
     await writeFile(join(root, "src", "index.js"), "export const answer = 42;\n");
+    await writeFile(join(root, "src", "worker.mts"), "export const worker = true;\n");
     const scan = await scanProject(root);
-    assert.equal(scan.summary.filesRead, 3);
+    assert.equal(scan.summary.filesRead, 4);
     assert.equal(scan.manifests[0].data.name, "fixture");
     assert.deepEqual(scan.lockFiles, ["package-lock.json"]);
     assert.ok(scan.files.some((file) => file.path === "src/index.js"));
+    assert.ok(scan.files.some((file) => file.path === "src/worker.mts"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -379,6 +381,58 @@ test("an incomplete project scan blocks a passing result", async () => {
   }
 });
 
+test("empty and documentation-only projects cannot receive a source-quality pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-no-source-"));
+  try {
+    await writeFile(join(root, "README.md"), "# Documentation only\n");
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "docs-only" }));
+    const report = await auditProject(root);
+    assert.equal(report.analysisScope.sourceFiles, 0);
+    assert.equal(report.analysisScope.assessmentStatus, "insufficient-source");
+    assert.equal(report.scoring.passed, false);
+    assert.equal(report.scoring.blockedByCoverage, true);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-SCAN-002"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("TypeScript module syntax is counted as unsupported module-graph coverage", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-ts-coverage-"));
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "ts-coverage-fixture" }));
+    await writeFile(join(root, "src", "library.js"), "export const candidate = true;");
+    await writeFile(join(root, "src", "component.tsx"), 'import { candidate } from "./library.js"; export default candidate;');
+    const report = await auditProject(root);
+    assert.equal(report.analysisScope.languageCoverage.javascriptModuleGraph.unsupportedModuleFiles, 1);
+    assert.equal(report.analysisScope.assessmentStatus, "partial");
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "partial");
+    assert.equal(report.diagnostics.some((item) => item.id === "CODE-DEAD-EXPORT-SCAN-PARTIAL"), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("skipped source symlinks make project coverage incomplete and block a pass", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-symlink-gap-"));
+  const outside = await mkdtemp(join(tmpdir(), "jbqa-symlink-outside-"));
+  try {
+    await writeFile(join(root, "src.js"), "export const ready = true;");
+    await writeFile(join(outside, "linked.js"), "export const omitted = true;");
+    await symlink(join(outside, "linked.js"), join(root, "linked.js"), "file");
+    const report = await auditProject(root);
+    assert.equal(report.projectScan.skippedSymlinks, 1);
+    assert.equal(report.analysisScope.complete, false);
+    assert.equal(report.analysisScope.coverage.skippedSymlinks, 1);
+    assert.equal(report.scoring.passed, false);
+    assert.equal(report.scoring.blockedByCritical, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
 test("oversized files also block a complete-pass result", async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-oversized-"));
   try {
@@ -409,12 +463,21 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 27);
+    assert.equal(report.summary.rulesExecuted, 34);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);
     assert.equal(report.projectScan.environmentFiles, 1);
     assert.equal(report.analysisScope.networkRequests, 0);
+    assert.equal(report.analysisScope.assessmentStatus, "partial");
+    assert.equal(report.analysisScope.deadCodeAnalysis.status, "partial");
+    assert.ok(report.analysisScope.deadCodeAnalysis.coverageWarnings > 0);
+    assert.ok(report.diagnostics.some((item) => item.id === "CODE-DEAD-FUNCTION-CLASS-ANALYSIS-SKIPPED"));
+    assert.ok(report.analysisScope.sourceFiles >= 2);
+    assert.ok(report.analysisScope.scannedExtensions.includes(".js"));
+    assert.deepEqual(report.analysisScope.languageCoverage.javascriptModuleGraph.supportedExtensions, [".js", ".mjs", ".cjs"]);
+    assert.ok(formatReport(report, "markdown").includes("Analysis coverage"));
+    assert.ok(formatReport(report, "html").includes("Analysis coverage"));
     assert.equal(report.analysisScope.dependencyAdvisoryLookup, false);
     assert.equal(report.dependencyAdvisories.status, "disabled");
     assert.equal(report.dependencyAdvisories.networkRequests, 0);

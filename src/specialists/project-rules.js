@@ -180,7 +180,7 @@ function collectHtmlSinks(source) {
 }
 
 const SOURCE_EXTENSIONS = new Set([
-  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte",
   ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".prisma",
   ".sh", ".ps1", ".py", ".rb", ".php", ".java", ".kt", ".go", ".rs",
   ".cs", ".graphql", ".gql"
@@ -197,6 +197,7 @@ export const codeQualityRules = [
       if (summary.truncated) reasons.push("file-count or directory-depth limit reached");
       if ((summary.oversizedFiles ?? 0) > 0) reasons.push(summary.oversizedFiles + " oversized file(s) skipped");
       if ((summary.unreadableFiles ?? 0) > 0) reasons.push(summary.unreadableFiles + " unreadable file(s) skipped");
+      if ((summary.skippedSymlinks ?? 0) > 0) reasons.push(summary.skippedSymlinks + " symbolic link(s) not followed");
       if (!reasons.length) return [];
       return [finding(
         "CODE-SCAN-001",
@@ -211,6 +212,23 @@ export const codeQualityRules = [
           unreadableFiles: summary.unreadableFiles ?? 0,
           blocksPass: true
         }
+      )];
+    }
+  },
+  {
+    id: "code-quality.source-presence",
+    specialist: "code-quality",
+    evaluate(context) {
+      const sourceFiles = (context.projectFiles ?? []).filter((file) => SOURCE_EXTENSIONS.has(file.extension));
+      if (sourceFiles.length > 0) return [];
+      return [finding(
+        "CODE-SCAN-002",
+        "No analyzable source files found",
+        "The scan completed, but no supported source files were found. An empty or documentation-only directory cannot receive a source-quality pass.",
+        "info",
+        ".",
+        "Add or select the implementation directory and rerun the audit against the actual source project.",
+        { sourceFiles: 0, blocksPass: true, detectedExtensions: [] }
       )];
     }
   },
