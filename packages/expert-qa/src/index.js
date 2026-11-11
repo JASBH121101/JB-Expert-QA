@@ -1,0 +1,12 @@
+export { auditProject } from "./adapters/filesystem/audit-project.js";
+export { scanProject } from "./adapters/filesystem/scan-project.js";
+export { ExpertQAEngine } from "./core/engine.js";
+export { RuleRegistry, isValidSpecialistId } from "./core/rule-registry.js";
+export { validateEngineConfig } from "./core/config.js";
+export { createDiagnostic } from "./core/diagnostic.js";
+export { calculateScore } from "./core/scoring.js";
+export { SEVERITIES, DEFAULT_SEVERITY_PENALTIES } from "./core/severities.js";
+export { formatReport, formatHtmlReport, formatMarkdownReport } from "./reporters/index.js";
+export { projectRules } from "./specialists/project-rules.js";
+export { deadCodeRules } from "./specialists/dead-code-rules.js";
+export { EXPERT_QA_PACKAGE_VERSION } from "./version.js";

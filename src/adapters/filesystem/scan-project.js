@@ -2,7 +2,7 @@ import { lstat, readdir, readFile } from "node:fs/promises";
 import { basename, extname, relative, resolve, sep } from "node:path";
 
 const IGNORED_DIRECTORIES = new Set([
-  ".git", ".hg", ".svn", "node_modules", "dist", "build", "coverage",
+  ".git", ".hg", ".svn", "node_modules", "dist", "build", "coverage", ".jb-expert-qa",
   ".next", ".nuxt", ".output", ".cache", ".turbo", ".vercel", ".wrangler",
   "vendor", "playwright-report", "test-results"
 ]);

@@ -1,0 +1,38 @@
+{
+  "name": "@jb/expert-qa",
+  "version": "0.1.0",
+  "description": "Local-first static project quality and code analysis for JavaScript and web projects.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "jb-qa": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./cli": "./src/cli.js"
+  },
+  "files": [
+    "src/**",
+    "config/project-audit.config.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-expert-qa-package.js",
+    "prepack": "npm run build",
+    "test": "npm run build && node --test"
+  },
+  "dependencies": {
+    "acorn": "8.15.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JASBH121101/JB-Expert-QA.git",
+    "directory": "packages/expert-qa"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "UNLICENSED"
+}
