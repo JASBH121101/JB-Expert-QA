@@ -3,7 +3,7 @@ name: Core validation
 
 on:
   push:
-    branches: [main, "feature/**", "integration/**"]
+    branches: [main, "feature/**", "integration/**", "qa/**"]
     paths:
       - "package.json"
       - "src/**"
@@ -58,3 +58,5 @@ jobs:
         run: npm run test:dead-code
       - name: Run syntax checks and tests
         run: npm run check
+      - name: Verify independently installable package distributions
+        run: npm run test:package-distributions

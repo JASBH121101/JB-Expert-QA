@@ -126,3 +126,123 @@ test("reporters do not display PASS when static analysis coverage is partial", (
   assert.match(markdown, /Dependency cycles: 1/);
   assert.match(html, /Dependency cycles: 1/);
 });
+
+test("theme and interaction reports include contrast, CSS token, and toggle evidence safely", () => {
+  const themeReport = {
+    ...report,
+    passed: false,
+    summary: {
+      viewportsChecked: 2,
+      themesChecked: 2,
+      themePairsCompared: 1,
+      passedViewports: 0,
+      failedViewports: 2,
+      totalFindings: 1,
+      interactionVisualComparisons: 1,
+      interactionVisualFailures: 0
+    },
+    viewports: [
+      {
+        name: "mobile",
+        theme: "light",
+        findings: [{
+          id: "UIUX-005-1",
+          specialist: "ui-ux",
+          severity: "medium",
+          title: "Text contrast is below WCAG AA",
+          location: "#muted",
+          recommendation: "Increase contrast."
+        }],
+        execution: [],
+        evidence: {
+          contrastSummary: { measured: 8, failed: 1, inconclusive: 2, exempt: 1 },
+          themeAudit: {
+            themeMarker: "light",
+            themeMarkerSource: "data-theme",
+            colorTokens: [{ name: "--surface", value: "#ffffff", scope: "root" }],
+            hardcodedColorDeclarationCount: 1,
+            hardcodedColorDeclarations: [{
+              selector: ".muted",
+              property: "color",
+              value: "#888888",
+              source: "stylesheet"
+            }]
+          },
+          themeTransitionAudit: { enabled: true, restoredStable: true },
+          interactionExploration: {
+            states: [{
+              kind: "theme-toggle",
+              triggerSelector: "#theme-toggle",
+              themeMarker: "dark",
+              rootColorScheme: "dark",
+              visibleControls: 4,
+              overlapCount: 0,
+              themeToggleEffect: {
+                status: "changed",
+                changedTokens: [{ name: "--surface", before: "#ffffff", after: "#121212" }]
+              },
+              visualComparison: {
+                status: "compared",
+                passed: true,
+                diffPixelRatio: 0
+              }
+            }]
+          }
+        },
+        themeTokenComparison: {
+          changedTokens: [{
+            name: "--surface",
+            scope: "root",
+            lightValue: "#ffffff",
+            darkValue: "#121212"
+          }],
+          unchangedTokens: [],
+          onlyInLight: [],
+          onlyInDark: []
+        }
+      },
+      {
+        name: "mobile",
+        theme: "dark",
+        findings: [],
+        execution: [],
+        evidence: {
+          contrastSummary: { measured: 8, failed: 0, inconclusive: 2, exempt: 1 },
+          themeAudit: {
+            themeMarker: "dark",
+            themeMarkerSource: "data-theme",
+            colorTokens: [{ name: "--surface", value: "#121212", scope: "root" }],
+            hardcodedColorDeclarationCount: 0,
+            hardcodedColorDeclarations: []
+          },
+          themeTransitionAudit: { enabled: true, restoredStable: true },
+          interactionExploration: { states: [] }
+        },
+        themeTokenComparison: {
+          changedTokens: [{
+            name: "--surface",
+            scope: "root",
+            lightValue: "#ffffff",
+            darkValue: "#121212"
+          }],
+          unchangedTokens: [],
+          onlyInLight: [],
+          onlyInDark: []
+        }
+      }
+    ]
+  };
+  const markdown = formatMarkdownReport(themeReport);
+  const html = formatHtmlReport(themeReport);
+  assert.match(markdown, /Theme and contrast audit/);
+  assert.match(markdown, /CSS custom-property differences/);
+  assert.match(markdown, /Literal CSS color declarations/);
+  assert.match(markdown, /Interactive state exploration/);
+  assert.match(markdown, /Toggle effect/);
+  assert.match(html, /Theme and contrast audit/);
+  assert.match(html, /CSS theme details/);
+  assert.match(html, /Literal CSS color declarations/);
+  assert.match(html, /Interactive state exploration/);
+  assert.match(html, /no-measurable-change|changed/);
+  assert.ok(html.includes("&lt;script&gt;") || html.includes("theme-toggle"));
+});
