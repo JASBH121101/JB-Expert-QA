@@ -79,6 +79,9 @@ function binPath(directory, name) {
 }
 
 try {
+  // Generate ignored package source/config from canonical root files before packing.
+  run(node, [path.join(repositoryRoot, "scripts/build-expert-qa-package.js")]);
+
   // Install the actual Expert QA tarball in a clean directory, separate from the monorepo.
   const expertTarball = await pack("packages/expert-qa");
   const expertInstall = await install(expertTarball, "install-expert-qa");

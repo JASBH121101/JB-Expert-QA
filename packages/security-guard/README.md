@@ -381,17 +381,17 @@ For the host-application middleware order and pre-production release gate, see d
 
 ## Distributed request rate limiting
 
-See [Distributed rate limiting](../../docs/DISTRIBUTED-RATE-LIMIT.md) for the shared atomic-store contract, fail-closed behavior, deployment example, and production adapter requirements. This is an optional asynchronous middleware; disable the built-in process-local limiter when mounting it to avoid applying two independent limits.
+See [Distributed rate limiting](docs/DISTRIBUTED-RATE-LIMIT.md) for the shared atomic-store contract, fail-closed behavior, deployment example, and production adapter requirements. This is an optional asynchronous middleware; disable the built-in process-local limiter when mounting it to avoid applying two independent limits.
 
 
 ## Distributed authentication protection
 
-See [Distributed authentication protection](../../docs/DISTRIBUTED-AUTH-PROTECTION.md) for the shared atomic-store contract, asynchronous API, fail-closed behavior and production integration requirements. The existing process-local authentication protection remains available for single-process deployments.
+See [Distributed authentication protection](docs/DISTRIBUTED-AUTH-PROTECTION.md) for the shared atomic-store contract, asynchronous API, fail-closed behavior and production integration requirements. The existing process-local authentication protection remains available for single-process deployments.
 
 
 ## Node.js HTTP server hardening
 
-`configureNodeHttpServer(server, options)` enforces parser timeouts, connection limits and an actual byte limit for both `Content-Length` and streamed/chunked request bodies. See [Node HTTP server hardening](../../docs/NODE-HTTP-HARDENING.md) for configuration, integration and streaming-handler safety requirements.
+`configureNodeHttpServer(server, options)` enforces parser timeouts, connection limits and an actual byte limit for both `Content-Length` and streamed/chunked request bodies. See [Node HTTP server hardening](docs/NODE-HTTP-HARDENING.md) for configuration, integration and streaming-handler safety requirements.
 
 ### Distributed-store timeout
 
