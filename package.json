@@ -34,6 +34,7 @@
   "workspaces": [
     "packages/expert-qa",
     "packages/security-guard",
-    "packages/malware-engine"
+    "packages/malware-engine",
+    "packages/advisor-engine"
   ]
 }
