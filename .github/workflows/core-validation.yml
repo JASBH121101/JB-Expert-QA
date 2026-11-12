@@ -60,6 +60,8 @@ jobs:
           node --test packages/expert-qa/package-tests/complete-engine.spec.js packages/expert-qa/package-tests/browser-audit.spec.js
       - name: Run focused static dead-code and dependency-graph tests
         run: npm run test:dead-code
+      - name: Test the standalone JB Advisor Engine workspace
+        run: npm run check --workspace @jb/advisor-engine
       - name: Run syntax checks and tests
         run: npm run check
       - name: Verify independently installable package distributions
