@@ -185,12 +185,12 @@ try {
     'import * as advisor from "@jb/advisor-engine"; const required = ["getEngineInfo", "createAdvisorCore", "ResearchEngine", "compareProducts", "KnowledgeStore", "CapacitorSQLiteKnowledgeAdapter", "createDefaultResearchProviders"]; if (advisor.ENGINE_ID !== "JBAE" || required.some((name) => typeof advisor[name] === "undefined")) process.exit(1); const research = new advisor.ResearchEngine({ providers: [] }); if (research.getProviderIds().length !== 0) process.exit(1);'
   ], { cwd: advisorInstall });
 
-  run(npm, ["run", "--prefix", advisorInstall, "build:fragrance-library"]);
+  const advisorPackageInstall = path.join(
+    advisorInstall, "node_modules", "@jb", "advisor-engine"
+  );
+  run(npm, ["run", "build:fragrance-library"], { cwd: advisorPackageInstall });
   const advisorSnapshot = path.join(
-    advisorInstall,
-    "node_modules",
-    "@jb",
-    "advisor-engine",
+    advisorPackageInstall,
     "dist",
     "fragrance-library",
     "scento-knowledge-snapshot.json"
