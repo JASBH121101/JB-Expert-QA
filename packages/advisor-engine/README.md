@@ -13,6 +13,16 @@ JB Advisor Engine (JBAE) is an independently versioned, provider-agnostic adviso
 
 JBAE separates deterministic advisor orchestration, research providers, evidence records and trust policy, comparison, recommendations, product identity matching, and versioned local knowledge. The Capacitor SQLite adapter is an integration adapter; the host Android application installs and configures its native SQLite plugin.
 
+## Offline fragrance dataset
+
+The package includes the Scento Perfume Database snapshot dated 2026-10-29 under CC BY 4.0, with attribution and source notes in `data/fragrance/sources/scento-2026-10-29/`. The included builder creates a normalized local knowledge snapshot and quality/coverage reports:
+
+```bash
+npm run build:fragrance-library
+```
+
+Imported source claims remain marked as reported; bundling the dataset does not mean JBAE independently verified every claim.
+
 ## Trust and autonomy
 
 - Retrieved facts enter as unconfirmed candidates, never as verified facts.
