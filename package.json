@@ -1,33 +1,39 @@
 {
   "name": "jb-expert-qa",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
-  "description": "Supervised QA engine with dependency advisories, visual regression, and interactive layout collision detection.",
+  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, and JB Malware Engine packages.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
-  "workspaces": [
-    "packages/security-guard"
-  ],
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
-    "check": "node --check src/index.js && node --test",
+    "check": "node --check src/index.js && node --check src/specialists/dead-code-rules.js && node --check src/adapters/filesystem/audit-project.js && node --test",
     "example": "node examples/basic-audit.js",
     "audit": "node src/cli.js",
     "audit:project": "node src/project-cli.js",
     "audit:security": "node src/security-cli.js",
     "autopilot": "node src/autopilot-cli.js",
     "audit:security:url": "node src/security-url-cli.js",
-    "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js tests/cloudflare-worker-rate-limit.test.js",
-    "benchmark:guard": "node bench/security-guard.js"
+    "benchmark:qa": "node bench/run.js",
+    "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js",
+    "benchmark:guard": "node bench/security-guard.js",
+    "test:dead-code": "node --test tests/dead-code-rules.test.js",
+    "test:package-distributions": "node scripts/verify-package-distributions.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
     "playwright": "1.56.1",
     "pixelmatch": "8.0.0",
-    "pngjs": "7.0.0"
+    "pngjs": "7.0.0",
+    "acorn": "8.15.0"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/expert-qa",
+    "packages/security-guard",
+    "packages/malware-engine"
+  ]
 }
