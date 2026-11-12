@@ -13,11 +13,14 @@
   "files": [
     "src/**",
     "docs/**",
+    "data/**",
+    "scripts/**",
     "README.md"
   ],
   "scripts": {
     "test": "node --test tests",
-    "check": "node --check src/index.js && node --test tests"
+    "check": "node --check src/index.js && node --test tests",
+    "build:fragrance-library": "node scripts/build-fragrance-library.mjs"
   },
   "repository": {
     "type": "git",
