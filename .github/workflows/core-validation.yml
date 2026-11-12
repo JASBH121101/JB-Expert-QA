@@ -33,7 +33,7 @@ jobs:
   test:
     name: Node.js tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +54,8 @@ jobs:
         run: npm audit --audit-level=high
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Run complete @jb/expert-qa package tests
+        run: npm run test --workspace @jb/expert-qa
       - name: Run focused static dead-code and dependency-graph tests
         run: npm run test:dead-code
       - name: Run syntax checks and tests
