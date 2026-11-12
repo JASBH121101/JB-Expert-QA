@@ -185,7 +185,19 @@ try {
     'import * as advisor from "@jb/advisor-engine"; const required = ["getEngineInfo", "createAdvisorCore", "ResearchEngine", "compareProducts", "KnowledgeStore", "CapacitorSQLiteKnowledgeAdapter", "createDefaultResearchProviders"]; if (advisor.ENGINE_ID !== "JBAE" || required.some((name) => typeof advisor[name] === "undefined")) process.exit(1); const research = new advisor.ResearchEngine({ providers: [] }); if (research.getProviderIds().length !== 0) process.exit(1);'
   ], { cwd: advisorInstall });
 
-  console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser and Advisor Engine API smoke checks passed.");
+  run(npm, ["run", "--prefix", advisorInstall, "build:fragrance-library"]);
+  const advisorSnapshot = path.join(
+    advisorInstall,
+    "node_modules",
+    "@jb",
+    "advisor-engine",
+    "dist",
+    "fragrance-library",
+    "scento-knowledge-snapshot.json"
+  );
+  assert.ok((await stat(advisorSnapshot)).size > 0, "Advisor Engine offline dataset builder must produce a knowledge snapshot");
+
+  console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
