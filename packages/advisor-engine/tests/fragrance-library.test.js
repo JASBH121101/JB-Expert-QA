@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import {
   buildScentoFragranceBundle,
   createScentoFragranceLibrary,
@@ -14,9 +13,9 @@ import {
   MemoryKnowledgeAdapter,
 } from "../src/knowledge/knowledge-store.js";
 
-const DATA = resolve("data/fragrance/sources/scento-2026-10-29");
+const DATA = new URL("../data/fragrance/sources/scento-2026-10-29/", import.meta.url);
 async function readSource(name) {
-  return readFile(resolve(DATA, name), "utf8");
+  return readFile(new URL(name, DATA), "utf8");
 }
 
 const sampleHeader = "id,name,house_id,house,year,perfumers,concentration,family,secondary_family,character,seasons,times_of_day,top_notes,heart_notes,base_notes,notes,description,popularity_rank,url";
