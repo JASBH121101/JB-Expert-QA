@@ -18,12 +18,120 @@ import {
   consistencyRules
 } from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
+import { applyThemeOverride, collectThemeContext } from "./theme-context.js";
+import { analyzeContrastSamples, summarizeContrastResults } from "../visual/contrast.js";
 import { exploreInteractionStates } from "./interactions.js";
 import defaultConfig from "../../../config/default.config.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
 const axeScriptPath = require.resolve("axe-core/axe.min.js");
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
+
+function themeTokenMap(themeContext = {}) {
+  return new Map((themeContext.themeAudit?.colorTokens ?? []).map((token) => [
+    String(token.scope ?? "root") + ":" + token.name,
+    token.value
+  ]));
+}
+
+function contrastSampleMap(themeContext = {}) {
+  return new Map((themeContext.contrastSamples ?? []).map((sample) => [
+    String(sample.selector ?? "") + "|" + String(sample.kind ?? "text"),
+    JSON.stringify({
+      foreground: sample.foreground,
+      backgroundStatus: sample.backgroundStatus,
+      backgroundReason: sample.backgroundReason,
+      backgroundLayers: sample.backgroundLayers,
+      fontSizePx: sample.fontSizePx,
+      fontWeight: sample.fontWeight
+    })
+  ]));
+}
+
+async function auditThemeRoundTrip(page, {
+  initialContext,
+  colorScheme,
+  themeAttribute,
+  themeStorageKey
+}) {
+  const alternateTheme = colorScheme === "dark" ? "light" : "dark";
+  const setStorageTheme = async (theme) => {
+    if (!themeStorageKey) return;
+    await page.evaluate(({ key, value }) => {
+      try {
+        const previous = window.localStorage.getItem(key);
+        window.localStorage.setItem(key, value);
+        window.dispatchEvent(new StorageEvent("storage", {
+          key,
+          oldValue: previous,
+          newValue: value,
+          storageArea: window.localStorage,
+          url: window.location.href
+        }));
+      } catch {}
+    }, { key: themeStorageKey, value: theme });
+  };
+
+  await page.emulateMedia({ colorScheme: alternateTheme });
+  await setStorageTheme(alternateTheme);
+  await applyThemeOverride(page, { theme: alternateTheme, attribute: themeAttribute });
+  await page.waitForTimeout(80);
+  const alternateContext = await collectThemeContext(page);
+
+  await page.emulateMedia({ colorScheme });
+  await setStorageTheme(colorScheme);
+  await applyThemeOverride(page, { theme: colorScheme, attribute: themeAttribute });
+  await page.waitForTimeout(80);
+  const restoredContext = await collectThemeContext(page);
+
+  const initialTokens = themeTokenMap(initialContext);
+  const restoredTokens = themeTokenMap(restoredContext);
+  const changedTokens = [...initialTokens.keys()]
+    .filter((name) => restoredTokens.has(name) &&
+      initialTokens.get(name) !== restoredTokens.get(name))
+    .map((name) => ({
+      scope: name.split(":")[0],
+      name: name.slice(name.indexOf(":") + 1),
+      initialValue: initialTokens.get(name),
+      restoredValue: restoredTokens.get(name)
+    }));
+
+  const addedTokens = [...restoredTokens.keys()].filter((name) => !initialTokens.has(name));
+  const removedTokens = [...initialTokens.keys()].filter((name) => !restoredTokens.has(name));
+  const rootColorSchemeChanged =
+    initialContext.themeAudit?.rootColorScheme !== restoredContext.themeAudit?.rootColorScheme;
+  const themeMarkerChanged =
+    initialContext.themeAudit?.themeMarker !== restoredContext.themeAudit?.themeMarker;
+
+  const initialSamples = contrastSampleMap(initialContext);
+  const restoredSamples = contrastSampleMap(restoredContext);
+  const sharedSamples = [...initialSamples.keys()].filter((key) => restoredSamples.has(key));
+  const changedSamples = sharedSamples
+    .filter((key) => initialSamples.get(key) !== restoredSamples.get(key))
+    .map((key) => ({
+      selector: key.split("|")[0],
+      kind: key.split("|")[1]
+    }));
+
+  return Object.freeze({
+    enabled: true,
+    sequence: Object.freeze([colorScheme, alternateTheme, colorScheme]),
+    alternateThemeMarker: alternateContext.themeAudit?.themeMarker ?? null,
+    restoredThemeMarker: restoredContext.themeAudit?.themeMarker ?? null,
+    restoredColorScheme: restoredContext.themeAudit?.requestedColorScheme ?? null,
+    changedTokens: Object.freeze(changedTokens),
+    addedTokens: Object.freeze(addedTokens),
+    removedTokens: Object.freeze(removedTokens),
+    changedSamples: Object.freeze(changedSamples),
+    rootColorSchemeChanged,
+    themeMarkerChanged,
+    addedSamplesAfterRestore: Math.max(0, restoredSamples.size - sharedSamples.length),
+    removedSamplesAfterRestore: Math.max(0, initialSamples.size - sharedSamples.length),
+    restoredStable: changedTokens.length === 0 && addedTokens.length === 0 &&
+      removedTokens.length === 0 && changedSamples.length === 0 &&
+      !rootColorSchemeChanged && !themeMarkerChanged
+  });
+}
 
 const ALL_RULES = [
   ...responsiveRules,
@@ -47,10 +155,42 @@ export async function auditUrl(url, {
   maxInteractionActions = 8,
   interactionSettleMs = 180,
   interactionScreenshotDir = null,
+  interactionBaselineDir = null,
+  interactionDiffDir = null,
+  updateInteractionBaselines = false,
+  interactionVisualThreshold = 0.1,
+  interactionMaxDiffPixelRatio = 0.005,
   interactionViewportName = "default",
   screenshotPath = null,
-  screenshotFullPage = false
+  screenshotFullPage = false,
+  colorScheme = "light",
+  themeAttribute = null,
+  themeStorageKey = null,
+  themeTransitionAudit = false
 } = {}) {
+  if (!["light", "dark"].includes(colorScheme)) throw new TypeError("colorScheme must be light or dark");
+  if (typeof themeTransitionAudit !== "boolean") throw new TypeError("themeTransitionAudit must be a boolean");
+  if (themeAttribute !== null &&
+      (typeof themeAttribute !== "string" ||
+       !(themeAttribute === "class" || /^data-[a-z0-9_-]{1,60}$/i.test(themeAttribute)))) {
+    throw new TypeError("themeAttribute must be class or a valid data-* attribute");
+  }
+  if (themeStorageKey !== null &&
+      (typeof themeStorageKey !== "string" || !themeStorageKey.trim() ||
+       themeStorageKey.length > 120 || [...themeStorageKey].some((character) =>
+         character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))) {
+    throw new TypeError("themeStorageKey must be a non-empty key of at most 120 characters");
+  }
+  if (typeof updateInteractionBaselines !== "boolean") throw new TypeError("updateInteractionBaselines must be a boolean");
+  if (interactionBaselineDir && !interactionScreenshotDir && !screenshotPath) {
+    throw new TypeError("Interaction screenshots are required for interaction baselines");
+  }
+  if (interactionDiffDir && !interactionBaselineDir) {
+    throw new TypeError("interactionBaselineDir is required for interaction diffs");
+  }
+  if (updateInteractionBaselines && !interactionBaselineDir) {
+    throw new TypeError("interactionBaselineDir is required when updating interaction baselines");
+  }
   if (typeof sameOriginOnly !== "boolean") throw new TypeError("sameOriginOnly must be a boolean");
   if (typeof interactionExploration !== "boolean") throw new TypeError("interactionExploration must be a boolean");
   if (screenshotPath !== null && (typeof screenshotPath !== "string" || !screenshotPath.trim())) throw new TypeError("screenshotPath must be a non-empty path");
@@ -60,7 +200,17 @@ export async function auditUrl(url, {
   const browser = await chromium.launch({ headless, env: createBrowserEnvironment(process.env) });
   let browserContext;
   try {
-    browserContext = await browser.newContext({ viewport, serviceWorkers: "block" });
+    browserContext = await browser.newContext({ viewport, serviceWorkers: "block", colorScheme });
+    if (themeStorageKey) {
+      await browserContext.addInitScript(({ key, theme }) => {
+        try {
+          window.localStorage.setItem(key, theme);
+          window.__jbqaThemeStorageSeeded = true;
+        } catch {
+          window.__jbqaThemeStorageSeeded = false;
+        }
+      }, { key: themeStorageKey, theme: colorScheme });
+    }
     const page = await browserContext.newPage();
     const runtimeIssues = {
       pageErrors: [],
@@ -124,7 +274,26 @@ export async function auditUrl(url, {
 
     await page.goto(parsed.href, { waitUntil: "domcontentloaded", timeout });
     await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 5000) }).catch(() => {});
+    await applyThemeOverride(page, { theme: colorScheme, attribute: themeAttribute });
     const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
+    const themeContext = await collectThemeContext(page);
+    const themeTransition = themeTransitionAudit
+      ? await auditThemeRoundTrip(page, {
+          initialContext: themeContext,
+          colorScheme,
+          themeAttribute,
+          themeStorageKey
+        })
+      : Object.freeze({ enabled: false, restoredStable: null });
+    Object.assign(context, themeContext);
+    context.themeTransitionAudit = themeTransition;
+    context.themeAudit = {
+      ...context.themeAudit,
+      appliedThemeAttribute: themeAttribute,
+      storageKeySeeded: themeStorageKey
+        ? await page.evaluate(() => window.__jbqaThemeStorageSeeded === true)
+        : false
+    };
     context.url = redactUrlForReport(context.url);
     context.resources = (context.resources ?? []).map((resource) => ({
       ...resource,
@@ -140,7 +309,14 @@ export async function auditUrl(url, {
         settleMs: interactionSettleMs,
         timeout,
         screenshotDir: interactionScreenshotDir ?? (screenshotPath ? join(dirname(screenshotPath), "interaction-states") : null),
-        viewportName: interactionViewportName
+        baselineDir: interactionBaselineDir,
+        diffDir: interactionDiffDir,
+        updateBaselines: updateInteractionBaselines,
+        visualThreshold: interactionVisualThreshold,
+        maxDiffPixelRatio: interactionMaxDiffPixelRatio,
+        viewportName: interactionViewportName,
+        colorScheme,
+        themeAttribute
       });
       context.interactiveElements = [
         ...(context.interactiveElements ?? []).map((item) => ({ ...item, state: "initial" })),
@@ -157,7 +333,8 @@ export async function auditUrl(url, {
         statesCaptured: interactionResult.statesCaptured,
         overlapsFound: interactionResult.overlapsFound,
         states: interactionResult.states,
-        skipped: interactionResult.skipped
+        skipped: interactionResult.skipped,
+        contrastSamplesTruncated: interactionResult.contrastSamplesTruncated
       };
     } else {
       context.interactionExploration = {
@@ -167,9 +344,17 @@ export async function auditUrl(url, {
         statesCaptured: 0,
         overlapsFound: 0,
         states: [],
-        skipped: []
+        skipped: [],
+        contrastSamplesTruncated: false
       };
     }
+
+    const allContrastSamples = [
+      ...(context.contrastSamples ?? []),
+      ...(interactionResult?.contrastSamples ?? [])
+    ];
+    context.contrastAnalysis = analyzeContrastSamples(allContrastSamples);
+    context.contrastSummary = summarizeContrastResults(context.contrastAnalysis);
 
     Object.assign(context, runtimeIssues);
 
@@ -213,7 +398,7 @@ export async function auditUrl(url, {
     const report = await engine.audit(context, { specialist });
     return {
       ...report,
-      target: { url: redactUrlForReport(parsed.href), viewport, pageTitle: context.title },
+      target: { url: redactUrlForReport(parsed.href), viewport, pageTitle: context.title, theme: colorScheme },
       evidence: {
         documentScrollWidth: context.documentScrollWidth,
         documentScrollHeight: context.documentScrollHeight,
@@ -232,6 +417,10 @@ export async function auditUrl(url, {
         interactionActionsAttempted: context.interactionExploration?.actionsAttempted ?? 0,
         interactionExploration: context.interactionExploration,
         axeViolations: context.axeViolations?.length ?? null,
+        themeAudit: context.themeAudit,
+        themeTransitionAudit: context.themeTransitionAudit,
+        contrastSummary: context.contrastSummary,
+        contrastSamplesTruncated: context.interactionExploration?.contrastSamplesTruncated ?? false,
         screenshotPath
       }
     };
@@ -256,10 +445,16 @@ export async function auditViewports(url, {
   updateBaselines = false,
   visualThreshold = 0.1,
   maxDiffPixelRatio = 0.005,
+  themes = ["light"],
   ...options
 } = {}) {
   if (!Array.isArray(viewports) || viewports.length === 0) {
     throw new TypeError("At least one viewport is required");
+  }
+  if (!Array.isArray(themes) || themes.length === 0 || themes.length > 2 ||
+      themes.some((theme) => !["light", "dark"].includes(theme)) ||
+      new Set(themes).size !== themes.length) {
+    throw new TypeError("themes must contain light, dark, or both without duplicates");
   }
   const seen = new Set();
   const seenSafeNames = new Set();
@@ -291,53 +486,116 @@ export async function auditViewports(url, {
   });
 
   for (const { viewport, safeName } of validatedViewports) {
-    const screenshotPath = screenshotDir ? join(screenshotDir, safeName + ".png") : null;
-    const report = await auditUrl(url, {
-      ...options,
-      screenshotPath,
-      screenshotFullPage,
-      viewport: { width: viewport.width, height: viewport.height },
-      interactionScreenshotDir: screenshotDir ? join(screenshotDir, "interaction-states") : null,
-      interactionViewportName: safeName
-    });
-    let visualComparison = null;
-    if (baselineDir) {
-      const baselinePath = join(baselineDir, safeName + ".png");
-      if (updateBaselines) {
-        await mkdir(dirname(baselinePath), { recursive: true });
-        await writeFile(baselinePath, await readFile(screenshotPath));
-        visualComparison = { status: "baseline-updated", passed: false, baselinePath, actualPath: screenshotPath };
-      } else {
-        let baselineExists = true;
-        try { await access(baselinePath); } catch { baselineExists = false; }
-        if (!baselineExists) {
-          visualComparison = { status: "baseline-missing", passed: false, baselinePath, actualPath: screenshotPath };
+    for (const theme of themes) {
+      const artifactName = themes.length > 1 || theme === "dark"
+        ? theme + "-" + safeName
+        : safeName;
+      const screenshotPath = screenshotDir ? join(screenshotDir, artifactName + ".png") : null;
+      const report = await auditUrl(url, {
+        ...options,
+        colorScheme: theme,
+        themeTransitionAudit: themes.length > 1,
+        screenshotPath,
+        screenshotFullPage,
+        viewport: { width: viewport.width, height: viewport.height },
+        interactionScreenshotDir: screenshotDir ? join(screenshotDir, "interaction-states") : null,
+        interactionBaselineDir: baselineDir ? join(baselineDir, "interaction-states") : null,
+        interactionDiffDir: diffDir ? join(diffDir, "interaction-states") : null,
+        updateInteractionBaselines: updateBaselines,
+        interactionVisualThreshold: visualThreshold,
+        interactionMaxDiffPixelRatio: maxDiffPixelRatio,
+        interactionViewportName: artifactName
+      });
+      let visualComparison = null;
+      if (baselineDir) {
+        const baselinePath = join(baselineDir, artifactName + ".png");
+        if (updateBaselines) {
+          await mkdir(dirname(baselinePath), { recursive: true });
+          await writeFile(baselinePath, await readFile(screenshotPath));
+          visualComparison = { status: "baseline-updated", passed: false, baselinePath, actualPath: screenshotPath };
         } else {
-          visualComparison = await comparePngFiles({
-            baselinePath,
-            actualPath: screenshotPath,
-            diffPath: diffDir ? join(diffDir, safeName + ".diff.png") : null,
-            threshold: visualThreshold,
-            maxDiffPixelRatio
-          });
+          let baselineExists = true;
+          try { await access(baselinePath); } catch { baselineExists = false; }
+          if (!baselineExists) {
+            visualComparison = { status: "baseline-missing", passed: false, baselinePath, actualPath: screenshotPath };
+          } else {
+            visualComparison = await comparePngFiles({
+              baselinePath,
+              actualPath: screenshotPath,
+              diffPath: diffDir ? join(diffDir, artifactName + ".diff.png") : null,
+              threshold: visualThreshold,
+              maxDiffPixelRatio
+            });
+          }
         }
       }
+      const visualPassed = !visualComparison ||
+        (visualComparison.status === "compared" && visualComparison.passed === true);
+      const interactionStates = report.evidence?.interactionExploration?.states ?? [];
+      const interactionVisualPassed = !baselineDir || interactionStates.length === 0 ||
+        interactionStates.every((state) =>
+          state.visualComparison?.status === "compared" &&
+          state.visualComparison.passed === true);
+      results.push({
+        name: viewport.name,
+        theme,
+        viewport: { width: viewport.width, height: viewport.height },
+        passed: report.scoring.passed && visualPassed && interactionVisualPassed,
+        score: report.scoring.score,
+        findings: report.diagnostics,
+        summary: report.summary,
+        execution: report.execution,
+        evidence: report.evidence,
+        screenshotPath,
+        visualComparison
+      });
     }
-    const visualPassed = !visualComparison ||
-      (visualComparison.status === "compared" && visualComparison.passed === true);
-    results.push({
-      name: viewport.name,
-      viewport: { width: viewport.width, height: viewport.height },
-      passed: report.scoring.passed && visualPassed,
-      score: report.scoring.score,
-      findings: report.diagnostics,
-      summary: report.summary,
-      execution: report.execution,
-      evidence: report.evidence,
-      screenshotPath,
-      visualComparison
-    });
   }
+  const themeTokenComparisons = [];
+  if (themes.includes("light") && themes.includes("dark")) {
+    for (const { viewport } of validatedViewports) {
+      const lightResult = results.find((item) => item.name === viewport.name && item.theme === "light");
+      const darkResult = results.find((item) => item.name === viewport.name && item.theme === "dark");
+      if (!lightResult || !darkResult) continue;
+      const tokenMap = (item) => new Map(
+        (item.evidence?.themeAudit?.colorTokens ?? []).map((token) => [
+          String(token.scope ?? "root") + ":" + token.name,
+          token.value
+        ])
+      );
+      const lightTokens = tokenMap(lightResult);
+      const darkTokens = tokenMap(darkResult);
+      const sharedNames = [...lightTokens.keys()].filter((name) => darkTokens.has(name));
+      const changedTokens = sharedNames
+        .filter((name) => lightTokens.get(name) !== darkTokens.get(name))
+        .map((name) => ({
+          scope: name.split(":")[0],
+          name: name.slice(name.indexOf(":") + 1),
+          lightValue: lightTokens.get(name),
+          darkValue: darkTokens.get(name)
+        }));
+      const unchangedTokens = sharedNames
+        .filter((name) => lightTokens.get(name) === darkTokens.get(name))
+        .map((name) => ({
+          scope: name.split(":")[0],
+          name: name.slice(name.indexOf(":") + 1),
+          value: lightTokens.get(name)
+        }));
+      const comparison = Object.freeze({
+        viewport: viewport.name,
+        lightTokenCount: lightTokens.size,
+        darkTokenCount: darkTokens.size,
+        changedTokens: Object.freeze(changedTokens),
+        unchangedTokens: Object.freeze(unchangedTokens),
+        onlyInLight: Object.freeze([...lightTokens.keys()].filter((name) => !darkTokens.has(name))),
+        onlyInDark: Object.freeze([...darkTokens.keys()].filter((name) => !lightTokens.has(name)))
+      });
+      lightResult.themeTokenComparison = comparison;
+      darkResult.themeTokenComparison = comparison;
+      themeTokenComparisons.push(comparison);
+    }
+  }
+
   return Object.freeze({
     engine: "JB Expert QA",
     version: ENGINE_VERSION,
@@ -345,6 +603,9 @@ export async function auditViewports(url, {
     target: { url: redactUrlForReport(new URL(url).href) },
     summary: Object.freeze({
       viewportsChecked: results.length,
+      themesChecked: themes.length,
+      viewportsPerTheme: validatedViewports.length,
+      themePairsCompared: themeTokenComparisons.length,
       passedViewports: results.filter((item) => item.passed).length,
       failedViewports: results.filter((item) => !item.passed).length,
       totalFindings: results.reduce((sum, item) => sum + item.findings.length, 0),
@@ -352,9 +613,22 @@ export async function auditViewports(url, {
       visualComparisons: results.filter((item) => item.visualComparison?.status === "compared").length,
       baselineMissing: results.filter((item) => item.visualComparison?.status === "baseline-missing").length,
       visualFailures: results.filter((item) => item.visualComparison?.status === "compared" && !item.visualComparison.passed).length,
-      baselinesUpdated: results.filter((item) => item.visualComparison?.status === "baseline-updated").length
+      baselinesUpdated: results.filter((item) => item.visualComparison?.status === "baseline-updated").length,
+      interactionVisualComparisons: results.reduce((sum, item) =>
+        sum + (item.evidence?.interactionExploration?.states ?? [])
+          .filter((state) => state.visualComparison?.status === "compared").length, 0),
+      interactionVisualFailures: results.reduce((sum, item) =>
+        sum + (item.evidence?.interactionExploration?.states ?? [])
+          .filter((state) => state.visualComparison?.status === "compared" && !state.visualComparison.passed).length, 0),
+      interactionBaselinesMissing: results.reduce((sum, item) =>
+        sum + (item.evidence?.interactionExploration?.states ?? [])
+          .filter((state) => state.visualComparison?.status === "baseline-missing").length, 0),
+      interactionBaselinesUpdated: results.reduce((sum, item) =>
+        sum + (item.evidence?.interactionExploration?.states ?? [])
+          .filter((state) => state.visualComparison?.status === "baseline-updated").length, 0)
     }),
     passed: results.every((item) => item.passed),
+    themeComparisons: Object.freeze(themeTokenComparisons),
     viewports: Object.freeze(results)
   });
 }

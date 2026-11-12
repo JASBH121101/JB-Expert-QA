@@ -11,7 +11,10 @@ function escapeHtml(value) {
 function findingsFor(report) {
   if (Array.isArray(report.viewports)) {
     return report.viewports.flatMap((viewport) =>
-      (viewport.findings ?? []).map((finding) => ({ ...finding, viewport: viewport.name }))
+      (viewport.findings ?? []).map((finding) => ({
+        ...finding,
+        viewport: viewport.name + (viewport.theme ? " / " + viewport.theme : "")
+      }))
     );
   }
   return (report.diagnostics ?? []).map((finding) => ({ ...finding, viewport: "single" }));
@@ -37,7 +40,10 @@ export function formatHtmlReport(report) {
 
   const summary = Array.isArray(report.viewports)
     ? "Viewports: " + (report.summary?.viewportsChecked ?? report.viewports.length) +
+      " · Themes: " + (report.summary?.themesChecked ?? 1) +
       " · Passed: " + (report.summary?.passedViewports ?? 0) +
+      " · Interaction visual diffs: " + (report.summary?.interactionVisualComparisons ?? 0) +
+      " · Interaction visual failures: " + (report.summary?.interactionVisualFailures ?? 0) +
       " · Findings: " + (report.summary?.totalFindings ?? findings.length)
     : "Rules: " + (report.summary?.rulesExecuted ?? 0) +
       " · Execution errors: " + (report.summary?.rulesWithErrors ?? 0) +
@@ -86,12 +92,13 @@ export function formatHtmlReport(report) {
 
   const visualSection = Array.isArray(report.viewports) &&
     report.viewports.some((viewport) => viewport.visualComparison || viewport.screenshotPath)
-    ? "<h2>Visual regression</h2><table><thead><tr><th>Viewport</th><th>Capture</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
+    ? "<h2>Visual regression</h2><table><thead><tr><th>Theme</th><th>Viewport</th><th>Capture</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
       report.viewports.map((viewport) => {
         const visual = viewport.visualComparison;
         const difference = visual && typeof visual.diffPixelRatio === "number"
           ? (visual.diffPixelRatio * 100).toFixed(3) + "%" : "—";
         return "<tr>" + [
+          viewport.theme || "—",
           viewport.name,
           viewport.screenshotPath || "not captured",
           visual ? visual.status : "not compared",
@@ -99,6 +106,124 @@ export function formatHtmlReport(report) {
           visual ? (visual.passed ? "PASS" : "REVIEW") : "—"
         ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>";
       }).join("") + "</tbody></table>"
+    : "";
+
+  const themeSection = Array.isArray(report.viewports) &&
+    report.viewports.some((viewport) => viewport.evidence?.themeAudit || viewport.evidence?.contrastSummary)
+    ? "<h2>Theme and contrast audit</h2><table><thead><tr><th>Theme</th><th>Viewport</th><th>Measured</th><th>Failures</th><th>Inconclusive</th><th>Exempt</th><th>Theme marker</th><th>CSS color tokens</th><th>Hardcoded declarations</th><th>Changed tokens</th><th>Unchanged tokens</th><th>Round-trip restore</th></tr></thead><tbody>" +
+      report.viewports.map((viewport) => {
+        const contrast = viewport.evidence?.contrastSummary ?? {};
+        const theme = viewport.evidence?.themeAudit ?? {};
+        const tokenComparison = viewport.themeTokenComparison ?? {};
+        const transition = viewport.evidence?.themeTransitionAudit ?? {};
+        const marker = theme.themeMarker
+          ? theme.themeMarker + " (" + (theme.themeMarkerSource || "detected") + ")"
+          : "not explicit / media-query based";
+        return "<tr>" + [
+          viewport.theme || "not specified",
+          viewport.name,
+          contrast.measured ?? 0,
+          contrast.failed ?? 0,
+          contrast.inconclusive ?? 0,
+          contrast.exempt ?? 0,
+          marker,
+          (theme.colorTokens || []).length,
+          theme.hardcodedColorDeclarationCount ?? 0,
+          tokenComparison.changedTokens?.length ?? "—",
+          tokenComparison.unchangedTokens?.length ?? "—",
+          transition.enabled ? (transition.restoredStable ? "Stable" : "Drift detected") : "Not run"
+        ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>";
+      }).join("") + "</tbody></table>"
+    : "";
+
+  const themeTokenDetailSection = Array.isArray(report.viewports)
+    ? (() => {
+        const comparisons = report.viewports
+          .filter((viewport) => viewport.themeTokenComparison &&
+            (!viewport.theme || viewport.theme === "light"))
+          .map((viewport) => ({
+            viewport: viewport.name,
+            comparison: viewport.themeTokenComparison
+          }));
+        const tokenRows = comparisons.flatMap(({ viewport, comparison }) => [
+          ...(comparison.changedTokens ?? []).map((token) => ({
+            viewport,
+            status: "Changed",
+            scope: token.scope,
+            name: token.name,
+            light: token.lightValue,
+            dark: token.darkValue
+          })),
+          ...(comparison.onlyInLight ?? []).map((name) => ({
+            viewport,
+            status: "Only in light",
+            scope: name.split(":")[0],
+            name: name.slice(name.indexOf(":") + 1),
+            light: "present",
+            dark: "missing"
+          })),
+          ...(comparison.onlyInDark ?? []).map((name) => ({
+            viewport,
+            status: "Only in dark",
+            scope: name.split(":")[0],
+            name: name.slice(name.indexOf(":") + 1),
+            light: "missing",
+            dark: "present"
+          }))
+        ]).slice(0, 300);
+        const declarationRows = report.viewports.flatMap((viewport) =>
+          (viewport.evidence?.themeAudit?.hardcodedColorDeclarations ?? [])
+            .slice(0, 25)
+            .map((item) => ({
+              theme: viewport.theme || "—",
+              viewport: viewport.name,
+              ...item
+            }))
+        ).slice(0, 200);
+        if (!tokenRows.length && !declarationRows.length) return "";
+        const tokenTable = tokenRows.length
+          ? "<h3>CSS custom-property differences</h3><table><thead><tr><th>Viewport</th><th>Status</th><th>Scope</th><th>Token</th><th>Light</th><th>Dark</th></tr></thead><tbody>" +
+            tokenRows.map((item) => "<tr>" + [
+              item.viewport, item.status, item.scope, item.name, item.light, item.dark
+            ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>").join("") +
+            "</tbody></table>"
+          : "";
+        const declarationsTable = declarationRows.length
+          ? "<h3>Literal CSS color declarations (inventory, not automatic failures)</h3><table><thead><tr><th>Theme</th><th>Viewport</th><th>Selector</th><th>Property</th><th>Value</th><th>Source</th></tr></thead><tbody>" +
+            declarationRows.map((item) => "<tr>" + [
+              item.theme, item.viewport, item.selector, item.property, item.value, item.source
+            ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>").join("") +
+            "</tbody></table>"
+          : "";
+        return "<h2>CSS theme details</h2>" + tokenTable + declarationsTable;
+      })()
+    : "";
+
+  const interactionSection = Array.isArray(report.viewports) &&
+    report.viewports.some((viewport) =>
+      (viewport.evidence?.interactionExploration?.states ?? []).length > 0)
+    ? "<h2>Interactive state exploration</h2><table><thead><tr><th>Theme</th><th>Viewport</th><th>State</th><th>Trigger</th><th>Detected theme</th><th>Root color-scheme</th><th>Theme toggle effect</th><th>Changed tokens</th><th>Visible controls</th><th>Overlaps</th><th>Baseline</th><th>Difference</th><th>Result</th></tr></thead><tbody>" +
+      report.viewports.flatMap((viewport) =>
+        (viewport.evidence?.interactionExploration?.states ?? []).map((state) => {
+          const visual = state.visualComparison;
+          const difference = visual && typeof visual.diffPixelRatio === "number"
+            ? (visual.diffPixelRatio * 100).toFixed(3) + "%"
+            : "—";
+          return "<tr>" + [
+            viewport.theme || "—",
+            viewport.name,
+            state.kind,
+            state.triggerSelector,
+            state.themeMarker || "not explicit",
+            state.rootColorScheme || "—",
+            state.visibleControls ?? 0,
+            state.overlapCount ?? 0,
+            visual?.status || "not compared",
+            difference,
+            visual ? (visual.passed ? "PASS" : "REVIEW") : "—"
+          ].map((value) => "<td>" + escapeHtml(value) + "</td>").join("") + "</tr>";
+        })
+      ).join("") + "</tbody></table>"
     : "";
 
   const aiReviews = report.aiVisualReview;
@@ -149,6 +274,9 @@ export function formatHtmlReport(report) {
     projectSummary,
     coverageSection,
     deadCodeSection,
+    themeSection,
+    themeTokenDetailSection,
+    interactionSection,
     visualSection,
     aiSection,
     "<h2>Findings</h2>",
