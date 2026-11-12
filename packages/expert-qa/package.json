@@ -32,9 +32,6 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node ../../scripts/build-expert-qa-package.js",
-    "prepack": "npm run build",
-    "test": "npm run build && node --test ./package-tests/complete-engine.spec.js ./package-tests/browser-audit.spec.js",
     "setup:browser": "node cli/package-cli.js setup --browser chromium"
   },
   "dependencies": {
