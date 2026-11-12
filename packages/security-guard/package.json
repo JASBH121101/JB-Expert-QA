@@ -4,16 +4,13 @@
   "description": "Node.js runtime HTTP security middleware with request controls and upload inspection contracts.",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js"
   },
   "files": [
     "src/**",
     "README.md"
   ],
-  "scripts": {
-    "test": "node --test ../../tests/security-guard.test.js ../../tests/account-recovery.test.js ../../tests/security-headers.test.js ../../tests/node-server-hardening.test.js ../../tests/origin-protection.test.js ../../tests/csrf-protection.test.js ../../tests/distributed-rate-limit.test.js ../../tests/distributed-auth-protection.test.js ../../tests/upload-inspector.test.js",
-    "check": "node --check src/index.js && npm test"
-  },
   "engines": {
     "node": ">=22"
   },
