@@ -177,7 +177,15 @@ try {
     'import { createMalwareEngine } from "@jb/malware-engine"; if (typeof createMalwareEngine !== "function") process.exit(1);'
   ], { cwd: malwareInstall });
 
-  console.log("PASS: all three npm tarballs installed in clean directories; the complete Expert QA browser suite passed.");
+  // JB Advisor Engine.
+  const advisorTarball = await pack("packages/advisor-engine");
+  const advisorInstall = await install(advisorTarball, "install-advisor-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import * as advisor from "@jb/advisor-engine"; const required = ["getEngineInfo", "createAdvisorCore", "ResearchEngine", "compareProducts", "KnowledgeStore", "CapacitorSQLiteKnowledgeAdapter", "createDefaultResearchProviders"]; if (advisor.ENGINE_ID !== "JBAE" || required.some((name) => typeof advisor[name] === "undefined")) process.exit(1); const research = new advisor.ResearchEngine({ providers: [] }); if (research.getProviderIds().length !== 0) process.exit(1);'
+  ], { cwd: advisorInstall });
+
+  console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser and Advisor Engine API smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
