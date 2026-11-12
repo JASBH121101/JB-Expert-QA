@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { auditViewports } from "../../src/adapters/playwright/audit-url.js";
+import { ENGINE_VERSION } from "../../src/core/version.js";
 
 test("multi-viewport audit identifies a defect only at mobile width", { timeout: 30000 }, async () => {
   const server = createServer((_request, response) => {
@@ -60,7 +61,7 @@ test("multi-viewport audit identifies a defect only at mobile width", { timeout:
     assert.equal(desktop.findings.some((item) => item.id.startsWith("UIUX-004-")), false,
       "should not report the same controls as overlapping at desktop width");
     assert.equal(desktop.findings.some((item) => item.id === "RESP-001"), false);
-    assert.equal(report.version, "0.7.0");
+    assert.equal(report.version, ENGINE_VERSION);
     assert.equal(report.summary.viewportsChecked, 2);
     assert.equal(report.summary.failedViewports, 0);
     assert.equal(report.summary.blockedRequests, 0);
