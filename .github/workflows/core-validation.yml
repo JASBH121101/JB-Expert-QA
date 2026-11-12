@@ -54,8 +54,10 @@ jobs:
         run: npm audit --audit-level=high
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run complete @jb/expert-qa package tests
-        run: npm run test --workspace @jb/expert-qa
+      - name: Build and test the complete @jb/expert-qa package
+        run: |
+          node scripts/build-expert-qa-package.js
+          node --test packages/expert-qa/package-tests/complete-engine.spec.js packages/expert-qa/package-tests/browser-audit.spec.js
       - name: Run focused static dead-code and dependency-graph tests
         run: npm run test:dead-code
       - name: Run syntax checks and tests
