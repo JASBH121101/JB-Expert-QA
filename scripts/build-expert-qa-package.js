@@ -1,57 +1,59 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageRoot = resolve(root, "packages/expert-qa");
-const generatedDirectories = [
-  "config",
-  "src/adapters",
-  "src/core",
-  "src/reporters",
-  "src/specialists"
-];
-const sourceFiles = [
-  "src/adapters/advisories/osv.js",
-  "src/adapters/filesystem/audit-project.js",
-  "src/adapters/filesystem/scan-project.js",
-  "src/core/config.js",
-  "src/core/diagnostic.js",
-  "src/core/engine.js",
-  "src/core/redaction.js",
-  "src/core/rule-registry.js",
-  "src/core/scoring.js",
-  "src/core/severities.js",
-  "src/core/version.js",
-  "src/reporters/html.js",
-  "src/reporters/index.js",
-  "src/reporters/markdown.js",
-  "src/specialists/dead-code-rules.js",
-  "src/specialists/project-rules.js",
-  "src/specialists/security-rules.js",
-  "config/project-audit.config.json"
+const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const packageRoot = resolve(repositoryRoot, "packages/expert-qa");
+const sourceRoot = resolve(repositoryRoot, "src");
+const configRoot = resolve(repositoryRoot, "config");
+const packageSourceRoot = resolve(packageRoot, "src");
+const packageConfigRoot = resolve(packageRoot, "config");
+
+const manifest = JSON.parse(await readFile(resolve(packageRoot, "package.json"), "utf8"));
+
+await rm(packageSourceRoot, { recursive: true, force: true });
+await rm(packageConfigRoot, { recursive: true, force: true });
+await mkdir(packageRoot, { recursive: true });
+
+await cp(sourceRoot, packageSourceRoot, { recursive: true, force: true });
+await cp(configRoot, packageConfigRoot, { recursive: true, force: true });
+
+await writeFile(
+  resolve(packageRoot, "package-version.js"),
+  "export const EXPERT_QA_PACKAGE_VERSION = " + JSON.stringify(manifest.version) + ";\n",
+  "utf8"
+);
+
+const requiredFiles = [
+  "src/index.js",
+  "src/cli.js",
+  "src/project-cli.js",
+  "src/security-cli.js",
+  "src/security-url-cli.js",
+  "src/autopilot-cli.js",
+  "src/adapters/playwright/audit-url.js",
+  "src/adapters/playwright/interactions.js",
+  "src/adapters/visual/png-diff.js",
+  "src/specialists/responsive/index.js",
+  "src/specialists/accessibility/index.js",
+  "src/ai/visual-review.js",
+  "src/agent/autopilot.js",
+  "src/security-bridge/index.js",
+  "config/default.config.json",
+  "config/project-audit.config.json",
+  "config/security-audit.config.json",
+  "config/security-url.config.json"
 ];
 
-for (const relativePath of generatedDirectories) {
-  await rm(resolve(packageRoot, relativePath), { recursive: true, force: true });
-}
-for (const relativePath of sourceFiles) {
-  const source = resolve(root, relativePath);
-  const destination = resolve(packageRoot, relativePath);
-  await mkdir(dirname(destination), { recursive: true });
-  await copyFile(source, destination);
-}
-for (const relativePath of [
-  "src/cli.js",
-  "src/index.js",
-  "src/adapters/filesystem/audit-project.js",
-  "src/core/engine.js",
-  "src/specialists/dead-code-rules.js",
-  "config/project-audit.config.json"
-]) {
-  const destination = resolve(packageRoot, relativePath);
-  if (!destination.startsWith(packageRoot)) {
-    throw new Error("Generated path escaped package root");
+for (const relativePath of requiredFiles) {
+  const path = resolve(packageRoot, relativePath);
+  if (!path.startsWith(packageRoot)) {
+    throw new Error("Generated package path escaped package root");
   }
+  await readFile(path);
 }
-console.log("Prepared JB Expert QA Core from canonical repository sources.");
+
+console.log(
+  "Prepared the complete JB Expert QA engine from canonical src/ and config/ trees (" +
+  requiredFiles.length + " required entry files verified)."
+);

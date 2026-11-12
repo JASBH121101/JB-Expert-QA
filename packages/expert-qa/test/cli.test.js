@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const buildScript = resolve(repositoryRoot, "scripts/build-expert-qa-package.js");
-const cliPath = resolve(packageRoot, "src/cli.js");
+const cliPath = resolve(packageRoot, "cli/package-cli.js");
 let tempRoot;
 
 before(async () => {
