@@ -33,7 +33,7 @@ The returned object also exposes `getStats()` and `reset()`.
 
 ## Runtime boundary
 
-This package targets Node.js 22+ HTTP applications and Express-compatible middleware. It is not a Cloudflare Workers adapter; Worker deployments need a runtime-native adapter and their own validation.
+The main package entry point targets Node.js 22+ HTTP applications and Express-compatible middleware. Cloudflare Workers use the separate, runtime-native `@jb/security-guard/cloudflare-worker-rate-limit` subpath. Do not import the Node.js middleware entry point into a Worker.
 
 ## Modes
 
@@ -396,3 +396,33 @@ See [Distributed authentication protection](../../docs/DISTRIBUTED-AUTH-PROTECTI
 ### Distributed-store timeout
 
 The distributed rate-limit and authentication controls accept `storeTimeoutMs` (default `3000`, maximum `60000`). Each store operation is bounded by this timeout. Middleware requests fail closed with a generic `503` when the shared store is unavailable, returns an invalid result, or does not respond in time. The adapter's atomicity and cross-instance consistency requirements still apply; a timeout does not cancel a backend operation that is already running, so adapters should also enforce their own connection and command deadlines.
+
+
+## Cloudflare Workers rate limiting
+
+Use the Worker-native subpath with a Cloudflare Rate Limiting binding. This module uses the Workers Web Crypto and Fetch APIs and does not import the Node.js middleware entry point.
+
+```js
+import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit";
+
+const limiter = createCloudflareWorkerRateLimit({
+  binding: env.LOGIN_RATE_LIMIT,
+  namespace: "my-application",
+  mode: "enforce",
+  periodSeconds: 60
+});
+
+// Resolve this identifier in trusted server-side code. Never accept it
+// directly from an untrusted request field.
+const decision = await limiter.check({
+  identity: authenticatedAccount.id,
+  scope: "login"
+});
+
+if (decision.response) return decision.response;
+// Continue only after applying the returned decision to the request flow.
+```
+
+Policies can also be configured independently with the `policies` option. Each policy requires its own Cloudflare Rate Limiting binding. Supported periods are 10 or 60 seconds. `monitor` mode observes without blocking and defaults to fail-open on binding failure; `enforce` mode blocks excess requests and defaults to fail-closed with HTTP 503 when its binding is unavailable. Override `failureMode` only after explicitly evaluating the availability/security trade-off.
+
+The adapter hashes the supplied identity together with the namespace, policy and scope before sending a key to Cloudflare. Pass a stable opaque account/client identifier resolved by trusted application logic; do not pass passwords, tokens, raw request bodies or client-controlled identity values. Cloudflare's rate-limit counters are approximate and location-scoped; they are not a globally exact distributed counter. Configure the binding in the Worker environment and test it in the actual Cloudflare runtime before production use.
