@@ -2,7 +2,7 @@
   "name": "jb-expert-qa",
   "version": "0.8.0",
   "private": true,
-  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, and JB Malware Engine packages.",
+  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, JB Malware Engine, and JB Advisor Engine packages.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
-    "check": "node --check src/index.js && node --check src/specialists/dead-code-rules.js && node --check src/adapters/filesystem/audit-project.js && node --test",
+    "check": "node --check src/index.js && node --check src/specialists/dead-code-rules.js && node --check src/adapters/filesystem/audit-project.js && node --check packages/advisor-engine/src/index.js && node --test",
     "example": "node examples/basic-audit.js",
     "audit": "node src/cli.js",
     "audit:project": "node src/project-cli.js",
