@@ -948,6 +948,59 @@ class SetupHealthTest extends TestCase
         $this->assertSame(9500.0, (float) $updatedProduct->prices->first()->amount);
     }
 
+    public function test_product_price_precision_follows_iso_currency_minor_units(): void
+    {
+        $this->post('/setup', $this->validSetupPayload())->assertRedirect(route('admin.home'));
+
+        \App\Models\BusinessCurrency::query()->create([
+            'code' => 'JPY',
+            'is_primary' => false,
+            'is_enabled' => true,
+            'sort_order' => 2,
+        ]);
+        \App\Models\BusinessCurrency::query()->create([
+            'code' => 'KWD',
+            'is_primary' => false,
+            'is_enabled' => true,
+            'sort_order' => 3,
+        ]);
+
+        $category = CatalogCategory::query()->where('name', 'Vehículos')->firstOrFail();
+        $payload = [
+            'name' => 'Producto con precios ISO',
+            'category_id' => $category->id,
+            'description' => 'Prueba de precisión por moneda.',
+            'status' => 'draft',
+            'prices' => [
+                'USD' => '',
+                'NIO' => '',
+                'JPY' => '1250',
+                'KWD' => '12.345',
+            ],
+        ];
+
+        $this->post(route('admin.products.store'), $payload)
+            ->assertRedirect(route('admin.products.index'))
+            ->assertSessionHas('status');
+
+        $product = Product::query()
+            ->with('prices')
+            ->where('name', 'Producto con precios ISO')
+            ->firstOrFail();
+        $prices = $product->prices->keyBy('currency_code');
+
+        $this->assertSame('1250.0000', (string) $prices['JPY']->amount);
+        $this->assertSame('12.3450', (string) $prices['KWD']->amount);
+
+        $payload['name'] = 'Producto con precisión inválida';
+        $payload['prices']['KWD'] = '12.3456';
+
+        $this->post(route('admin.products.store'), $payload)
+            ->assertSessionHasErrors('prices.KWD');
+
+        $this->assertDatabaseCount('products', 1);
+    }
+
     public function test_employee_product_access_obeys_catalog_permissions(): void
     {
         $this->post('/setup', $this->validSetupPayload())->assertRedirect(route('admin.home'));
@@ -1281,7 +1334,7 @@ class SetupHealthTest extends TestCase
         $this->assertDatabaseCount('product_prices', 0);
         $this->assertDatabaseCount('business_contacts', 0);
         $this->assertDatabaseCount('business_currencies', 0);
-        $this->assertDatabaseCount('migrations', 5);
+        $this->assertDatabaseCount('migrations', 6);
         $this->assertTrue(app(InstallationState::class)->hasSchema());
         $this->assertFalse(app(InstallationState::class)->isCompleted());
 

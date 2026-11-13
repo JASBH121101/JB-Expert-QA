@@ -21,6 +21,10 @@ final class LibraryCatalog
     {
         $countries = CountryCatalog::codes();
         $currencies = CurrencyCatalog::codes();
+        $currencyMetadata = array_map(
+            static fn (string $code): ?array => CurrencyCatalog::metadata($code),
+            $currencies,
+        );
         $countryCurrencies = CountryCurrencyCatalog::all();
         $callingCodes = CountryDialingCodeCatalog::all();
         $locales = LanguageCatalog::codes();
@@ -42,6 +46,12 @@ final class LibraryCatalog
             'currency_codes_alpha3' => count(array_filter(
                 $currencies,
                 static fn (string $code): bool => preg_match('/^[A-Z]{3}$/D', $code) !== 1,
+            )) === 0,
+            'currency_metadata_complete' => count(array_filter(
+                $currencyMetadata,
+                static fn (?array $metadata): bool => $metadata === null
+                    || ! in_array($metadata['minor_units'], [0, 2, 3], true)
+                    || $metadata['symbol'] === '',
             )) === 0,
             'country_currency_keys_valid' => array_diff($countryCurrencyKeys, $countries) === [],
             'country_currency_codes_supported' => count(array_filter(
@@ -79,6 +89,7 @@ final class LibraryCatalog
             'counts' => [
                 'countries' => count($countries),
                 'currencies' => count($currencies),
+                'currencies_with_metadata' => count(array_filter($currencyMetadata)),
                 'country_currency_mappings' => count($countryCurrencies),
                 'country_calling_code_mappings' => count($callingCodes),
                 'unique_calling_codes' => count(CountryDialingCodeCatalog::uniqueCodes()),
