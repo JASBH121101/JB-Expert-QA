@@ -7,14 +7,19 @@ import projectConfig from "../../../config/project-audit.config.json" with { typ
 import { scanProject } from "./scan-project.js";
 import { databaseSpecialistRules } from "../../specialists/database/index.js";
 
-const DB_SIGNAL = /\b(?:DATABASE_URL|database|dataSource|prisma|sequelize|typeorm|knex|postgres(?:ql)?|mysql|mariadb|sqlite|pg\.Pool|queryRunner|sqlalchemy|PDO|mysqli|DB::)\b/i;
+const DB_SIGNAL = /\b(?:DATABASE_URL|(?:POSTGRES|MYSQL|MONGO|REDIS)_URL|DB_(?:HOST|PORT|NAME|DATABASE|USER|USERNAME|PASSWORD)|prisma(?:client)?|sequelize|typeorm|knex|pg\.Pool|pg\.Client|queryRunner|DataSource|sqlalchemy|PDO|mysqli|mongodb|mongoose|MongoClient|postgres(?:ql)?|mysql|mariadb|sqlite|redis|ioredis)\b|\bDB\s*::\s*(?:select|statement|unprepared|raw)\b/i;
 const DB_SCHEMA_EXTENSIONS = new Set([".sql", ".prisma"]);
+const DB_SOURCE_EXTENSIONS = new Set([
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+  ".php", ".py", ".rb", ".java", ".kt", ".go", ".rs", ".cs",
+  ".json", ".yml", ".yaml", ".toml"
+]);
 
 function getDatabaseEvidence(files) {
   return files.filter((file) =>
     DB_SCHEMA_EXTENSIONS.has(file.extension) ||
     /(?:^|\/)(?:migrations?|database|db)(?:\/|$)/i.test(file.path) ||
-    DB_SIGNAL.test(file.content)
+    (DB_SOURCE_EXTENSIONS.has(file.extension) && DB_SIGNAL.test(file.content))
   );
 }
 
