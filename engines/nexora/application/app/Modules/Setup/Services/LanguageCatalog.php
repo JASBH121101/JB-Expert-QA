@@ -2,17 +2,16 @@
 
 namespace App\Modules\Setup\Services;
 
+/** @deprecated Use App\Core\Library\Localization\LanguageCatalog. */
 final class LanguageCatalog
 {
-    /**
-     * Languages currently offered as NEXORA installation defaults.
-     * Additional languages must be enabled after their interface translations exist.
-     */
     public static function all(string $locale = 'es'): array
     {
-        return [
-            'es' => $locale === 'en' ? 'Spanish' : 'Español',
-            'en' => 'English',
-        ];
+        return \App\Core\Library\Localization\LanguageCatalog::all($locale);
+    }
+
+    public static function codes(): array
+    {
+        return \App\Core\Library\Localization\LanguageCatalog::codes();
     }
 }
