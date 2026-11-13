@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 900" role="img" aria-label="Imagen de muestra no disponible">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8eddf"/><stop offset="1" stop-color="#cbd5c2"/></linearGradient></defs>
+  <rect width="800" height="900" fill="url(#g)"/>
+  <circle cx="400" cy="360" r="150" fill="#fff" opacity=".34"/>
+  <path d="M270 590h260M310 630h180" stroke="#7b8d72" stroke-width="10" stroke-linecap="round" opacity=".5"/>
+  <text x="400" y="490" text-anchor="middle" fill="#53634f" font-family="Arial,sans-serif" font-size="72" font-weight="700">N.</text>
+  <text x="400" y="700" text-anchor="middle" fill="#677662" font-family="Arial,sans-serif" font-size="23" letter-spacing="5">NEXORA DEMO</text>
+</svg>

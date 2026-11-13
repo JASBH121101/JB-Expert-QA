@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="Panel administrativo de muestra de NEXORA.">
+  <title>Panel demo — NEXORA</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <script defer src="assets/js/data.js"></script>
+  <script defer src="assets/js/store.js"></script>
+  <script defer src="assets/js/admin.js"></script>
+</head>
+<body class="admin-body">
+  <div class="demo-ribbon"><span class="status-dot"></span> PANEL DE PRUEBA · LOS CAMBIOS SE GUARDAN SOLO EN ESTE NAVEGADOR</div>
+  <header class="admin-topbar">
+    <a class="brand" href="./"><span class="brand-mark">N</span><span class="brand-name">NEXORA<span class="brand-period">.</span><small>ADMINISTRACIÓN DEMO</small></span></a>
+    <div class="admin-top-actions">
+      <label class="business-switch"><span class="sr-only">Elegir negocio</span><select id="admin-business-select" aria-label="Elegir negocio"><option value="fashion">Atelier Luna · Moda</option><option value="autos">Norte Motors · Vehículos</option><option value="technology">Nexo Tech · Tecnología</option></select></label>
+      <a class="button button-outline button-small" href="setup.html">Configurar negocio</a>
+      <a class="button button-outline button-small" href="./">← Ver catálogo</a>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <p class="sidebar-label">ESPACIO DE TRABAJO</p>
+      <a class="sidebar-item is-current" href="#overview"><span>▦</span> Resumen</a>
+      <a class="sidebar-item" href="#products-section"><span>▤</span> Productos</a>
+      <a class="sidebar-item" href="#settings-section"><span>⚙</span> Configuración</a>
+      <div class="sidebar-note"><span class="status-dot"></span><span><strong>Modo demostración</strong><small>Sin servidor ni base de datos.</small></span></div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-page-heading" id="overview">
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> PANEL DE CONTROL</p><h1>Resumen<span class="brand-period">.</span></h1><p>Administra una muestra del catálogo desde este navegador.</p></div>
+        <a class="button button-dark button-small" href="./">Abrir catálogo ↗</a>
+      </div>
+
+      <div class="admin-notice"><strong>Importante:</strong> esta pantalla es solo una simulación visual. Los datos se guardan en el almacenamiento local del navegador y no representan un panel seguro ni multiusuario.</div>
+
+      <section class="stat-grid" aria-label="Resumen del catálogo">
+        <article class="stat-card"><span>PRODUCTOS PUBLICADOS</span><strong id="stat-products">0</strong><small>Visibles en el catálogo público</small></article>
+        <article class="stat-card"><span>CATEGORÍAS</span><strong id="stat-categories">0</strong><small>Con productos registrados</small></article>
+        <article class="stat-card"><span>DESTACADOS</span><strong id="stat-featured">0</strong><small>Visibles en la muestra</small></article>
+      </section>
+
+      <section class="admin-panel" id="products-section">
+        <div class="panel-heading"><div><p class="eyebrow">CATÁLOGO</p><h2>Productos</h2></div><button id="new-product-button" class="button button-dark button-small" type="button">＋ Nuevo producto</button></div>
+        <div class="table-wrap">
+          <table class="product-table">
+            <thead><tr><th>PRODUCTO</th><th>CATEGORÍA</th><th>PRECIO</th><th>ESTADO</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+            <tbody id="admin-product-rows"></tbody>
+          </table>
+        </div>
+        <p id="admin-empty" class="admin-empty" hidden>No hay productos todavía. Agrega uno para probar el panel.</p>
+      </section>
+
+      <section class="admin-panel settings-panel" id="settings-section">
+        <div class="panel-heading"><div><p class="eyebrow">IDENTIDAD DEL NEGOCIO</p><h2>Configuración básica</h2></div></div>
+        <form id="settings-form" class="settings-form">
+          <label>Nombre comercial<input id="setting-name" name="name" maxlength="60" required></label>
+          <label>WhatsApp (código de país + número)<input id="setting-whatsapp" name="whatsapp" inputmode="numeric" maxlength="16" placeholder="505..." required></label>
+          <label class="full-field">Mensaje de contacto<input id="setting-contact" name="contact" maxlength="120"></label>
+          <div class="form-actions"><span>Los cambios son locales a esta demostración.</span><button class="button button-lime button-small" type="submit">Guardar cambios</button></div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="product-form-dialog" class="admin-dialog">
+    <form id="product-form" method="dialog">
+      <div class="dialog-form-heading"><div><p class="eyebrow">GESTIÓN DE CATÁLOGO</p><h2 id="product-form-title">Nuevo producto</h2></div><button class="dialog-close" id="product-form-close" type="button" aria-label="Cerrar">×</button></div>
+      <input id="product-id" type="hidden">
+      <label>Nombre del producto<input id="product-name" maxlength="90" required></label>
+      <label>Categoría<input id="product-category" maxlength="45" required></label>
+      <div id="product-prices" class="product-prices" aria-label="Precios por moneda"></div>
+      <label>Precio anterior en la moneda principal (opcional)<input id="product-old-price" type="number" min="0" step="0.01"></label>
+      <label>Descripción<textarea id="product-description" rows="3" maxlength="500" required></textarea></label>
+      <div id="dynamic-product-fields" class="dynamic-product-fields"></div>
+      <label id="product-image-field">Fotografía del producto (URL de muestra)<input id="product-image" type="url" placeholder="https://..."></label>
+      <label class="check-label"><input id="product-published" type="checkbox" checked> Publicar en el catálogo público</label>
+      <label class="check-label"><input id="product-featured" type="checkbox"> Marcar como destacado</label>
+      <div class="form-actions"><button id="cancel-product" class="button button-outline button-small" type="button">Cancelar</button><button class="button button-dark button-small" type="submit">Guardar producto</button></div>
+    </form>
+  </dialog>
+  <div id="admin-toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
