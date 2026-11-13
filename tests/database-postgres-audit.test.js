@@ -188,10 +188,10 @@ test("foreign-key coverage accepts a valid leading-column index and rejects expr
 
   assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-items_customer_fk"]);
   const indexQuery = client.calls.find((sql) => sql.includes("jb-expert-qa:indexes"));
-  assert.match(indexQuery, /unnest\\(ix\\.indkey\\)/);
+  assert.match(indexQuery, /unnest\\(ix\\.indkey::smallint\\[\\]\\)/);
   assert.match(indexQuery, /CASE WHEN k\\.attnum > 0 THEN a\\.attname::text ELSE NULL END/);
   assert.match(indexQuery, /LEFT JOIN pg_catalog\\.pg_attribute/);
-  assert.doesNotMatch(indexQuery, /indkey::smallint\\[\\]/);
+  assert.match(indexQuery, /indkey::smallint\\[\\]/);
 });
 
 test("audit rolls back and closes the connection when a catalog query fails", async () => {
