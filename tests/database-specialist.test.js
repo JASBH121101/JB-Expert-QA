@@ -108,3 +108,38 @@ test("database audit cannot pass when there is no database evidence", async () =
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("incidental database wording in config and documentation is not database evidence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-db-incidental-"));
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "jb-expert-qa.config.json"),
+      JSON.stringify({ weights: { database: 15 } }, null, 2));
+    await writeFile(join(root, "README.md"),
+      "# Database tooling\\nThis project discusses PostgreSQL but has no database integration.\\n");
+    await writeFile(join(root, "src", "app.js"),
+      'export const label = "database";\\n');
+    const report = await auditDatabaseProject(root);
+    assert.equal(report.databaseScope.databaseEvidenceFiles, 0);
+    assert.equal(report.databaseScope.assessmentStatus, "insufficient-database-evidence");
+    assert.equal(report.scoring.passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("explicit database connection and Prisma client signals count as evidence", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-db-real-signal-"));
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "database.ts"),
+      'const url = process.env.DATABASE_URL;\\nconst client = new PrismaClient();\\n');
+    const report = await auditDatabaseProject(root);
+    assert.equal(report.databaseScope.databaseEvidenceFiles, 1);
+    assert.equal(report.databaseScope.assessmentStatus, "scanned");
+    assert.equal(report.databaseScope.complete, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
