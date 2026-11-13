@@ -27,7 +27,7 @@
                     @foreach ($product->prices as $price)
                         <div>
                             <span>{{ $price->currency_code }}</span>
-                            <strong>{{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::formatAmount((string) $price->amount, $price->currency_code, app()->getLocale()) ?? $price->amount }}` }}</strong>
+                            <strong>{{ \App\Core\Library\Money\CurrencyCatalog::formatAmount((string) $price->amount, $price->currency_code, app()->getLocale()) ?? $price->amount }}</strong>
                         </div>
                     @endforeach
                 </div>

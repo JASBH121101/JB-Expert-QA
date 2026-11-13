@@ -90,17 +90,17 @@
             <p class="muted small">Introduce manualmente los precios en las monedas habilitadas. No se realizan conversiones automáticas.</p>
             <div class="field-grid">
                 @foreach ($currencies as $currency)
-                    <label>{{ $currency->code }} · {{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::symbol($currency->code) }}` }}
+                    <label>{{ $currency->code }} · {{ \App\Core\Library\Money\CurrencyCatalog::symbol($currency->code) }}` }}
                         <input
                             type="number"
                             name="prices[{{ $currency->code }}]"
                             min="0"
                             max="999999999999.9999"
-                            step="{{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::step($currency->code) }}` }}"
+                            step="{{ \App\Core\Library\Money\CurrencyCatalog::step($currency->code) }}"
                             value="{{ old('prices.'.$currency->code, $prices[$currency->code]->amount ?? '') }}"
-                            placeholder="{{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::placeholder($currency->code) }}` }}"
+                            placeholder="{{ \App\Core\Library\Money\CurrencyCatalog::placeholder($currency->code) }}"
                         >
-                        <small class="muted">Hasta {{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::minorUnits($currency->code) }}` }} decimales</small>
+                        <small class="muted">Hasta {{ \App\Core\Library\Money\CurrencyCatalog::minorUnits($currency->code) }} decimales</small>
                     </label>
                 @endforeach
             </div>
