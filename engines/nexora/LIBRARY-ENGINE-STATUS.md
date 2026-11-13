@@ -38,3 +38,13 @@ La suite nueva está en tests/Unit/Library/LibraryCatalogTest.php. Hasta ejecuta
 - Unit conversion uses explicit same-dimension checks and rational factors.
 - Custom or unknown unit labels remain intact and are not silently converted.
 - Automated PHP tests are added; execution is still pending in a Composer-enabled environment.
+
+
+## Currency Library — second cut
+
+- Supported currency codes now expose minor-unit precision, display symbols, steps and placeholders.
+- Zero-decimal currencies (for example JPY) and three-decimal currencies (for example KWD) are validated separately.
+- Product amount input validation checks decimal strings directly and does not use float conversion for precision decisions.
+- Product prices use DECIMAL(16,4), preserving the existing 12-integer-digit capacity and enabling three minor units.
+- Public price formatting uses the selected currency precision and locale separators; the ISO code remains visible beside the symbol.
+- Rolling back the precision migration is blocked when any stored value has non-zero precision beyond two decimals.

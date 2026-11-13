@@ -40,3 +40,13 @@ UnitCatalog supplies canonical unit identifiers, localized labels, symbols, lega
 product_field_definitions.unit_catalog_code is an additive canonical identifier. The existing unit_code column is retained as a compatibility/display value, so existing custom units and older installations are not overwritten. A migration backfills known template units where their dimension and legacy code match exactly.
 
 Known mappings include pulgadas/inches → in, piezas/pieces → piece, and unchanged identifiers such as ml, kg, GB, and cc. Unknown or custom units remain supported as legacy strings and do not become convertible automatically.
+
+
+## Currency Library
+
+CurrencyCatalog keeps the supported ISO alphabetic codes, currency display hints, and minor-unit precision together. The symbol is a presentation aid, not an identifier: the ISO code remains visible next to every amount, and unknown symbols fall back to the code.
+
+The metadata snapshot follows ISO 4217 List One minor-unit rules for the currency codes supported by this application. The official maintenance source is SIX List One:
+https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
+
+The price form validates the maximum decimal places for each currency without converting the input string to a binary float. Product prices are stored as DECIMAL(16,4); four storage places support the current three-decimal currencies while retaining the existing 12-digit integer capacity. Display formatting applies the currency's ISO minor-unit precision.

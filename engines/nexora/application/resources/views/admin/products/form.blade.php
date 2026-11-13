@@ -90,7 +90,7 @@
             <p class="muted small">Introduce manualmente los precios en las monedas habilitadas. No se realizan conversiones automáticas.</p>
             <div class="field-grid">
                 @foreach ($currencies as $currency)
-                    <label>{{ $currency->code }} · {{ \App\Core\Library\Money\CurrencyCatalog::symbol($currency->code) }}` }}
+                    <label>{{ $currency->code }} · {{ \App\Core\Library\Money\CurrencyCatalog::symbol($currency->code) }}
                         <input
                             type="number"
                             name="prices[{{ $currency->code }}]"
