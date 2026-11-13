@@ -26,7 +26,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind IN ('r', 'p')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_%'
+      AND left(n.nspname, 3) <> 'pg_'
     ORDER BY n.nspname, c.relname\`,
   constraints: \`/* jb-expert-qa:constraints */
     SELECT n.nspname AS schema_name,
@@ -46,7 +46,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_class t ON t.oid = con.conrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_%'
+      AND left(n.nspname, 3) <> 'pg_'
     ORDER BY n.nspname, t.relname, con.conname\`,
   indexes: \`/* jb-expert-qa:indexes */
     SELECT n.nspname AS schema_name,
@@ -70,7 +70,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_%'
+      AND left(n.nspname, 3) <> 'pg_'
     ORDER BY n.nspname, t.relname, i.relname\`,
   policies: \`/* jb-expert-qa:policies */
     SELECT schemaname AS schema_name,
@@ -80,7 +80,7 @@ const SQL = Object.freeze({
            cmd AS command
     FROM pg_catalog.pg_policies
     WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
-      AND schemaname NOT LIKE 'pg_%'
+      AND left(schemaname, 3) <> 'pg_'
     ORDER BY schemaname, tablename, policyname\`,
   role: \`/* jb-expert-qa:role */
     SELECT rolsuper AS is_superuser,
@@ -446,10 +446,10 @@ export async function auditPostgresDatabase({
       throw new Error("PostgreSQL did not confirm a read-only transaction; audit aborted.");
     }
 
-    const results = await Promise.all(Object.entries(SQL).map(async ([key, query]) => [
-      key, rowsOf(await client.query(query))
-    ]));
-    const snapshot = Object.fromEntries(results);
+    const snapshot = {};
+    for (const [key, query] of Object.entries(SQL)) {
+      snapshot[key] = rowsOf(await client.query(query));
+    }
     if (!snapshot.metadata[0]) {
       throw new Error("PostgreSQL returned no database metadata.");
     }
