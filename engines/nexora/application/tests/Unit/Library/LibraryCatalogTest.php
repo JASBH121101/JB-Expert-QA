@@ -25,10 +25,12 @@ final class LibraryCatalogTest extends TestCase
     {
         $countries = CountryCatalog::codes();
 
-        $this->assertSame([], array_values(array_diff($countries, array_keys(CountryCurrencyCatalog::all()))));
+        $this->assertSame([], array_values(array_diff(array_keys(CountryCurrencyCatalog::all()), $countries)));
         $this->assertSame([], array_values(array_diff($countries, array_keys(CountryDialingCodeCatalog::all()))));
         $this->assertSame('+505', CountryDialingCodeCatalog::forCountry(' ni '));
+        $this->assertSame('+44', CountryDialingCodeCatalog::forCountry('GB'));
         $this->assertSame('NIO', CountryCurrencyCatalog::forCountry(' ni '));
+        $this->assertNull(CountryCurrencyCatalog::forCountry('AQ'));
     }
 
     public function test_currency_and_locale_catalogues_expose_stable_codes(): void

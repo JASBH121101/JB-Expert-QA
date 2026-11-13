@@ -24,7 +24,7 @@ Do not use prefix guessing to determine a country. Shared calling plans make tha
 
 ## Integrity report
 
-LibraryCatalog::integrityReport() checks unique and syntactically valid country and currency codes, exact country coverage in currency and calling-code maps, supported currency references, calling code shapes, and locale keys.
+LibraryCatalog::integrityReport() checks unique and syntactically valid country and currency codes, valid country keys in the currency map, complete calling-code coverage, supported currency references, calling code shapes, and locale keys. A territory without a defined currency (such as AQ in this dataset) may return null.
 
 This is an internal consistency check, not a claim that bundled data is the latest authoritative ISO publication.
 

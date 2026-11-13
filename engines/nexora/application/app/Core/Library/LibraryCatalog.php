@@ -37,8 +37,7 @@ final class LibraryCatalog
                 $currencies,
                 static fn (string $code): bool => preg_match('/^[A-Z]{3}$/D', $code) !== 1,
             )) === 0,
-            'country_currency_coverage' => array_diff($countries, $countryCurrencyKeys) === []
-                && array_diff($countryCurrencyKeys, $countries) === [],
+            'country_currency_keys_valid' => array_diff($countryCurrencyKeys, $countries) === [],
             'country_currency_codes_supported' => count(array_filter(
                 $countryCurrencies,
                 static fn (string $code): bool => ! CurrencyCatalog::contains($code),
