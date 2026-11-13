@@ -49,7 +49,7 @@ The CLI refuses to run without \`--confirm-read-only\`. The adapter forces TLS c
 
 The initial adapter reports:
 - Tables without primary keys.
-- Foreign keys without a valid, ready, non-partial index whose leading columns support the foreign key.
+- Foreign keys without a valid, ready index whose leading columns support the foreign key. A partial index is accepted only when its predicate is exactly a foreign-key column `IS NOT NULL`; partial indexes with additional restrictions remain conservatively excluded.
 - Constraints marked \`NOT VALID\`.
 - Invalid or not-ready indexes.
 - Tables with row-level security enabled but no visible policy.
