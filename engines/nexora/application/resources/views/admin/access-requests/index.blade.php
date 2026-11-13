@@ -1,0 +1,20 @@
+@extends('layouts.app')
+@section('title','Solicitudes de acceso · NEXORA')
+@section('content')
+<section class="panel"><div class="page-head"><div><p class="muted eyebrow">CENTRO DE NOTIFICACIONES</p><h1>Solicitudes de acceso</h1><p class="muted">{{$pendingCount}} pendientes</p></div><a class="secondary-button link" href="{{route('admin.home')}}">Volver</a></div>
+@if(session('status'))<div class="notice success">{{session('status')}}</div>@endif
+@if($errors->any())<div class="notice error">@foreach($errors->all() as $error)<p>{{$error}}</p>@endforeach</div>@endif
+@if(session('temporary_password_once'))<div class="notice credentials"><strong>Contraseña temporal generada. Cópiala ahora; no se volverá a mostrar.</strong><p>Usuario: <code>{{session('temporary_password_once.username')}}</code></p><p>Contraseña: <code>{{session('temporary_password_once.password')}}</code></p><p>El empleado deberá cambiarla al entrar.</p></div>@endif
+@forelse($requests as $item)<article class="request-card"><div class="request-head"><strong>{{$item->username}}</strong><span class="state {{$item->status}}">{{$item->status==='pending'?'Pendiente':($item->status==='resolved'?'Resuelta':'Rechazada')}}</span><time>{{$item->created_at->format('d/m/Y H:i')}}</time></div>
+<p class="reason">{{['forgot_password'=>'Olvidó su contraseña','username_not_working'=>'El usuario no funciona','account_locked'=>'Cuenta bloqueada','other'=>'Otro problema'][$item->reason]??'Problema de acceso'}}</p>@if($item->details)<p class="muted detail">{{$item->details}}</p>@endif
+@if($item->status==='pending')<div class="request-actions">
+<form method="POST" action="{{route('admin.access-requests.temporary-password',$item)}}" onsubmit="return confirm('Se reemplazará la contraseña del empleado por una temporal. ¿Continuar?')">@csrf<button class="primary-button">Generar contraseña temporal</button></form>
+<form method="POST" action="{{route('admin.access-requests.update',[$item,'resolved'])}}">@csrf<button class="secondary-button">Marcar resuelta</button></form>
+<form method="POST" action="{{route('admin.access-requests.update',[$item,'rejected'])}}">@csrf<button class="secondary-button danger">Rechazar</button></form></div>
+@else<p class="muted small">Gestionada {{optional($item->handled_at)->format('d/m/Y H:i')}}@if($item->handler) por {{$item->handler->username}}@endif</p>@endif</article>
+@empty<p class="muted">No hay solicitudes de acceso.</p>@endforelse
+{{$requests->links()}}</section>
+@endsection
+@push('head')<style>
+.page-head{display:flex;justify-content:space-between;gap:12px}.eyebrow{font-size:11px;font-weight:800}.page-head h1{margin:8px 0}.link{display:inline-flex;align-items:center;text-decoration:none}.notice{margin:14px 0;padding:12px;border-radius:10px;font-size:13px}.success,.credentials{background:#edf7ed;color:#286536}.error{background:#fff0ee;color:#963b32}.request-card{padding:16px 0;border-bottom:1px solid #edf0e9}.request-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.request-head time,.small{font-size:11px;color:#697366}.state{font-size:10px;font-weight:800;padding:4px 8px;border-radius:20px;background:#fff4dd;color:#805c19}.state.resolved{background:#edf7ed;color:#286536}.state.rejected{background:#fff0ee;color:#963b32}.reason{margin:8px 0 4px;font-weight:700}.detail{font-size:13px;white-space:pre-wrap}.request-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.request-actions form{margin:0}.primary-button,.secondary-button{min-height:36px;padding:0 12px;border:0;border-radius:8px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.primary-button{background:#20271f;color:#fff}.secondary-button{background:#eef1e9;color:#35402b}.danger{background:#fff0ee;color:#963b32}@media(max-width:560px){.page-head{flex-direction:column}.request-head{align-items:flex-start;flex-wrap:wrap}.request-actions{display:grid;grid-template-columns:1fr}.request-actions button{width:100%}}
+</style>@endpush
