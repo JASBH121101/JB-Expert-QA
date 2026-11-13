@@ -120,7 +120,7 @@ function partialIndexSupportsForeignKey(index, foreignKeyColumns) {
   // still covers every row that can reference a parent key.
   const predicate = String(index.index_predicate ?? "").trim();
   const match = predicate.match(
-    /^\\(?\\s*(?:"((?:[^"]|"")+)"|([a-z_][a-z0-9_$]*))\\s+IS\\s+NOT\\s+NULL\\s*\\)?$/i
+    /^\(?\s*(?:"((?:[^"]|"")+)"|([a-z_][a-z0-9_$]*))\s+IS\s+NOT\s+NULL\s*\)?$/i
   );
   if (!match) return false;
 
