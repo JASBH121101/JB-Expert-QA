@@ -59,7 +59,7 @@ const SQL = Object.freeze({
            (ix.indpred IS NOT NULL) AS is_partial,
            ARRAY(
              SELECT a.attname::text
-             FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, position)
+             FROM unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
              JOIN pg_catalog.pg_attribute a
                ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
              WHERE k.position <= ix.indnkeyatts AND k.attnum > 0
@@ -385,7 +385,7 @@ function buildReport(snapshot) {
     coverage: Object.freeze({
       metadataOnly: true,
       applicationRowsRead: 0,
-      queriesExecuted: 9,
+      catalogQueries: 8,
       migrationTablesDetected: migrationTables
     }),
     diagnostics: Object.freeze(diagnostics),
@@ -420,15 +420,15 @@ export async function auditPostgresDatabase({
   }
 
   const config = safeConnectionConfig(connectionString, normalizedOptions);
-  const client = await clientFactory(config);
-  if (!client || typeof client.connect !== "function" ||
-      typeof client.query !== "function" || typeof client.end !== "function") {
-    throw new TypeError("The PostgreSQL client factory returned an invalid client.");
-  }
-
+  let client;
   let connected = false;
   let transactionOpen = false;
   try {
+    client = await clientFactory(config);
+    if (!client || typeof client.connect !== "function" ||
+        typeof client.query !== "function" || typeof client.end !== "function") {
+      throw new TypeError("The PostgreSQL client factory returned an invalid client.");
+    }
     await client.connect();
     connected = true;
     await client.query("BEGIN READ ONLY");
@@ -471,10 +471,10 @@ export async function auditPostgresDatabase({
       .replace(/password\s*[=:]\s*\S+/gi, "password=[redacted]");
     throw new Error("PostgreSQL database audit failed: " + safeMessage);
   } finally {
-    if (connected && transactionOpen) {
+    if (client && connected && transactionOpen) {
       try { await client.query("ROLLBACK"); } catch {}
     }
-    if (connected) {
+    if (client && connected) {
       try { await client.end(); } catch {}
     }
   }
