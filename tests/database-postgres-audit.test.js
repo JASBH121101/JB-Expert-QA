@@ -64,7 +64,7 @@ test("PostgreSQL audit uses a read-only transaction, metadata queries, rollback 
   assert.equal(client.calls[0], "BEGIN READ ONLY");
   assert.ok(client.calls.includes("ROLLBACK"));
   assert.equal(client.ended, true);
-  assert.equal(client.calls.some((sql) => /\\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\\b/i.test(sql)), false);
+  assert.equal(client.calls.some((sql) => /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b/i.test(sql)), false);
 });
 
 test("live audit reports missing primary keys, missing FK indexes and unvalidated constraints", async () => {
@@ -150,4 +150,57 @@ test("connection errors redact connection strings and passwords", async () => {
       return true;
     }
   );
+});
+
+
+test("foreign-key coverage accepts a valid leading-column index and rejects expression-leading indexes", async () => {
+  const client = fixtureClient({
+    constraints: [
+      {
+        schema_name: "public", table_name: "orders",
+        constraint_name: "orders_tenant_customer_fk", constraint_type: "f",
+        is_validated: true, columns: ["tenant_id", "customer_id"]
+      },
+      {
+        schema_name: "public", table_name: "order_items",
+        constraint_name: "items_customer_fk", constraint_type: "f",
+        is_validated: true, columns: ["customer_id"]
+      }
+    ],
+    indexes: [
+      {
+        schema_name: "public", table_name: "orders", index_name: "orders_tenant_customer_idx",
+        is_valid: true, is_ready: true, is_partial: false,
+        key_columns: ["tenant_id", "customer_id", "created_at"]
+      },
+      {
+        schema_name: "public", table_name: "order_items", index_name: "items_expr_customer_idx",
+        is_valid: true, is_ready: true, is_partial: false,
+        key_columns: [null, "customer_id"]
+      }
+    ]
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const missing = report.diagnostics
+    .filter((item) => item.id.startsWith("DB-LIVE-FK-NO-INDEX-"))
+    .map((item) => item.id);
+
+  assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-items_customer_fk"]);
+});
+
+test("audit rolls back and closes the connection when a catalog query fails", async () => {
+  const client = fixtureClient();
+  const originalQuery = client.query.bind(client);
+  client.query = async (sql) => {
+    if (sql.includes("jb-expert-qa:tables")) throw new Error("catalog permission denied");
+    return originalQuery(sql);
+  };
+
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => client }),
+    /catalog permission denied/
+  );
+  assert.ok(client.calls.includes("ROLLBACK"));
+  assert.equal(client.ended, true);
 });
