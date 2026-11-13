@@ -4,6 +4,7 @@ import { auditPostgresDatabase } from "../src/adapters/database/postgres.js";
 
 function fixtureClient({
   readOnly = "on",
+  connectError = null,
   metadata = [{
     database_name: "qa_fixture",
     audit_role: "qa_auditor",
@@ -26,7 +27,10 @@ function fixtureClient({
     calls,
     get connected() { return connected; },
     get ended() { return ended; },
-    async connect() { connected = true; },
+    async connect() {
+      if (connectError) throw connectError;
+      connected = true;
+    },
     async query(sql) {
       calls.push(sql);
       if (sql === "SHOW transaction_read_only") {
@@ -121,6 +125,15 @@ test("audit aborts if PostgreSQL does not confirm read-only mode", async () => {
     /did not confirm a read-only transaction/
   );
   assert.ok(client.calls.includes("ROLLBACK"));
+  assert.equal(client.ended, true);
+});
+
+test("audit closes a client when the initial connection attempt fails", async () => {
+  const client = fixtureClient({ connectError: new Error("connection refused") });
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => client }),
+    /connection refused/
+  );
   assert.equal(client.ended, true);
 });
 
