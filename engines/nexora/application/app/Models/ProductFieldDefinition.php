@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Core\Library\Measurement\UnitCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,7 +12,7 @@ class ProductFieldDefinition extends Model
 {
     protected $fillable = [
         'group_id', 'field_key', 'label', 'field_type', 'options',
-        'unit_dimension', 'unit_code', 'is_required', 'is_public',
+        'unit_dimension', 'unit_code', 'unit_catalog_code', 'is_required', 'is_public',
         'is_searchable', 'width', 'sort_order',
     ];
 
@@ -52,6 +53,22 @@ class ProductFieldDefinition extends Model
                     ->orWhereColumn('catalog_groups.category_id', 'products.category_id');
             });
         });
+    }
+
+    public function unitLabel(?string $locale = null): ?string
+    {
+        $catalogCode = $this->unit_catalog_code
+            ?: UnitCatalog::canonicalCode($this->unit_code, $this->unit_dimension);
+
+        if ($catalogCode === null) {
+            return $this->unit_code;
+        }
+
+        return UnitCatalog::label(
+            $catalogCode,
+            $locale ?? app()->getLocale(),
+            $this->unit_dimension,
+        ) ?? $this->unit_code;
     }
 
     public function values(): HasMany

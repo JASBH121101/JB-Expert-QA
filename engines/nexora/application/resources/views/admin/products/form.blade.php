@@ -116,6 +116,7 @@
                 <div class="field-grid">
                     @foreach ($group->fields as $field)
                         @php($fieldValue = old('fields.'.$field->field_key, $values[$field->field_key] ?? null))
+                        @php($unitLabel = $field->unitLabel())
                         <div class="dynamic-field {{ $field->width === 'full' ? 'full' : '' }}">
                             @switch($field->field_type)
                                 @case('textarea')
@@ -155,7 +156,7 @@
                                     </label>
                                     @break
                                 @default
-                                    <label>{{ $field->label }}{{ $field->unit_code ? ' ('.$field->unit_code.')' : '' }}{{ $field->is_required ? ' *' : '' }}
+                                    <label>{{ $field->label }}{{ $unitLabel ? ' ('.$unitLabel.')' : '' }}{{ $field->is_required ? ' *' : '' }}
                                         <input
                                             type="{{ $field->field_type === 'number' ? 'number' : 'text' }}"
                                             name="fields[{{ $field->field_key }}]"

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Http\Controllers;
 
+use App\Core\Library\Measurement\UnitCatalog;
 use App\Models\CatalogCategory;
 use App\Models\CatalogGroup;
 use App\Models\ProductFieldDefinition;
@@ -169,6 +170,10 @@ final class FieldDefinitionController
                 : null,
             'unit_dimension' => ($data['unit_dimension'] ?? '') ?: null,
             'unit_code' => ($data['unit_code'] ?? '') ?: null,
+            'unit_catalog_code' => UnitCatalog::canonicalCode(
+                ($data['unit_code'] ?? '') ?: null,
+                ($data['unit_dimension'] ?? '') ?: null,
+            ),
             'is_required' => (bool) ($data['is_required'] ?? false),
             'is_public' => $isPublic,
             'is_searchable' => $isPublic && (bool) ($data['is_searchable'] ?? false),

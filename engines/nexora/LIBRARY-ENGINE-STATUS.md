@@ -28,3 +28,13 @@ Ejecutar desde engines/nexora/application:
     composer lint
 
 La suite nueva está en tests/Unit/Library/LibraryCatalogTest.php. Hasta ejecutar esos comandos en un entorno PHP con dependencias instaladas, esta entrega no debe considerarse certificada.
+
+
+## Measurement Library — second cut
+
+- Stable unit catalogues and localized labels are defined separately from template labels.
+- The additive unit_catalog_code column preserves the existing unit_code field.
+- A data migration backfills known units without rewriting legacy display values.
+- Unit conversion uses explicit same-dimension checks and rational factors.
+- Custom or unknown unit labels remain intact and are not silently converted.
+- Automated PHP tests are added; execution is still pending in a Composer-enabled environment.

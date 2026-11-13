@@ -31,3 +31,12 @@ This is an internal consistency check, not a claim that bundled data is the late
 ## Deferred work
 
 Measurement/unit metadata remains embedded in TemplateCatalog. Before moving it, introduce stable unit identifiers and migration rules so localized labels are not persisted as identifiers. Currency symbols, minor-unit precision, official data provenance, and update policy are also deferred to a separate review.
+
+
+## Measurement Library
+
+UnitCatalog supplies canonical unit identifiers, localized labels, symbols, legacy aliases, and dimensional metadata. UnitConverter converts only between units in the same dimension and uses rational scale factors (including exact inch-to-millimetre and pound-to-milligram ratios).
+
+product_field_definitions.unit_catalog_code is an additive canonical identifier. The existing unit_code column is retained as a compatibility/display value, so existing custom units and older installations are not overwritten. A migration backfills known template units where their dimension and legacy code match exactly.
+
+Known mappings include pulgadas/inches → in, piezas/pieces → piece, and unchanged identifiers such as ml, kg, GB, and cc. Unknown or custom units remain supported as legacy strings and do not become convertible automatically.

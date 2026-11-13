@@ -641,6 +641,7 @@ class SetupHealthTest extends TestCase
             'field_key' => 'engine_displacement',
             'unit_dimension' => 'displacement',
             'unit_code' => 'cc',
+            'unit_catalog_code' => 'cc',
         ]);
         $this->assertDatabaseHas('business_currencies', [
             'code' => 'USD',
@@ -656,6 +657,19 @@ class SetupHealthTest extends TestCase
             'phone' => '+50588881234',
             'is_primary' => 1,
             'show_public' => 1,
+        ]);
+    }
+
+
+    public function test_template_seed_keeps_legacy_unit_labels_and_stores_canonical_unit_codes(): void
+    {
+        $catalog = app(TemplateCatalog::class);
+        $catalog->seed('technology', 'en');
+
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'screen_size',
+            'unit_code' => 'inches',
+            'unit_catalog_code' => 'in',
         ]);
     }
 
@@ -1222,6 +1236,17 @@ class SetupHealthTest extends TestCase
 
         $perfumeType = ProductFieldDefinition::query()->where('field_key', 'perfume_type')->firstOrFail();
         $this->assertSame(['Original', 'Inspired', 'Generic'], $perfumeType->options);
+
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'content',
+            'unit_code' => 'ml',
+            'unit_catalog_code' => 'ml',
+        ]);
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'set_items_count',
+            'unit_code' => 'pieces',
+            'unit_catalog_code' => 'piece',
+        ]);
     }
 
     public function test_demo_installation_can_be_reset_without_dropping_its_schema(): void

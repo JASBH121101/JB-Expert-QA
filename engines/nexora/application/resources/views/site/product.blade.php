@@ -35,6 +35,7 @@
                     <h2>Detalles del producto</h2>
                     @foreach ($product->fieldValues as $fieldValue)
                         @php($value = data_get($fieldValue->value, 'value'))
+                        @php($unitLabel = $fieldValue->definition->unitLabel())
                         @if ($value !== null && $value !== '')
                             <div class="specification-row">
                                 <span>{{ $fieldValue->definition->label }}</span>
@@ -44,7 +45,7 @@
                                     @elseif (is_array($value))
                                         {{ implode(', ', $value) }}
                                     @else
-                                        {{ $value }}{{ $fieldValue->definition->unit_code ? ' '.$fieldValue->definition->unit_code : '' }}
+                                        {{ $value }}{{ $unitLabel ? ' '.$unitLabel : '' }}
                                     @endif
                                 </strong>
                             </div>
