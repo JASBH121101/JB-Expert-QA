@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="Asistente de configuración y plantillas sectoriales de NEXORA.">
+  <title>Configurar negocio — NEXORA Studio</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/setup.css">
+  <script defer src="assets/js/setup.js"></script>
+</head>
+<body class="studio-body">
+  <div class="demo-ribbon"><span class="status-dot"></span> NEXORA STUDIO · PROTOTIPO INTERACTIVO · DATOS LOCALES DE DEMOSTRACIÓN</div>
+  <header class="studio-header">
+    <a class="brand" href="./" aria-label="NEXORA, inicio">
+      <span class="brand-mark">N</span>
+      <span class="brand-name">NEXORA<span class="brand-period">.</span><small>CATÁLOGOS DIGITALES</small></span>
+    </a>
+    <a class="button button-outline button-small" href="admin.html">← Panel demo</a>
+  </header>
+
+  <main class="studio-shell">
+    <section class="studio-intro">
+      <p class="eyebrow"><span class="eyebrow-line"></span> CONFIGURACIÓN GUIADA</p>
+      <h1>Tu negocio.<br><span>Tu catálogo.</span></h1>
+      <p>Prepara la identidad, los contactos y la ficha de productos que mejor se adapte a tu actividad comercial.</p>
+    </section>
+
+    <div class="studio-progress" aria-label="Progreso de configuración">
+      <div class="progress-track"><span id="progress-fill"></span></div>
+      <div class="progress-steps">
+        <span data-step-label="1" class="is-active">Negocio</span>
+        <span data-step-label="2">Identidad</span>
+        <span data-step-label="3">Plantilla</span>
+        <span data-step-label="4">Revisión</span>
+      </div>
+    </div>
+
+    <form id="setup-form" novalidate>
+      <section class="setup-step is-active" data-step="1" aria-labelledby="step-one-title">
+        <div class="step-heading">
+          <div><p class="eyebrow">PASO 01 · INFORMACIÓN</p><h2 id="step-one-title">Cuéntanos de tu negocio.</h2></div>
+          <span class="step-count">01 / 04</span>
+        </div>
+        <div class="setup-card">
+          <div class="form-grid">
+            <label>Nombre comercial<input id="business-name" name="businessName" maxlength="80" required placeholder="Ej. Perfumería Aroma"></label>
+            <label>Nombre del propietario<input id="owner-name" name="ownerName" maxlength="100" required placeholder="Nombre completo"></label>
+            <label>Correo electrónico<input id="owner-email" name="ownerEmail" type="email" maxlength="140" required placeholder="nombre@correo.com"></label>
+            <label>Tipo de negocio
+              <select id="business-type" name="businessType">
+                <option value="perfumery">Perfumería</option>
+                <option value="fashion">Ropa y calzado</option>
+                <option value="technology">Tecnología</option>
+                <option value="gym">Gimnasio y fitness</option>
+                <option value="automotive">Repuestos y vehículos</option>
+                <option value="grocery">Alimentos y abarrotes</option>
+                <option value="other">Otro tipo de negocio</option>
+              </select>
+            </label>
+          </div>
+          <div class="security-note"><span aria-hidden="true">ⓘ</span><p>En producción, el correo se verificará con un enlace de confirmación y el acceso tendrá contraseña protegida, sesiones seguras y recuperación de cuenta. Esta demostración no crea cuentas ni solicita contraseñas reales.</p></div>
+          <div class="subsection-heading"><div><h3>Contactos de WhatsApp</h3><p>Registra hasta cinco números y elige cuáles podrá ver el visitante.</p></div><span id="phone-counter" class="counter-pill">1 / 5</span></div>
+          <div id="phone-list" class="phone-list"></div>
+          <button id="add-phone" class="button button-outline button-small add-phone" type="button">＋ Agregar otro número</button>
+        </div>
+      </section>
+
+      <section class="setup-step" data-step="2" aria-labelledby="step-two-title" hidden>
+        <div class="step-heading">
+          <div><p class="eyebrow">PASO 02 · PRESENTACIÓN</p><h2 id="step-two-title">La identidad de tu negocio.</h2></div>
+          <span class="step-count">02 / 04</span>
+        </div>
+        <div class="setup-card">
+          <div class="form-grid">
+            <label>Logotipo (URL de demostración)<input id="logo-url" type="url" placeholder="https://..."></label>
+            <label>Imagen de portada (URL de demostración)<input id="cover-url" type="url" placeholder="https://..."></label>
+            <label class="full-field">Descripción del negocio<textarea id="business-description" rows="3" maxlength="400" placeholder="Describe brevemente qué ofrece tu negocio."></textarea></label>
+            <label>Color principal<div class="color-field"><input id="brand-color" type="color" value="#a6c940"><output id="brand-color-value">#A6C940</output></div></label>
+            <label>Moneda principal<select id="primary-currency"></select></label>
+          </div>
+          <div class="subsection-heading"><div><h3>Otras monedas</h3><p>Activa las monedas que tu negocio utilizará para mostrar precios.</p></div></div>
+          <div id="currency-list" class="choice-grid"></div>
+          <div class="inline-add">
+            <label for="custom-currency">Agregar moneda de la biblioteca</label>
+            <div class="inline-controls"><select id="custom-currency"></select><button id="add-currency" class="button button-outline button-small" type="button">Agregar</button></div>
+          </div>
+          <p class="helper-note">Los precios se registran por moneda. La conversión automática mediante tasas de cambio no forma parte de este prototipo.</p>
+          <div class="form-grid optional-business">
+            <label>Ubicación (opcional)<input id="business-location" maxlength="120" placeholder="Ciudad, país"></label>
+            <label>Horario (opcional)<input id="business-hours" maxlength="120" placeholder="Lun–Sáb · 9:00 a 18:00"></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="setup-step" data-step="3" aria-labelledby="step-three-title" hidden>
+        <div class="step-heading">
+          <div><p class="eyebrow">PASO 03 · ESTRUCTURA</p><h2 id="step-three-title">Diseña tus fichas.</h2><p class="step-description">Partimos de una plantilla según tu rubro. Puedes cambiarla, quitar campos o agregar los tuyos.</p></div>
+          <span class="step-count">03 / 04</span>
+        </div>
+        <div class="setup-card template-card">
+          <div class="template-summary">
+            <div><span class="template-kicker">PLANTILLA INICIAL</span><h3 id="template-name">Perfumería</h3><p id="template-description">Campos sugeridos para este tipo de negocio.</p></div>
+            <label class="switch-control"><input id="photos-enabled" type="checkbox"><span class="switch-track"></span><span>Usar fotografías en productos</span></label>
+          </div>
+          <div id="schema-editor" class="schema-editor"></div>
+          <div class="builder-toolbar">
+            <button id="add-group" class="button button-outline button-small" type="button">＋ Grupo</button>
+            <button id="add-field" class="button button-dark button-small" type="button">＋ Campo personalizado</button>
+          </div>
+          <div class="unit-library">
+            <div><h3>Biblioteca de unidades</h3><p>Las unidades se filtran por magnitud para evitar opciones incoherentes.</p></div>
+            <div class="unit-pills">
+              <span>Masa: kg · g · lb · oz</span><span>Volumen: L · ml · gal</span><span>Cilindraje de motor: cc</span><span>Longitud: m · cm · in</span><span>Cantidad: unidad · pieza · par · paquete</span><span>Digital: MB · GB · TB</span>
+            </div>
+            <div class="inline-add">
+              <label for="custom-unit-group">Agregar unidad personalizada</label>
+              <div class="inline-controls"><select id="custom-unit-group"><option value="mass">Masa</option><option value="volume">Volumen</option><option value="displacement">Cilindraje de motor</option><option value="length">Longitud</option><option value="count">Cantidad</option><option value="digital">Capacidad digital</option><option value="area">Área</option></select><input id="custom-unit-name" maxlength="24" placeholder="Nombre o abreviatura"><button id="add-unit" class="button button-outline button-small" type="button">Agregar</button></div>
+            </div>
+            <p id="unit-feedback" class="helper-note" aria-live="polite"></p>
+          </div>
+          <div class="preview-panel">
+            <div class="preview-title"><div><span class="template-kicker">VISTA PREVIA</span><h3>Ficha de producto</h3></div><span class="preview-device">Adaptable</span></div>
+            <div id="product-preview" class="product-preview"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="setup-step" data-step="4" aria-labelledby="step-four-title" hidden>
+        <div class="step-heading">
+          <div><p class="eyebrow">PASO 04 · CONFIRMACIÓN</p><h2 id="step-four-title">Revisa tu configuración.</h2></div>
+          <span class="step-count">04 / 04</span>
+        </div>
+        <div class="setup-card review-card">
+          <div class="review-brand"><span class="brand-mark">N</span><div><strong id="review-business-name">Mi negocio</strong><small id="review-business-type">Catálogo digital</small></div></div>
+          <div class="review-grid">
+            <div><span>PROPIETARIO</span><strong id="review-owner"></strong></div>
+            <div><span>CORREO</span><strong id="review-email"></strong></div>
+            <div><span>MONEDA PRINCIPAL</span><strong id="review-currency"></strong></div>
+            <div><span>CONTACTOS VISIBLES</span><strong id="review-phones"></strong></div>
+            <div><span>FOTOGRAFÍAS</span><strong id="review-photos"></strong></div>
+            <div><span>CAMPOS PERSONALIZADOS</span><strong id="review-fields"></strong></div>
+          </div>
+          <div class="review-template"><span class="template-kicker">ESTRUCTURA DEL CATÁLOGO</span><h3 id="review-template"></h3><div id="review-groups"></div></div>
+          <div class="security-note"><span aria-hidden="true">ⓘ</span><p>Al confirmar, esta demostración guardará una configuración de prueba en este navegador. La instalación real tendrá base de datos propia, almacenamiento persistente y controles de seguridad en el servidor.</p></div>
+          <div id="save-feedback" class="save-feedback" role="status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <div class="wizard-actions">
+        <button id="previous-step" class="button button-outline" type="button" disabled>← Anterior</button>
+        <span id="step-hint">Puedes volver a modificar cada sección.</span>
+        <button id="next-step" class="button button-dark" type="button">Continuar →</button>
+        <button id="save-setup" class="button button-lime" type="button" hidden>Guardar configuración</button>
+      </div>
+    </form>
+  </main>
+  <footer class="studio-footer"><span>NEXORA STUDIO</span><span>Prototipo de configuración · No usar para datos reales</span><a href="./">Volver al catálogo</a></footer>
+  <div id="studio-toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
