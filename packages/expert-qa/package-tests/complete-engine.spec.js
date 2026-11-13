@@ -23,6 +23,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "securityRuntimeRules",
     "scanProject",
     "auditProject",
+    "auditDatabaseProject",
+    "databaseSpecialistRules",
     "auditSecurityProject",
     "auditSecurityUrl",
     "auditUrl",

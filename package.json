@@ -21,7 +21,8 @@
     "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js tests/cloudflare-worker-rate-limit.test.js",
     "benchmark:guard": "node bench/security-guard.js",
     "test:dead-code": "node --test tests/dead-code-rules.test.js",
-    "test:package-distributions": "node scripts/verify-package-distributions.js"
+    "test:package-distributions": "node scripts/verify-package-distributions.js",
+    "audit:database": "node src/database-cli.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",

@@ -12,7 +12,8 @@
     "jb-qa-url": "./src/cli.js",
     "jb-qa-security": "./src/security-cli.js",
     "jb-qa-security-url": "./src/security-url-cli.js",
-    "jb-qa-autopilot": "./src/autopilot-cli.js"
+    "jb-qa-autopilot": "./src/autopilot-cli.js",
+    "jb-qa-db": "./src/database-cli.js"
   },
   "exports": {
     ".": "./src/index.js",
@@ -22,7 +23,8 @@
     "./ai": "./src/ai/provider-router.js",
     "./autopilot": "./src/agent/autopilot.js",
     "./security-bridge": "./src/security-bridge/index.js",
-    "./version": "./package-version.js"
+    "./version": "./package-version.js",
+    "./database": "./src/adapters/filesystem/audit-database.js"
   },
   "files": [
     "src/**",

@@ -50,15 +50,17 @@ The browser auditor can capture screenshots, inspect accessibility findings with
 | `jb-qa-security [path]` | Focused static security audit |
 | `jb-qa-security-url <url>` | Runtime website security audit |
 | `jb-qa-autopilot [path]` | AI-assisted analysis and optional remediation |
+| `jb-qa-db [path]` | Focused database schema, migration, ORM, query-safety and performance audit |
 
 AI features are opt-in. The autopilot does not apply patches by default. Applying low-risk changes requires the explicit approval flags enforced by the CLI; review diffs and run project tests before accepting any change. Source upload to an AI provider is a separate explicit opt-in.
 
 ## JavaScript API
 
 ```js
-import { auditProject, auditUrl, auditViewports, comparePngBuffers } from "@jb/expert-qa";
+import { auditProject, auditDatabaseProject, auditUrl, auditViewports, comparePngBuffers } from "@jb/expert-qa";
 
 const staticReport = await auditProject("./");
+const databaseReport = await auditDatabaseProject("./");
 const browserReport = await auditUrl("https://example.com");
 const responsiveReport = await auditViewports("https://example.com");
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
@@ -79,3 +81,12 @@ The root export also exposes specialist rule groups, provider adapters, visual r
 Findings are heuristic and can include false positives or miss issues. A passing score is not a security certification. Browser exploration is bounded and does not prove every application state is correct. AI-generated remediation is untrusted until reviewed and tested.
 
 JB Expert QA is a development/CI quality tool, not runtime middleware. Use JB Security Guard for server-side request controls and a separately validated malware scanner for file inspection.
+
+## Database Auditor
+
+```bash
+npx jb-qa-db . --format=html
+npx jb-qa-db ./ --format=json --output=.jb-expert-qa/reports/database.json
+```
+
+The focused auditor checks SQL and Prisma schema/migration files plus source and configuration files for destructive DDL, unsafe raw queries, ORM auto-sync, disabled database TLS verification, selected SQL performance patterns, PostgreSQL privilege issues, missing foreign-key indexes and visible migration rollback gaps. It is local and static: it does not connect to a live database, read rows, execute queries, run EXPLAIN, modify schemas or make network requests. Findings are heuristic and require human review.
