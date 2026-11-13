@@ -7,7 +7,7 @@ Inventario basado en el commit importado `c83f4297f12fc3f804d396b3d3e4203cc8d4e7
 | Setup | Existe en Laravel | Extraer servicios de catálogo reutilizables y reforzar instalación idempotente |
 | Security | Parcial | Auditoría de autorización, sesiones, CSRF, rate limiting y pruebas negativas |
 | Catalog | Existe en Laravel | Estabilizar contrato de categorías, campos dinámicos, valores, precios y publicación |
-| Library | Parcial | Extraer países, monedas, teléfonos, locales y unidades a una API versionada |
+| Library | Parcial — primer corte 0.1.0 | Geo, monedas, idiomas y normalización telefónica ya están en Core/Library; unidades y metadatos avanzados pendientes |
 | Media | Parcial | Separar validadores, almacenamiento, metadatos, miniaturas y adaptadores |
 | Template | Parcial | Versionar definiciones y preservar datos cuando cambie una plantilla |
 | Export | No identificado | Diseñar exportación PDF y proteger campos privados |
