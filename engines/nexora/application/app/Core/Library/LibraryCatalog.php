@@ -6,6 +6,7 @@ use App\Core\Library\Geo\CountryCatalog;
 use App\Core\Library\Geo\CountryCurrencyCatalog;
 use App\Core\Library\Geo\CountryDialingCodeCatalog;
 use App\Core\Library\Localization\LanguageCatalog;
+use App\Core\Library\Measurement\UnitCatalog;
 use App\Core\Library\Money\CurrencyCatalog;
 
 /**
@@ -23,6 +24,11 @@ final class LibraryCatalog
         $countryCurrencies = CountryCurrencyCatalog::all();
         $callingCodes = CountryDialingCodeCatalog::all();
         $locales = LanguageCatalog::codes();
+        $unitCodes = UnitCatalog::codes();
+        $unitDefinitions = array_map(
+            static fn (string $code): ?array => UnitCatalog::get($code),
+            $unitCodes,
+        );
         $countryCurrencyKeys = array_keys($countryCurrencies);
         $callingCountryKeys = array_keys($callingCodes);
 
@@ -48,6 +54,18 @@ final class LibraryCatalog
                 $callingCodes,
                 static fn (string $code): bool => preg_match('/^\+[1-9][0-9]{0,2}$/D', $code) !== 1,
             )) === 0,
+            'unit_codes_unique' => count($unitCodes) === count(array_unique($unitCodes)),
+            'unit_dimension_metadata' => count(array_filter(
+                $unitDefinitions,
+                static fn (?array $unit): bool => $unit === null
+                    || ! in_array($unit['dimension'], UnitCatalog::dimensions(), true),
+            )) === 0,
+            'unit_factors_positive' => count(array_filter(
+                $unitDefinitions,
+                static fn (?array $unit): bool => $unit === null
+                    || $unit['numerator'] <= 0
+                    || $unit['denominator'] <= 0,
+            )) === 0,
             'locale_codes_format' => count(array_filter(
                 $locales,
                 static fn (string $code): bool => preg_match('/^[a-z]{2}(?:-[A-Z]{2})?$/D', $code) !== 1,
@@ -65,6 +83,8 @@ final class LibraryCatalog
                 'country_calling_code_mappings' => count($callingCodes),
                 'unique_calling_codes' => count(CountryDialingCodeCatalog::uniqueCodes()),
                 'locales' => count($locales),
+                'measurement_units' => count($unitCodes),
+                'measurement_dimensions' => count(UnitCatalog::dimensions()),
             ],
         ];
     }
