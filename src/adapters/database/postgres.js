@@ -477,7 +477,7 @@ export async function auditPostgresDatabase({
     if (client && connected && transactionOpen) {
       try { await client.query("ROLLBACK"); } catch {}
     }
-    if (client && connected) {
+    if (client && typeof client.end === "function") {
       try { await client.end(); } catch {}
     }
   }
