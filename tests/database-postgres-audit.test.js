@@ -207,6 +207,72 @@ test("foreign-key coverage accepts a valid leading-column index and rejects expr
   assert.ok(indexQuery.includes("indkey::smallint[]"));
 });
 
+test("foreign-key coverage accepts safe IS NOT NULL partial indexes and rejects extra predicates", async () => {
+  const client = fixtureClient({
+    constraints: [
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_owner_fk", constraint_type: "f",
+        is_validated: true, columns: ["owner_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_active_owner_fk", constraint_type: "f",
+        is_validated: true, columns: ["active_owner_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_tenant_account_fk", constraint_type: "f",
+        is_validated: true, columns: ["tenant_id", "account_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_user_fk", constraint_type: "f",
+        is_validated: true, columns: ["userId"]
+      }
+    ],
+    indexes: [
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_owner_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["owner_id"],
+        index_predicate: "(owner_id IS NOT NULL)"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_active_owner_filtered_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["active_owner_id"],
+        index_predicate: "((active_owner_id IS NOT NULL) AND (deleted_at IS NULL))"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_tenant_account_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["tenant_id", "account_id"],
+        index_predicate: "(tenant_id IS NOT NULL)"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_user_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["userId"],
+        index_predicate: '("userId" IS NOT NULL)'
+      }
+    ]
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const missing = report.diagnostics
+    .filter((item) => item.id.startsWith("DB-LIVE-FK-NO-INDEX-"))
+    .map((item) => item.id);
+
+  assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-events_active_owner_fk"]);
+  const indexQuery = client.calls.find((sql) => sql.includes("jb-expert-qa:indexes"));
+  assert.ok(indexQuery.includes("pg_catalog.pg_get_expr(ix.indpred, ix.indrelid) AS index_predicate"));
+});
+
 test("audit rolls back and closes the connection when a catalog query fails", async () => {
   const client = fixtureClient();
   const originalQuery = client.query.bind(client);
