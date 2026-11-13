@@ -25,7 +25,10 @@
             @if ($product->prices->isNotEmpty())
                 <div class="detail-prices">
                     @foreach ($product->prices as $price)
-                        <div><span>{{ $price->currency_code }}</span><strong>{{ number_format((float) $price->amount, 2) }}</strong></div>
+                        <div>
+                            <span>{{ $price->currency_code }}</span>
+                            <strong>{{ \App\Core\Library\Money\CurrencyCatalog::formatAmount((string) $price->amount, $price->currency_code, app()->getLocale()) ?? $price->amount }}</strong>
+                        </div>
                     @endforeach
                 </div>
             @endif
@@ -35,6 +38,7 @@
                     <h2>Detalles del producto</h2>
                     @foreach ($product->fieldValues as $fieldValue)
                         @php($value = data_get($fieldValue->value, 'value'))
+                        @php($unitLabel = $fieldValue->definition->unitLabel())
                         @if ($value !== null && $value !== '')
                             <div class="specification-row">
                                 <span>{{ $fieldValue->definition->label }}</span>
@@ -44,7 +48,7 @@
                                     @elseif (is_array($value))
                                         {{ implode(', ', $value) }}
                                     @else
-                                        {{ $value }}{{ $fieldValue->definition->unit_code ? ' '.$fieldValue->definition->unit_code : '' }}
+                                        {{ $value }}{{ $unitLabel ? ' '.$unitLabel : '' }}
                                     @endif
                                 </strong>
                             </div>

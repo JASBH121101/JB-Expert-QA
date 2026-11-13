@@ -5,6 +5,7 @@ namespace App\Modules\Setup\Http\Controllers;
 use App\Core\Installation\DatabaseInstaller;
 use App\Core\Installation\InstallationState;
 use App\Core\Installation\ServerRequirements;
+use App\Core\Library\Contact\PhoneNumberNormalizer;
 use App\Models\BusinessContact;
 use App\Models\BusinessCurrency;
 use App\Models\InstallationSettings;
@@ -220,18 +221,19 @@ final class SetupController
         $normalizedPhones = [];
 
         foreach ($validated['phones'] ?? [] as $index => $phone) {
-            $callingCode = preg_replace('/\\D+/', '', $phone['country_calling_code']) ?? '';
-            $nationalNumber = preg_replace('/\\D+/', '', $phone['number']) ?? '';
-            $internationalNumber = $callingCode.$nationalNumber;
+            $internationalNumber = PhoneNumberNormalizer::toE164(
+                $phone['country_calling_code'],
+                $phone['number'],
+            );
 
-            if (strlen($nationalNumber) < 6 || strlen($internationalNumber) > 15) {
+            if ($internationalNumber === null) {
                 throw ValidationException::withMessages([
                     "phones.{$index}.number" => __('setup.phone_length_error'),
                 ]);
             }
 
             $normalizedPhones[] = [
-                'phone' => '+'.$internationalNumber,
+                'phone' => $internationalNumber,
                 'show_public' => (bool) ($phone['show_public'] ?? false),
             ];
         }

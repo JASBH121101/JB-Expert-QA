@@ -2,6 +2,7 @@
 
 namespace App\Modules\Setup\Services;
 
+use App\Core\Library\Measurement\UnitCatalog;
 use App\Models\CatalogCategory;
 use App\Models\CatalogGroup;
 use App\Models\ProductFieldDefinition;
@@ -112,6 +113,10 @@ final class TemplateCatalog
                         'options' => $field['options'] ?? null,
                         'unit_dimension' => $field['dimension'] ?? null,
                         'unit_code' => $field['unit'] ?? null,
+                        'unit_catalog_code' => UnitCatalog::canonicalCode(
+                            $field['unit'] ?? null,
+                            $field['dimension'] ?? null,
+                        ),
                         'is_required' => false,
                         'is_public' => true,
                         'is_searchable' => $field['searchable'] ?? false,

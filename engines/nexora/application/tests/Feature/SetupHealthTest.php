@@ -641,6 +641,7 @@ class SetupHealthTest extends TestCase
             'field_key' => 'engine_displacement',
             'unit_dimension' => 'displacement',
             'unit_code' => 'cc',
+            'unit_catalog_code' => 'cc',
         ]);
         $this->assertDatabaseHas('business_currencies', [
             'code' => 'USD',
@@ -656,6 +657,19 @@ class SetupHealthTest extends TestCase
             'phone' => '+50588881234',
             'is_primary' => 1,
             'show_public' => 1,
+        ]);
+    }
+
+
+    public function test_template_seed_keeps_legacy_unit_labels_and_stores_canonical_unit_codes(): void
+    {
+        $catalog = app(TemplateCatalog::class);
+        $catalog->seed('technology', 'en');
+
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'screen_size',
+            'unit_code' => 'inches',
+            'unit_catalog_code' => 'in',
         ]);
     }
 
@@ -904,6 +918,10 @@ class SetupHealthTest extends TestCase
         $this->assertSame('Honda', $fieldValues['brand']);
         $this->assertSame('2000', $fieldValues['engine_displacement']);
 
+        $this->get('/producto/honda-civic')
+            ->assertOk()
+            ->assertSee('2000 cc');
+
         $this->put(route('admin.products.update', $product), [
             'name' => 'Honda Civic Sport',
             'category_id' => $category->id,
@@ -928,6 +946,59 @@ class SetupHealthTest extends TestCase
         $this->assertSame('honda-civic-sport', $updatedProduct->slug);
         $this->assertSame('draft', $updatedProduct->status);
         $this->assertSame(9500.0, (float) $updatedProduct->prices->first()->amount);
+    }
+
+    public function test_product_price_precision_follows_iso_currency_minor_units(): void
+    {
+        $this->post('/setup', $this->validSetupPayload())->assertRedirect(route('admin.home'));
+
+        \App\Models\BusinessCurrency::query()->create([
+            'code' => 'JPY',
+            'is_primary' => false,
+            'is_enabled' => true,
+            'sort_order' => 2,
+        ]);
+        \App\Models\BusinessCurrency::query()->create([
+            'code' => 'KWD',
+            'is_primary' => false,
+            'is_enabled' => true,
+            'sort_order' => 3,
+        ]);
+
+        $category = CatalogCategory::query()->where('name', 'Vehículos')->firstOrFail();
+        $payload = [
+            'name' => 'Producto con precios ISO',
+            'category_id' => $category->id,
+            'description' => 'Prueba de precisión por moneda.',
+            'status' => 'draft',
+            'prices' => [
+                'USD' => '',
+                'NIO' => '',
+                'JPY' => '1250',
+                'KWD' => '12.345',
+            ],
+        ];
+
+        $this->post(route('admin.products.store'), $payload)
+            ->assertRedirect(route('admin.products.index'))
+            ->assertSessionHas('status');
+
+        $product = Product::query()
+            ->with('prices')
+            ->where('name', 'Producto con precios ISO')
+            ->firstOrFail();
+        $prices = $product->prices->keyBy('currency_code');
+
+        $this->assertSame('1250.0000', (string) $prices['JPY']->amount);
+        $this->assertSame('12.3450', (string) $prices['KWD']->amount);
+
+        $payload['name'] = 'Producto con precisión inválida';
+        $payload['prices']['KWD'] = '12.3456';
+
+        $this->post(route('admin.products.store'), $payload)
+            ->assertSessionHasErrors('prices.KWD');
+
+        $this->assertDatabaseCount('products', 1);
     }
 
     public function test_employee_product_access_obeys_catalog_permissions(): void
@@ -1222,6 +1293,17 @@ class SetupHealthTest extends TestCase
 
         $perfumeType = ProductFieldDefinition::query()->where('field_key', 'perfume_type')->firstOrFail();
         $this->assertSame(['Original', 'Inspired', 'Generic'], $perfumeType->options);
+
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'content',
+            'unit_code' => 'ml',
+            'unit_catalog_code' => 'ml',
+        ]);
+        $this->assertDatabaseHas('product_field_definitions', [
+            'field_key' => 'set_items_count',
+            'unit_code' => 'pieces',
+            'unit_catalog_code' => 'piece',
+        ]);
     }
 
     public function test_demo_installation_can_be_reset_without_dropping_its_schema(): void
@@ -1252,7 +1334,7 @@ class SetupHealthTest extends TestCase
         $this->assertDatabaseCount('product_prices', 0);
         $this->assertDatabaseCount('business_contacts', 0);
         $this->assertDatabaseCount('business_currencies', 0);
-        $this->assertDatabaseCount('migrations', 4);
+        $this->assertDatabaseCount('migrations', 6);
         $this->assertTrue(app(InstallationState::class)->hasSchema());
         $this->assertFalse(app(InstallationState::class)->isCompleted());
 

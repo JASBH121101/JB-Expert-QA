@@ -17,7 +17,7 @@ El origen documenta un monolito modular Laravel con una aplicación y una base d
 | Setup | `app/Modules/Setup`, `app/Core/Installation` | Implementado dentro de la aplicación |
 | Security | `app/Core/Authorization`, `app/Http/Middleware`, rutas de acceso | Parcial; requiere auditoría y contratos |
 | Catalog | modelos, migraciones, controladores de productos/categorías/campos | Implementado dentro de la aplicación |
-| Library | servicios Country/Currency/Language/DialingCode y datos de unidades | Parcial y acoplado a Setup/Template |
+| Library | catálogos Geo/Money/Localization/Contact y unidades de plantilla | Primer corte extraído a Core/Library 0.1.0; unidades y metadatos monetarios pendientes |
 | Media | validación de imágenes y Storage desde ProductController | Parcial; no existe módulo autónomo |
 | Template | `TemplateCatalog`, campos dinámicos y etiquetas ES/EN | Parcial/funcional dentro de Setup |
 | Export | no se encontró implementación PDF en el árbol importado | Pendiente |

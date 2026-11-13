@@ -28,6 +28,9 @@ La aplicación copiada es un monolito modular Laravel:
 Las dos ramas especializadas comparten el commit base de Core. No son subramas jerárquicas nativas de Git, pero sí líneas de trabajo independientes.
 
 ## Enfoque principal
-La primera extracción prioritaria es **NEXORA Library Engine**: países, monedas, relación país-moneda, códigos telefónicos, locales, dimensiones y unidades de medida. Actualmente esos datos están parcialmente agrupados dentro de Setup y TemplateCatalog.
+El primer corte de NEXORA Library Engine (0.1.0) ya separa países, monedas, relación país-moneda, códigos telefónicos e idiomas en App/Core/Library. Está en la rama feature/nexora-library-engine y su PR #24 hacia NEXORA-Core permanece en borrador; todavía no está integrado en NEXORA-Core. Las unidades de medida siguen dentro de TemplateCatalog porque requieren identificadores estables y una migración compatible.
 
 No se publican paquetes ni se declara una instalación npm/Composer hasta que exista una API estable, dependencias separadas, pruebas contractuales y documentación.
+
+
+The Currency Library now carries supported ISO codes, minor-unit precision and display-symbol hints. Product price entry and display use currency-specific precision; symbols never replace the ISO code.

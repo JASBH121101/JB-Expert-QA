@@ -90,16 +90,17 @@
             <p class="muted small">Introduce manualmente los precios en las monedas habilitadas. No se realizan conversiones automáticas.</p>
             <div class="field-grid">
                 @foreach ($currencies as $currency)
-                    <label>{{ $currency->code }}
+                    <label>{{ $currency->code }} · {{ \App\Core\Library\Money\CurrencyCatalog::symbol($currency->code) }}
                         <input
                             type="number"
                             name="prices[{{ $currency->code }}]"
                             min="0"
-                            max="999999999999.99"
-                            step="0.01"
+                            max="999999999999.9999"
+                            step="{{ \App\Core\Library\Money\CurrencyCatalog::step($currency->code) }}"
                             value="{{ old('prices.'.$currency->code, $prices[$currency->code]->amount ?? '') }}"
-                            placeholder="0.00"
+                            placeholder="{{ \App\Core\Library\Money\CurrencyCatalog::placeholder($currency->code) }}"
                         >
+                        <small class="muted">Hasta {{ \App\Core\Library\Money\CurrencyCatalog::minorUnits($currency->code) }} decimales</small>
                     </label>
                 @endforeach
             </div>
@@ -116,6 +117,7 @@
                 <div class="field-grid">
                     @foreach ($group->fields as $field)
                         @php($fieldValue = old('fields.'.$field->field_key, $values[$field->field_key] ?? null))
+                        @php($unitLabel = $field->unitLabel())
                         <div class="dynamic-field {{ $field->width === 'full' ? 'full' : '' }}">
                             @switch($field->field_type)
                                 @case('textarea')
@@ -155,7 +157,7 @@
                                     </label>
                                     @break
                                 @default
-                                    <label>{{ $field->label }}{{ $field->unit_code ? ' ('.$field->unit_code.')' : '' }}{{ $field->is_required ? ' *' : '' }}
+                                    <label>{{ $field->label }}{{ $unitLabel ? ' ('.$unitLabel.')' : '' }}{{ $field->is_required ? ' *' : '' }}
                                         <input
                                             type="{{ $field->field_type === 'number' ? 'number' : 'text' }}"
                                             name="fields[{{ $field->field_key }}]"
