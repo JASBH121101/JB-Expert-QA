@@ -48,3 +48,8 @@ La suite nueva está en tests/Unit/Library/LibraryCatalogTest.php. Hasta ejecuta
 - Product prices use DECIMAL(16,4), preserving the existing 12-integer-digit capacity and enabling three minor units.
 - Public price formatting uses the selected currency precision and locale separators; the ISO code remains visible beside the symbol.
 - Rolling back the precision migration is blocked when any stored value has non-zero precision beyond two decimals.
+
+
+## Release marker
+
+The combined Core/Library development version is 0.2.0. The 0.1.0 reference extraction remains the baseline; Measurement and Currency capabilities are additive work in this unreleased branch.

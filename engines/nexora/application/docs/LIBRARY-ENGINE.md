@@ -10,7 +10,7 @@ The shared library lives under app/Core/Library and is organized by domain:
 - Contact: phone normalization with an explicitly selected calling code.
 - LibraryCatalog: version and cross-catalogue integrity report.
 
-The initial version is 0.1.0. These are PHP application services, not yet independently installable Composer packages.
+The current development version is 0.2.0 (first library extraction 0.1.0). These are PHP application services, not yet independently installable Composer packages.
 
 ## Compatibility
 
@@ -50,3 +50,6 @@ The metadata snapshot follows ISO 4217 List One minor-unit rules for the currenc
 https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
 
 The price form validates the maximum decimal places for each currency without converting the input string to a binary float. Product prices are stored as DECIMAL(16,4); four storage places support the current three-decimal currencies while retaining the existing 12-digit integer capacity. Display formatting applies the currency's ISO minor-unit precision.
+
+
+Currency minor-unit metadata follows the currently supported ISO 4217 List One currency codes. The SIX Maintenance Agency publishes the current List One data and amendments. This repository stores a reviewable local snapshot; it does not fetch live currency metadata at runtime. Symbols are curated display hints and fall back to the ISO code when no symbol is defined.
