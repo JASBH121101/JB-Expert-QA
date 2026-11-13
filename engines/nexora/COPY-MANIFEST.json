@@ -1,0 +1,20 @@
+{
+  "source_repository": "JASBH121101/Nexora",
+  "source_branch": "feature/nexora-configurable-catalog",
+  "source_commit": "c83f4297f12fc3f804d396b3d3e4203cc8d4e7ae",
+  "target_branch": "NEXORA-Core",
+  "target_path": "engines/nexora/application/",
+  "files_copied": 124,
+  "copy_mode": "content-preserving snapshot",
+  "source_modified": false,
+  "package_status": {
+    "npm": false,
+    "composer_packages": false,
+    "laravel_application": true
+  },
+  "notes": [
+    "Backend requires Composer; npm is not its installer.",
+    "No NEXORA package has been published by this operation.",
+    "Admin and Site Engine remain modules inside the modular Laravel application pending extraction."
+  ]
+}
