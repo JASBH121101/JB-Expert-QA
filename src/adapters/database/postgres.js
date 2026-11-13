@@ -59,7 +59,7 @@ const SQL = Object.freeze({
            (ix.indpred IS NOT NULL) AS is_partial,
            ARRAY(
              SELECT CASE WHEN k.attnum > 0 THEN a.attname::text ELSE NULL END
-             FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, position)
+             FROM unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
              LEFT JOIN pg_catalog.pg_attribute a
                ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
              WHERE k.position <= ix.indnkeyatts
