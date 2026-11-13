@@ -57,6 +57,7 @@ const SQL = Object.freeze({
            ix.indisunique AS is_unique,
            ix.indisprimary AS is_primary,
            (ix.indpred IS NOT NULL) AS is_partial,
+           pg_catalog.pg_get_expr(ix.indpred, ix.indrelid) AS index_predicate,
            ARRAY(
              SELECT CASE WHEN k.attnum > 0 THEN a.attname::text ELSE NULL END
              FROM unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
@@ -110,6 +111,24 @@ const SQL = Object.freeze({
 function dbBool(value) {
   return value === true || value === 1 || value === "1" ||
     value === "t" || value === "true" || value === "on";
+}
+
+function partialIndexSupportsForeignKey(index, foreignKeyColumns) {
+  if (!dbBool(index.is_partial)) return true;
+
+  // A partial index limited only to non-null values of one FK column
+  // still covers every row that can reference a parent key.
+  const predicate = String(index.index_predicate ?? "").trim();
+  const match = predicate.match(
+    /^\\(?\\s*(?:"((?:[^"]|"")+)"|([a-z_][a-z0-9_$]*))\\s+IS\\s+NOT\\s+NULL\\s*\\)?$/i
+  );
+  if (!match) return false;
+
+  const predicateColumn = match[1]
+    ? match[1].replace(/""/g, '"')
+    : match[2].toLowerCase();
+
+  return foreignKeyColumns.includes(predicateColumn);
 }
 
 function rowsOf(result) {
@@ -247,13 +266,13 @@ function buildReport(snapshot) {
       const hasSupportingIndex = indexes.some((index) => {
         if (index.schema_name !== constraint.schema_name ||
             index.table_name !== constraint.table_name ||
-            dbBool(index.is_partial) ||
             !dbBool(index.is_valid) ||
             !dbBool(index.is_ready)) return false;
         const indexColumns = Array.isArray(index.key_columns) ? index.key_columns : [];
         return fkColumns.length > 0 &&
           indexColumns.length >= fkColumns.length &&
-          fkColumns.every((column, position) => indexColumns[position] === column);
+          fkColumns.every((column, position) => indexColumns[position] === column) &&
+          partialIndexSupportsForeignKey(index, fkColumns);
       });
 
       if (fkColumns.length > 0 && !hasSupportingIndex) {
