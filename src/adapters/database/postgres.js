@@ -151,11 +151,13 @@ function safeConnectionConfig(connectionString, options) {
   };
 }
 
-export async function createPostgresClient({ connectionString, options = {} } = {}) {
-  const config = safeConnectionConfig(connectionString, {
-    ...DEFAULTS,
-    ...options
-  });
+export async function createPostgresClient(input = {}) {
+  const config = typeof input?.host === "string" && typeof input?.database === "string"
+    ? input
+    : safeConnectionConfig(input.connectionString, {
+      ...DEFAULTS,
+      ...(input.options ?? {})
+    });
 
   let pg;
   try {
