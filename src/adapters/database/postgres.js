@@ -26,7 +26,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind IN ('r', 'p')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+      AND n.nspname NOT LIKE 'pg_%'
     ORDER BY n.nspname, c.relname\`,
   constraints: \`/* jb-expert-qa:constraints */
     SELECT n.nspname AS schema_name,
@@ -46,7 +46,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_class t ON t.oid = con.conrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+      AND n.nspname NOT LIKE 'pg_%'
     ORDER BY n.nspname, t.relname, con.conname\`,
   indexes: \`/* jb-expert-qa:indexes */
     SELECT n.nspname AS schema_name,
@@ -58,11 +58,11 @@ const SQL = Object.freeze({
            ix.indisprimary AS is_primary,
            (ix.indpred IS NOT NULL) AS is_partial,
            ARRAY(
-             SELECT a.attname::text
-             FROM unnest(ix.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
-             JOIN pg_catalog.pg_attribute a
+             SELECT CASE WHEN k.attnum > 0 THEN a.attname::text ELSE NULL END
+             FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, position)
+             LEFT JOIN pg_catalog.pg_attribute a
                ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
-             WHERE k.position <= ix.indnkeyatts AND k.attnum > 0
+             WHERE k.position <= ix.indnkeyatts
              ORDER BY k.position
            ) AS key_columns
     FROM pg_catalog.pg_index ix
@@ -70,7 +70,7 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+      AND n.nspname NOT LIKE 'pg_%'
     ORDER BY n.nspname, t.relname, i.relname\`,
   policies: \`/* jb-expert-qa:policies */
     SELECT schemaname AS schema_name,
@@ -80,6 +80,7 @@ const SQL = Object.freeze({
            cmd AS command
     FROM pg_catalog.pg_policies
     WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+      AND schemaname NOT LIKE 'pg_%'
     ORDER BY schemaname, tablename, policyname\`,
   role: \`/* jb-expert-qa:role */
     SELECT rolsuper AS is_superuser,
