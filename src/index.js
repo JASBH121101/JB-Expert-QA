@@ -57,3 +57,4 @@ export {
   createSecurityBridgeCoordinator,
   createSecurityBridgeServer
 } from "./security-bridge/index.js";
+export { auditPostgresDatabase, createPostgresClient } from "./adapters/database/postgres.js";
