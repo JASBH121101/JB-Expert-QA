@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "profile": "nexora-digital-catalog-v1",
+  "weights": {
+    "code-quality": 25,
+    "security": 40,
+    "dependencies": 20,
+    "database": 15
+  },
+  "severityPenalties": {
+    "critical": 25,
+    "high": 12,
+    "medium": 5,
+    "low": 2,
+    "info": 0
+  },
+  "thresholds": {
+    "minimumScore": 80,
+    "failOnCritical": true,
+    "maxFileLines": 800
+  },
+  "scan": {
+    "maxFiles": 2500,
+    "maxFileBytes": 1000000,
+    "maxTotalBytes": 20000000,
+    "maxDepth": 20
+  },
+  "advisories": {
+    "enabled": false,
+    "required": false
+  }
+}
