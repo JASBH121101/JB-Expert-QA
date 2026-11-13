@@ -918,6 +918,10 @@ class SetupHealthTest extends TestCase
         $this->assertSame('Honda', $fieldValues['brand']);
         $this->assertSame('2000', $fieldValues['engine_displacement']);
 
+        $this->get('/producto/honda-civic')
+            ->assertOk()
+            ->assertSee('2000 cc');
+
         $this->put(route('admin.products.update', $product), [
             'name' => 'Honda Civic Sport',
             'category_id' => $category->id,

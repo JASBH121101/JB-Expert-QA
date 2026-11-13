@@ -54,6 +54,12 @@ final class UnitCatalogTest extends TestCase
         UnitConverter::convert(1.0, 'kg', 'ml');
     }
 
+    public function test_converter_rejects_unknown_units(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        UnitConverter::convert(1.0, 'unknown-unit', 'kg');
+    }
+
     public function test_converter_rejects_non_finite_values_and_invalid_precision(): void
     {
         try {
