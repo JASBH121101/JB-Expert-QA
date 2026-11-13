@@ -5,12 +5,12 @@ const DEFAULTS = Object.freeze({
 });
 
 const SQL = Object.freeze({
-  metadata: \`/* jb-expert-qa:metadata */
+  metadata: `/* jb-expert-qa:metadata */
     SELECT current_database() AS database_name,
            current_user AS audit_role,
            current_setting('server_version') AS server_version,
-           current_setting('transaction_read_only') AS transaction_read_only\`,
-  tables: \`/* jb-expert-qa:tables */
+           current_setting('transaction_read_only') AS transaction_read_only`,
+  tables: `/* jb-expert-qa:tables */
     SELECT n.nspname AS schema_name,
            c.relname AS table_name,
            c.relkind,
@@ -27,8 +27,8 @@ const SQL = Object.freeze({
     WHERE c.relkind IN ('r', 'p')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND left(n.nspname, 3) <> 'pg_'
-    ORDER BY n.nspname, c.relname\`,
-  constraints: \`/* jb-expert-qa:constraints */
+    ORDER BY n.nspname, c.relname`,
+  constraints: `/* jb-expert-qa:constraints */
     SELECT n.nspname AS schema_name,
            t.relname AS table_name,
            con.conname AS constraint_name,
@@ -47,8 +47,8 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND left(n.nspname, 3) <> 'pg_'
-    ORDER BY n.nspname, t.relname, con.conname\`,
-  indexes: \`/* jb-expert-qa:indexes */
+    ORDER BY n.nspname, t.relname, con.conname`,
+  indexes: `/* jb-expert-qa:indexes */
     SELECT n.nspname AS schema_name,
            t.relname AS table_name,
            i.relname AS index_name,
@@ -71,8 +71,8 @@ const SQL = Object.freeze({
     JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND left(n.nspname, 3) <> 'pg_'
-    ORDER BY n.nspname, t.relname, i.relname\`,
-  policies: \`/* jb-expert-qa:policies */
+    ORDER BY n.nspname, t.relname, i.relname`,
+  policies: `/* jb-expert-qa:policies */
     SELECT schemaname AS schema_name,
            tablename AS table_name,
            policyname AS policy_name,
@@ -81,16 +81,16 @@ const SQL = Object.freeze({
     FROM pg_catalog.pg_policies
     WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
       AND left(schemaname, 3) <> 'pg_'
-    ORDER BY schemaname, tablename, policyname\`,
-  role: \`/* jb-expert-qa:role */
+    ORDER BY schemaname, tablename, policyname`,
+  role: `/* jb-expert-qa:role */
     SELECT rolsuper AS is_superuser,
            rolcreatedb AS can_create_database,
            rolcreaterole AS can_create_role,
            rolreplication AS can_replicate,
            rolbypassrls AS bypasses_rls
     FROM pg_catalog.pg_roles
-    WHERE rolname = current_user\`,
-  stats: \`/* jb-expert-qa:stats */
+    WHERE rolname = current_user`,
+  stats: `/* jb-expert-qa:stats */
     SELECT schemaname AS schema_name,
            relname AS table_name,
            seq_scan,
@@ -100,11 +100,11 @@ const SQL = Object.freeze({
            last_analyze,
            last_autoanalyze
     FROM pg_catalog.pg_stat_user_tables
-    ORDER BY schemaname, relname\`,
-  extensions: \`/* jb-expert-qa:extensions */
+    ORDER BY schemaname, relname`,
+  extensions: `/* jb-expert-qa:extensions */
     SELECT extname AS extension_name, extversion AS version
     FROM pg_catalog.pg_extension
-    ORDER BY extname\`
+    ORDER BY extname`
 });
 
 function dbBool(value) {
