@@ -36,7 +36,7 @@ final class CurrencyCatalogTest extends TestCase
         $this->assertSame('C$', CurrencyCatalog::symbol('NIO'));
         $this->assertSame('€', CurrencyCatalog::symbol('EUR'));
         $this->assertSame('¥', CurrencyCatalog::symbol('JPY'));
-        $this->assertSame('AED', CurrencyCatalog::symbol('AED'));
+        $this->assertSame('XCG', CurrencyCatalog::symbol('XCG'));
         $this->assertNull(CurrencyCatalog::symbol('XXX'));
     }
 

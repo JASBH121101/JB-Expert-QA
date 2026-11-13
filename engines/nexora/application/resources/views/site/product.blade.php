@@ -25,7 +25,10 @@
             @if ($product->prices->isNotEmpty())
                 <div class="detail-prices">
                     @foreach ($product->prices as $price)
-                        <div><span>{{ $price->currency_code }}</span><strong>{{ number_format((float) $price->amount, 2) }}</strong></div>
+                        <div>
+                            <span>{{ $price->currency_code }}</span>
+                            <strong>{{ `{{ \\\App\\Core\\Library\\Money\\CurrencyCatalog::formatAmount((string) $price->amount, $price->currency_code, app()->getLocale()) ?? $price->amount }}` }}</strong>
+                        </div>
                     @endforeach
                 </div>
             @endif
