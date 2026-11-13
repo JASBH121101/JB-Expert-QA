@@ -91,6 +91,9 @@ try {
   await writeFile(path.join(fixture, "package.json"), JSON.stringify({ type: "module" }));
   await writeFile(path.join(fixture, "src", "app.js"),
     "export function add(a, b) { return a + b; }\n");
+  await mkdir(path.join(fixture, "database", "migrations"), { recursive: true });
+  await writeFile(path.join(fixture, "database", "migrations", "001.sql"),
+    "CREATE TABLE smoke_test (id integer PRIMARY KEY);\n");
   await writeFile(path.join(fixture, "tests", "app.test.js"),
     'import { add } from "../src/app.js";\nif (add(1, 2) !== 3) throw new Error("failed");\n');
   run(binPath(expertInstall, "jb-qa"), ["init"], { cwd: fixture });
@@ -101,6 +104,14 @@ try {
   const expertReport = JSON.parse(await readFile(expertReportPath, "utf8"));
   assert.equal(expertReport.analysisScope.dependencyAdvisoryLookup, false);
   assert.equal(expertReport.analysisScope.networkRequests, 0);
+  const databaseReportPath = path.join(fixture, ".jb-expert-qa", "reports", "database-package-check.json");
+  run(binPath(expertInstall, "jb-qa-db"), [
+    fixture, "--format=json", "--output=" + databaseReportPath
+  ], { cwd: fixture });
+  const databaseReport = JSON.parse(await readFile(databaseReportPath, "utf8"));
+  assert.equal(databaseReport.databaseScope.databaseEvidenceFiles, 1);
+  assert.equal(databaseReport.databaseScope.databaseConnections, 0);
+  assert.equal(databaseReport.databaseScope.networkRequests, 0);
   run(node, [
     "--input-type=module",
     "-e",
@@ -109,7 +120,7 @@ try {
 
   for (const bin of [
     "jb-qa", "jb-qa-project", "jb-qa-url", "jb-qa-security",
-    "jb-qa-security-url", "jb-qa-autopilot"
+    "jb-qa-security-url", "jb-qa-autopilot", "jb-qa-db"
   ]) {
     assert.ok((await stat(binPath(expertInstall, bin))).isFile(), "missing installed CLI: " + bin);
   }
