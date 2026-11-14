@@ -16,13 +16,14 @@ A lab pass means only that the named scenario produced its expected outcome. It 
 
 | Target | Planned test areas |
 | --- | --- |
-| JB Malware Engine | EICAR harmless test string; test-only hash/byte signatures; inert suspicious text; benign false-positive corpus; unknown/incomplete coverage; file size and parser boundaries |
-| JB Security Guard | mocked request and upload validation; size limits; malformed metadata; digest mismatch; timeout/error handling; fail-closed behavior |
-| JB Expert QA | static analysis of intentionally vulnerable source fixtures; expected findings; repaired fixture regression; database and API contract checks; deterministic visual checks |
+| JB Malware Engine | EICAR harmless test string; exact test-only signatures; inert suspicious text; benign false-positive checks; unknown/incomplete coverage; ZIP, PDF and PE parser boundaries; bounded scanning |
+| JB Security Guard | XSS, SQL injection and path-traversal request patterns; ambiguous HTTP framing; upload size/type/digest checks; scanner timeout/error handling; fail-closed quarantine and promotion |
+| JB Expert QA | intentionally vulnerable source fixtures; repaired-code regression; database raw-query/TLS checks; deterministic visual regression; accessibility and responsive QA |
 | NEXORA | owner authentication; authorization boundaries; business registration; templates; product CRUD; currency rules; PDF export; upload constraints; responsive/accessibility checks |
+| Perfumaría JB (future profile) | initially a lightweight public catalogue with a private owner panel for products and photos; later, when the business grows, a separately installable modular Laravel/PHP ERP package for a VPS |
 | Client ERP projects | disposable database; inventory arithmetic; stock movement invariants; roles; audit trail; input validation; backup/restore; export integrity; performance budgets |
 
-The project name NEXORA is taken from the existing project context. If a customer project has a different final name, its profile uses that name without changing the laboratory.
+NEXORA and Perfumaría JB are independent future integration targets, not dependencies of the current lab package. The Perfumaría JB storefront and its future ERP are not being developed in this PR.
 
 ## Malware testing boundary
 
@@ -46,9 +47,17 @@ Reports use `jb.threat-lab.report/v1` and include target identity/version, scena
 
 ## Current implementation status
 
-The core registry, target-scoped scenarios, safety gate, inert fixtures, report schema, and the first real local integration suite are implemented in `@jb/threat-lab`. The initial suite covers:
-- Malware Engine: exact harmless EICAR detection, benign no-match, and inert PowerShell-like text classified as suspicious rather than confirmed malicious.
-- Security Guard: synthetic XSS request blocking; malicious upload rejection through the real Malware Engine adapter; and conservative no-match-to-unknown quarantine behavior.
-- Expert QA: static detection of an intentionally vulnerable dynamic HTML sink, followed by a repaired `textContent` regression check.
+The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its first cross-engine suite now contains **16 scenarios**, all calling the real engine APIs against temporary local fixtures and in-memory upload storage.
 
-The suite uses temporary directories, an in-memory quarantine store, no network requests, and no production data. GitHub Actions is configured to run the suite on Node 22 and 24; the run must be observed before marking it green. NEXORA and customer ERP profiles remain future integrations after this core-engine phase is reviewed.
+- **JB Malware Engine — 6 scenarios:** exact harmless EICAR match; benign no-match/false-positive; inert PowerShell-like text classified as suspicious, not confirmed malicious; exact configured SHA-256 signature detection; over-limit file returned as `unknown`; PDF active-action indicators classified as suspicious without an exact malware detection.
+- **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
+- **JB Expert QA — 4 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls.
+
+**Latest GitHub Actions results for branch head `ed7a19e`:**
+- [Core validation #560](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858299): Node 22 ✅ and Node 24 ✅. Includes the monorepo regression suite, Malware Engine package tests, all 16 Threat Lab scenarios, and independent package distribution verification.
+- [Security QA #343](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858352): Node 22 ✅ and Node 24 ✅.
+- [NPM package distribution #65](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858355): Node 22 ✅ and Node 24 ✅.
+
+The suite uses temporary directories and no production data, network requests, real malware execution, external feeds, paid services, or AI calls. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The database auditor is local-static and makes zero database connections. The PNG comparison scenario validates deterministic visual diff only; it is not a full visual/browser certification.
+
+NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
