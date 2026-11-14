@@ -45,6 +45,18 @@ Dynamic malware behavior analysis, if ever approved, requires a separate isolate
 
 Reports use `jb.threat-lab.report/v1` and include target identity/version, scenario identity/category, pass/fail/skip status, findings, metrics, and duration. Future versions may add coverage and confidence metadata. Certification must list exactly which scenarios ran, skipped, and failed, and must not extrapolate beyond that scope.
 
+## Trojan-focused validation
+
+The Malware Engine now has dedicated, safe regression coverage beyond the original 16 cross-engine cases:
+
+- **Script delivery and persistence:** inert fixtures correlate download + dynamic execution with Windows Run-key, scheduled-task, service, and WMI event-subscription persistence indicators.
+- **PE/RAT capability correlation:** a synthetic PE fixture correlates process-injection imports with remote command-channel imports; a control fixture verifies that process-injection imports alone do not imply RAT/Trojan behavior.
+- **Process hollowing:** unit coverage verifies that process-hollowing capability plus a remote command channel produces RAT/Trojan-like candidate labels.
+- **False-positive guard:** a single low-specificity download marker must not produce a Trojan-family candidate.
+- **Containment boundary:** a suspicious Trojan-like candidate cannot be passed to `quarantineFile`; only an authentic `malicious` report from the same engine instance is eligible.
+
+These are static behavior correlations over inert text and synthetic PE structures. They never execute files, create a network connection, or confirm malware. A family candidate remains `suspicious` and is not automatically quarantined. Exact configured hash/byte-signature matches remain the confirmed `malicious` path.
+
 ## Current implementation status
 
 The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its first cross-engine suite now contains **16 scenarios**, all calling the real engine APIs against temporary local fixtures and in-memory upload storage.
@@ -53,10 +65,16 @@ The reusable core, target-scoped scenario registry, explicit offline/non-destruc
 - **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
 - **JB Expert QA — 4 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls.
 
-**Latest GitHub Actions results for branch head `ed7a19e`:**
-- [Core validation #560](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858299): Node 22 ✅ and Node 24 ✅. Includes the monorepo regression suite, Malware Engine package tests, all 16 Threat Lab scenarios, and independent package distribution verification.
-- [Security QA #343](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858352): Node 22 ✅ and Node 24 ✅.
-- [NPM package distribution #65](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43544858355): Node 22 ✅ and Node 24 ✅.
+**Previous completed baseline (`2d4606c`):**
+- [Core validation #567](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838062): Node 22 ✅ and Node 24 ✅, including the initial Trojan script and PE/RAT Threat Lab checks.
+- [Security QA #350](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838028): Node 22 ✅ and Node 24 ✅.
+- [NPM package distribution #69](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838105): Node 22 ✅ and Node 24 ✅.
+
+**Latest commit under validation (`232f4a6`):**
+- [Core validation #569](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078965): running at the time of this documentation update.
+- [Security QA #352](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078948): Node 22 ✅ and Node 24 ✅.
+- [NPM package distribution #70](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078960): Node 22 ✅; Node 24 was still running at the time of this documentation update.
+- [JB Malware Engine Validation #156](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078997): Ubuntu ✅ and Windows ✅.
 
 The suite uses temporary directories and no production data, network requests, real malware execution, external feeds, paid services, or AI calls. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The database auditor is local-static and makes zero database connections. The PNG comparison scenario validates deterministic visual diff only; it is not a full visual/browser certification.
 
