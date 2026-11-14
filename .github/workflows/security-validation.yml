@@ -2,7 +2,7 @@ name: Security QA
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feature/jb-expert-qa-refresh"]
     paths:
       - "package.json"
       - "packages/**"
