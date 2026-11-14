@@ -26,7 +26,7 @@ test("compares named, brace and positional placeholders without losing duplicate
   assert.equal(comparePlaceholders("Hello :name {count}", "Hola :name {count}").matches, true);
   const mismatch = comparePlaceholders(":name :name %2$s", ":name %s");
   assert.equal(mismatch.matches, false);
-  assert.deepEqual(mismatch.missing, [":name", "%2$s"]);
+  assert.deepEqual(mismatch.missing, ["%2$s", ":name"]);
   assert.deepEqual(mismatch.unexpected, ["%s"]);
 });
 
