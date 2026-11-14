@@ -13,7 +13,8 @@ const LIMITS = Object.freeze({
   findings: 100,
   findingsBytes: 48 * 1024,
   metricKeys: 50,
-  metricsBytes: 16 * 1024
+  metricsBytes: 16 * 1024,
+  reportResultBytes: 2 * 1024 * 1024
 });
 
 function assertId(value, label) {
@@ -193,9 +194,23 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
     });
     const startedAt = clock().toISOString();
     const results = [];
+    let totalOutcomeBytes = 0;
+    let reportBudgetExceeded = false;
 
     for (const target of selectedTargets) {
       for (const scenario of selectedScenarios) {
+        if (reportBudgetExceeded) {
+          results.push({
+            target: { id: target.id, kind: target.kind, version: target.version },
+            scenario: { id: scenario.id, category: scenario.category },
+            status: "skip",
+            summary: "Total report output budget reached; adapter was not invoked",
+            findings: [],
+            metrics: {},
+            durationMs: 0
+          });
+          continue;
+        }
         if (scenario.appliesTo.length > 0 &&
             !scenario.appliesTo.includes(target.id) &&
             !scenario.appliesTo.includes(target.kind)) {
@@ -217,6 +232,25 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
             context: Object.freeze({ lab: name, labVersion: version, targetId: target.id })
           });
           const outcome = normalizeOutcome(raw);
+          const outcomeBytes = new TextEncoder().encode(JSON.stringify(outcome)).byteLength;
+          if (totalOutcomeBytes + outcomeBytes > LIMITS.reportResultBytes) {
+            reportBudgetExceeded = true;
+            results.push({
+              target: { id: target.id, kind: target.kind, version: target.version },
+              scenario: { id: scenario.id, category: scenario.category },
+              status: "fail",
+              summary: "Total report output budget exceeded",
+              findings: [{
+                code: "LAB_REPORT_SIZE_LIMIT",
+                message: "The cumulative adapter outcome payload exceeded the " +
+                  LIMITS.reportResultBytes + "-byte report budget; remaining adapters were skipped."
+              }],
+              metrics: {},
+              durationMs: Math.max(0, clock().getTime() - started)
+            });
+            continue;
+          }
+          totalOutcomeBytes += outcomeBytes;
           results.push({
             target: { id: target.id, kind: target.kind, version: target.version },
             scenario: { id: scenario.id, category: scenario.category },
