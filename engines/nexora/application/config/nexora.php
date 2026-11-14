@@ -1,5 +1,7 @@
 <?php
 
+use App\\Core\\Security\\TrustedProxyList;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -11,4 +13,6 @@ return [
     |
     */
     'installation_mode' => env('NEXORA_INSTALLATION_MODE', 'production'),
+
+    'trusted_proxies' => TrustedProxyList::parse(env('TRUSTED_PROXIES')),
 ];
