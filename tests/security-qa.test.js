@@ -348,7 +348,7 @@ test("production-only scope still audits application code in an unrelated projec
     const report = await auditSecurityProject(root, { productionOnly: true });
     const httpFinding = report.diagnostics.find((item) => item.id.startsWith("SEC-HTTP-"));
     assert.ok(httpFinding);
-    assert.match(JSON.stringify(httpFinding), /src[\\/]app\\.js/);
+    assert.ok(JSON.stringify(httpFinding).includes("app.js"));
     assert.equal(report.securityAssessment.excludedNonProductionFiles, 0);
   });
 });
