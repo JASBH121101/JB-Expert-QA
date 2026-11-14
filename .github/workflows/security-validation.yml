@@ -2,7 +2,7 @@ name: Security QA
 
 on:
   push:
-    branches: [main]
+    branches: [main, "integration/**"]
     paths:
       - "package.json"
       - "packages/**"
@@ -12,7 +12,7 @@ on:
       - "config/security-url.config.json"
       - ".github/workflows/security-validation.yml"
   pull_request:
-    branches: [main]
+    branches: [main, "integration/**"]
     paths:
       - "package.json"
       - "packages/**"
