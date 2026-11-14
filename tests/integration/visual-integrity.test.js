@@ -42,3 +42,34 @@ test("localization audit checks visible text and accessibility attributes withou
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("does not treat an unclamped webkit box with visible overflow as clipped text", { timeout: 30000 }, async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Clipping regression</title></head><body>
+      <p id="intentional-overflow" style="display:-webkit-box;width:40px;overflow:visible;white-space:nowrap">This overflow is intentionally visible</p>
+      <p id="actual-line-clamp" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden;width:80px;height:18px">This paragraph is intentionally clamped to one line and must be reported</p>
+    </body></html>`);
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const url = "http://127.0.0.1:" + server.address().port + "/";
+  try {
+    const report = await auditUrl(url, {
+      config,
+      viewport: { width: 1280, height: 800 },
+      timeout: 10000,
+      runAxe: false,
+      allowPrivateNetworks: true,
+      targetLanguage: "en"
+    });
+    const clipping = report.diagnostics.filter((item) => item.id.startsWith("UIUX-008-"));
+    assert.equal(clipping.some((item) => item.location === "#intentional-overflow"), false);
+    assert.equal(clipping.some((item) => item.location === "#actual-line-clamp"), true);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
