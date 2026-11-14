@@ -64,3 +64,6 @@ export { auditDatabaseProject } from "./adapters/filesystem/audit-database.js";
 export { databaseSpecialistRules, existingDatabaseRules, operationalDatabaseRules } from "./specialists/database/index.js";
 
 export { auditPostgresDatabase, createPostgresClient } from "./adapters/database/postgres.js";
+export { auditLanguageFiles } from "./adapters/filesystem/audit-language.js";
+export * from "./language/index.js";
+export { languageRules } from "./specialists/language/index.js";

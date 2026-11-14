@@ -11,6 +11,7 @@ export { accessibilityRules } from "./accessibility/index.js";
 export { performanceRules } from "./performance/index.js";
 export { functionalRules } from "./functional/index.js";
 export { consistencyRules } from "./consistency/index.js";
+export { languageRules } from "./language/index.js";
 
 export const SPECIALIST_IDS = Object.freeze([
   "ui-ux",
@@ -22,5 +23,6 @@ export const SPECIALIST_IDS = Object.freeze([
   "code-quality",
   "security",
   "dependencies",
-  "database"
+  "database",
+  "language"
 ]);
