@@ -1,0 +1,153 @@
+name: Database PostgreSQL integration
+
+on:
+  push:
+    branches: [main, "integration/**"]
+    paths:
+      - "package.json"
+      - "src/adapters/database/**"
+      - "src/database-cli.js"
+      - "src/index.js"
+      - "tests/database-postgres-audit.test.js"
+      - "tests/e2e/database-postgres-cli-smoke.js"
+      - "docs/DATABASE-QA.md"
+      - ".github/workflows/database-postgres-integration.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "package.json"
+      - "src/adapters/database/**"
+      - "src/database-cli.js"
+      - "src/index.js"
+      - "tests/database-postgres-audit.test.js"
+      - "tests/e2e/database-postgres-cli-smoke.js"
+      - "docs/DATABASE-QA.md"
+      - ".github/workflows/database-postgres-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-postgres-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-cli:
+    name: Real pg driver and CLI (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jbqa_ci
+          POSTGRES_PASSWORD: jbqa_ci_password
+          POSTGRES_DB: jbqa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jbqa_ci -d jbqa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install optional PostgreSQL driver without changing manifests
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@^8
+      - name: Run real PostgreSQL CLI smoke test
+        env:
+          QA_DATABASE_URL: postgresql://jbqa_ci:jbqa_ci_password@127.0.0.1:5432/jbqa_ci?sslmode=disable
+        run: node tests/e2e/database-postgres-cli-smoke.js
+
+  neon-development:
+    name: Optional Neon development read-only E2E
+    needs: postgres-cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Detect Neon development credential
+        id: neon-credential
+        env:
+          QA_NEON_DEVELOPMENT_DATABASE_URL: ${{ secrets.QA_NEON_DEVELOPMENT_DATABASE_URL }}
+        shell: bash
+        run: |
+          if [ -n "$QA_NEON_DEVELOPMENT_DATABASE_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Neon E2E skipped: QA_NEON_DEVELOPMENT_DATABASE_URL is not configured."
+          fi
+      - name: Set up Node.js
+        if: steps.neon-credential.outputs.configured == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install repository dependencies
+        if: steps.neon-credential.outputs.configured == 'true'
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install optional PostgreSQL driver without changing manifests
+        if: steps.neon-credential.outputs.configured == 'true'
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@^8
+      - name: Execute read-only audit through the real pg CLI path
+        if: steps.neon-credential.outputs.configured == 'true'
+        env:
+          QA_NEON_DEVELOPMENT_DATABASE_URL: ${{ secrets.QA_NEON_DEVELOPMENT_DATABASE_URL }}
+        shell: bash
+        run: |
+          set +x
+          report="$RUNNER_TEMP/neon-development-audit.json"
+          node src/postgres-database-cli.js --env=QA_NEON_DEVELOPMENT_DATABASE_URL --confirm-read-only > "$report"
+          node --input-type=module - "$report" <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+
+          const connection = new URL(process.env.QA_NEON_DEVELOPMENT_DATABASE_URL);
+          assert.ok(connection.hostname.endsWith(".neon.tech"), "The optional live check must use a Neon endpoint.");
+          const report = JSON.parse(readFileSync(process.argv[2], "utf8"));
+          assert.equal(report.database.engine, "postgresql");
+          assert.equal(report.database.name, "erp_perfume");
+          assert.equal(report.database.auditRole, "jb_erp_runtime_sql");
+          assert.equal(report.database.transactionReadOnly, true);
+          assert.equal(report.coverage.metadataOnly, true);
+          assert.equal(report.coverage.applicationRowsRead, 0);
+          assert.equal(report.coverage.catalogQueries, 8);
+          assert.equal(report.diagnostics.some((item) =>
+            item.id === "DB-LIVE-ROLE-SUPERUSER" ||
+            item.id === "DB-LIVE-ROLE-BYPASS-RLS"
+          ), false, "Neon must be audited with the intended least-privilege role.");
+
+          console.log(
+            "Neon development read-only E2E passed: database=" +
+            report.database.name +
+            ", role=" + report.database.auditRole +
+            ", PostgreSQL=" + report.database.serverVersion +
+            ", tables=" + report.summary.tables +
+            ", constraints=" + report.summary.constraints +
+            ", indexes=" + report.summary.indexes +
+            ", application rows read=0."
+          );
+          NODE
+          rm -f "$report"
+      - name: Confirm Neon E2E was intentionally skipped
+        if: steps.neon-credential.outputs.configured != 'true'
+        run: echo "No Neon credentials were used. Configure QA_NEON_DEVELOPMENT_DATABASE_URL with the development-only read-only URL to enable this extra check."
