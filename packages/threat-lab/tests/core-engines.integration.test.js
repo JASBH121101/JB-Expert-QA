@@ -11,6 +11,7 @@ import { createSecurityGuardScanner } from "../../malware-engine/src/security-gu
 import { createSecurityGuard } from "../../security-guard/src/index.js";
 import { createUploadInspector } from "../../security-guard/src/upload-inspector.js";
 import { auditProject } from "../../../src/adapters/filesystem/audit-project.js";
+import projectAuditConfig from "../../../config/project-audit.config.json" with { type: "json" };
 
 const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const TEST_MARKER = Buffer.from("deadbeef", "hex");
@@ -91,6 +92,7 @@ function simulateGuardRequest(guard, url) {
 async function auditFixture(projectPath) {
   return auditProject(projectPath, {
     config: {
+      ...projectAuditConfig,
       profile: "jb-threat-lab-static-fixture",
       advisories: { enabled: false, required: false }
     },
