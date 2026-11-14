@@ -463,7 +463,7 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
     const report = await auditProject(root);
     const serialized = JSON.stringify(report);
     assert.equal(report.target.project.startsWith("jbqa-project-"), true);
-    assert.equal(report.summary.rulesExecuted, 34);
+    assert.equal(report.summary.rulesExecuted, 35);
     assert.ok(report.diagnostics.some((item) => item.severity === "critical"));
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes("not-read"), false);

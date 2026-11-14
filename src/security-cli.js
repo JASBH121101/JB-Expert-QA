@@ -10,8 +10,14 @@ try {
   const options = new Map();
   const supportedOptions = ["--config=", "--format=", "--output="];
   let onlineAdvisories = false;
+  let productionOnly = false;
 
   for (const arg of args) {
+    if (arg === "--production-only") {
+      if (productionOnly) throw new TypeError("--production-only may only be supplied once");
+      productionOnly = true;
+      continue;
+    }
     if (arg === "--online-advisories") {
       if (onlineAdvisories) throw new TypeError("--online-advisories may only be supplied once");
       onlineAdvisories = true;
@@ -50,7 +56,8 @@ try {
 
   const report = await auditSecurityProject(projectPath, {
     ...(config === undefined ? {} : { config }),
-    onlineAdvisories
+    onlineAdvisories,
+    productionOnly
   });
   const rendered = formatReport(report, format);
 

@@ -1,11 +1,17 @@
 export { responsiveRules } from "./responsive/index.js";
 import { uiUxRules as baseUiUxRules } from "./ui-ux/index.js";
 import { themeContrastRules } from "./ui-ux/theme-contrast.js";
-export const uiUxRules = Object.freeze([...baseUiUxRules, ...themeContrastRules]);
+import { layoutIntegrityRules } from "./ui-ux/layout-integrity.js";
+export const uiUxRules = Object.freeze([
+  ...baseUiUxRules,
+  ...themeContrastRules,
+  ...layoutIntegrityRules
+]);
 export { accessibilityRules } from "./accessibility/index.js";
 export { performanceRules } from "./performance/index.js";
 export { functionalRules } from "./functional/index.js";
 export { consistencyRules } from "./consistency/index.js";
+export { languageRules } from "./language/index.js";
 
 export const SPECIALIST_IDS = Object.freeze([
   "ui-ux",
@@ -17,5 +23,6 @@ export const SPECIALIST_IDS = Object.freeze([
   "code-quality",
   "security",
   "dependencies",
-  "database"
+  "database",
+  "language"
 ]);

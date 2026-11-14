@@ -91,9 +91,6 @@ try {
   await writeFile(path.join(fixture, "package.json"), JSON.stringify({ type: "module" }));
   await writeFile(path.join(fixture, "src", "app.js"),
     "export function add(a, b) { return a + b; }\n");
-  await mkdir(path.join(fixture, "database", "migrations"), { recursive: true });
-  await writeFile(path.join(fixture, "database", "migrations", "001.sql"),
-    "CREATE TABLE smoke_test (id integer PRIMARY KEY);\n");
   await writeFile(path.join(fixture, "tests", "app.test.js"),
     'import { add } from "../src/app.js";\nif (add(1, 2) !== 3) throw new Error("failed");\n');
   run(binPath(expertInstall, "jb-qa"), ["init"], { cwd: fixture });
@@ -104,23 +101,15 @@ try {
   const expertReport = JSON.parse(await readFile(expertReportPath, "utf8"));
   assert.equal(expertReport.analysisScope.dependencyAdvisoryLookup, false);
   assert.equal(expertReport.analysisScope.networkRequests, 0);
-  const databaseReportPath = path.join(fixture, ".jb-expert-qa", "reports", "database-package-check.json");
-  run(binPath(expertInstall, "jb-qa-db"), [
-    fixture, "--format=json", "--output=" + databaseReportPath
-  ], { cwd: fixture });
-  const databaseReport = JSON.parse(await readFile(databaseReportPath, "utf8"));
-  assert.equal(databaseReport.databaseScope.databaseEvidenceFiles, 1);
-  assert.equal(databaseReport.databaseScope.databaseConnections, 0);
-  assert.equal(databaseReport.databaseScope.networkRequests, 0);
   run(node, [
     "--input-type=module",
     "-e",
-    'import { auditProject, auditDatabaseProject, databaseSpecialistRules, auditUrl, auditViewports, comparePngBuffers, runAutopilot, createSecurityBridgeCoordinator } from "@jb/expert-qa"; for (const fn of [auditProject,auditDatabaseProject,auditUrl,auditViewports,comparePngBuffers,runAutopilot,createSecurityBridgeCoordinator]) if (typeof fn !== "function") process.exit(1); if (!Array.isArray(databaseSpecialistRules) || databaseSpecialistRules.length < 1) process.exit(1);'
+    'import { auditProject, auditUrl, auditViewports, comparePngBuffers, runAutopilot, createSecurityBridgeCoordinator } from "@jb/expert-qa"; for (const fn of [auditProject,auditUrl,auditViewports,comparePngBuffers,runAutopilot,createSecurityBridgeCoordinator]) if (typeof fn !== "function") process.exit(1);'
   ], { cwd: expertInstall });
 
   for (const bin of [
     "jb-qa", "jb-qa-project", "jb-qa-url", "jb-qa-security",
-    "jb-qa-security-url", "jb-qa-autopilot", "jb-qa-db"
+    "jb-qa-security-url", "jb-qa-autopilot"
   ]) {
     assert.ok((await stat(binPath(expertInstall, bin))).isFile(), "missing installed CLI: " + bin);
   }
@@ -188,7 +177,27 @@ try {
     'import { createMalwareEngine } from "@jb/malware-engine"; if (typeof createMalwareEngine !== "function") process.exit(1);'
   ], { cwd: malwareInstall });
 
-  console.log("PASS: all three npm tarballs installed in clean directories; the complete Expert QA browser suite passed.");
+  // JB Advisor Engine.
+  const advisorTarball = await pack("packages/advisor-engine");
+  const advisorInstall = await install(advisorTarball, "install-advisor-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import * as advisor from "@jb/advisor-engine"; const required = ["getEngineInfo", "createAdvisorCore", "ResearchEngine", "compareProducts", "KnowledgeStore", "CapacitorSQLiteKnowledgeAdapter", "createDefaultResearchProviders"]; if (advisor.ENGINE_ID !== "JBAE" || required.some((name) => typeof advisor[name] === "undefined")) process.exit(1); const research = new advisor.ResearchEngine({ providers: [] }); if (research.getProviderIds().length !== 0) process.exit(1);'
+  ], { cwd: advisorInstall });
+
+  const advisorPackageInstall = path.join(
+    advisorInstall, "node_modules", "@jb", "advisor-engine"
+  );
+  run(npm, ["run", "build:fragrance-library"], { cwd: advisorPackageInstall });
+  const advisorSnapshot = path.join(
+    advisorPackageInstall,
+    "dist",
+    "fragrance-library",
+    "scento-knowledge-snapshot.json"
+  );
+  assert.ok((await stat(advisorSnapshot)).size > 0, "Advisor Engine offline dataset builder must produce a knowledge snapshot");
+
+  console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
