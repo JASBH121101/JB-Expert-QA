@@ -74,12 +74,14 @@ The manifest is currently a contract/schema, not a live release feed. Engine npm
 5. npm stages the exact package version with lifecycle scripts disabled.
 6. The staged package version, package-lock integrity, declared entry points and JavaScript syntax are checked.
 7. A patch may proceed under the hybrid policy. Minor and major releases need `--approve`.
-8. The project must have a package-lock file. Before installing, the updater snapshots `package.json` and `package-lock.json`.
-9. The project install runs with lifecycle scripts disabled. The installed version and integrity are checked again.
-10. On failure, the updater restores the snapshots and runs `npm ci --ignore-scripts`.
-11. Rollback verifies the restored installed version and package integrity against the saved metadata.
+8. The project must have a `package-lock.json` and a working `npm test` script. Before installing, the updater snapshots `package.json` and `package-lock.json`.
+9. The project install runs with lifecycle scripts disabled.
+10. The updater runs the project's `npm test` script after installation. This project-defined code runs only because the owner explicitly invoked `update --apply`.
+11. The installed package version, lockfile integrity, entry points and JavaScript syntax are checked again after the test command.
+12. If installation, project tests or post-install verification fail, the updater restores the snapshots and runs `npm ci --ignore-scripts`.
+13. Rollback verifies the restored installed version and package integrity against the saved metadata.
 
-Rollback uses the saved lockfile and `npm ci --ignore-scripts`, then checks the installed version and integrity against the backup metadata. Do not delete the backup folder until the update has been validated in the consuming project.
+The updater does not treat package syntax checks as a substitute for the consuming project's tests. A missing or failing `npm test` script blocks the update and triggers rollback. Rollback uses the saved lockfile and `npm ci --ignore-scripts`, then checks the installed version and integrity against the backup metadata. Do not delete the backup folder until the update has been validated in the consuming project.
 
 ## Limitations
 
