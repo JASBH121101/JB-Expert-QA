@@ -2,7 +2,7 @@
   "name": "jb-expert-qa",
   "version": "0.8.0",
   "private": true,
-  "description": "Monorepo for independently versioned JB QA/security engines and the extensible JB Threat Lab.",
+  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, and JB Malware Engine packages.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -22,8 +22,7 @@
     "benchmark:guard": "node bench/security-guard.js",
     "test:dead-code": "node --test tests/dead-code-rules.test.js",
     "test:package-distributions": "node scripts/verify-package-distributions.js",
-    "audit:database": "node src/database-cli.js",
-    "test:threat-lab": "npm --workspace @jb/threat-lab run check"
+    "audit:database": "node src/database-cli.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -36,7 +35,6 @@
   "workspaces": [
     "packages/expert-qa",
     "packages/security-guard",
-    "packages/malware-engine",
-    "packages/threat-lab"
+    "packages/malware-engine"
   ]
 }
