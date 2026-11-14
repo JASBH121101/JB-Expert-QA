@@ -14,7 +14,13 @@ import { languageRules } from "../../specialists/language/index.js";
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) throw new TypeError("A project directory path is required");
   const root = resolve(rootPath);
-  const validatedConfig = validateEngineConfig(config);
+  const configWithSpecialistDefaults = config && typeof config === "object" && !Array.isArray(config)
+    ? {
+        ...config,
+        weights: { ...projectConfig.weights, ...(config.weights ?? {}) }
+      }
+    : config;
+  const validatedConfig = validateEngineConfig(configWithSpecialistDefaults);
   const effectiveScanOptions = { ...validatedConfig.scan, ...scanOptions };
   const scan = await scanProject(root, effectiveScanOptions);
   const dependencyAdvisories = await scanNpmAdvisories(scan, validatedConfig.advisories);
