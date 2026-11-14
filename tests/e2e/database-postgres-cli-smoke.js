@@ -27,7 +27,7 @@ try {
 
   const result = spawnSync(
     process.execPath,
-    ["src/database-cli.js", "--env=QA_DATABASE_URL", "--confirm-read-only"],
+    ["src/postgres-database-cli.js", "--env=QA_DATABASE_URL", "--confirm-read-only"],
     {
       cwd: process.cwd(),
       env: process.env,
