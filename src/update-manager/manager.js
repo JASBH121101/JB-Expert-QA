@@ -477,20 +477,17 @@ export async function applyEngineUpdate({
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   if (nodeMajor < release.nodeMinMajor) fail("Current Node.js version is below the signed manifest requirement");
 
+  const classification = classifyUpdate(currentVersion, release.version);
+  if (classification.status === "prerelease") {
+    fail("Prerelease engine updates are not available through the stable CLI path");
+  }
+  if (classification.releaseType !== "patch" && !userApproved) {
+    fail("Update blocked by hybrid policy: approval-required (minor-or-major-release)");
+  }
+
   const stageResult = await stageCandidate({ packageName, release, npmRunner });
-  const policy = evaluateHybridUpdate({
-    packageName,
-    currentVersion,
-    candidateVersion: release.version,
-    channel: "stable",
-    integrityVerified: stageResult.lockEntry.integrity === release.dist.integrity,
-    signatureVerified: manifestVerified,
-    compatibilityVerified: nodeMajor >= release.nodeMinMajor,
-    testsPassed: true,
-    userApproved
-  });
-  if (!["auto-apply", "apply-after-approval"].includes(policy.decision)) {
-    fail("Update blocked by hybrid policy: " + policy.decision + " (" + policy.reason + ")");
+  if (stageResult?.lockEntry?.integrity !== release.dist.integrity) {
+    fail("Staged package integrity does not match the signed manifest");
   }
 
   const { id } = await writeBackup({
@@ -517,10 +514,29 @@ export async function applyEngineUpdate({
       "--no-fund"
     ], root);
     assertCommandSuccess(result, "Project npm install");
+
+    const testResult = npmRunner(["test"], root);
+    assertCommandSuccess(testResult, "Post-install project tests (npm test)");
+
     const validation = await validatePackageLayout({ installRoot: root, packageName, release });
     if (validation.packageJson.version !== release.version) {
-      fail("Installed version does not match the signed manifest");
+      fail("Installed version does not match the signed manifest after project tests");
     }
+    const policy = evaluateHybridUpdate({
+      packageName,
+      currentVersion,
+      candidateVersion: release.version,
+      channel: "stable",
+      integrityVerified: validation.lockEntry.integrity === release.dist.integrity,
+      signatureVerified: manifestVerified,
+      compatibilityVerified: nodeMajor >= release.nodeMinMajor,
+      testsPassed: true,
+      userApproved
+    });
+    if (!["auto-apply", "apply-after-approval"].includes(policy.decision)) {
+      fail("Update blocked by hybrid policy: " + policy.decision + " (" + policy.reason + ")");
+    }
+
     return {
       decision: policy.decision,
       packageName,
