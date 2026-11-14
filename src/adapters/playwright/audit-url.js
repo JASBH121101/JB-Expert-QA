@@ -18,6 +18,7 @@ import {
   consistencyRules
 } from "../../specialists/index.js";
 import { collectPageContext } from "./context.js";
+import { collectVisualIntegrity } from "./visual-integrity.js";
 import { applyThemeOverride, collectThemeContext } from "./theme-context.js";
 import { analyzeContrastSamples, summarizeContrastResults } from "../visual/contrast.js";
 import { exploreInteractionStates } from "./interactions.js";
@@ -166,9 +167,15 @@ export async function auditUrl(url, {
   colorScheme = "light",
   themeAttribute = null,
   themeStorageKey = null,
-  themeTransitionAudit = false
+  themeTransitionAudit = false,
+  targetLanguage = null,
+  preserveTerms
 } = {}) {
   if (!["light", "dark"].includes(colorScheme)) throw new TypeError("colorScheme must be light or dark");
+  if (targetLanguage !== null &&
+      (typeof targetLanguage !== "string" || !/^(?:es|en)(?:[-_][a-z0-9]+)?$/i.test(targetLanguage.trim()))) {
+    throw new TypeError("targetLanguage must be es, en, or a supported locale such as es-NI or en-US");
+  }
   if (typeof themeTransitionAudit !== "boolean") throw new TypeError("themeTransitionAudit must be a boolean");
   if (themeAttribute !== null &&
       (typeof themeAttribute !== "string" ||
@@ -277,6 +284,8 @@ export async function auditUrl(url, {
     await applyThemeOverride(page, { theme: colorScheme, attribute: themeAttribute });
     const context = await collectPageContext(page, { thresholds: config.thresholds ?? {} });
     const themeContext = await collectThemeContext(page);
+    const visualIntegrity = await collectVisualIntegrity(page, { targetLanguage, preserveTerms });
+    Object.assign(context, visualIntegrity);
     const themeTransition = themeTransitionAudit
       ? await auditThemeRoundTrip(page, {
           initialContext: themeContext,
@@ -419,6 +428,9 @@ export async function auditUrl(url, {
         axeViolations: context.axeViolations?.length ?? null,
         themeAudit: context.themeAudit,
         themeTransitionAudit: context.themeTransitionAudit,
+        layoutIntegrity: context.layoutIntegrity?.summary ?? null,
+        containerMetrics: context.layoutIntegrity?.containerMetrics ?? [],
+        localizationAudit: context.localizationAudit,
         contrastSummary: context.contrastSummary,
         contrastSamplesTruncated: context.interactionExploration?.contrastSamplesTruncated ?? false,
         screenshotPath
@@ -434,6 +446,18 @@ const DEFAULT_VIEWPORTS = Object.freeze([
   { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1365, height: 900 }
+]);
+
+const FULL_VIEWPORTS = Object.freeze([
+  { name: "small-phone", width: 320, height: 720 },
+  { name: "phone", width: 375, height: 812 },
+  { name: "mobile", width: 390, height: 844 },
+  { name: "large-phone", width: 430, height: 932 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "small-laptop", width: 1280, height: 720 },
+  { name: "laptop", width: 1366, height: 768 },
+  { name: "desktop", width: 1600, height: 900 },
+  { name: "wide-monitor", width: 1920, height: 1080 }
 ]);
 
 export async function auditViewports(url, {
@@ -633,4 +657,4 @@ export async function auditViewports(url, {
   });
 }
 
-export { DEFAULT_VIEWPORTS };
+export { DEFAULT_VIEWPORTS, FULL_VIEWPORTS };

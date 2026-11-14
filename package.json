@@ -22,7 +22,8 @@
     "benchmark:guard": "node bench/security-guard.js",
     "test:dead-code": "node --test tests/dead-code-rules.test.js",
     "test:package-distributions": "node scripts/verify-package-distributions.js",
-    "audit:database": "node src/database-cli.js"
+    "audit:database": "node src/database-cli.js",
+    "audit:database:postgres": "node src/postgres-database-cli.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",

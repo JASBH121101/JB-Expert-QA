@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { auditProject } from "../src/adapters/filesystem/audit-project.js";
 import { formatReport } from "../src/reporters/index.js";
 import { EXPERT_QA_PACKAGE_VERSION } from "../package-version.js";
+import { runUpdateCommand } from "../src/update-manager/cli.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bundledConfigPath = resolve(packageRoot, "config/project-audit.config.json");
@@ -21,6 +22,9 @@ function help() {
     "  jb-qa setup --browser chromium [--with-deps]",
     "  jb-qa init [--force]",
     "  jb-qa audit [project-path] [--format html|json|markdown] [--output file] [--config file]",
+    "  jb-qa update --check --manifest <file-or-HTTPS-URL> [--signature file] [--public-key file]",
+    "  jb-qa update --apply <@jb/package> --manifest <source> [--approve] [--public-key file]",
+    "  jb-qa update --rollback <backup-id>",
     "",
     "Other complete-engine commands:",
     "  jb-qa-project [path]       Static project audit",
@@ -158,6 +162,8 @@ try {
     await initialize(args);
   } else if (command === "audit") {
     await audit(args);
+  } else if (command === "update") {
+    await runUpdateCommand(args, { cwd: process.cwd() });
   } else {
     throw new TypeError("Unknown command: " + command + ". Run jb-qa --help.");
   }

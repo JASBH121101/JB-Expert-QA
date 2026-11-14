@@ -3,7 +3,7 @@ name: Core validation
 
 on:
   push:
-    branches: [main, "feature/**", "integration/**", "qa/**"]
+    branches: [main, "feature/jb-expert-qa-refresh"]
     paths:
       - "package.json"
       - "src/**"
