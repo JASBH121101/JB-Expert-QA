@@ -86,6 +86,7 @@ function fixtureNpmRunner(args, cwd) {
     writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify({
       name: "@jb/expert-qa",
       version: requested,
+      type: "module",
       main: "./index.js"
     }, null, 2) + "\n");
     writeFileSync(resolve(packageDirectory, "index.js"), "export const version = " + JSON.stringify(requested) + ";\n");
