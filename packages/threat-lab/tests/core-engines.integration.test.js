@@ -260,14 +260,44 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     capabilities: ["request-filtering", "upload-inspection", "fail-closed"],
     adapter: {
       async runScenario({ scenario }) {
-        if (scenario.id === "guard.request.xss-block") {
-          const result = simulateGuardRequest(guard, "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E");
-          const passed = result.statusCode === 403 && !result.reachedApplication;
+        const requestCases = {
+          "guard.request.xss-block": {
+            url: "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+            expectedStatus: 403
+          },
+          "guard.request.sqli-block": {
+            url: "/search?q=%27%20OR%201%3D1",
+            expectedStatus: 403
+          },
+          "guard.request.path-traversal-block": {
+            url: "/files/%2e%2e/%2e%2e/private.txt",
+            expectedStatus: 403
+          },
+          "guard.request.ambiguous-framing-block": {
+            url: "/upload",
+            method: "POST",
+            headers: { "content-length": "5", "transfer-encoding": "chunked" },
+            rawHeaders: ["Host", "example.test", "Content-Length", "5", "Transfer-Encoding", "chunked"],
+            expectedStatus: 400
+          }
+        };
+        if (requestCases[scenario.id]) {
+          const requestCase = requestCases[scenario.id];
+          const result = simulateGuardRequest(guard, requestCase.url, requestCase);
+          const passed = result.statusCode === requestCase.expectedStatus && !result.reachedApplication;
           return outcome(passed ? "pass" : "fail", passed
-            ? "Security Guard blocked the inert XSS-pattern request"
-            : "Security Guard did not block the expected request",
-          { statusCode: result.statusCode, reachedApplication: result.reachedApplication },
-          passed ? [] : [{ code: "GUARD_REQUEST_NOT_BLOCKED" }]);
+            ? "Security Guard blocked the synthetic request at the expected boundary"
+            : "Security Guard did not block the synthetic request as expected",
+          {
+            statusCode: result.statusCode,
+            expectedStatus: requestCase.expectedStatus,
+            reachedApplication: result.reachedApplication
+          },
+          passed ? [] : [{
+            code: "GUARD_REQUEST_NOT_BLOCKED",
+            expectedStatus: requestCase.expectedStatus,
+            actualStatus: result.statusCode
+          }]);
         }
 
         if (scenario.id === "guard.upload.malicious-block" || scenario.id === "guard.upload.unknown-quarantine") {
