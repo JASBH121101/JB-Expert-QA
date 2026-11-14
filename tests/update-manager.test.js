@@ -50,6 +50,7 @@ async function createProject() {
   await writeFile(resolve(root, "package.json"), JSON.stringify({
     name: "fixture-project",
     version: "1.0.0",
+    scripts: { test: "node --test" },
     dependencies: { "@jb/expert-qa": "^0.2.0" }
   }, null, 2) + "\n");
   await writeFile(resolve(packageDirectory, "package.json"), JSON.stringify({
@@ -74,6 +75,9 @@ async function createProject() {
 }
 
 function fixtureNpmRunner(args, cwd) {
+  if (args[0] === "test") {
+    return { status: 0, stdout: "tests passed", stderr: "" };
+  }
   if (args[0] === "install") {
     const requested = args[1].split("@").slice(-1)[0];
     const packageDirectory = resolve(cwd, "node_modules/@jb/expert-qa");
@@ -239,6 +243,38 @@ test("blocks local workspace/file dependencies instead of replacing them from th
       },
       npmRunner: fixtureNpmRunner
     }), /local workspace\/file dependencies/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("automatically restores the previous install when post-install project tests fail", async () => {
+  const root = await createProject();
+  const failingTestRunner = (args, cwd) => {
+    if (args[0] === "test") {
+      return { status: 1, stdout: "", stderr: "simulated project test failure" };
+    }
+    return fixtureNpmRunner(args, cwd);
+  };
+
+  try {
+    await assert.rejects(() => applyEngineUpdate({
+      packageName: "@jb/expert-qa",
+      release: makeManifest().packages["@jb/expert-qa"],
+      currentVersion: "0.2.0",
+      projectRoot: root,
+      manifestVerified: true,
+      npmRunner: failingTestRunner
+    }), /Post-install project tests \(npm test\) failed/i);
+
+    const restoredPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+    const restoredLock = JSON.parse(await readFile(resolve(root, "package-lock.json"), "utf8"));
+    const restoredInstalled = JSON.parse(await readFile(
+      resolve(root, "node_modules/@jb/expert-qa/package.json"), "utf8"
+    ));
+    assert.equal(restoredPackage.dependencies["@jb/expert-qa"], "^0.2.0");
+    assert.equal(restoredLock.packages["node_modules/@jb/expert-qa"].version, "0.2.0");
+    assert.equal(restoredInstalled.version, "0.2.0");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
