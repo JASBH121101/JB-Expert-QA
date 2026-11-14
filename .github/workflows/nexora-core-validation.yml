@@ -2,7 +2,7 @@ name: NEXORA Core PHP validation
 
 on:
   push:
-    branches: ["feature/nexora-library-engine"]
+    branches: ["feature/nexora-core-ci", "feature/nexora-library-engine"]
     paths:
       - "engines/nexora/application/**"
       - ".github/workflows/nexora-core-validation.yml"
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up PHP 8.3
-        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
         with:
           php-version: "8.3"
           extensions: bcmath, curl, dom, fileinfo, intl, mbstring, openssl, pdo_pgsql, pdo_sqlite, xml, zip
