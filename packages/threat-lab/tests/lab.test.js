@@ -73,7 +73,7 @@ test("rejects duplicate target and scenario identifiers", () => {
   const target = { id: "sample-target", kind: "test", adapter: { async runScenario() { return { status: "pass" }; } } };
   lab.registerTarget(target);
   assert.throws(() => lab.registerTarget(target), /already registered/);
-  const scenario = { id: "sample-case", category: "test", description: "case", safety: { safe: true, network: false, destructive: false } };
+  const scenario = { id: "sample-case", category: "test", description: "case", safety: { safe: true, network: false, destructive: false, executesSample: false } };
   lab.registerScenario(scenario);
   assert.throws(() => lab.registerScenario(scenario), /already registered/);
 });
@@ -96,14 +96,14 @@ test("target-scoped scenarios skip unrelated engines without invoking their adap
     category: "static",
     description: "Only the static engine should run this check.",
     appliesTo: ["engine-a"],
-    safety: { safe: true, network: false, destructive: false }
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
   });
   lab.registerScenario({
     id: "runtime-kind-check",
     category: "runtime",
     description: "Target kinds can be used to scope a reusable check.",
     appliesTo: ["runtime-engine"],
-    safety: { safe: true, network: false, destructive: false }
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
   });
 
   const report = await lab.run();
