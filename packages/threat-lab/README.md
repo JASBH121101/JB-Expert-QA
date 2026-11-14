@@ -67,3 +67,21 @@ Node.js 22 or newer. No cloud services, paid APIs, telemetry, external malware f
 
 
 The Advisor Engine profile uses synthetic smartphone fixtures and an in-memory research provider. It verifies that research candidates remain `unconfirmed` and `pending_review` until explicit human approval. The test reports zero network requests and does not contact external research providers.
+
+
+## Four-engine certification update — 2026-11-14
+
+PR #41 adds JB Advisor Engine as a fourth independently versioned target to `integration/jb-threat-lab`. The current four-engine matrix contains **20 scenarios**: 6 Malware Engine, 6 Security Guard, 5 Expert QA (including Language QA), and 3 Advisor Engine.
+
+Advisor scenarios use synthetic smartphone fixtures and an in-memory research provider. Research candidates remain `unconfirmed` / `pending_review` until human review, mixed phone/laptop comparisons are rejected by domain isolation, and the integration records zero network requests.
+
+Verified CI for PR #41:
+- Core validation #43626122864: Node.js 22 and 24 passed.
+- Four-package distribution #43626122830: all four engine packages packed and installed in clean directories on Node.js 22 and 24.
+- PostgreSQL integration #43626122866: PostgreSQL 16 CLI E2E passed on Node.js 22 and 24.
+- JB Engines Certification #43626122920: Expert QA, Security Guard, Malware Engine Windows/Ubuntu regressions and the existing three-engine package-boundary jobs passed.
+- Security QA #43626122868 and Language QA #43626122855 passed.
+
+PR #23 is closed as superseded. Its Advisor implementation is represented by PR #41; do not merge the obsolete `integration/jb-advisor-engine` branch.
+
+The original PR #38 run records the historical three-engine baseline (17 scenarios). PR #41 adds the three Advisor scenarios and is the current four-engine integration.
