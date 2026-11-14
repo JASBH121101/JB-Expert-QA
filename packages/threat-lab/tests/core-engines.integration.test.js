@@ -139,6 +139,7 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
   const malwareQuarantine = path.join(root, "malware-quarantine");
   const guardTemp = path.join(root, "guard-temp");
   const expertProject = path.join(root, "expert-project");
+  const expertDatabaseProject = path.join(root, "expert-database-project");
   await Promise.all([
     mkdir(malwareFixtures),
     mkdir(guardTemp),
@@ -177,8 +178,6 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     mode: "balanced",
     rateLimit: { enabled: false }
   });
-  const expertDatabaseProject = path.join(root, "expert-database-project");
-
   const lab = createThreatLab({ name: "JB Threat Lab", version: "0.1.0" });
 
   lab.registerTarget({
