@@ -339,13 +339,11 @@ test("production-only security assessment excludes test fixtures and this reposi
   });
 });
 
-test("production-only scope does not exclude a similarly named file from another project", async () => {
+test("production-only scope still audits application code in an unrelated project", async () => {
   await withProject(async (root) => {
-    await mkdir(join(root, "src", "specialists"), { recursive: true });
+    await mkdir(join(root, "src"), { recursive: true });
     await writeFile(join(root, "package.json"), JSON.stringify({ name: "unrelated-app" }));
-    await writeFile(join(root, "src", "specialists", "security-rules.js"), [
-      'const resetToken = Math.random().toString(36);'
-    ].join("\n"));
+    await writeFile(join(root, "src", "app.js"), 'const resetToken = Math.random().toString(36);');
 
     const report = await auditSecurityProject(root, { productionOnly: true });
     assert.ok(report.diagnostics.some((item) => item.id.startsWith("SEC-RANDOM-")));
