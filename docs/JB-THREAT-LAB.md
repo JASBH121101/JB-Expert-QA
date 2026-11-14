@@ -46,4 +46,9 @@ Reports use `jb.threat-lab.report/v1` and include target identity/version, scena
 
 ## Current implementation status
 
-The core registry, adapter contract, safety gate, inert fixtures, report schema, unit tests, and isolated Node 22/24 CI workflow are implemented in `@jb/threat-lab`. Product adapters and the initial project-specific scenario suites remain subsequent milestones.
+The core registry, target-scoped scenarios, safety gate, inert fixtures, report schema, and the first real local integration suite are implemented in `@jb/threat-lab`. The initial suite covers:
+- Malware Engine: exact harmless EICAR detection, benign no-match, and inert PowerShell-like text classified as suspicious rather than confirmed malicious.
+- Security Guard: synthetic XSS request blocking; malicious upload rejection through the real Malware Engine adapter; and conservative no-match-to-unknown quarantine behavior.
+- Expert QA: static detection of an intentionally vulnerable dynamic HTML sink, followed by a repaired `textContent` regression check.
+
+The suite uses temporary directories, an in-memory quarantine store, no network requests, and no production data. GitHub Actions is configured to run the suite on Node 22 and 24; the run must be observed before marking it green. NEXORA and customer ERP profiles remain future integrations after this core-engine phase is reviewed.
