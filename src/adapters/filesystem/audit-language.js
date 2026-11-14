@@ -4,7 +4,7 @@ import { normalizeLocale, DEFAULT_LOCALE, SUPPORTED_LOCALES } from "../../langua
 import { parsePhpTranslationArray } from "../../language/php-array-parser.js";
 import { auditTranslationMaps } from "../../language/audit.js";
 
-async function listFiles(directory, root, output = []) {
+async function listFiles(directory, root, output = [], maxFiles = 500) {
   let entries;
   try {
     entries = await readdir(directory, { withFileTypes: true });
@@ -14,15 +14,16 @@ async function listFiles(directory, root, output = []) {
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of entries) {
+    if (output.length >= maxFiles) return output;
     if (entry.isSymbolicLink()) continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      await listFiles(path, root, output);
+      await listFiles(path, root, output, maxFiles);
       continue;
     }
     if (!entry.isFile() || ![".php", ".json"].includes(extname(entry.name).toLowerCase())) continue;
     output.push(path);
-    if (output.length >= 500) return output;
+    if (output.length >= maxFiles) return output;
   }
   return output;
 }
@@ -97,10 +98,10 @@ export async function auditLanguageFiles(projectRoot, {
     });
   }
 
-  const sourceFiles = sourceRoot ? await listFiles(sourceRoot, sourceRoot) : [];
-  const targetFiles = targetRoot ? await listFiles(targetRoot, targetRoot) : [];
-  if (sourceFiles.length > maxFiles || targetFiles.length > maxFiles) {
-    throw new Error("Language audit exceeds the configured file limit");
+  const sourceFiles = sourceRoot ? await listFiles(sourceRoot, sourceRoot, [], maxFiles) : [];
+  const targetFiles = targetRoot ? await listFiles(targetRoot, targetRoot, [], maxFiles) : [];
+  if (sourceFiles.length >= maxFiles || targetFiles.length >= maxFiles) {
+    throw new Error("Language audit reached the configured file limit; narrow the locale directory before relying on full coverage");
   }
   const sourceMap = flattenFiles(sourceFiles, sourceRoot ?? langRoot, source);
   const targetMap = flattenFiles(targetFiles, targetRoot ?? langRoot, target);
