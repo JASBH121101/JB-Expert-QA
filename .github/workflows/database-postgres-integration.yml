@@ -2,7 +2,7 @@ name: Database PostgreSQL integration
 
 on:
   push:
-    branches: [main, "integration/**"]
+    branches: [main, "integration/**", "feature/jb-expert-qa-refresh"]
     paths:
       - "package.json"
       - "src/adapters/database/**"
