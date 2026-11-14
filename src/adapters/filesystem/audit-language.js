@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { realpath, readdir, readFile } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { normalizeLocale, DEFAULT_LOCALE, SUPPORTED_LOCALES } from "../../language/locale.js";
 import { parsePhpTranslationArray } from "../../language/php-array-parser.js";
@@ -78,10 +78,24 @@ export async function auditLanguageFiles(projectRoot, {
     throw new TypeError("Language audit requires two different supported locales");
   }
 
-  const languageDirs = await readdir(langRoot, { withFileTypes: true }).catch((error) => {
-    if (error?.code === "ENOENT") return [];
+  const realProjectRoot = await realpath(root);
+  const realLanguageRoot = await realpath(langRoot).catch((error) => {
+    if (error?.code === "ENOENT") return null;
     throw error;
   });
+  if (realLanguageRoot !== null) {
+    const actualRelativeLanguagePath = relative(realProjectRoot, realLanguageRoot);
+    if (
+      isAbsolute(actualRelativeLanguagePath) ||
+      actualRelativeLanguagePath === ".." ||
+      actualRelativeLanguagePath.startsWith(".." + sep)
+    ) {
+      throw new TypeError("languageDirectory must not resolve through a symbolic link outside the project root");
+    }
+  }
+  const languageDirs = realLanguageRoot
+    ? await readdir(realLanguageRoot, { withFileTypes: true })
+    : [];
   const localeRoots = new Map();
   for (const entry of languageDirs) {
     if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
@@ -90,7 +104,7 @@ export async function auditLanguageFiles(projectRoot, {
     const existing = localeRoots.get(locale);
     // Prefer canonical es-419 over the legacy es alias when both exist.
     if (!existing || entry.name.toLowerCase() === locale.toLowerCase()) {
-      localeRoots.set(locale, join(langRoot, entry.name));
+      localeRoots.set(locale, join(realLanguageRoot, entry.name));
     }
   }
 
