@@ -192,3 +192,43 @@ test("rejects duplicate matrix selections and excessive scenario metadata", asyn
     safety: { safe: true, network: false, destructive: false, executesSample: false }
   }), /scenario.tags must contain at most/);
 });
+
+
+test("stops invoking adapters when the cumulative report output budget is reached", async () => {
+  const lab = createThreatLab();
+  let calls = 0;
+  lab.registerTarget({
+    id: "large-output-target",
+    kind: "test",
+    adapter: {
+      async runScenario() {
+        calls += 1;
+        return {
+          status: "pass",
+          findings: [{ detail: "x".repeat(40 * 1024) }]
+        };
+      }
+    }
+  });
+  for (let index = 0; index < 100; index += 1) {
+    lab.registerScenario({
+      id: "large-output-" + index,
+      category: "report-budget",
+      description: "Exercise the cumulative report output budget.",
+      safety: { safe: true, network: false, destructive: false, executesSample: false }
+    });
+  }
+
+  const report = await lab.run();
+  const budgetFailures = report.results.filter((item) =>
+    item.findings.some((finding) => finding.code === "LAB_REPORT_SIZE_LIMIT")
+  );
+  const skippedAfterBudget = report.results.filter((item) =>
+    item.status === "skip" && item.summary.includes("Total report output budget reached")
+  );
+  assert.equal(budgetFailures.length, 1);
+  assert.ok(calls < 100);
+  assert.ok(skippedAfterBudget.length > 0);
+  assert.equal(report.totals.fail, 1);
+  assert.equal(report.totals.skip, skippedAfterBudget.length);
+});
