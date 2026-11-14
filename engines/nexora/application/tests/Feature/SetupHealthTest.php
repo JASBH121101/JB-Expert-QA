@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Core\Installation\InstallationState;
 use App\Models\BusinessContact;
+use App\Models\BusinessCurrency;
 use App\Models\CatalogCategory;
 use App\Models\CatalogGroup;
 use App\Models\InstallationSettings;
@@ -660,7 +661,6 @@ class SetupHealthTest extends TestCase
         ]);
     }
 
-
     public function test_template_seed_keeps_legacy_unit_labels_and_stores_canonical_unit_codes(): void
     {
         $catalog = app(TemplateCatalog::class);
@@ -952,13 +952,13 @@ class SetupHealthTest extends TestCase
     {
         $this->post('/setup', $this->validSetupPayload())->assertRedirect(route('admin.home'));
 
-        \App\Models\BusinessCurrency::query()->create([
+        BusinessCurrency::query()->create([
             'code' => 'JPY',
             'is_primary' => false,
             'is_enabled' => true,
             'sort_order' => 2,
         ]);
-        \App\Models\BusinessCurrency::query()->create([
+        BusinessCurrency::query()->create([
             'code' => 'KWD',
             'is_primary' => false,
             'is_enabled' => true,
