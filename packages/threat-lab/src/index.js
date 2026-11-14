@@ -70,10 +70,15 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
     if (typeof scenario.description !== "string" || !scenario.description.trim()) {
       throw new TypeError("scenario description is required");
     }
+    const appliesTo = scenario.appliesTo ?? [];
+    if (!Array.isArray(appliesTo) || appliesTo.some((item) => typeof item !== "string" || !item.trim())) {
+      throw new TypeError("scenario.appliesTo must be an array of target ids or kinds");
+    }
     scenarios.set(scenario.id, Object.freeze({
       id: scenario.id,
       category: scenario.category,
       description: scenario.description.slice(0, 500),
+      appliesTo: Object.freeze([...appliesTo]),
       safety: Object.freeze({ safe: true, network: false, destructive: false, executesSample: false }),
       tags: Object.freeze(Array.isArray(scenario.tags) ? [...scenario.tags] : [])
     }));
@@ -97,6 +102,20 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
 
     for (const target of selectedTargets) {
       for (const scenario of selectedScenarios) {
+        if (scenario.appliesTo.length > 0 &&
+            !scenario.appliesTo.includes(target.id) &&
+            !scenario.appliesTo.includes(target.kind)) {
+          results.push({
+            target: { id: target.id, kind: target.kind, version: target.version },
+            scenario: { id: scenario.id, category: scenario.category },
+            status: "skip",
+            summary: "Scenario is not assigned to this target",
+            findings: [],
+            metrics: {},
+            durationMs: 0
+          });
+          continue;
+        }
         const started = clock().getTime();
         try {
           const raw = await target.adapter.runScenario({
