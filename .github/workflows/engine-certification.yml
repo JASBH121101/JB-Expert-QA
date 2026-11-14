@@ -59,7 +59,6 @@ jobs:
         run: npm run check
       - name: Generate Expert QA security assessment
         id: expert-report
-        continue-on-error: true
         run: |
           mkdir -p certification-reports
           npm run audit:security -- . --format=markdown --output=certification-reports/expert-qa-security.md
