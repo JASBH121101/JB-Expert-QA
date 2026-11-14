@@ -2,7 +2,7 @@ name: JB Engines Certification
 
 on:
   push:
-    branches: [main]
+    branches: [main, "integration/**"]
     paths:
       - "src/**"
       - "tests/**"
@@ -14,7 +14,7 @@ on:
       - "package-lock.json"
       - ".github/workflows/engine-certification.yml"
   pull_request:
-    branches: [main]
+    branches: [main, "integration/**"]
     paths:
       - "src/**"
       - "tests/**"
