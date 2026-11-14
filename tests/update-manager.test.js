@@ -9,7 +9,8 @@ import {
   applyEngineUpdate,
   buildUpdatePlan,
   rollbackEngineUpdate,
-  verifyUpdateManifest
+  verifyUpdateManifest,
+  loadSignedUpdateManifest
 } from "../src/update-manager/manager.js";
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
@@ -317,4 +318,40 @@ test("automatically restores the previous install when the project install fails
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+
+test("rejects oversized manifest input before signature parsing", () => {
+  assert.throws(() => verifyUpdateManifest({
+    raw: " ".repeat(256 * 1024 + 1),
+    signature: "invalid",
+    publicKey: publicKeyPem
+  }), /256 KiB size limit/i);
+});
+
+test("bounds remote manifest and detached-signature response bodies", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    const payload = calls === 1 ? "{}" : "x".repeat(8 * 1024 + 1);
+    return new Response(payload, { status: 200 });
+  };
+
+  await assert.rejects(loadSignedUpdateManifest({
+    manifest: "https://updates.example.invalid/manifest.json",
+    publicKey: publicKeyPem,
+    fetchImpl
+  }), /Detached manifest signature exceeds/i);
+  assert.equal(calls, 2);
+});
+
+test("rejects signed tarball URLs that do not match the exact package and version path", () => {
+  const manifest = makeManifest();
+  manifest.packages["@jb/expert-qa"].dist.tarball =
+    "https://registry.npmjs.org/@jb%2fexpert-qa/-/expert-qa-0.2.2.tgz";
+  const signed = signManifest(manifest);
+  assert.throws(() => verifyUpdateManifest({
+    ...signed,
+    publicKey: publicKeyPem
+  }), /exact versioned artifact path/i);
 });
