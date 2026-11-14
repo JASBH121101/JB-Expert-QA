@@ -384,7 +384,13 @@ async function stagePackage({ packageName, release, npmRunner = runNpm }) {
   }
 }
 
-async function writeBackup({ projectRoot, packageName, candidateVersion }) {
+async function writeBackup({
+  projectRoot,
+  packageName,
+  candidateVersion,
+  previousVersion,
+  previousIntegrity
+}) {
   const root = resolve(projectRoot);
   const packagePath = resolve(root, "package.json");
   const lockPath = resolve(root, "package-lock.json");
@@ -398,6 +404,8 @@ async function writeBackup({ projectRoot, packageName, candidateVersion }) {
     id,
     packageName,
     candidateVersion,
+    previousVersion,
+    previousIntegrity,
     createdAt: new Date().toISOString()
   }, null, 2) + "\n", "utf8");
   return { id, backupDirectory };
@@ -416,10 +424,18 @@ async function restoreBackup({ projectRoot, backupId, npmRunner = runNpm }) {
   await copyFile(resolve(backupDirectory, "package-lock.json"), resolve(root, "package-lock.json"));
   const result = npmRunner(["ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
   assertCommandSuccess(result, "npm rollback");
+  const restoredPackage = await installedPackage(root, metadata.packageName);
+  const restoredLock = await readJson(resolve(root, "package-lock.json"), "restored package-lock.json");
+  const restoredEntry = restoredLock.packages?.["node_modules/" + metadata.packageName];
+  if (!restoredPackage || restoredPackage.version !== metadata.previousVersion ||
+      restoredEntry?.version !== metadata.previousVersion ||
+      (metadata.previousIntegrity && restoredEntry.integrity !== metadata.previousIntegrity)) {
+    fail("Rollback verification failed: restored package version or integrity does not match the backup");
+  }
   return {
     backupId,
     packageName: metadata.packageName,
-    restoredVersion: metadata.previousVersion ?? null
+    restoredVersion: metadata.previousVersion
   };
 }
 
@@ -453,8 +469,9 @@ export async function applyEngineUpdate({
     fail("Installed version changed since the update plan was created; run update --check again");
   }
   const lock = await readJson(lockPath, "project package-lock.json");
-  if (!lock.packages?.["node_modules/" + packageName]) {
-    fail("A current npm package-lock.json entry is required before updates can be applied");
+  const currentLockEntry = lock.packages?.["node_modules/" + packageName];
+  if (!currentLockEntry || currentLockEntry.version !== currentVersion || !currentLockEntry.integrity) {
+    fail("A matching npm package-lock.json version and integrity entry are required before updates can be applied");
   }
 
   const nodeMajor = Number(process.versions.node.split(".")[0]);
@@ -476,20 +493,24 @@ export async function applyEngineUpdate({
     fail("Update blocked by hybrid policy: " + policy.decision + " (" + policy.reason + ")");
   }
 
-  const { id, backupDirectory } = await writeBackup({
+  const { id } = await writeBackup({
     projectRoot: root,
     packageName,
-    candidateVersion: release.version
+    candidateVersion: release.version,
+    previousVersion: currentVersion,
+    previousIntegrity: currentLockEntry.integrity
   });
-  const backupMetadataPath = resolve(backupDirectory, "metadata.json");
-  const metadata = await readJson(backupMetadataPath, "new update backup metadata");
-  metadata.previousVersion = currentVersion;
-  await writeFile(backupMetadataPath, JSON.stringify(metadata, null, 2) + "\n", "utf8");
 
   try {
+    const saveFlag = {
+      dependencies: "--save-prod",
+      devDependencies: "--save-dev",
+      optionalDependencies: "--save-optional"
+    }[declared.section];
     const result = npmRunner([
       "install",
       packageName + "@" + release.version,
+      saveFlag,
       "--save-exact",
       "--ignore-scripts",
       "--no-audit",
