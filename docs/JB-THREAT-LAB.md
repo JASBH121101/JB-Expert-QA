@@ -32,10 +32,10 @@ Dynamic malware behavior analysis, if ever approved, requires a separate isolate
 
 ## Safety controls
 
-1. Scenarios must explicitly declare safe, offline, and non-destructive.
+1. Scenarios must explicitly declare safe, offline, non-destructive, and non-executing.
 2. Submitted samples are never executed by the lab.
 3. Test data and databases must be disposable and separate from production.
-4. Adapters must have explicit timeouts and bounded inputs; secrets and personal data are excluded from reports.
+4. Adapter code is trusted code, not sandboxed by the metadata gate; review it, use explicit timeouts and bounded inputs, and exclude secrets and personal data from reports.
 5. No automatic source repair, database mutation, deployment, package publication, or production action.
 6. No paid services, cloud malware feeds, external sample uploads, telemetry, or new paid infrastructure.
 7. Every integration is opt-in and separately reviewed.
