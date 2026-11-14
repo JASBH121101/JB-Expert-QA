@@ -208,3 +208,31 @@ test("requires approval for minor releases and never installs them silently", as
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("blocks local workspace/file dependencies instead of replacing them from the registry", async () => {
+  const root = await createProject();
+  try {
+    const projectPackagePath = resolve(root, "package.json");
+    const projectPackage = JSON.parse(await readFile(projectPackagePath, "utf8"));
+    projectPackage.dependencies["@jb/expert-qa"] = "workspace:*";
+    await writeFile(projectPackagePath, JSON.stringify(projectPackage, null, 2) + "\n");
+
+    const plan = await buildUpdatePlan({ projectRoot: root, manifest: makeManifest() });
+    assert.equal(plan[0].status, "local-dependency");
+    assert.equal(plan[0].decision, "blocked");
+
+    await assert.rejects(() => applyEngineUpdate({
+      packageName: "@jb/expert-qa",
+      release: makeManifest().packages["@jb/expert-qa"],
+      currentVersion: "0.2.0",
+      projectRoot: root,
+      manifestVerified: true,
+      stageCandidate: async () => {
+        throw new Error("Local dependencies must be blocked before staging");
+      },
+      npmRunner: fixtureNpmRunner
+    }), /local workspace\/file dependencies/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

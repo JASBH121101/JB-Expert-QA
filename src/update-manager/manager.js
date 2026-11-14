@@ -9,6 +9,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -214,6 +215,10 @@ export async function buildUpdatePlan({ projectRoot = process.cwd(), manifest } 
     const release = manifest.packages[packageName];
     const declared = dependencySpec(projectPackage, packageName);
     if (!release || !declared) continue;
+    if (/^(?:workspace:|file:|link:)/.test(String(declared.value))) {
+      plan.push({ packageName, currentVersion: null, candidateVersion: release.version, status: "local-dependency", releaseType: null, decision: "blocked" });
+      continue;
+    }
     const installed = await installedPackage(root, packageName);
     if (!installed?.version) {
       plan.push({
@@ -303,13 +308,16 @@ async function validatePackageLayout({ installRoot, packageName, release }) {
 
   const paths = [];
   const addTarget = (target) => {
-    if (typeof target !== "string" || !target.startsWith("./") || target.includes("*")) return;
+    if (typeof target !== "string") return;
+    if (!target.startsWith("./") || target.includes("\0")) {
+      fail("Package entry points must be relative paths inside the package");
+    }
     const absolute = resolve(packageDirectory, target);
     const relativeTarget = relative(packageDirectory, absolute);
     if (isAbsolute(relativeTarget) || relativeTarget === ".." || relativeTarget.startsWith(".." + (process.platform === "win32" ? "\\" : "/"))) {
       fail("Package export escapes its installation directory");
     }
-    paths.push(absolute);
+    if (!target.includes("*")) paths.push(absolute);
   };
   addTarget(packageJson.main);
   if (typeof packageJson.exports === "string") addTarget(packageJson.exports);
@@ -327,8 +335,15 @@ async function validatePackageLayout({ installRoot, packageName, release }) {
 
   for (const path of paths) {
     try {
-      await readFile(path);
-    } catch {
+      const actualPath = await realpath(path);
+      const actualRelative = relative(packageDirectory, actualPath);
+      if (isAbsolute(actualRelative) || actualRelative === ".." ||
+          actualRelative.startsWith(".." + (process.platform === "win32" ? "\\" : "/"))) {
+        fail("Package entry point resolves outside its installation directory");
+      }
+      await readFile(actualPath);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("resolves outside")) throw error;
       fail("Package entry point is missing: " + path.slice(packageDirectory.length + 1));
     }
   }
@@ -430,6 +445,9 @@ export async function applyEngineUpdate({
   const projectPackage = await readJson(projectPackagePath, "project package.json");
   const declared = dependencySpec(projectPackage, packageName);
   if (!declared) fail(packageName + " is not a direct dependency of this project");
+  if (/^(?:workspace:|file:|link:)/.test(String(declared.value))) {
+    fail("Local workspace/file dependencies are not eligible for package auto-updates");
+  }
   const installed = await installedPackage(root, packageName);
   if (!installed || installed.version !== currentVersion) {
     fail("Installed version changed since the update plan was created; run update --check again");

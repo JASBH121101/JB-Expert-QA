@@ -83,6 +83,7 @@ Rollback uses the saved lockfile and `npm ci --ignore-scripts`. Do not delete th
 ## Limitations
 
 - The updater currently targets npm projects with `package-lock.json`; pnpm and Yarn lockfiles are not modified.
+- Local `workspace:`, `file:` and `link:` dependencies are blocked and are never replaced with registry packages.
 - The release manifest and detached signature must be supplied by the publisher.
 - Beta releases are not applied by the stable CLI path.
 - The initial implementation does not schedule background updates. It performs work only when the project owner invokes the command.
