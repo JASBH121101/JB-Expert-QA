@@ -113,6 +113,17 @@ test("only specialists included in the audit affect its score", () => {
 
 
 test("legacy scoring policies keep new specialists visible but explicitly unweighted", () => {
+  const result = calculateScore([], {
+    weights: { responsive: 100 },
+    includedSpecialists: ["responsive", "language"]
+  });
+  assert.equal(result.score, 100);
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.unweightedSpecialists, ["language"]);
+  assert.equal(result.specialistScores.language, 100);
+});
+
+test("unweighted specialist findings block a pass until the policy assigns a weight", () => {
   const result = calculateScore([{
     specialist: "language",
     severity: "high"
@@ -121,9 +132,8 @@ test("legacy scoring policies keep new specialists visible but explicitly unweig
     includedSpecialists: ["responsive", "language"]
   });
   assert.equal(result.score, 100);
-  assert.equal(result.passed, true);
-  assert.deepEqual(result.unweightedSpecialists, ["language"]);
-  assert.equal(result.specialistScores.language, 88);
+  assert.equal(result.passed, false);
+  assert.equal(result.blockedByUnweightedFindings, true);
 });
 
 test("audit cannot pass when a rule execution fails", async () => {
