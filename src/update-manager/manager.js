@@ -477,7 +477,6 @@ export async function applyEngineUpdate({
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   if (nodeMajor < release.nodeMinMajor) fail("Current Node.js version is below the signed manifest requirement");
 
-  const classification = classifyUpdate(currentVersion, release.version);
   if (classification.status === "prerelease") {
     fail("Prerelease engine updates are not available through the stable CLI path");
   }
