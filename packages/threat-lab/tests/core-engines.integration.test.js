@@ -416,20 +416,20 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
         }
 
         if (scenario.id === "expert-qa.language.translation-integrity") {
-          await writeFile(path.join(expertProject, "lang", "es", "messages.php"), \`<?php
+          await writeFile(path.join(expertProject, "lang", "es", "messages.php"), `<?php
 return [
   'greeting' => 'Hola :name',
   'count' => 'Total :count',
   'description' => 'Descripción del producto',
 ];
-\`);
-          await writeFile(path.join(expertProject, "lang", "en", "messages.php"), \`<?php
+`);
+          await writeFile(path.join(expertProject, "lang", "en", "messages.php"), `<?php
 return [
   'greeting' => 'Hello :name',
   'count' => 'Total',
   'legacy' => 'Old label',
 ];
-\`);
+`);
           const report = await auditFixture(expertProject);
           const languageAudit = report.languageAudit;
           const missingKey = languageAudit?.findings?.some((item) =>
