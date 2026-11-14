@@ -67,7 +67,7 @@ class StaticPhpArrayParser {
     const char = this.source[this.offset];
     if (char === "[") return this.parseArray();
     if (char === "'" || char === '"') return this.readString();
-    const scalar = this.source.slice(this.offset).match(/^(true|false|null|-?[0-9]+(?:\.[0-9]+)?)(?=\s*[,\\]])/i);
+    const scalar = this.source.slice(this.offset).match(/^(true|false|null|-?[0-9]+(?:\.[0-9]+)?)(?=\s*(?:,|\]))/i);
     if (!scalar) throw parserError("Only literal strings, scalar values and nested arrays are supported", this.offset);
     this.offset += scalar[0].length;
     if (scalar[0].toLowerCase() === "true") return true;
