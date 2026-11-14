@@ -31,14 +31,14 @@ test("compares named, brace and positional placeholders without losing duplicate
 });
 
 test("parses static nested Laravel translation arrays without executing PHP", () => {
-  const parsed = parsePhpTranslationArray(\`<?php
+  const parsed = parsePhpTranslationArray(`<?php
 return [
   'heading' => 'Hello :name',
   'nested' => [
     'count' => 'There are :count items',
   ],
 ];
-\`);
+`);
   assert.equal(parsed.heading, "Hello :name");
   assert.equal(parsed.nested.count, "There are :count items");
   assert.throws(() => parsePhpTranslationArray("<?php return include 'evil.php';"), /Only literal strings/);
@@ -96,20 +96,20 @@ test("filesystem auditor compares legacy es and en PHP resources and exposes fin
   try {
     await mkdir(join(root, "lang", "es"), { recursive: true });
     await mkdir(join(root, "lang", "en"), { recursive: true });
-    await writeFile(join(root, "lang", "es", "messages.php"), \`<?php
+    await writeFile(join(root, "lang", "es", "messages.php"), `<?php
 return [
   'greeting' => 'Hola :name',
   'count' => 'Total :count',
   'missing' => 'Descripción',
 ];
-\`);
-    await writeFile(join(root, "lang", "en", "messages.php"), \`<?php
+`);
+    await writeFile(join(root, "lang", "en", "messages.php"), `<?php
 return [
   'greeting' => 'Hello :name',
   'count' => 'Total',
   'obsolete' => 'Old message',
 ];
-\`);
+`);
     const result = await auditLanguageFiles(root);
     assert.equal(result.status, "checked");
     assert.equal(result.sourceLocale, "es-419");
