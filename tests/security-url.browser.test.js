@@ -41,3 +41,31 @@ test("runtime URL auditor can inspect a controlled local HTTP fixture without ex
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+test("runtime URL auditor follows redirects and reports the redirect-inspection limitation", async () => {
+  const server = createServer((request, response) => {
+    if (request.url === "/") {
+      response.writeHead(302, { location: "/final" });
+      response.end();
+      return;
+    }
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><html><body>Final fixture</body></html>");
+  });
+
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  try {
+    const report = await auditSecurityUrl("http://127.0.0.1:" + address.port + "/", {
+      allowPrivateNetworks: true,
+      timeout: 15000
+    });
+    assert.equal(report.target.status, 200);
+    assert.ok(report.target.finalUrl.endsWith("/final"));
+    assert.equal(report.runtimeAssessment.networkDnsPolicy.redirectHopsFullyInspected, false);
+    assert.ok(report.runtimeAssessment.limitations.some((item) => item.includes("redirect chain")));
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
