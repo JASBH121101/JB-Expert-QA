@@ -1,6 +1,5 @@
 <?php
 
-use App\Core\Security\TrustedProxyList;
 use App\Http\Middleware\AdminAccess;
 use App\Http\Middleware\ApplyInstallationLocale;
 use App\Http\Middleware\OwnerOnly;
