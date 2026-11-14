@@ -416,6 +416,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
         }
 
         if (scenario.id === "expert-qa.language.translation-integrity") {
+          await mkdir(path.join(expertProject, "lang", "es"), { recursive: true });
+          await mkdir(path.join(expertProject, "lang", "en"), { recursive: true });
           await writeFile(path.join(expertProject, "lang", "es", "messages.php"), `<?php
 return [
   'greeting' => 'Hola :name',
