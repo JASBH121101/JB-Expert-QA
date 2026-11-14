@@ -42,7 +42,7 @@ final class SetupController
 
         $locale = $request->query('locale');
 
-        if (!is_string($locale) || !array_key_exists($locale, LanguageCatalog::all())) {
+        if (! is_string($locale) || !array_key_exists($locale, LanguageCatalog::all())) {
             $locale = $request->getPreferredLanguage(array_keys(LanguageCatalog::all())) ?? 'es';
         }
 
@@ -389,7 +389,7 @@ final class SetupController
             $request->query('locale', config('app.locale', 'es')),
         )));
 
-        if (!array_key_exists($locale, LanguageCatalog::all())) {
+        if (! array_key_exists($locale, LanguageCatalog::all())) {
             $locale = 'es';
         }
 
