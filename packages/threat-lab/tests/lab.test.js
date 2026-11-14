@@ -63,3 +63,36 @@ test("rejects duplicate target and scenario identifiers", () => {
   lab.registerScenario(scenario);
   assert.throws(() => lab.registerScenario(scenario), /already registered/);
 });
+
+test("target-scoped scenarios skip unrelated engines without invoking their adapters", async () => {
+  const lab = createThreatLab();
+  const calls = [];
+  lab.registerTarget({
+    id: "engine-a",
+    kind: "static-engine",
+    adapter: { async runScenario({ scenario }) { calls.push("a:" + scenario.id); return { status: "pass" }; } }
+  });
+  lab.registerTarget({
+    id: "engine-b",
+    kind: "runtime-engine",
+    adapter: { async runScenario({ scenario }) { calls.push("b:" + scenario.id); return { status: "pass" }; } }
+  });
+  lab.registerScenario({
+    id: "static-only-check",
+    category: "static",
+    description: "Only the static engine should run this check.",
+    appliesTo: ["engine-a"],
+    safety: { safe: true, network: false, destructive: false }
+  });
+  lab.registerScenario({
+    id: "runtime-kind-check",
+    category: "runtime",
+    description: "Target kinds can be used to scope a reusable check.",
+    appliesTo: ["runtime-engine"],
+    safety: { safe: true, network: false, destructive: false }
+  });
+
+  const report = await lab.run();
+  assert.deepEqual(calls, ["a:static-only-check", "b:runtime-kind-check"]);
+  assert.deepEqual(report.totals, { pass: 2, fail: 0, skip: 2 });
+});
