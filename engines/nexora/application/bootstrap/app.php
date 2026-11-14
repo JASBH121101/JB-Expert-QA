@@ -5,6 +5,7 @@ use App\Http\Middleware\ApplyInstallationLocale;
 use App\Http\Middleware\OwnerOnly;
 use App\Http\Middleware\RequirePasswordChange;
 use App\Http\Middleware\RequirePermission;
+use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,13 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $trustedProxies = config('nexora.trusted_proxies', []);
-
-        $middleware->trustProxies(
-            at: $trustedProxies === [] ? null : $trustedProxies,
-            headers: Request::HEADER_X_FORWARDED_FOR
-                | Request::HEADER_X_FORWARDED_PORT
-                | Request::HEADER_X_FORWARDED_PROTO,
+        $middleware->replace(
+            \Illuminate\Http\Middleware\TrustProxies::class,
+            TrustConfiguredProxies::class,
         );
 
         $middleware->web(append: [ApplyInstallationLocale::class]);

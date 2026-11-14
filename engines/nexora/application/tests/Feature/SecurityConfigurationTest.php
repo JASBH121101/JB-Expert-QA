@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Core\Security\TrustedProxyList;
+use App\Http\Middleware\TrustConfiguredProxies;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -28,6 +31,49 @@ final class SecurityConfigurationTest extends TestCase
                 '192.0.2.10, 198.51.100.0/24, 2001:db8::10, 2001:db8:abcd::/48, 192.0.2.10',
             ),
         );
+    }
+
+
+    public function test_proxy_middleware_uses_only_the_configured_proxy_list_and_header_set(): void
+    {
+        config(['nexora.trusted_proxies' => ['192.0.2.10', '2001:db8:abcd::/48']]);
+
+        $request = Request::create('https://nexora.example.test/');
+
+        (new TrustConfiguredProxies())->handle(
+            $request,
+            static fn (Request $request): Response => new Response('ok'),
+        );
+
+        $this->assertSame(
+            ['192.0.2.10', '2001:db8:abcd::/48'],
+            Request::getTrustedProxies(),
+        );
+        $this->assertSame(
+            Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+            Request::getTrustedHeaderSet(),
+        );
+
+        Request::setTrustedProxies([], 0);
+    }
+
+    public function test_proxy_middleware_does_not_trust_any_proxy_when_configuration_is_empty(): void
+    {
+        config(['nexora.trusted_proxies' => []]);
+        Request::setTrustedProxies(['198.51.100.10'], Request::HEADER_X_FORWARDED_ALL);
+
+        $request = Request::create('http://nexora.example.test/');
+
+        (new TrustConfiguredProxies())->handle(
+            $request,
+            static fn (Request $request): Response => new Response('ok'),
+        );
+
+        $this->assertSame([], Request::getTrustedProxies());
+
+        Request::setTrustedProxies([], 0);
     }
 
     public function test_proxy_parser_rejects_wildcard_trust(): void
