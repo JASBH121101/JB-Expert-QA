@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -11,14 +12,37 @@ import { createSecurityGuardScanner } from "../../malware-engine/src/security-gu
 import { createSecurityGuard } from "../../security-guard/src/index.js";
 import { createUploadInspector } from "../../security-guard/src/upload-inspector.js";
 import { auditProject } from "../../../src/adapters/filesystem/audit-project.js";
+import { auditDatabaseProject } from "../../../src/adapters/filesystem/audit-database.js";
+import { comparePngBuffers } from "../../../src/adapters/visual/png-diff.js";
 import projectAuditConfig from "../../../config/project-audit.config.json" with { type: "json" };
+import pngjs from "pngjs";
+
+const { PNG } = pngjs;
 
 const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const TEST_MARKER = Buffer.from("deadbeef", "hex");
+const HASH_FIXTURE = Buffer.from("JB Threat Lab exact SHA-256 fixture; inert bytes only.");
+const HASH_FIXTURE_SHA256 = createHash("sha256").update(HASH_FIXTURE).digest("hex");
 const EXPECTED_EICAR = Buffer.from(
   "WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=",
   "base64"
 );
+
+function makePng(changed = false) {
+  const image = new PNG({ width: 2, height: 2 });
+  for (let index = 0; index < image.data.length; index += 4) {
+    image.data[index] = 20;
+    image.data[index + 1] = 40;
+    image.data[index + 2] = 60;
+    image.data[index + 3] = 255;
+  }
+  if (changed) {
+    image.data[0] = 250;
+    image.data[1] = 0;
+    image.data[2] = 0;
+  }
+  return PNG.sync.write(image);
+}
 
 async function createWorkspace(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "jb-threat-lab-engines-"));
@@ -68,7 +92,11 @@ function createMemoryStore() {
   };
 }
 
-function simulateGuardRequest(guard, url) {
+function simulateGuardRequest(guard, url, {
+  method = "GET",
+  headers = {},
+  rawHeaders = []
+} = {}) {
   const response = {
     statusCode: 200,
     headersSent: false,
@@ -81,9 +109,9 @@ function simulateGuardRequest(guard, url) {
   let reachedApplication = false;
   guard.middleware({
     url,
-    method: "GET",
-    headers: {},
-    rawHeaders: [],
+    method,
+    headers,
+    rawHeaders,
     socket: { remoteAddress: "127.0.0.1" }
   }, response, () => { reachedApplication = true; });
   return { statusCode: response.statusCode, headers: response.headers, body: response.body, reachedApplication };
@@ -114,13 +142,22 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
   await Promise.all([
     mkdir(malwareFixtures),
     mkdir(guardTemp),
-    mkdir(path.join(expertProject, "src"), { recursive: true })
+    mkdir(path.join(expertProject, "src"), { recursive: true }),
+    mkdir(path.join(expertDatabaseProject, "src"), { recursive: true })
   ]);
 
   assert.deepEqual(Buffer.from(EICAR_TEST_STRING), EXPECTED_EICAR,
     "Threat Lab's EICAR fixture must match the exact harmless test string");
 
   const malwareEngine = createMalwareEngine({ quarantineDir: malwareQuarantine });
+  const hashSignatureEngine = createMalwareEngine({
+    quarantineDir: path.join(root, "hash-signature-quarantine"),
+    hashSignatures: { [HASH_FIXTURE_SHA256]: "ThreatLab.ExactHashFixture" }
+  });
+  const sizeBoundedMalwareEngine = createMalwareEngine({
+    quarantineDir: path.join(root, "size-bounded-quarantine"),
+    maxFileBytes: 32
+  });
   const uploadMalwareEngine = createMalwareEngine({
     quarantineDir: path.join(root, "upload-engine-quarantine"),
     byteSignatures: [{
@@ -140,6 +177,7 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     mode: "balanced",
     rateLimit: { enabled: false }
   });
+  const expertDatabaseProject = path.join(root, "expert-database-project");
 
   const lab = createThreatLab({ name: "JB Threat Lab", version: "0.1.0" });
 
