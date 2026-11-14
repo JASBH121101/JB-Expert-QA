@@ -347,6 +347,73 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     capabilities: ["local-static-audit", "security-rules", "regression-check"],
     adapter: {
       async runScenario({ scenario }) {
+        if (scenario.id === "expert-qa.database.dynamic-query-and-tls") {
+          const source = [
+            "const pool = new pg.Pool({ ssl: false });",
+            'export function findUser(input) { return pool.query("SELECT * FROM users WHERE name = \'" + input + "\'"); }'
+          ].join("\n");
+          await writeFile(path.join(expertDatabaseProject, "src", "db.js"), source);
+          const report = await auditDatabaseProject(expertDatabaseProject, {
+            config: {
+              ...projectAuditConfig,
+              profile: "jb-threat-lab-database-fixture",
+              advisories: { enabled: false, required: false }
+            },
+            scanOptions: {
+              maxFiles: 100,
+              maxFileBytes: 1_000_000,
+              maxTotalBytes: 2_000_000,
+              maxDepth: 5
+            }
+          });
+          const rawQuery = report.diagnostics.some((item) => item.metadata?.detector === "dynamic-raw-query");
+          const disabledTls = report.diagnostics.some((item) => item.metadata?.detector === "database-tls-disabled");
+          const passed = report.databaseScope.complete && rawQuery && disabledTls &&
+            report.databaseScope.databaseConnections === 0 &&
+            report.databaseScope.networkRequests === 0;
+          return outcome(passed ? "pass" : "fail",
+            passed
+              ? "Expert QA detected dynamic raw SQL and disabled database TLS without connecting to a database"
+              : "Expert QA database audit did not return both expected static findings",
+            {
+              complete: report.databaseScope.complete,
+              rawQueryDetected: rawQuery,
+              disabledTlsDetected: disabledTls,
+              evidenceFiles: report.databaseScope.databaseEvidenceFiles,
+              databaseConnections: report.databaseScope.databaseConnections,
+              networkRequests: report.databaseScope.networkRequests
+            },
+            passed ? [] : [{
+              code: "EXPERT_QA_DATABASE_AUDIT_MISMATCH",
+              rawQuery,
+              disabledTls,
+              complete: report.databaseScope.complete
+            }]);
+        }
+
+        if (scenario.id === "expert-qa.visual.deterministic-diff") {
+          const baseline = makePng(false);
+          const changed = makePng(true);
+          const identical = comparePngBuffers(baseline, baseline);
+          const difference = comparePngBuffers(baseline, changed, { maxDiffPixelRatio: 0 });
+          const passed = identical.passed === true &&
+            difference.passed === false &&
+            difference.diffPixels > 0 &&
+            Buffer.isBuffer(difference.diffBuffer);
+          return outcome(passed ? "pass" : "fail",
+            passed
+              ? "Expert QA visual comparison deterministically detected a local pixel difference"
+              : "Expert QA visual comparison did not report the expected pixel difference",
+            {
+              identicalPassed: identical.passed,
+              changedPassed: difference.passed,
+              changedPixels: difference.diffPixels,
+              changedPixelRatio: difference.diffPixelRatio,
+              aiCalls: 0
+            },
+            passed ? [] : [{ code: "EXPERT_QA_VISUAL_DIFF_MISMATCH" }]);
+        }
+
         if (scenario.id !== "expert-qa.static.unsafe-html-detected" &&
             scenario.id !== "expert-qa.static.repaired-html-regression") {
           return outcome("skip", "No Expert QA handler for this scenario");
