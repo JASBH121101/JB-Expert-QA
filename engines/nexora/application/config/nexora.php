@@ -1,6 +1,6 @@
 <?php
 
-use App\\Core\\Security\\TrustedProxyList;
+use App\Core\Security\TrustedProxyList;
 
 return [
     /*
