@@ -51,11 +51,26 @@ The Malware Engine now has dedicated, safe regression coverage beyond the origin
 
 - **Script delivery and persistence:** inert fixtures correlate download + dynamic execution with Windows Run-key, scheduled-task, service, and WMI event-subscription persistence indicators.
 - **PE/RAT capability correlation:** a synthetic PE fixture correlates process-injection imports with remote command-channel imports; a control fixture verifies that process-injection imports alone do not imply RAT/Trojan behavior.
+- **Backdoor/persistence:** a synthetic PE fixture correlates Windows service-persistence imports with remote command-channel and process-launch capabilities.
+- **Credential theft/exfiltration:** a synthetic PE fixture correlates process-memory and logon-session access imports with remote-transfer capabilities.
 - **Process hollowing:** unit coverage verifies that process-hollowing capability plus a remote command channel produces RAT/Trojan-like candidate labels.
-- **False-positive guard:** a single low-specificity download marker must not produce a Trojan-family candidate.
+- **False-positive guard:** a single low-specificity download marker and isolated process-injection imports must not produce a Trojan/RAT family candidate.
 - **Containment boundary:** a suspicious Trojan-like candidate cannot be passed to `quarantineFile`; only an authentic `malicious` report from the same engine instance is eligible.
 
 These are static behavior correlations over inert text and synthetic PE structures. They never execute files, create a network connection, or confirm malware. A family candidate remains `suspicious` and is not automatically quarantined. Exact configured hash/byte-signature matches remain the confirmed `malicious` path.
+
+## Signed signature-bundle trust and rollback controls
+
+The Malware Engine supports optional monotonic bundle sequencing and caller-persisted anti-rollback checkpoints:
+
+- Ed25519 signatures are verified against explicitly trusted public-key IDs.
+- Locally revoked key IDs are rejected even when the supplied bundle has a valid signature.
+- Strict mode requires a positive signed `sequence` and a `signatureBundleState` created by `createSignatureBundleState()` or restored from its JSON representation.
+- Lower sequence numbers are rejected; different signed content cannot reuse an accepted sequence; the exact same bundle is idempotent.
+- Checkpoints are advanced only after all bundles and signature rules validate successfully. A rejected batch does not partially advance state.
+- Key rotation is supported by adding a new trusted key ID and revoking the previous ID.
+
+The checkpoint is caller-owned state, not protected storage. The host application must persist it atomically under restrictive operating-system permissions. Restoring an older or attacker-modified checkpoint defeats rollback protection. No signing private key, remote update feed, key server, or live malware database is shipped or configured. Legacy schema-v1 bundles without a sequence remain accepted only when strict sequencing is not requested and no checkpoint state is supplied.
 
 ## Current implementation status
 
@@ -65,17 +80,11 @@ The reusable core, target-scoped scenario registry, explicit offline/non-destruc
 - **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
 - **JB Expert QA — 4 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls.
 
-**Previous completed baseline (`2d4606c`):**
-- [Core validation #567](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838062): Node 22 ✅ and Node 24 ✅, including the initial Trojan script and PE/RAT Threat Lab checks.
-- [Security QA #350](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838028): Node 22 ✅ and Node 24 ✅.
-- [NPM package distribution #69](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43545838105): Node 22 ✅ and Node 24 ✅.
-
-**Latest commit under validation (`232f4a6`):**
-- [Core validation #569](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078965): running at the time of this documentation update.
-- [Security QA #352](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078948): Node 22 ✅ and Node 24 ✅.
-- [NPM package distribution #70](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078960): Node 22 ✅; Node 24 was still running at the time of this documentation update.
-- [JB Malware Engine Validation #156](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43546078997): Ubuntu ✅ and Windows ✅.
-
+**Latest completed validation for branch commit `dc7c795`:**
+- [Core validation #576](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309541): Node 22 ✅ and Node 24 ✅. Includes all Malware Engine package regressions, the cross-engine Threat Lab, Trojan script/persistence tests, PE RAT/backdoor/credential-theft correlations, signed-bundle policy tests, and package-distribution checks.
+- [Security QA #359](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309496): Node 22 ✅ and Node 24 ✅.
+- [NPM package distribution #74](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309572): Node 22 ✅ and Node 24 ✅.
+- [JB Malware Engine Validation #160](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309579): Ubuntu ✅ and Windows ✅.
 The suite uses temporary directories and no production data, network requests, real malware execution, external feeds, paid services, or AI calls. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The database auditor is local-static and makes zero database connections. The PNG comparison scenario validates deterministic visual diff only; it is not a full visual/browser certification.
 
 NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
