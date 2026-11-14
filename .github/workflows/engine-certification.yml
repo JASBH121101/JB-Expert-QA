@@ -61,11 +61,12 @@ jobs:
         id: expert-report
         run: |
           mkdir -p certification-reports
-          npm run audit:security -- . --format=markdown --output=certification-reports/expert-qa-security.md
+          npm run audit:security -- . --production-only --format=markdown --output=certification-reports/expert-qa-security.md
       - name: Add report status to workflow summary
         if: always()
         run: |
           if [ -f certification-reports/expert-qa-security.md ]; then
+            echo "Scope: production source only. Test/fixture files and the security detector rule definitions are excluded from finding evaluation; all tests still run in the regression suite." >> "$GITHUB_STEP_SUMMARY"
             cat certification-reports/expert-qa-security.md >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Expert QA report was not generated; inspect the preceding step." >> "$GITHUB_STEP_SUMMARY"

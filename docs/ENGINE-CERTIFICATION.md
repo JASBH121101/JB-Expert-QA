@@ -87,3 +87,7 @@ Possible outcomes: **Passed**, **Passed with observations**, or **Not passed**. 
 - CI uses GitHub-hosted runners and the repository's existing free-tier controls.
 - No malware samples are executed. No destructive tests are run against live systems.
 - Artifacts contain test reports/benchmarks only and have a 14-day retention period.
+
+## Security assessment scope
+
+The certification security report uses production-source scope. It evaluates deployable source files and excludes test directories, fixture/testing directories, and the repository's own security-rule definition files, which contain intentionally unsafe examples and detection patterns. These excluded files remain covered by the full regression suite; they are not treated as application runtime code. Any finding that remains in production-source scope continues to block the assessment.

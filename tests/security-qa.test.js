@@ -314,3 +314,26 @@ test("runtime cookie findings include cookie names but never cookie values", asy
   assert.deepEqual(cookieFinding.metadata.missingAttributes, ["Secure", "HttpOnly", "SameSite"]);
   assert.equal(JSON.stringify(report).includes("sensitive-cookie-value-must-not-leak"), false);
 });
+
+test("production-only security assessment excludes test fixtures and the detector's own rule definitions", async () => {
+  await withProject(async (root) => {
+    await mkdir(join(root, "src", "specialists"), { recursive: true });
+    await mkdir(join(root, "tests"), { recursive: true });
+    await writeFile(join(root, "src", "app.js"), 'const endpoint = "http://api.example.com/v1";');
+    await writeFile(join(root, "tests", "unsafe.test.js"), [
+      'const endpoint = "http://api.example.com/v1";',
+      'const resetToken = Math.random().toString(36);',
+      'eval("fixture");'
+    ].join("\\n"));
+    await writeFile(join(root, "src", "specialists", "security-rules.js"), [
+      'const detector = /Math\\\\s*\\\\.\\\\s*random\\\\s*\\\\(/;',
+      'const sensitivePurpose = /token|secret|session/i;'
+    ].join("\\n"));
+
+    const report = await auditSecurityProject(root, { productionOnly: true });
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("SEC-HTTP-")));
+    assert.equal(report.diagnostics.some((item) => item.id.startsWith("SEC-RANDOM-")), false);
+    assert.equal(report.securityAssessment.scope, "production-source");
+    assert.equal(report.securityAssessment.excludedNonProductionFiles, 2);
+  });
+});
