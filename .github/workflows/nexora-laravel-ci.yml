@@ -1,0 +1,85 @@
+name: NEXORA Laravel CI
+
+on:
+  push:
+    branches:
+      - feature/nexora-security-baseline
+    paths:
+      - "engines/nexora/application/**"
+      - ".github/workflows/nexora-laravel-ci.yml"
+  pull_request:
+    branches:
+      - NEXORA-Core
+    paths:
+      - "engines/nexora/application/**"
+      - ".github/workflows/nexora-laravel-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-laravel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  laravel:
+    name: Laravel 13 · PHP 8.3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: engines/nexora/application
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexora
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        with:
+          php-version: "8.3"
+          extensions: bcmath, curl, dom, fileinfo, intl, mbstring, openssl, pdo_pgsql, pdo_sqlite, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+      - name: Prepare isolated test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run Laravel Pint
+        run: composer lint
+
+      - name: Run feature tests on SQLite
+        run: composer test
+
+      - name: Run feature tests on PostgreSQL 16
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: nexora
+          DB_USERNAME: nexora
+          DB_PASSWORD: nexora
+          DB_SCHEMA: public
+          DB_URL: ""
+        run: composer test
