@@ -35,13 +35,27 @@ test("rejects scenarios that are not explicitly safe and offline", () => {
   const lab = createThreatLab();
   const base = { id: "unsafe-case", category: "security", description: "unsafe", safety: { safe: true, network: true, destructive: false } };
   assert.throws(() => lab.registerScenario(base), /Scenario rejected/);
-  assert.throws(() => lab.registerScenario({ ...base, id: "not-safe", safety: { safe: false, network: false, destructive: false } }), /Scenario rejected/);
+  assert.throws(() => lab.registerScenario({
+    ...base,
+    id: "missing-execution-boundary",
+    safety: { safe: true, network: false, destructive: false }
+  }), /Scenario rejected/);
+  assert.throws(() => lab.registerScenario({
+    ...base,
+    id: "sample-execution-enabled",
+    safety: { safe: true, network: false, destructive: false, executesSample: true }
+  }), /Scenario rejected/);
+  assert.throws(() => lab.registerScenario({
+    ...base,
+    id: "not-safe",
+    safety: { safe: false, network: false, destructive: false, executesSample: false }
+  }), /Scenario rejected/);
 });
 
 test("records adapter exceptions as failed checks without aborting the matrix", async () => {
   const lab = createThreatLab();
   lab.registerTarget({ id: "broken-adapter", kind: "test", adapter: { async runScenario() { throw new Error("controlled failure"); } } });
-  lab.registerScenario({ id: "safe-check", category: "regression", description: "Inert regression case", safety: { safe: true, network: false, destructive: false } });
+  lab.registerScenario({ id: "safe-check", category: "regression", description: "Inert regression case", safety: { safe: true, network: false, destructive: false, executesSample: false } });
   const report = await lab.run();
   assert.equal(report.totals.fail, 1);
   assert.equal(report.results[0].findings[0].code, "LAB_ADAPTER_ERROR");
