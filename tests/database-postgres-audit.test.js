@@ -269,6 +269,9 @@ test("foreign-key coverage accepts safe IS NOT NULL partial indexes and rejects 
     .map((item) => item.id);
 
   assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-events_active_owner_fk"]);
+  const finding = report.diagnostics.find((item) => item.id === "DB-LIVE-FK-NO-INDEX-events_active_owner_fk");
+  assert.match(finding.description, /partial index is accepted only when/i);
+  assert.doesNotMatch(finding.description, /non-partial index/i);
   const indexQuery = client.calls.find((sql) => sql.includes("jb-expert-qa:indexes"));
   assert.ok(indexQuery.includes("pg_catalog.pg_get_expr(ix.indpred, ix.indrelid) AS index_predicate"));
 });
