@@ -1,8 +1,19 @@
 name: Database PostgreSQL integration
 
 on:
+  push:
+    branches: [main, "integration/**"]
+    paths:
+      - "package.json"
+      - "src/adapters/database/**"
+      - "src/database-cli.js"
+      - "src/index.js"
+      - "tests/database-postgres-audit.test.js"
+      - "tests/e2e/database-postgres-cli-smoke.js"
+      - "docs/DATABASE-QA.md"
+      - ".github/workflows/database-postgres-integration.yml"
   pull_request:
-    branches: [main]
+    branches: [main, "integration/**"]
     paths:
       - "package.json"
       - "src/adapters/database/**"
