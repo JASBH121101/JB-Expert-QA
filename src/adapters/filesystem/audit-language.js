@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { normalizeLocale, DEFAULT_LOCALE, SUPPORTED_LOCALES } from "../../language/locale.js";
 import { parsePhpTranslationArray } from "../../language/php-array-parser.js";
 import { auditTranslationMaps } from "../../language/audit.js";
@@ -28,7 +28,7 @@ async function listFiles(directory, root, output = [], maxFiles = 500) {
   return output;
 }
 
-function flattenFiles(files, localeRoot, locale) {
+function flattenFiles(files, localeRoot) {
   return new Map(files.map((path) => [
     relative(localeRoot, path).split(sep).join("/"),
     path
@@ -61,13 +61,23 @@ export async function auditLanguageFiles(projectRoot, {
     throw new TypeError("A project root directory is required");
   }
   const root = resolve(projectRoot);
+  if (typeof languageDirectory !== "string" || !languageDirectory.trim()) {
+    throw new TypeError("languageDirectory must be a non-empty relative path");
+  }
+  if (!Number.isInteger(maxFiles) || maxFiles < 1 || maxFiles > 500) {
+    throw new TypeError("maxFiles must be an integer between 1 and 500");
+  }
+  const langRoot = resolve(root, languageDirectory);
+  const relativeLanguagePath = relative(root, langRoot);
+  if (isAbsolute(relativeLanguagePath) || relativeLanguagePath === ".." || relativeLanguagePath.startsWith(".." + sep)) {
+    throw new TypeError("languageDirectory must resolve inside the project root");
+  }
   const source = normalizeLocale(sourceLocale);
   const target = normalizeLocale(targetLocale);
   if (!source || !target || source === target) {
     throw new TypeError("Language audit requires two different supported locales");
   }
 
-  const langRoot = resolve(root, languageDirectory);
   const languageDirs = await readdir(langRoot, { withFileTypes: true }).catch((error) => {
     if (error?.code === "ENOENT") return [];
     throw error;
@@ -103,8 +113,8 @@ export async function auditLanguageFiles(projectRoot, {
   if (sourceFiles.length >= maxFiles || targetFiles.length >= maxFiles) {
     throw new Error("Language audit reached the configured file limit; narrow the locale directory before relying on full coverage");
   }
-  const sourceMap = flattenFiles(sourceFiles, sourceRoot ?? langRoot, source);
-  const targetMap = flattenFiles(targetFiles, targetRoot ?? langRoot, target);
+  const sourceMap = flattenFiles(sourceFiles, sourceRoot ?? langRoot);
+  const targetMap = flattenFiles(targetFiles, targetRoot ?? langRoot);
   const allPaths = [...new Set([...sourceMap.keys(), ...targetMap.keys()])].sort();
   const files = [];
   const findings = [];
