@@ -249,8 +249,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
         }
         const vulnerable = scenario.id === "expert-qa.static.unsafe-html-detected";
         const source = vulnerable
-          ? "const params = new URLSearchParams(location.search);\ndocument.querySelector('#result').innerHTML = params.get('name');\n"
-          : "const params = new URLSearchParams(location.search);\ndocument.querySelector('#result').textContent = params.get('name');\n";
+          ? "document.querySelector('#result').innerHTML = location.search;\n"
+          : "document.querySelector('#result').textContent = location.search;\n";
         await writeFile(path.join(expertProject, "src", "app.js"), source);
         const report = await auditFixture(expertProject);
         const findings = report.diagnostics.filter((item) =>
