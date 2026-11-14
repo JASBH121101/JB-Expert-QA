@@ -57,10 +57,9 @@ export function calculateScore(diagnostics, {
 
   const activeNames = [...new Set(includedSpecialists)];
   const specialistScores = {};
+  const unweightedSpecialists = [];
   for (const name of activeNames) {
-    if (!Object.hasOwn(weights, name)) {
-      throw new TypeError("Missing scoring weight for specialist \"" + name + "\"");
-    }
+    if (!Object.hasOwn(weights, name)) unweightedSpecialists.push(name);
     const relevant = diagnostics.filter((item) => item.specialist === name);
     const penalty = relevant.reduce(
       (sum, item) => sum + (severityPenalties[item.severity] ?? 0),
