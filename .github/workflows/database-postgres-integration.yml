@@ -105,7 +105,7 @@ jobs:
         run: |
           set +x
           report="$RUNNER_TEMP/neon-development-audit.json"
-          node src/database-cli.js --env=QA_NEON_DEVELOPMENT_DATABASE_URL --confirm-read-only > "$report"
+          node src/postgres-database-cli.js --env=QA_NEON_DEVELOPMENT_DATABASE_URL --confirm-read-only > "$report"
           node --input-type=module - "$report" <<'NODE'
           import assert from "node:assert/strict";
           import { readFileSync } from "node:fs";
