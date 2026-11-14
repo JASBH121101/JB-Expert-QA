@@ -110,3 +110,85 @@ test("target-scoped scenarios skip unrelated engines without invoking their adap
   assert.deepEqual(calls, ["a:static-only-check", "b:runtime-kind-check"]);
   assert.deepEqual(report.totals, { pass: 2, fail: 0, skip: 2 });
 });
+
+
+test("rejects oversized or non-JSON run metadata before executing adapters", async () => {
+  const lab = createThreatLab();
+  let calls = 0;
+  lab.registerTarget({
+    id: "bounded-target",
+    kind: "test",
+    adapter: { async runScenario() { calls += 1; return { status: "pass" }; } }
+  });
+  lab.registerScenario({
+    id: "bounded-case",
+    category: "regression",
+    description: "Metadata limits are enforced before adapter execution.",
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
+  });
+
+  await assert.rejects(
+    lab.run({ metadata: { payload: "x".repeat(16 * 1024) } }),
+    /Run metadata exceeds/
+  );
+  await assert.rejects(
+    lab.run({ metadata: { secret: 1n } }),
+    /serializable JSON values/
+  );
+  assert.equal(calls, 0);
+});
+
+test("converts oversized adapter findings and metrics into controlled failed scenarios", async () => {
+  const lab = createThreatLab();
+  lab.registerTarget({
+    id: "oversized-output-target",
+    kind: "test",
+    adapter: {
+      async runScenario({ scenario }) {
+        if (scenario.id === "too-many-findings") {
+          return { status: "pass", findings: Array.from({ length: 101 }, (_, index) => ({ id: index })) };
+        }
+        return {
+          status: "pass",
+          metrics: Object.fromEntries(Array.from({ length: 51 }, (_, index) => ["metric_" + index, index]))
+        };
+      }
+    }
+  });
+  for (const id of ["too-many-findings", "too-many-metrics"]) {
+    lab.registerScenario({
+      id,
+      category: "limits",
+      description: "The lab bounds adapter output.",
+      safety: { safe: true, network: false, destructive: false, executesSample: false }
+    });
+  }
+
+  const report = await lab.run();
+  assert.deepEqual(report.totals, { pass: 0, fail: 2, skip: 0 });
+  assert.ok(report.results.every((item) => item.findings[0].code === "LAB_ADAPTER_ERROR"));
+});
+
+test("rejects duplicate matrix selections and excessive scenario metadata", async () => {
+  const lab = createThreatLab();
+  lab.registerTarget({
+    id: "matrix-target",
+    kind: "test",
+    adapter: { async runScenario() { return { status: "pass" }; } }
+  });
+  lab.registerScenario({
+    id: "matrix-case",
+    category: "regression",
+    description: "Matrix selections must be unambiguous.",
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
+  });
+
+  await assert.rejects(lab.run({ targetIds: ["matrix-target", "matrix-target"] }), /must not contain duplicates/);
+  assert.throws(() => lab.registerScenario({
+    id: "too-many-tags",
+    category: "limits",
+    description: "Scenario tags are bounded.",
+    tags: Array.from({ length: 51 }, (_, index) => "tag-" + index),
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
+  }), /scenario.tags must contain at most/);
+});
