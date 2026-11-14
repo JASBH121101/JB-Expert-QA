@@ -39,7 +39,7 @@ final class SecurityConfigurationTest extends TestCase
 
         $request = Request::create('https://nexora.example.test/');
 
-        (new TrustConfiguredProxies())->handle(
+        (new TrustConfiguredProxies)->handle(
             $request,
             static fn (Request $request): Response => new Response('ok'),
         );
@@ -65,7 +65,7 @@ final class SecurityConfigurationTest extends TestCase
 
         $request = Request::create('http://nexora.example.test/');
 
-        (new TrustConfiguredProxies())->handle(
+        (new TrustConfiguredProxies)->handle(
             $request,
             static fn (Request $request): Response => new Response('ok'),
         );
