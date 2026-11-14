@@ -1,0 +1,320 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { auditPostgresDatabase } from "../src/adapters/database/postgres.js";
+
+function fixtureClient({
+  readOnly = "on",
+  connectError = null,
+  metadata = [{
+    database_name: "qa_fixture",
+    audit_role: "qa_auditor",
+    server_version: "18.1",
+    transaction_read_only: "on"
+  }],
+  tables = [],
+  constraints = [],
+  indexes = [],
+  policies = [],
+  role = [{}],
+  stats = [],
+  extensions = []
+} = {}) {
+  const calls = [];
+  let connected = false;
+  let ended = false;
+  const resultMap = { metadata, tables, constraints, indexes, policies, role, stats, extensions };
+  const client = {
+    calls,
+    get connected() { return connected; },
+    get ended() { return ended; },
+    async connect() {
+      if (connectError) throw connectError;
+      connected = true;
+    },
+    async query(sql) {
+      calls.push(sql);
+      if (sql === "SHOW transaction_read_only") {
+        return { rows: [{ transaction_read_only: readOnly }] };
+      }
+      const match = sql.match(/jb-expert-qa:([a-z]+)/);
+      if (match) return { rows: resultMap[match[1]] ?? [] };
+      return { rows: [] };
+    },
+    async end() { ended = true; }
+  };
+  return client;
+}
+
+const connectionString = "postgresql://qa_user:secret-value@db.example.test:5432/qa_fixture?sslmode=require";
+
+test("PostgreSQL audit uses a read-only transaction, metadata queries, rollback and closes the client", async () => {
+  const client = fixtureClient();
+  const report = await auditPostgresDatabase({
+    connectionString,
+    clientFactory: async (config) => {
+      assert.equal(config.host, "db.example.test");
+      assert.equal(config.database, "qa_fixture");
+      assert.equal(config.user, "qa_user");
+      assert.equal(config.password, "secret-value");
+      assert.deepEqual(config.ssl, { rejectUnauthorized: true });
+      return client;
+    }
+  });
+
+  assert.equal(report.database.engine, "postgresql");
+  assert.equal(report.database.transactionReadOnly, true);
+  assert.equal(report.database.name, "qa_fixture");
+  assert.equal(report.coverage.applicationRowsRead, 0);
+  assert.equal(client.calls[0], "BEGIN READ ONLY");
+  assert.ok(client.calls.includes("ROLLBACK"));
+  assert.equal(client.ended, true);
+  assert.equal(client.calls.some((sql) => /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b/i.test(sql)), false);
+});
+
+test("live audit reports missing primary keys, missing FK indexes and unvalidated constraints", async () => {
+  const client = fixtureClient({
+    tables: [{
+      schema_name: "public", table_name: "orders", relkind: "r",
+      estimated_rows: "12000", total_bytes: "8192",
+      has_primary_key: false, row_level_security: false, force_row_level_security: false
+    }],
+    constraints: [{
+      schema_name: "public", table_name: "orders",
+      constraint_name: "orders_customer_fk", constraint_type: "f",
+      is_validated: false, columns: ["customer_id"]
+    }],
+    indexes: []
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const ids = report.diagnostics.map((item) => item.id);
+  assert.ok(ids.some((id) => id.startsWith("DB-LIVE-NO-PRIMARY-KEY-")));
+  assert.ok(ids.includes("DB-LIVE-UNVALIDATED-CONSTRAINT-orders_customer_fk"));
+  assert.ok(ids.includes("DB-LIVE-FK-NO-INDEX-orders_customer_fk"));
+});
+
+test("live audit flags elevated roles, invalid indexes and RLS without policies", async () => {
+  const client = fixtureClient({
+    tables: [{
+      schema_name: "public", table_name: "accounts", relkind: "r",
+      estimated_rows: "5", total_bytes: "8192",
+      has_primary_key: true, row_level_security: true, force_row_level_security: true
+    }],
+    indexes: [{
+      schema_name: "public", table_name: "accounts", index_name: "accounts_idx",
+      is_valid: false, is_ready: false, is_partial: false, key_columns: ["id"]
+    }],
+    role: [{
+      is_superuser: true, can_create_database: true, can_create_role: true,
+      can_replicate: false, bypasses_rls: true
+    }]
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const ids = report.diagnostics.map((item) => item.id);
+  assert.ok(ids.includes("DB-LIVE-ROLE-SUPERUSER"));
+  assert.ok(ids.includes("DB-LIVE-INVALID-INDEX-accounts_idx"));
+  assert.ok(ids.some((id) => id.startsWith("DB-LIVE-RLS-NO-POLICY-")));
+  assert.ok(ids.includes("DB-LIVE-ROLE-ELEVATED-ATTRIBUTES"));
+});
+
+test("audit aborts if PostgreSQL does not confirm read-only mode", async () => {
+  const client = fixtureClient({ readOnly: "off" });
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => client }),
+    /did not confirm a read-only transaction/
+  );
+  assert.ok(client.calls.includes("ROLLBACK"));
+  assert.equal(client.ended, true);
+});
+
+test("audit closes a client when the initial connection attempt fails", async () => {
+  const client = fixtureClient({ connectError: new Error("connection refused") });
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => client }),
+    /connection refused/
+  );
+  assert.equal(client.ended, true);
+});
+
+test("invalid connection schemes and missing clients are rejected before any audit query", async () => {
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString: "https://example.test/db" }),
+    /postgres/
+  );
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => ({}) }),
+    /invalid client/
+  );
+});
+
+test("connection errors redact connection strings and passwords", async () => {
+  await assert.rejects(
+    auditPostgresDatabase({
+      connectionString,
+      clientFactory: async () => {
+        throw new Error("could not connect using postgresql://user:secret-value@host/db");
+      }
+    }),
+    (error) => {
+      assert.equal(error.message.includes("secret-value"), false);
+      assert.equal(error.message.includes("postgresql://user"), false);
+      assert.match(error.message, /redacted PostgreSQL connection string/);
+      return true;
+    }
+  );
+});
+
+
+test("foreign-key coverage accepts a valid leading-column index and rejects expression-leading indexes", async () => {
+  const client = fixtureClient({
+    constraints: [
+      {
+        schema_name: "public", table_name: "orders",
+        constraint_name: "orders_tenant_customer_fk", constraint_type: "f",
+        is_validated: true, columns: ["tenant_id", "customer_id"]
+      },
+      {
+        schema_name: "public", table_name: "order_items",
+        constraint_name: "items_customer_fk", constraint_type: "f",
+        is_validated: true, columns: ["customer_id"]
+      }
+    ],
+    indexes: [
+      {
+        schema_name: "public", table_name: "orders", index_name: "orders_tenant_customer_idx",
+        is_valid: true, is_ready: true, is_partial: false,
+        key_columns: ["tenant_id", "customer_id", "created_at"]
+      },
+      {
+        schema_name: "public", table_name: "order_items", index_name: "items_expr_customer_idx",
+        is_valid: true, is_ready: true, is_partial: false,
+        key_columns: [null, "customer_id"]
+      }
+    ]
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const missing = report.diagnostics
+    .filter((item) => item.id.startsWith("DB-LIVE-FK-NO-INDEX-"))
+    .map((item) => item.id);
+
+  assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-items_customer_fk"]);
+  const indexQuery = client.calls.find((sql) => sql.includes("jb-expert-qa:indexes"));
+  assert.ok(indexQuery.includes("unnest(ix.indkey::smallint[])"));
+  assert.ok(indexQuery.includes("CASE WHEN k.attnum > 0 THEN a.attname::text ELSE NULL END"));
+  assert.ok(indexQuery.includes("LEFT JOIN pg_catalog.pg_attribute"));
+  assert.ok(indexQuery.includes("indkey::smallint[]"));
+});
+
+test("foreign-key coverage accepts safe IS NOT NULL partial indexes and rejects extra predicates", async () => {
+  const client = fixtureClient({
+    constraints: [
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_owner_fk", constraint_type: "f",
+        is_validated: true, columns: ["owner_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_active_owner_fk", constraint_type: "f",
+        is_validated: true, columns: ["active_owner_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_tenant_account_fk", constraint_type: "f",
+        is_validated: true, columns: ["tenant_id", "account_id"]
+      },
+      {
+        schema_name: "public", table_name: "events",
+        constraint_name: "events_user_fk", constraint_type: "f",
+        is_validated: true, columns: ["userId"]
+      }
+    ],
+    indexes: [
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_owner_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["owner_id"],
+        index_predicate: "(owner_id IS NOT NULL)"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_active_owner_filtered_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["active_owner_id"],
+        index_predicate: "((active_owner_id IS NOT NULL) AND (deleted_at IS NULL))"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_tenant_account_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["tenant_id", "account_id"],
+        index_predicate: "(tenant_id IS NOT NULL)"
+      },
+      {
+        schema_name: "public", table_name: "events",
+        index_name: "events_user_not_null_idx",
+        is_valid: true, is_ready: true, is_partial: true,
+        key_columns: ["userId"],
+        index_predicate: '("userId" IS NOT NULL)'
+      }
+    ]
+  });
+
+  const report = await auditPostgresDatabase({ connectionString, clientFactory: async () => client });
+  const missing = report.diagnostics
+    .filter((item) => item.id.startsWith("DB-LIVE-FK-NO-INDEX-"))
+    .map((item) => item.id);
+
+  assert.deepEqual(missing, ["DB-LIVE-FK-NO-INDEX-events_active_owner_fk"]);
+  const finding = report.diagnostics.find((item) => item.id === "DB-LIVE-FK-NO-INDEX-events_active_owner_fk");
+  assert.match(finding.description, /partial index is accepted only when/i);
+  assert.doesNotMatch(finding.description, /non-partial index/i);
+  const indexQuery = client.calls.find((sql) => sql.includes("jb-expert-qa:indexes"));
+  assert.ok(indexQuery.includes("pg_catalog.pg_get_expr(ix.indpred, ix.indrelid) AS index_predicate"));
+});
+
+test("audit rolls back and closes the connection when a catalog query fails", async () => {
+  const client = fixtureClient();
+  const originalQuery = client.query.bind(client);
+  client.query = async (sql) => {
+    if (sql.includes("jb-expert-qa:tables")) throw new Error("catalog permission denied");
+    return originalQuery(sql);
+  };
+
+  await assert.rejects(
+    auditPostgresDatabase({ connectionString, clientFactory: async () => client }),
+    /catalog permission denied/
+  );
+  assert.ok(client.calls.includes("ROLLBACK"));
+  assert.equal(client.ended, true);
+});
+
+
+test("TLS can be disabled only for explicit loopback PostgreSQL connections", async () => {
+  const client = fixtureClient();
+  let receivedConfig;
+  await auditPostgresDatabase({
+    connectionString: "postgresql://qa_user:local-only@127.0.0.1:5432/qa_fixture?sslmode=disable",
+    clientFactory: async (config) => {
+      receivedConfig = config;
+      return client;
+    }
+  });
+  assert.equal(receivedConfig.ssl, false);
+
+  let remoteFactoryCalled = false;
+  await assert.rejects(
+    auditPostgresDatabase({
+      connectionString: "postgresql://qa_user:secret-value@db.example.test:5432/qa_fixture?sslmode=disable",
+      clientFactory: async () => {
+        remoteFactoryCalled = true;
+        return fixtureClient();
+      }
+    }),
+    /TLS cannot be disabled for non-loopback PostgreSQL connections/
+  );
+  assert.equal(remoteFactoryCalled, false);
+});

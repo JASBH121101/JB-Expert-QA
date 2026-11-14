@@ -1,0 +1,66 @@
+name: Language QA validation
+
+on:
+  push:
+    branches: [main, "integration/**", "feature/language-qa-engine"]
+    paths:
+      - "package.json"
+      - "src/language/**"
+      - "src/adapters/filesystem/audit-language.js"
+      - "src/adapters/filesystem/audit-project.js"
+      - "src/specialists/index.js"
+      - "src/specialists/language/**"
+      - "src/index.js"
+      - "tests/language-qa-engine.test.js"
+      - ".github/workflows/language-qa.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "package.json"
+      - "src/language/**"
+      - "src/adapters/filesystem/audit-language.js"
+      - "src/adapters/filesystem/audit-project.js"
+      - "src/specialists/index.js"
+      - "src/specialists/language/**"
+      - "src/index.js"
+      - "tests/language-qa-engine.test.js"
+      - ".github/workflows/language-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: language-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  language-tests:
+    name: Language QA unit tests (Node.js 22)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Check Language QA source syntax
+        run: |
+          node --check src/language/locale.js
+          node --check src/language/placeholders.js
+          node --check src/language/php-array-parser.js
+          node --check src/language/glossary.js
+          node --check src/language/translation-memory.js
+          node --check src/language/review.js
+          node --check src/language/audit.js
+          node --check src/adapters/filesystem/audit-language.js
+          node --check src/specialists/language/index.js
+          node --check src/language-cli.js
+          node --check src/adapters/filesystem/audit-project.js
+          node --check src/index.js
+      - name: Run Language QA regression tests
+        run: node --test tests/language-qa-engine.test.js

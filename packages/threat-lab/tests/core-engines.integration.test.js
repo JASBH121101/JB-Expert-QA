@@ -144,6 +144,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     mkdir(malwareFixtures),
     mkdir(guardTemp),
     mkdir(path.join(expertProject, "src"), { recursive: true }),
+    mkdir(path.join(expertProject, "lang", "es"), { recursive: true }),
+    mkdir(path.join(expertProject, "lang", "en"), { recursive: true }),
     mkdir(path.join(expertDatabaseProject, "src"), { recursive: true })
   ]);
 
@@ -413,6 +415,64 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
             passed ? [] : [{ code: "EXPERT_QA_VISUAL_DIFF_MISMATCH" }]);
         }
 
+        if (scenario.id === "expert-qa.language.translation-integrity") {
+          await mkdir(path.join(expertProject, "lang", "es"), { recursive: true });
+          await mkdir(path.join(expertProject, "lang", "en"), { recursive: true });
+          await writeFile(path.join(expertProject, "lang", "es", "messages.php"), `<?php
+return [
+  'greeting' => 'Hola :name',
+  'count' => 'Total :count',
+  'description' => 'Descripción del producto',
+];
+`);
+          await writeFile(path.join(expertProject, "lang", "en", "messages.php"), `<?php
+return [
+  'greeting' => 'Hello :name',
+  'count' => 'Total',
+  'legacy' => 'Old label',
+];
+`);
+          const report = await auditFixture(expertProject);
+          const languageAudit = report.languageAudit;
+          const missingKey = languageAudit?.findings?.some((item) =>
+            item.id === "missing-key" && item.key === "description"
+          ) ?? false;
+          const placeholderMismatch = languageAudit?.findings?.some((item) =>
+            item.id === "placeholder-mismatch" && item.key === "count"
+          ) ?? false;
+          const specialistFinding = report.diagnostics.some((item) =>
+            typeof item.id === "string" && item.id.startsWith("LANG-")
+          );
+          const passed = languageAudit?.status === "checked"
+            && languageAudit.sourceLocale === "es-419"
+            && languageAudit.targetLocale === "en"
+            && missingKey
+            && placeholderMismatch
+            && specialistFinding;
+          return outcome(
+            passed ? "pass" : "fail",
+            passed
+              ? "Expert QA detected a missing locale key and placeholder mismatch through its project auditor"
+              : "Language QA findings were not propagated through the Expert QA project audit",
+            {
+              status: languageAudit?.status ?? null,
+              sourceLocale: languageAudit?.sourceLocale ?? null,
+              targetLocale: languageAudit?.targetLocale ?? null,
+              missingKey,
+              placeholderMismatch,
+              specialistFinding,
+              glossaryFindings: languageAudit?.summary?.glossaryReview ?? 0
+            },
+            passed ? [] : [{
+              code: "EXPERT_QA_LANGUAGE_AUDIT_MISMATCH",
+              status: languageAudit?.status ?? null,
+              missingKey,
+              placeholderMismatch,
+              specialistFinding
+            }]
+          );
+        }
+
         if (scenario.id !== "expert-qa.static.unsafe-html-detected" &&
             scenario.id !== "expert-qa.static.repaired-html-regression") {
           return outcome("skip", "No Expert QA handler for this scenario");
@@ -455,7 +515,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa"],
     ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa"],
     ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa"],
-    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa"]
+    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa"],
+    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa"]
   ];
   for (const [id, category, description, targetId] of scenarios) {
     lab.registerScenario({

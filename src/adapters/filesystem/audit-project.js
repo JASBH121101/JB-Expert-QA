@@ -8,17 +8,27 @@ import { scanProject } from "./scan-project.js";
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { projectRules } from "../../specialists/project-rules.js";
 import { deadCodeRules } from "../../specialists/dead-code-rules.js";
+import { auditLanguageFiles } from "./audit-language.js";
+import { languageRules } from "../../specialists/language/index.js";
 
 export async function auditProject(rootPath, { config = projectConfig, scanOptions = {} } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) throw new TypeError("A project directory path is required");
   const root = resolve(rootPath);
-  const validatedConfig = validateEngineConfig(config);
+  const configWithSpecialistDefaults = config && typeof config === "object" && !Array.isArray(config)
+    ? {
+        ...config,
+        weights: { ...projectConfig.weights, ...(config.weights ?? {}) }
+      }
+    : config;
+  const validatedConfig = validateEngineConfig(configWithSpecialistDefaults);
   const effectiveScanOptions = { ...validatedConfig.scan, ...scanOptions };
   const scan = await scanProject(root, effectiveScanOptions);
   const dependencyAdvisories = await scanNpmAdvisories(scan, validatedConfig.advisories);
   const registry = new RuleRegistry();
   for (const rule of projectRules) registry.register(rule);
   for (const rule of deadCodeRules) registry.register(rule);
+  for (const rule of languageRules) registry.register(rule);
+  const languageAudit = await auditLanguageFiles(root);
 
   const incompleteReasons = [];
   if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
@@ -32,7 +42,8 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     packageManifests: scan.manifests,
     projectScan: scan,
     thresholds: validatedConfig.thresholds,
-    dependencyAdvisoryScan: dependencyAdvisories
+    dependencyAdvisoryScan: dependencyAdvisories,
+    languageAudit
   };
   const report = await new ExpertQAEngine({ registry, config: validatedConfig }).audit(context);
   const hasSourceFiles = scan.files.some((file) => [
@@ -72,6 +83,7 @@ export async function auditProject(rootPath, { config = projectConfig, scanOptio
     target: Object.freeze({ project: basename(root) }),
     projectScan: scan.summary,
     dependencyAdvisories,
+    languageAudit,
     analysisScope: Object.freeze({
       mode: "local-static",
       complete: scanComplete,

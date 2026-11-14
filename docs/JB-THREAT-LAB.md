@@ -47,7 +47,7 @@ Reports use `jb.threat-lab.report/v1` and include target identity/version, scena
 
 ## Trojan-focused validation
 
-The Malware Engine now has dedicated, safe regression coverage beyond the original 16 cross-engine cases:
+The Malware Engine also has dedicated, safe regression coverage beyond the core 17-scenario three-engine matrix:
 
 - **Script delivery and persistence:** inert fixtures correlate download + dynamic execution with Windows Run-key, scheduled-task, service, and WMI event-subscription persistence indicators.
 - **PE/RAT capability correlation:** a synthetic PE fixture correlates process-injection imports with remote command-channel imports; a control fixture verifies that process-injection imports alone do not imply RAT/Trojan behavior.
@@ -74,17 +74,21 @@ The checkpoint is caller-owned state, not protected storage. The host applicatio
 
 ## Current implementation status
 
-The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its first cross-engine suite now contains **16 scenarios**, all calling the real engine APIs against temporary local fixtures and in-memory upload storage.
+The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current three-engine integration matrix contains **17 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
 
 - **JB Malware Engine — 6 scenarios:** exact harmless EICAR match; benign no-match/false-positive; inert PowerShell-like text classified as suspicious, not confirmed malicious; exact configured SHA-256 signature detection; over-limit file returned as `unknown`; PDF active-action indicators classified as suspicious without an exact malware detection.
 - **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
-- **JB Expert QA — 4 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls.
+- **JB Expert QA — 5 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls; Language QA detects a missing locale key and placeholder mismatch through the real project auditor.
 
-**Latest completed validation for branch commit `dc7c795`:**
-- [Core validation #576](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309541): Node 22 ✅ and Node 24 ✅. Includes all Malware Engine package regressions, the cross-engine Threat Lab, Trojan script/persistence tests, PE RAT/backdoor/credential-theft correlations, signed-bundle policy tests, and package-distribution checks.
-- [Security QA #359](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309496): Node 22 ✅ and Node 24 ✅.
-- [NPM package distribution #74](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309572): Node 22 ✅ and Node 24 ✅.
-- [JB Malware Engine Validation #160](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43547309579): Ubuntu ✅ and Windows ✅.
-The suite uses temporary directories and no production data, network requests, real malware execution, external feeds, paid services, or AI calls. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The database auditor is local-static and makes zero database connections. The PNG comparison scenario validates deterministic visual diff only; it is not a full visual/browser certification.
+**Latest completed validation for PR #38, branch commit `698c605b75f28c929b294c4272e69bd6fcee3408`, targeting `integration/jb-threat-lab`:**
+- [Core validation #43622143702](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143702): Node.js 22 ✅ and Node.js 24 ✅. Includes syntax checks, project regressions, Malware Engine regressions, all Threat Lab workspace tests, and clean npm package-distribution installs.
+- [Security QA #43622143615](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143615): Node.js 22 ✅ and Node.js 24 ✅.
+- [Language QA validation #43622143573](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143573): passed.
+- [PostgreSQL integration #43622143578](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143578): PostgreSQL 16 read-only CLI E2E on Node.js 22 and 24 ✅.
+- [Malware Engine validation #43622143567](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143567): Ubuntu and Windows on Node.js 22 and 24 ✅.
+- [Three-engine certification #43622143590](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143590): package-boundary, Expert QA, Security Guard and Malware Engine jobs all ✅.
+- The local Threat Lab workspace completed **14 tests, 14 passed, 0 failed**. Its core adapter matrix covers 17 scenarios: 6 Malware Engine, 6 Security Guard, and 5 Expert QA.
+
+The suite uses temporary directories, inert fixtures, and in-memory upload storage. It does not use production data, execute malware samples, send network requests from Threat Lab adapters, contact external malware feeds, call AI providers, or require paid services. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The PostgreSQL CLI E2E is the separate opt-in integration check and uses only a disposable CI PostgreSQL service; the Threat Lab database scenario remains static and makes zero database connections. The PNG comparison validates deterministic pixel differences, not every browser/device combination.
 
 NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
