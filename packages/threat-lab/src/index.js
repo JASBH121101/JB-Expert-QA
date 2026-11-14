@@ -15,7 +15,7 @@ function safeScenario(scenario) {
   return scenario?.safety?.safe === true
     && scenario.safety.network === false
     && scenario.safety.destructive === false
-    && scenario.safety.executesSample !== true;
+    && scenario.safety.executesSample === false;
 }
 
 function normalizeOutcome(outcome) {
