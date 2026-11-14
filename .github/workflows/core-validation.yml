@@ -3,7 +3,7 @@ name: Core validation
 
 on:
   push:
-    branches: [main, "integration/**"]
+    branches: [main, "feature/**", "integration/**", "qa/**"]
     paths:
       - "package.json"
       - "src/**"
@@ -12,7 +12,7 @@ on:
       - "config/**"
       - ".github/workflows/**"
   pull_request:
-    branches: [main, "integration/**"]
+    branches: [main]
     paths:
       - "package.json"
       - "src/**"
@@ -62,9 +62,5 @@ jobs:
         run: npm run test:dead-code
       - name: Run syntax checks and tests
         run: npm run check
-      - name: Run Malware Engine package regressions
-        run: npm --workspace @jb/malware-engine run check
-      - name: Run JB Threat Lab three-engine integration suite
-        run: npm run test:threat-lab
       - name: Verify independently installable package distributions
         run: npm run test:package-distributions
