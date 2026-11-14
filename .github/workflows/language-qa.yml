@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: language-qa-\${{ github.ref }}
+  group: language-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
