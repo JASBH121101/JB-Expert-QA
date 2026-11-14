@@ -2,8 +2,7 @@ name: JB Engines Certification
 
 on:
   push:
-    branches:
-      - feature/engine-certification
+    branches: [main]
     paths:
       - "src/**"
       - "tests/**"
@@ -45,10 +44,10 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
@@ -74,7 +73,7 @@ jobs:
           fi
       - name: Upload Expert QA report
         if: always()
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: expert-qa-security-node-${{ matrix.node }}
           path: certification-reports/
@@ -91,10 +90,10 @@ jobs:
         os: [ubuntu-24.04, windows-2022]
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
@@ -113,10 +112,10 @@ jobs:
         os: [ubuntu-24.04, windows-2022]
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
@@ -132,7 +131,7 @@ jobs:
         run: npm --workspace @jb/malware-engine run benchmark
       - name: Upload Malware Engine benchmark
         if: always() && matrix.os == 'ubuntu-24.04' && matrix.node == 22
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: malware-engine-benchmark
           path: certification-reports/malware-benchmark/
@@ -148,10 +147,10 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
