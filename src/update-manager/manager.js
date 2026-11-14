@@ -11,6 +11,7 @@ import {
   readdir,
   realpath,
   rm,
+  stat,
   writeFile
 } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -26,6 +27,8 @@ const SIGNATURE_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 const INTEGRITY_PATTERN = /^sha(256|384|512)-([A-Za-z0-9+/]+={0,2})$/;
 const BACKUP_ID_PATTERN = /^\d{14}-[a-f0-9]{8}$/;
 const MAX_MANIFEST_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_MANIFEST_BYTES = 256 * 1024;
+const MAX_SIGNATURE_BYTES = 8 * 1024;
 const MAX_JS_FILES_TO_CHECK = 500;
 
 function fail(message) {
@@ -92,8 +95,13 @@ function validateManifest(manifest, now = Date.now()) {
     }
     decodeIntegrity(release.dist.integrity);
     const tarball = assertHttpsUrl(release.dist.tarball, "Manifest tarball URL");
-    if (tarball.hostname !== "registry.npmjs.org") {
-      fail("Engine tarballs must be hosted by registry.npmjs.org");
+    const packageLeaf = name.split("/").at(-1);
+    const expectedTarballPath = "/" + name.replace("/", "%2f") +
+      "/-/" + packageLeaf + "-" + release.version + ".tgz";
+    if (tarball.hostname !== "registry.npmjs.org" ||
+        tarball.username || tarball.password || tarball.port ||
+        tarball.search || tarball.hash || tarball.pathname !== expectedTarballPath) {
+      fail("Engine tarball URL must match the exact versioned artifact path on registry.npmjs.org");
     }
   }
   return manifest;
@@ -101,6 +109,7 @@ function validateManifest(manifest, now = Date.now()) {
 
 export function verifyUpdateManifest({ raw, signature, publicKey, now = Date.now() } = {}) {
   if (typeof raw !== "string" || !raw.trim()) fail("Update manifest is empty");
+  if (Buffer.byteLength(raw, "utf8") > MAX_MANIFEST_BYTES) fail("Update manifest exceeds the 256 KiB size limit");
   if (typeof signature !== "string" || !SIGNATURE_PATTERN.test(signature.trim())) {
     fail("Detached manifest signature is missing or invalid");
   }
@@ -139,15 +148,54 @@ export function verifyUpdateManifest({ raw, signature, publicKey, now = Date.now
   });
 }
 
-async function readTextSource(source, fetchImpl) {
+async function readTextSource(source, fetchImpl, {
+  maxBytes = MAX_MANIFEST_BYTES,
+  label = "Source"
+} = {}) {
   if (typeof source !== "string" || !source.trim()) fail("Manifest source is required");
   if (source.startsWith("https://")) {
-    assertHttpsUrl(source, "Manifest URL");
+    assertHttpsUrl(source, label + " URL");
     const response = await fetchImpl(source, { redirect: "error" });
-    if (!response.ok) fail("Unable to fetch " + source + " (HTTP " + response.status + ")");
-    return response.text();
+    if (!response.ok) fail("Unable to fetch " + label + " (HTTP " + response.status + ")");
+    const declaredLength = Number(response.headers?.get?.("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      fail(label + " exceeds the " + maxBytes + "-byte size limit");
+    }
+
+    if (typeof response.body?.getReader === "function") {
+      const reader = response.body.getReader();
+      const chunks = [];
+      let totalBytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = Buffer.from(value);
+          totalBytes += chunk.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel().catch(() => {});
+            fail(label + " exceeds the " + maxBytes + "-byte size limit");
+          }
+          chunks.push(chunk);
+        }
+      } finally {
+        reader.releaseLock?.();
+      }
+      return Buffer.concat(chunks).toString("utf8");
+    }
+
+    const text = await response.text();
+    if (Buffer.byteLength(text, "utf8") > maxBytes) {
+      fail(label + " exceeds the " + maxBytes + "-byte size limit");
+    }
+    return text;
   }
-  return readFile(resolve(source), "utf8");
+
+  const sourcePath = resolve(source);
+  const details = await stat(sourcePath);
+  if (!details.isFile()) fail(label + " source must be a regular file");
+  if (details.size > maxBytes) fail(label + " exceeds the " + maxBytes + "-byte size limit");
+  return readFile(sourcePath, "utf8");
 }
 
 async function loadPublicKey({ publicKeyPath, publicKey }) {
@@ -166,10 +214,10 @@ export async function loadSignedUpdateManifest({
   fetchImpl = fetch,
   now = Date.now()
 } = {}) {
-  const raw = await readTextSource(manifest, fetchImpl);
+  const raw = await readTextSource(manifest, fetchImpl, { maxBytes: MAX_MANIFEST_BYTES, label: "Update manifest" });
   const signatureSource = signature ??
     (manifest.startsWith("https://") ? manifest + ".sig" : resolve(manifest) + ".sig");
-  const detachedSignature = await readTextSource(signatureSource, fetchImpl);
+  const detachedSignature = await readTextSource(signatureSource, fetchImpl, { maxBytes: MAX_SIGNATURE_BYTES, label: "Detached manifest signature" });
   const trustedKey = await loadPublicKey({ publicKeyPath, publicKey });
   return verifyUpdateManifest({
     raw,
