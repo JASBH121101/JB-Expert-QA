@@ -1,0 +1,216 @@
+{
+  "name": "scento-perfume-database",
+  "title": "Scento Perfume Database",
+  "version": "2026.10.29",
+  "description": "Scento's verified perfume database: perfumes, houses and raw materials with fragrance family, character, notes and a link to the matching scento.com page. Powers the free Scento Perfume API.",
+  "homepage": "https://www.scento.com/perfume-database",
+  "licenses": [
+    {
+      "name": "CC-BY-4.0",
+      "path": "https://creativecommons.org/licenses/by/4.0/",
+      "title": "Creative Commons Attribution 4.0 International"
+    }
+  ],
+  "contributors": [
+    {
+      "title": "Scento",
+      "path": "https://www.scento.com",
+      "role": "author"
+    }
+  ],
+  "keywords": [
+    "perfume",
+    "fragrance",
+    "fragrance notes",
+    "perfumery",
+    "knowledge base"
+  ],
+  "sources": [
+    {
+      "title": "Scento Perfume API",
+      "path": "https://www.scento.com/developers"
+    }
+  ],
+  "resources": [
+    {
+      "name": "perfumes",
+      "path": "perfumes.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "description": "One row per perfume.",
+      "schema": {
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "house_id",
+            "type": "string"
+          },
+          {
+            "name": "house",
+            "type": "string"
+          },
+          {
+            "name": "year",
+            "type": "integer"
+          },
+          {
+            "name": "perfumers",
+            "type": "string"
+          },
+          {
+            "name": "concentration",
+            "type": "string"
+          },
+          {
+            "name": "family",
+            "type": "string"
+          },
+          {
+            "name": "secondary_family",
+            "type": "string"
+          },
+          {
+            "name": "character",
+            "type": "string"
+          },
+          {
+            "name": "seasons",
+            "type": "string"
+          },
+          {
+            "name": "times_of_day",
+            "type": "string"
+          },
+          {
+            "name": "top_notes",
+            "type": "string"
+          },
+          {
+            "name": "heart_notes",
+            "type": "string"
+          },
+          {
+            "name": "base_notes",
+            "type": "string"
+          },
+          {
+            "name": "notes",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "popularity_rank",
+            "type": "integer"
+          },
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "houses",
+      "path": "houses.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "description": "Perfume houses.",
+      "schema": {
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "country",
+            "type": "string"
+          },
+          {
+            "name": "founded",
+            "type": "integer"
+          },
+          {
+            "name": "type",
+            "type": "string"
+          },
+          {
+            "name": "portrait",
+            "type": "string"
+          },
+          {
+            "name": "perfume_count",
+            "type": "integer"
+          },
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "materials",
+      "path": "materials.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "description": "Raw materials, accords and notes.",
+      "schema": {
+        "fields": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "aliases",
+            "type": "string"
+          },
+          {
+            "name": "material_family",
+            "type": "string"
+          },
+          {
+            "name": "origin",
+            "type": "string"
+          },
+          {
+            "name": "smell",
+            "type": "string"
+          },
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "perfumes-jsonl",
+      "path": "perfumes.jsonl",
+      "format": "jsonl",
+      "mediatype": "application/jsonl",
+      "encoding": "utf-8",
+      "description": "Same rows as perfumes.csv with list fields as arrays."
+    }
+  ]
+}

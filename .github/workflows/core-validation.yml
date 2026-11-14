@@ -58,8 +58,14 @@ jobs:
         run: |
           node scripts/build-expert-qa-package.js
           node --test packages/expert-qa/package-tests/complete-engine.spec.js packages/expert-qa/package-tests/browser-audit.spec.js
+      - name: Read-only JB Expert QA audit of Advisor Engine
+        run: |
+          node packages/expert-qa/cli/package-cli.js audit packages/advisor-engine --format=json --output="$RUNNER_TEMP/jb-advisor-qa.json"
+          REPORT_PATH="$RUNNER_TEMP/jb-advisor-qa.json" node --input-type=module -e 'import { readFileSync } from "node:fs"; const report = JSON.parse(readFileSync(process.env.REPORT_PATH, "utf8")); if (report.analysisScope?.dependencyAdvisoryLookup !== false || report.analysisScope?.networkRequests !== 0) throw new Error("Advisor audit must stay local and read-only");'
       - name: Run focused static dead-code and dependency-graph tests
         run: npm run test:dead-code
+      - name: Test the standalone JB Advisor Engine workspace
+        run: npm run check --workspace @jb/advisor-engine
       - name: Run syntax checks and tests
         run: npm run check
       - name: Verify independently installable package distributions
