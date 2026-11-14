@@ -87,6 +87,8 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
 
   const fullRatPath = path.join(root, "synthetic-rat-capability-fixture.exe");
   const isolatedPath = path.join(root, "isolated-injection-capability-fixture.exe");
+  const backdoorPath = path.join(root, "synthetic-service-backdoor-fixture.exe");
+  const credentialPath = path.join(root, "synthetic-credential-exfiltration-fixture.exe");
   const engine = createMalwareEngine({ quarantineDir: path.join(root, "quarantine") });
   const lab = createThreatLab({ name: "JB PE Trojan Defense Validation", version: "0.1.0" });
 
@@ -94,7 +96,7 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
     id: "jb-malware-engine",
     kind: "security-engine",
     version: "0.6.2",
-    capabilities: ["pe-import-analysis", "rat-correlation", "trojan-static-triage"],
+    capabilities: ["pe-import-analysis", "rat-correlation", "backdoor-correlation", "credential-theft-correlation", "trojan-static-triage"],
     adapter: {
       async runScenario({ scenario }) {
         if (scenario.id === "malware.trojan.pe-rat-capability-chain") {
@@ -164,6 +166,92 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
           );
         }
 
+
+        if (scenario.id === "malware.trojan.pe-service-backdoor-chain") {
+          const pe = buildMinimalPE();
+          addImportNames(pe, [
+            "OpenSCManagerW",
+            "CreateServiceW",
+            "StartServiceW",
+            "WinHttpOpen",
+            "WinHttpConnect",
+            "WinHttpSendRequest",
+            "WSAStartup",
+            "connect",
+            "send",
+            "CreateProcessW"
+          ]);
+          await writeFile(backdoorPath, pe.buffer, { flag: "wx" });
+          const report = await engine.scanFile(backdoorPath);
+          const capabilities = report.peAnalysis?.imports?.capabilities?.map((item) => item.id) ?? [];
+          const families = report.threatAssessment.families.map((item) => item.id);
+          const passed = report.peAnalysis?.status === "complete"
+            && report.status === "suspicious"
+            && capabilities.includes("service-persistence-api-chain")
+            && capabilities.includes("remote-network-command-channel")
+            && capabilities.includes("network-to-process-execution")
+            && families.includes("backdoor")
+            && families.includes("trojan-like")
+            && report.detections.length === 0;
+          return outcome(
+            passed,
+            passed
+              ? "Correlated service persistence, remote command-channel and process-launch imports as backdoor/Trojan-like behavior"
+              : "PE service-persistence and remote-channel capabilities did not produce the expected backdoor candidate",
+            {
+              verdict: report.status,
+              peStatus: report.peAnalysis?.status ?? null,
+              capabilities,
+              candidateFamilies: families,
+              confirmedDetections: report.detections.length,
+              sampleExecuted: false,
+              networkRequests: 0
+            },
+            { code: "PE_BACKDOOR_CORRELATION_MISMATCH", expected: ["backdoor", "trojan-like"], actual: families, capabilities }
+          );
+        }
+
+        if (scenario.id === "malware.trojan.pe-credential-theft-exfiltration") {
+          const pe = buildMinimalPE();
+          addImportNames(pe, [
+            "OpenProcess",
+            "MiniDumpWriteDump",
+            "LsaEnumerateLogonSessions",
+            "WSAStartup",
+            "connect",
+            "send",
+            "CreateProcessW"
+          ]);
+          await writeFile(credentialPath, pe.buffer, { flag: "wx" });
+          const report = await engine.scanFile(credentialPath);
+          const capabilities = report.peAnalysis?.imports?.capabilities?.map((item) => item.id) ?? [];
+          const families = report.threatAssessment.families.map((item) => item.id);
+          const passed = report.peAnalysis?.status === "complete"
+            && report.status === "suspicious"
+            && capabilities.includes("credential-dumping-api-chain")
+            && capabilities.includes("remote-network-command-channel")
+            && families.includes("credential-stealer")
+            && families.includes("spyware")
+            && families.includes("trojan-like")
+            && report.detections.length === 0;
+          return outcome(
+            passed,
+            passed
+              ? "Correlated process-memory/credential-session access and remote transfer imports as credential-stealer/Trojan-like behavior"
+              : "PE credential-access and remote-transfer capabilities did not produce the expected candidate families",
+            {
+              verdict: report.status,
+              peStatus: report.peAnalysis?.status ?? null,
+              capabilities,
+              candidateFamilies: families,
+              confirmedDetections: report.detections.length,
+              sampleExecuted: false,
+              networkRequests: 0
+            },
+            { code: "PE_CREDENTIAL_EXFILTRATION_CORRELATION_MISMATCH", expected: ["credential-stealer", "spyware", "trojan-like"], actual: families, capabilities }
+          );
+        }
+
         return { status: "skip", summary: "No handler for this PE Trojan-defense scenario" };
       }
     }
@@ -171,7 +259,9 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
 
   const scenarios = [
     ["malware.trojan.pe-rat-capability-chain", "pe-rat-detection", "Correlate process-injection and remote-command-channel import capabilities."],
-    ["malware.trojan.pe-injection-alone-not-rat", "pe-rat-false-positive", "Do not infer RAT/Trojan behavior from process-injection capability alone."]
+    ["malware.trojan.pe-injection-alone-not-rat", "pe-rat-false-positive", "Do not infer RAT/Trojan behavior from process-injection capability alone."],
+    ["malware.trojan.pe-service-backdoor-chain", "pe-backdoor-detection", "Correlate service persistence and remote command-channel capabilities."],
+    ["malware.trojan.pe-credential-theft-exfiltration", "pe-credential-theft", "Correlate credential-dumping capability and remote transfer behavior."]
   ];
   for (const [id, category, description] of scenarios) {
     lab.registerScenario({
@@ -186,7 +276,7 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
 
   const report = await lab.run({
     metadata: {
-      suite: "pe-rat-and-trojan-capability-correlation",
+      suite: "pe-rat-backdoor-and-credential-threat-correlation",
       syntheticPeFixtures: true,
       sampleExecution: false,
       networkRequests: 0,
