@@ -73,15 +73,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 22
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Install optional PostgreSQL driver without changing manifests
-        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@^8
       - name: Detect Neon development credential
         id: neon-credential
         env:
@@ -94,6 +85,18 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "Neon E2E skipped: QA_NEON_DEVELOPMENT_DATABASE_URL is not configured."
           fi
+      - name: Set up Node.js
+        if: steps.neon-credential.outputs.configured == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install repository dependencies
+        if: steps.neon-credential.outputs.configured == 'true'
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install optional PostgreSQL driver without changing manifests
+        if: steps.neon-credential.outputs.configured == 'true'
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@^8
       - name: Execute read-only audit through the real pg CLI path
         if: steps.neon-credential.outputs.configured == 'true'
         env:
@@ -107,14 +110,20 @@ jobs:
           import assert from "node:assert/strict";
           import { readFileSync } from "node:fs";
 
+          const connection = new URL(process.env.QA_NEON_DEVELOPMENT_DATABASE_URL);
+          assert.ok(connection.hostname.endsWith(".neon.tech"), "The optional live check must use a Neon endpoint.");
           const report = JSON.parse(readFileSync(process.argv[2], "utf8"));
           assert.equal(report.database.engine, "postgresql");
+          assert.equal(report.database.name, "erp_perfume");
+          assert.equal(report.database.auditRole, "jb_erp_runtime_sql");
           assert.equal(report.database.transactionReadOnly, true);
           assert.equal(report.coverage.metadataOnly, true);
           assert.equal(report.coverage.applicationRowsRead, 0);
           assert.equal(report.coverage.catalogQueries, 8);
-          assert.ok(report.database.name, "Database name must be present.");
-          assert.ok(report.database.auditRole, "Audit role must be present.");
+          assert.equal(report.diagnostics.some((item) =>
+            item.id === "DB-LIVE-ROLE-SUPERUSER" ||
+            item.id === "DB-LIVE-ROLE-BYPASS-RLS"
+          ), false, "Neon must be audited with the intended least-privilege role.");
 
           console.log(
             "Neon development read-only E2E passed: database=" +
