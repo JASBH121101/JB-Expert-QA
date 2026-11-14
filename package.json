@@ -2,7 +2,7 @@
   "name": "jb-expert-qa",
   "version": "0.8.0",
   "private": true,
-  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, and JB Malware Engine packages.",
+  "description": "Monorepo for independently versioned JB QA/security engines and the extensible JB Threat Lab.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -35,6 +35,7 @@
   "workspaces": [
     "packages/expert-qa",
     "packages/security-guard",
-    "packages/malware-engine"
+    "packages/malware-engine",
+    "packages/threat-lab"
   ]
 }
