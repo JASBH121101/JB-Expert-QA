@@ -57,10 +57,9 @@ export function calculateScore(diagnostics, {
 
   const activeNames = [...new Set(includedSpecialists)];
   const specialistScores = {};
+  const unweightedSpecialists = [];
   for (const name of activeNames) {
-    if (!Object.hasOwn(weights, name)) {
-      throw new TypeError("Missing scoring weight for specialist \"" + name + "\"");
-    }
+    if (!Object.hasOwn(weights, name)) unweightedSpecialists.push(name);
     const relevant = diagnostics.filter((item) => item.specialist === name);
     const penalty = relevant.reduce(
       (sum, item) => sum + (severityPenalties[item.severity] ?? 0),
@@ -69,11 +68,11 @@ export function calculateScore(diagnostics, {
     specialistScores[name] = Math.max(0, 100 - penalty);
   }
 
-  const totalWeight = activeNames.reduce((sum, name) => sum + weights[name], 0);
+  const totalWeight = activeNames.reduce((sum, name) => sum + (weights[name] ?? 0), 0);
   const hasAssessments = activeNames.length > 0 && totalWeight > 0;
   const score = hasAssessments
     ? Math.round(activeNames.reduce(
-        (sum, name) => sum + specialistScores[name] * weights[name],
+        (sum, name) => sum + specialistScores[name] * (weights[name] ?? 0),
         0
       ) / totalWeight)
     : null;
@@ -81,14 +80,19 @@ export function calculateScore(diagnostics, {
   const hasCritical = diagnostics.some((item) => item.severity === "critical");
   const blockedByCritical = Boolean(failOnCritical && hasCritical);
   const blockedByExecutionErrors = executionErrors > 0;
+  const blockedByUnweightedFindings = unweightedSpecialists.some((name) =>
+    diagnostics.some((item) => item.specialist === name)
+  );
   return Object.freeze({
     score,
     minimumScore,
     assessedSpecialists: Object.freeze(activeNames),
     specialistScores: Object.freeze(specialistScores),
-    passed: hasAssessments && score >= minimumScore && !blockedByCritical && !blockedByExecutionErrors,
+    unweightedSpecialists: Object.freeze(unweightedSpecialists),
+    passed: hasAssessments && score >= minimumScore && !blockedByCritical && !blockedByExecutionErrors && !blockedByUnweightedFindings,
     blockedByCritical,
     blockedByExecutionErrors,
+    blockedByUnweightedFindings,
     noRulesExecuted: activeNames.length === 0
   });
 }
