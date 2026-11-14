@@ -287,7 +287,7 @@ function buildReport(snapshot) {
           "DB-LIVE-FK-NO-INDEX-" + constraint.constraint_name,
           "Foreign key without a supporting leading-column index",
           "medium",
-          "No valid, ready, non-partial index with the foreign-key columns as its leading columns was found.",
+          "No valid, ready index with the foreign-key columns as its leading columns was found. A partial index is accepted only when its predicate preserves all rows eligible for the foreign-key lookup.",
           "Review delete/update workloads and add a supporting index if query patterns and write costs justify it.",
           key,
           { constraint: constraint.constraint_name, columns: fkColumns }
