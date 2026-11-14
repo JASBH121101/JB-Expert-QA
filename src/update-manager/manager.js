@@ -108,8 +108,9 @@ function validateManifest(manifest, now = Date.now()) {
 }
 
 export function verifyUpdateManifest({ raw, signature, publicKey, now = Date.now() } = {}) {
-  if (typeof raw !== "string" || !raw.trim()) fail("Update manifest is empty");
+  if (typeof raw !== "string") fail("Update manifest is empty");
   if (Buffer.byteLength(raw, "utf8") > MAX_MANIFEST_BYTES) fail("Update manifest exceeds the 256 KiB size limit");
+  if (!raw.trim()) fail("Update manifest is empty");
   if (typeof signature !== "string" || !SIGNATURE_PATTERN.test(signature.trim())) {
     fail("Detached manifest signature is missing or invalid");
   }
