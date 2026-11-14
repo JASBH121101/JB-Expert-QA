@@ -35,13 +35,13 @@ Set a connection URL in the environment; do not put it in shell command history 
 
 \`\`\`sh
 export QA_DATABASE_URL='postgresql://read_only_user:...@host:5432/database?sslmode=require'
-npm run audit:database -- --env=QA_DATABASE_URL --confirm-read-only
+npm run audit:database:postgres -- --env=QA_DATABASE_URL --confirm-read-only
 \`\`\`
 
 To write the JSON report to a local file:
 
 \`\`\`sh
-npm run audit:database -- --env=QA_DATABASE_URL --confirm-read-only --output=reports/database-qa.json
+npm run audit:database:postgres -- --env=QA_DATABASE_URL --confirm-read-only --output=reports/database-qa.json
 \`\`\`
 
 The CLI refuses to run without \`--confirm-read-only\`. The adapter forces TLS certificate verification and rejects non-PostgreSQL URL schemes.
