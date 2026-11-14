@@ -65,12 +65,6 @@ jobs:
           cp .env.example .env
           php artisan key:generate --force
 
-      - name: Inspect exact Laravel Pint correction
-        run: |
-          vendor/bin/pint app/Modules/Setup/Http/Controllers/SetupController.php
-          git diff -- app/Modules/Setup/Http/Controllers/SetupController.php
-          git restore -- app/Modules/Setup/Http/Controllers/SetupController.php
-
       - name: Run Laravel Pint
         run: composer lint
 
