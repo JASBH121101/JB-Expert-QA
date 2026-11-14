@@ -4,7 +4,7 @@ An extensible, local-first test laboratory for JB engines and independent applic
 
 ## Design
 
-Targets register through a small adapter contract: `runScenario({ scenario, context })`. A target can be a security engine, QA engine, ERP, catalog, API, or any future application. Scenarios are reusable test definitions. The lab produces a versioned JSON report with pass/fail/skip outcomes, findings, metrics, and durations.
+Targets register through a small adapter contract: `runScenario({ scenario, context })`. A target can be a security engine, QA engine, ERP, catalog, API, or any future application. Scenarios are reusable test definitions and can declare `appliesTo` target IDs/kinds to avoid running irrelevant cases. The lab produces a versioned JSON report with pass/fail/skip outcomes, findings, metrics, and durations.
 
 The lab does not import or couple itself to a particular JB product. Integrations belong in separate adapters, so adding a future engine or a customer application does not require changing the lab core.
 
@@ -49,7 +49,7 @@ console.log(JSON.stringify(report, null, 2));
 - Expert QA: intentionally vulnerable source fixtures analyzed statically; compare expected findings against a repaired fixture. Visual QA remains deterministic/local; no AI visual calls.
 - Applications such as NEXORA or a client ERP: isolated test database, authentication/authorization, CRUD invariants, inventory arithmetic, validation, file uploads, exports, accessibility and performance budgets.
 
-These are integration profiles to be implemented separately. A green lab run only certifies the scenarios that actually ran; it does not prove absence of malware, vulnerabilities, or defects. Static file triage is not dynamic malware behavior analysis and cannot claim detection of every trojan, virus, ransomware family, spyware, or worm.
+The first local integration suite now exercises all three advanced JB engines together: Malware Engine (EICAR, benign false-positive, inert suspicious-script classification), Security Guard (synthetic XSS blocking, malicious upload rejection through the Malware Engine adapter, and no-match quarantine), and Expert QA (unsafe HTML sink detection followed by a repaired textContent regression check). These tests use temporary directories, synthetic inputs, and in-memory upload storage. A green lab run only certifies the scenarios that actually ran; it does not prove absence of malware, vulnerabilities, or defects. Static file triage is not dynamic malware behavior analysis and cannot claim detection of every trojan, virus, ransomware family, spyware, or worm.
 
 ## Development
 
