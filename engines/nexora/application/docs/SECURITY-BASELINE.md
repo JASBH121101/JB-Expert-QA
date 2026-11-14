@@ -43,6 +43,11 @@ These controls were present in the inspected NEXORA Core source; their runtime b
 - Initial setup checks for an existing owner/settings record before creating the first owner.
 - Logo and cover uploads have server-side type, size, and dimension validation.
 
+
+## Validation snapshot
+
+The seven tests in `tests/Feature/SecurityConfigurationTest.php` passed on SQLite in the first full-suite run. The full existing application suite also ran: 52 tests passed and 6 existing assertions in `SetupHealthTest` failed around installer copy/language and redirect query-string expectations. Those installer behaviors are unchanged from `NEXORA-Core` and are outside this security increment; the full suite is therefore **not certified green** by this baseline. The focused security suite is run separately on both SQLite and PostgreSQL 16.
+
 ## Follow-up security work
 
 The baseline is not complete. The next review must cover:

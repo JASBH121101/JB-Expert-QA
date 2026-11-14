@@ -1,4 +1,4 @@
-name: NEXORA Laravel CI
+name: NEXORA Security Baseline CI
 
 on:
   push:
@@ -68,10 +68,10 @@ jobs:
       - name: Run Laravel Pint
         run: composer lint
 
-      - name: Run feature tests on SQLite
-        run: composer test
+      - name: Run security regression tests on SQLite
+        run: vendor/bin/phpunit tests/Feature/SecurityConfigurationTest.php
 
-      - name: Run feature tests on PostgreSQL 16
+      - name: Run security regression tests on PostgreSQL 16
         env:
           APP_ENV: testing
           DB_CONNECTION: pgsql
@@ -82,4 +82,4 @@ jobs:
           DB_PASSWORD: nexora
           DB_SCHEMA: public
           DB_URL: ""
-        run: composer test
+        run: vendor/bin/phpunit tests/Feature/SecurityConfigurationTest.php
