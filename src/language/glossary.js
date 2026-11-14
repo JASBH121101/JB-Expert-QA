@@ -24,11 +24,11 @@ export const DEFAULT_GLOSSARY = Object.freeze([
 ]);
 
 function escapeRegExp(value) {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\\\$&");
+  return value.replace(/([\\^$.*+?()[\]{}|])/g, "\\$1");
 }
 
 function containsTerm(text, term) {
-  const pattern = new RegExp("(^|[^\\\\p{L}\\\\p{N}])" + escapeRegExp(term.toLocaleLowerCase()) + "($|[^\\\\p{L}\\\\p{N}])", "u");
+  const pattern = new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(term.toLocaleLowerCase()) + "($|[^\\p{L}\\p{N}])", "u");
   return pattern.test(text.toLocaleLowerCase());
 }
 
