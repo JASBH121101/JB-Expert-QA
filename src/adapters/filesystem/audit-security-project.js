@@ -9,10 +9,28 @@ import { codeQualityRules, securityRules, dependencyRules } from "../../speciali
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { securityDefenseRules } from "../../specialists/security-rules.js";
 
+const NON_PRODUCTION_SEGMENTS = new Set(["test", "tests", "__tests__", "fixture", "fixtures", "testing"]);
+
+const SELF_AUDIT_RULE_FILES = new Set([
+  "src/specialists/security-rules.js",
+  "src/specialists/runtime-security-rules.js",
+  "packages/expert-qa/src/specialists/security-rules.js",
+  "packages/expert-qa/src/specialists/runtime-security-rules.js"
+]);
+
+function isProductionSecurityFile(file, { selfAuditProject = false } = {}) {
+  const relativePath = String(file.path ?? "").replace(/\\/g, "/");
+  const segments = relativePath.split("/").filter(Boolean);
+  if (segments.some((segment) => NON_PRODUCTION_SEGMENTS.has(segment.toLowerCase()))) return false;
+  if (selfAuditProject && SELF_AUDIT_RULE_FILES.has(relativePath)) return false;
+  return true;
+}
+
 export async function auditSecurityProject(rootPath, {
   config = securityConfig,
   scanOptions = {},
   onlineAdvisories = false,
+  productionOnly = false,
   fetchImpl = globalThis.fetch
 } = {}) {
   if (typeof rootPath !== "string" || !rootPath.trim()) {
@@ -21,6 +39,7 @@ export async function auditSecurityProject(rootPath, {
 
   const root = resolve(rootPath);
   if (typeof onlineAdvisories !== "boolean") throw new TypeError("onlineAdvisories must be a boolean");
+  if (typeof productionOnly !== "boolean") throw new TypeError("productionOnly must be a boolean");
   if (fetchImpl !== undefined && typeof fetchImpl !== "function") throw new TypeError("fetchImpl must be a function");
   const validatedConfig = validateEngineConfig(config);
   const scan = await scanProject(root, { ...validatedConfig.scan, ...scanOptions });
@@ -28,6 +47,13 @@ export async function auditSecurityProject(rootPath, {
     ? { ...validatedConfig.advisories, enabled: true, required: true }
     : validatedConfig.advisories;
   const dependencyAdvisories = await scanNpmAdvisories(scan, advisoryOptions, { fetchImpl });
+  const selfAuditProject = scan.manifests.some((manifest) =>
+    manifest.path === "package.json" && manifest.data?.name === "jb-expert-qa"
+  );
+  const auditFiles = productionOnly
+    ? scan.files.filter((file) => isProductionSecurityFile(file, { selfAuditProject }))
+    : scan.files;
+  const excludedNonProductionFiles = scan.files.length - auditFiles.length;
   const incompleteReasons = [];
 
   if (scan.summary.truncated) incompleteReasons.push("file-count or directory-depth limit reached");
@@ -53,7 +79,7 @@ export async function auditSecurityProject(rootPath, {
     registry,
     config: validatedConfig
   }).audit({
-    projectFiles: scan.files,
+    projectFiles: auditFiles,
     packageManifests: scan.manifests,
     projectScan: scan,
     thresholds: validatedConfig.thresholds,
@@ -69,6 +95,8 @@ export async function auditSecurityProject(rootPath, {
     dependencyAdvisories,
     securityAssessment: Object.freeze({
       mode: "local-static",
+      scope: productionOnly ? "production-source" : "full-project",
+      excludedNonProductionFiles,
       complete: incompleteReasons.length === 0,
       incompleteReasons: Object.freeze(incompleteReasons),
       networkRequests: dependencyAdvisories.networkRequests ?? 0,

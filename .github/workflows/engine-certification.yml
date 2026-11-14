@@ -1,0 +1,160 @@
+name: JB Engines Certification
+
+on:
+  push:
+    branches: [main, "integration/**"]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "packages/**"
+      - "scripts/**"
+      - "config/**"
+      - "docs/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/engine-certification.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "packages/**"
+      - "scripts/**"
+      - "config/**"
+      - "docs/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/engine-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expert-qa:
+    name: Expert QA regression / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium for browser QA
+        run: npx playwright install --with-deps chromium
+      - name: Run full deterministic regression suite
+        run: npm run check
+      - name: Generate Expert QA security assessment
+        id: expert-report
+        run: |
+          mkdir -p certification-reports
+          npm run audit:security -- . --production-only --format=markdown --output=certification-reports/expert-qa-security.md
+      - name: Add report status to workflow summary
+        if: always()
+        run: |
+          if [ -f certification-reports/expert-qa-security.md ]; then
+            echo "Scope: production source only. Test/fixture files and the security detector rule definitions are excluded from finding evaluation; all tests still run in the regression suite." >> "$GITHUB_STEP_SUMMARY"
+            cat certification-reports/expert-qa-security.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Expert QA report was not generated; inspect the preceding step." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload Expert QA report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: expert-qa-security-node-${{ matrix.node }}
+          path: certification-reports/
+          if-no-files-found: warn
+          retention-days: 14
+
+  security-guard:
+    name: Security Guard tests / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run Security Guard attack-simulation and regression suite
+        run: npm run test:security-guard
+
+  malware-engine:
+    name: Malware Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run Malware Engine full suite (including calibration and Guard adapter)
+        run: npm --workspace @jb/malware-engine run check
+      - name: Run bounded benchmark on Ubuntu / Node 22
+        if: matrix.os == 'ubuntu-24.04' && matrix.node == 22
+        env:
+          BENCH_ITERATIONS: "5"
+          BENCH_OUTPUT_DIR: certification-reports/malware-benchmark
+        run: npm --workspace @jb/malware-engine run benchmark
+      - name: Upload Malware Engine benchmark
+        if: always() && matrix.os == 'ubuntu-24.04' && matrix.node == 22
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: malware-engine-benchmark
+          path: certification-reports/malware-benchmark/
+          if-no-files-found: warn
+          retention-days: 14
+
+  package-boundaries:
+    name: Three-engine package boundary / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Verify all three independently installable packages
+        run: npm run test:package-distributions
