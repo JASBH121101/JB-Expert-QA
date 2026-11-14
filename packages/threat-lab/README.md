@@ -51,6 +51,12 @@ console.log(JSON.stringify(report, null, 2));
 
 The first local integration suite now exercises all three advanced JB engines together: Malware Engine (EICAR, benign false-positive, inert suspicious-script classification), Security Guard (synthetic XSS blocking, malicious upload rejection through the Malware Engine adapter, and no-match quarantine), and Expert QA (unsafe HTML sink detection followed by a repaired textContent regression check). These tests use temporary directories, synthetic inputs, and in-memory upload storage. A green lab run only certifies the scenarios that actually ran; it does not prove absence of malware, vulnerabilities, or defects. Static file triage is not dynamic malware behavior analysis and cannot claim detection of every trojan, virus, ransomware family, spyware, or worm.
 
+## Bounded execution and report contract
+
+The orchestration core rejects duplicate matrix selections and bounds work to 50 registered targets, 100 registered scenarios, and 2,500 target-scenario executions per run. Each run's metadata is limited to 16 KiB. Adapter responses are limited to 64 KiB overall, 100 findings (48 KiB), and 50 metric keys (16 KiB). Scenario tags, target capabilities, and target-scoping lists are also bounded. Invalid or oversized adapter output is recorded as a controlled failed scenario instead of being treated as a pass.
+
+These limits protect report generation from unexpectedly large or malformed adapter payloads. They do not make untrusted adapter code safe; adapters must still be reviewed and run in an appropriate isolated environment.
+
 ## Development
 
 ```bash
