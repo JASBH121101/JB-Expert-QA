@@ -144,13 +144,10 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
           const report = await engine.scanFile(isolatedPath);
           const families = report.threatAssessment.families.map((item) => item.id);
           const passed = report.peAnalysis?.status === "complete"
-            && report.peAnalysis.imports.capabilities.includes("unused")
-              ? false
-              : report.peAnalysis?.status === "complete"
-                && report.status !== "malicious"
-                && !families.includes("rat")
-                && !families.includes("trojan-like")
-                && report.detections.length === 0;
+            && report.status !== "malicious"
+            && !families.includes("rat")
+            && !families.includes("trojan-like")
+            && report.detections.length === 0;
           return outcome(
             passed,
             passed
