@@ -58,6 +58,7 @@ Project / application repository
 - Expert QA can identify a risky route, unsafe configuration, missing validation, dead code, dependency exposure or visual/accessibility regression. Its quality score is never a malware verdict.
 - Security Guard owns request enforcement and the upload decision. It must fail closed on scanner errors, malformed responses, timeouts, digest/size mismatch and unknown verdicts.
 - Malware Engine scans files locally and reports its own evidence. An exact signature match can produce `malicious`; heuristic results can produce `suspicious`; incomplete coverage can produce `unknown`; `no_match` is not proof that a file is safe.
+- The current Malware Engine scope is Windows-focused. Android/iOS and APK support are excluded; desktop VPN enforcement, Windows services/drivers, firewall/routing changes, and installers remain deferred until a real Windows test device is available and separately approved.
 - The existing Malware-to-Guard adapter intentionally maps `no_match`, `suspicious` and `unknown` to Guard's `unknown` verdict. It never promotes an upload to `clean`. This is a security property, not a defect to relax.
 - Expert QA is a read-only quality gate by default. Remediation must be reviewed and tested before it is accepted.
 
