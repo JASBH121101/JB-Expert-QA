@@ -49,7 +49,7 @@ console.log(JSON.stringify(report, null, 2));
 - Expert QA: intentionally vulnerable source fixtures analyzed statically; compare expected findings against a repaired fixture. Visual QA remains deterministic/local; no AI visual calls.
 - Applications such as NEXORA or a client ERP: isolated test database, authentication/authorization, CRUD invariants, inventory arithmetic, validation, file uploads, exports, accessibility and performance budgets.
 
-The first local integration suite now exercises all three advanced JB engines together: Malware Engine (EICAR, benign false-positive, inert suspicious-script classification), Security Guard (synthetic XSS blocking, malicious upload rejection through the Malware Engine adapter, and no-match quarantine), and Expert QA (unsafe HTML sink detection followed by a repaired textContent regression check). These tests use temporary directories, synthetic inputs, and in-memory upload storage. A green lab run only certifies the scenarios that actually ran; it does not prove absence of malware, vulnerabilities, or defects. Static file triage is not dynamic malware behavior analysis and cannot claim detection of every trojan, virus, ransomware family, spyware, or worm.
+The local integration suites now exercise all four JB engines: Malware Engine (EICAR, benign false-positive, inert suspicious-script classification), Advisor Engine (deterministic recommendation, evidence-review gating and technology product-type isolation), Security Guard (synthetic XSS blocking, malicious upload rejection through the Malware Engine adapter, and no-match quarantine), and Expert QA (unsafe HTML sink detection followed by a repaired textContent regression check). These tests use temporary directories, synthetic inputs, and in-memory upload storage. A green lab run only certifies the scenarios that actually ran; it does not prove absence of malware, vulnerabilities, or defects. Static file triage is not dynamic malware behavior analysis and cannot claim detection of every trojan, virus, ransomware family, spyware, or worm.
 
 ## Bounded execution and report contract
 
@@ -64,3 +64,6 @@ npm test
 ```
 
 Node.js 22 or newer. No cloud services, paid APIs, telemetry, external malware feeds, or sample uploads are required.
+
+
+The Advisor Engine profile uses synthetic smartphone fixtures and an in-memory research provider. It verifies that research candidates remain `unconfirmed` and `pending_review` until explicit human approval. The test reports zero network requests and does not contact external research providers.
