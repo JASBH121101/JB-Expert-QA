@@ -30,7 +30,7 @@ const LANGUAGE_MARKERS = Object.freeze({
 const UI_TEXT_SELECTOR = [
   "button", "a", "[role='button']", "[role='link']", "label", "input", "textarea",
   "select", "h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "summary",
-  "[aria-label]", "[title]"
+  "[aria-label]", "[aria-description]", "[title]", "[data-tooltip]", "img[alt]"
 ].join(",");
 
 function normalizeLanguage(value) {
@@ -100,9 +100,13 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
         const values = [];
         const text = (element.innerText ?? element.textContent ?? "").replace(/\s+/g, " ").trim();
         if (text) values.push({ attribute: "text", value: text });
-        for (const attribute of ["aria-label", "title", "placeholder"]) {
+        for (const attribute of ["aria-label", "aria-description", "title", "placeholder", "alt", "data-tooltip"]) {
           const value = element.getAttribute(attribute);
           if (value?.trim()) values.push({ attribute, value: value.trim() });
+        }
+        if (element.matches("input[type=button],input[type=submit],input[type=reset]")) {
+          const value = element.getAttribute("value");
+          if (value?.trim()) values.push({ attribute: "value", value: value.trim() });
         }
         for (const entry of values) {
           const normalized = clean(entry.value);

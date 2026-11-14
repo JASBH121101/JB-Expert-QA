@@ -87,4 +87,64 @@ export const layoutIntegrityRules = [
       }));
     }
   }
+  ,
+  {
+    id: "ui-ux.constrained-primary-container",
+    specialist: "ui-ux",
+    evaluate(context) {
+      const viewportWidth = Number(context.viewport?.width ?? 0);
+      if (viewportWidth < 1280) return [];
+      const ratioLimit = Number(context.thresholds?.narrowContainerRatio ?? 0.72);
+      const widthLimit = Number(context.thresholds?.narrowContainerMaxWidthPx ?? 960);
+      return (context.layoutIntegrity?.containerMetrics ?? [])
+        .filter((item) => {
+          const semantic = item.tagName === "main" ||
+            /page-content|content-wrapper|content-area|catalog-grid|dashboard-content/i.test(
+              String(item.className ?? "") + " " + String(item.selector ?? "")
+            );
+          const maxWidth = Number.parseFloat(item.maxWidth);
+          return semantic && Number(item.parentContentWidthPx) >= 1200 &&
+            Number(item.widthPx) <= widthLimit &&
+            Number(item.widthToParentRatio) > 0 &&
+            Number(item.widthToParentRatio) <= ratioLimit &&
+            Number.isFinite(maxWidth) && maxWidth <= widthLimit;
+        })
+        .map((item, index) => ({
+          id: "UIUX-012-" + (index + 1),
+          title: "Primary content container may be unnecessarily constrained",
+          description: item.selector + " uses " + Number(item.widthPx) +
+            "px inside a " + Number(item.parentContentWidthPx) +
+            "px parent at a " + viewportWidth + "px viewport.",
+          severity: "low",
+          location: item.selector,
+          evidence: {
+            widthPx: item.widthPx,
+            parentContentWidthPx: item.parentContentWidthPx,
+            widthToParentRatio: item.widthToParentRatio,
+            maxWidth: item.maxWidth,
+            viewportWidthPx: viewportWidth,
+            className: item.className
+          },
+          recommendation: "Review the max-width and width rules at this desktop breakpoint. Compare equivalent sections across pages and remove accidental fixed limits, while preserving intentional readable content widths."
+        }));
+    }
+  },
+  {
+    id: "ui-ux.missing-document-language",
+    specialist: "ui-ux",
+    evaluate(context) {
+      const audit = context.localizationAudit;
+      if (!audit || audit.status !== "skipped" || audit.languageSource !== "undetermined") return [];
+      return [{
+        id: "UIUX-011",
+        title: "Document language is not declared",
+        description: "JB Expert QA could not determine whether the page is Spanish or English, so the localization completeness check was skipped.",
+        severity: "low",
+        location: "html",
+        evidence: { localizationStatus: audit.status, languageSource: audit.languageSource },
+        recommendation: "Set the correct lang attribute on the html element (for example, lang=\"es\" or lang=\"en\") or pass --language=es|en when auditing a specific localized version."
+      }];
+    }
+  }
+
 ];
