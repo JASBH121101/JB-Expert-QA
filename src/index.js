@@ -29,7 +29,9 @@ export { auditSecurityProject } from "./adapters/filesystem/audit-security-proje
 export { auditSecurityUrl } from "./adapters/filesystem/audit-security-url.js";
 export { formatReport, formatMarkdownReport, formatHtmlReport } from "./reporters/index.js";
 
-export { auditUrl, auditViewports, DEFAULT_VIEWPORTS } from "./adapters/playwright/audit-url.js";
+export { auditUrl, auditViewports, DEFAULT_VIEWPORTS, FULL_VIEWPORTS } from "./adapters/playwright/audit-url.js";
+export { collectVisualIntegrity, DEFAULT_PRESERVED_TERMS } from "./adapters/playwright/visual-integrity.js";
+export { classifyUpdate, evaluateHybridUpdate, HYBRID_UPDATE_POLICY, ENGINE_PACKAGES } from "./update-manager/policy.js";
 export { comparePngBuffers, comparePngFiles } from "./adapters/visual/png-diff.js";
 export { createGeminiProvider } from "./ai/gemini-provider.js";
 export {
