@@ -1,0 +1,11 @@
+{
+  "name": "@jb/threat-lab",
+  "version": "0.1.0",
+  "description": "Extensible, safe test laboratory for JB engines and independent applications.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./src/index.js", "./fixtures": "./src/fixtures.js" },
+  "files": ["src/**", "tests/**", "README.md"],
+  "scripts": { "test": "node --test", "check": "node --check src/index.js && node --check src/fixtures.js && node --test" },
+  "license": "UNLICENSED"
+}
