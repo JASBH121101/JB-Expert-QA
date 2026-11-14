@@ -80,15 +80,19 @@ export function calculateScore(diagnostics, {
   const hasCritical = diagnostics.some((item) => item.severity === "critical");
   const blockedByCritical = Boolean(failOnCritical && hasCritical);
   const blockedByExecutionErrors = executionErrors > 0;
+  const blockedByUnweightedFindings = unweightedSpecialists.some((name) =>
+    diagnostics.some((item) => item.specialist === name)
+  );
   return Object.freeze({
     score,
     minimumScore,
     assessedSpecialists: Object.freeze(activeNames),
     specialistScores: Object.freeze(specialistScores),
     unweightedSpecialists: Object.freeze(unweightedSpecialists),
-    passed: hasAssessments && score >= minimumScore && !blockedByCritical && !blockedByExecutionErrors,
+    passed: hasAssessments && score >= minimumScore && !blockedByCritical && !blockedByExecutionErrors && !blockedByUnweightedFindings,
     blockedByCritical,
     blockedByExecutionErrors,
+    blockedByUnweightedFindings,
     noRulesExecuted: activeNames.length === 0
   });
 }
