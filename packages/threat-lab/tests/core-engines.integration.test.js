@@ -350,7 +350,7 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
         if (scenario.id === "expert-qa.database.dynamic-query-and-tls") {
           const source = [
             "const pool = new pg.Pool({ ssl: false });",
-            'export function findUser(input) { return pool.query("SELECT * FROM users WHERE name = \'" + input + "\'"); }'
+            'export function findUser(input) { return pool.query("SELECT * FROM users WHERE name = " + input); }'
           ].join("\n");
           await writeFile(path.join(expertDatabaseProject, "src", "db.js"), source);
           const report = await auditDatabaseProject(expertDatabaseProject, {
