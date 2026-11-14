@@ -1,0 +1,35 @@
+name: JB Threat Lab
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/threat-lab/**"
+      - "package.json"
+      - ".github/workflows/threat-lab.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/threat-lab/**"
+      - "package.json"
+      - ".github/workflows/threat-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safe-lab-tests:
+    name: Safe lab core (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm --workspace @jb/threat-lab run check
