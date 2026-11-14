@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Core\Security\TrustedProxyList;
 use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class SecurityConfigurationTest extends TestCase
@@ -32,7 +32,6 @@ final class SecurityConfigurationTest extends TestCase
             ),
         );
     }
-
 
     public function test_proxy_middleware_uses_only_the_configured_proxy_list_and_header_set(): void
     {
@@ -62,7 +61,7 @@ final class SecurityConfigurationTest extends TestCase
     public function test_proxy_middleware_does_not_trust_any_proxy_when_configuration_is_empty(): void
     {
         config(['nexora.trusted_proxies' => []]);
-        Request::setTrustedProxies(['198.51.100.10'], Request::HEADER_X_FORWARDED_ALL);
+        Request::setTrustedProxies(['198.51.100.10'], Request::HEADER_X_FORWARDED_FOR);
 
         $request = Request::create('http://nexora.example.test/');
 
