@@ -11,12 +11,18 @@ import { securityDefenseRules } from "../../specialists/security-rules.js";
 
 const NON_PRODUCTION_SEGMENTS = new Set(["test", "tests", "__tests__", "fixture", "fixtures", "testing"]);
 
-function isProductionSecurityFile(file) {
-  const segments = String(file.path ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
+const SELF_AUDIT_RULE_FILES = new Set([
+  "src/specialists/security-rules.js",
+  "src/specialists/runtime-security-rules.js",
+  "packages/expert-qa/src/specialists/security-rules.js",
+  "packages/expert-qa/src/specialists/runtime-security-rules.js"
+]);
+
+function isProductionSecurityFile(file, { selfAuditProject = false } = {}) {
+  const relativePath = String(file.path ?? "").replace(/\\/g, "/");
+  const segments = relativePath.split("/").filter(Boolean);
   if (segments.some((segment) => NON_PRODUCTION_SEGMENTS.has(segment.toLowerCase()))) return false;
-  const basename = segments.at(-1);
-  const parent = segments.at(-2);
-  if (parent === "specialists" && ["security-rules.js", "runtime-security-rules.js"].includes(basename)) return false;
+  if (selfAuditProject && SELF_AUDIT_RULE_FILES.has(relativePath)) return false;
   return true;
 }
 
@@ -41,7 +47,12 @@ export async function auditSecurityProject(rootPath, {
     ? { ...validatedConfig.advisories, enabled: true, required: true }
     : validatedConfig.advisories;
   const dependencyAdvisories = await scanNpmAdvisories(scan, advisoryOptions, { fetchImpl });
-  const auditFiles = productionOnly ? scan.files.filter(isProductionSecurityFile) : scan.files;
+  const selfAuditProject = scan.manifests.some((manifest) =>
+    manifest.path === "package.json" && manifest.data?.name === "jb-expert-qa"
+  );
+  const auditFiles = productionOnly
+    ? scan.files.filter((file) => isProductionSecurityFile(file, { selfAuditProject }))
+    : scan.files;
   const excludedNonProductionFiles = scan.files.length - auditFiles.length;
   const incompleteReasons = [];
 
