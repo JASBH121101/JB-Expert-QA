@@ -391,7 +391,7 @@ final class SetupController
             $request->query('locale', config('app.locale', 'es')),
         )));
 
-        if (!array_key_exists($locale, LanguageCatalog::all())) {
+        if (! array_key_exists($locale, LanguageCatalog::all())) {
             $locale = 'es';
         }
 
