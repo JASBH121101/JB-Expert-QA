@@ -18,6 +18,7 @@ A lab pass means only that the named scenario produced its expected outcome. It 
 | --- | --- |
 | JB Malware Engine | EICAR harmless test string; exact test-only signatures; inert suspicious text; benign false-positive checks; unknown/incomplete coverage; ZIP, PDF and PE parser boundaries; bounded scanning |
 | JB Security Guard | XSS, SQL injection and path-traversal request patterns; ambiguous HTTP framing; upload size/type/digest checks; scanner timeout/error handling; fail-closed quarantine and promotion |
+| JB Advisor Engine | deterministic product recommendation; fragrance/technology domain separation; offline research-candidate review gates; no automatic promotion to verified evidence |
 | JB Expert QA | intentionally vulnerable source fixtures; repaired-code regression; database raw-query/TLS checks; deterministic visual regression; accessibility and responsive QA |
 | NEXORA | owner authentication; authorization boundaries; business registration; templates; product CRUD; currency rules; PDF export; upload constraints; responsive/accessibility checks |
 | Perfumaría JB (future profile) | initially a lightweight public catalogue with a private owner panel for products and photos; later, when the business grows, a separately installable modular Laravel/PHP ERP package for a VPS |
@@ -74,7 +75,7 @@ The checkpoint is caller-owned state, not protected storage. The host applicatio
 
 ## Current implementation status
 
-The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current three-engine integration matrix contains **17 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
+The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current four-engine integration matrix contains **20 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
 
 - **JB Malware Engine — 6 scenarios:** exact harmless EICAR match; benign no-match/false-positive; inert PowerShell-like text classified as suspicious, not confirmed malicious; exact configured SHA-256 signature detection; over-limit file returned as `unknown`; PDF active-action indicators classified as suspicious without an exact malware detection.
 - **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
@@ -92,3 +93,5 @@ The reusable core, target-scoped scenario registry, explicit offline/non-destruc
 The suite uses temporary directories, inert fixtures, and in-memory upload storage. It does not use production data, execute malware samples, send network requests from Threat Lab adapters, contact external malware feeds, call AI providers, or require paid services. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The PostgreSQL CLI E2E is the separate opt-in integration check and uses only a disposable CI PostgreSQL service; the Threat Lab database scenario remains static and makes zero database connections. The PNG comparison validates deterministic pixel differences, not every browser/device combination.
 
 NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
+
+- **JB Advisor Engine — 3 scenarios:** deterministic synthetic smartphone recommendation; mocked research candidate remains `unconfirmed` and `pending_review` with zero network requests; mixed smartphone/laptop comparisons are rejected by the technology domain adapter.
