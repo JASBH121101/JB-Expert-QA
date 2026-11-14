@@ -69,11 +69,11 @@ export function calculateScore(diagnostics, {
     specialistScores[name] = Math.max(0, 100 - penalty);
   }
 
-  const totalWeight = activeNames.reduce((sum, name) => sum + weights[name], 0);
+  const totalWeight = activeNames.reduce((sum, name) => sum + (weights[name] ?? 0), 0);
   const hasAssessments = activeNames.length > 0 && totalWeight > 0;
   const score = hasAssessments
     ? Math.round(activeNames.reduce(
-        (sum, name) => sum + specialistScores[name] * weights[name],
+        (sum, name) => sum + specialistScores[name] * (weights[name] ?? 0),
         0
       ) / totalWeight)
     : null;
@@ -86,6 +86,7 @@ export function calculateScore(diagnostics, {
     minimumScore,
     assessedSpecialists: Object.freeze(activeNames),
     specialistScores: Object.freeze(specialistScores),
+    unweightedSpecialists: Object.freeze(unweightedSpecialists),
     passed: hasAssessments && score >= minimumScore && !blockedByCritical && !blockedByExecutionErrors,
     blockedByCritical,
     blockedByExecutionErrors,
