@@ -152,8 +152,9 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
       const clipsY = ["hidden", "clip"].includes(style.overflowY);
       const horizontalExcess = Math.max(0, element.scrollWidth - element.clientWidth);
       const verticalExcess = Math.max(0, element.scrollHeight - element.clientHeight);
+      const lineClamp = Number.parseInt(style.webkitLineClamp, 10);
       const clamped = style.textOverflow === "ellipsis" ||
-        style.webkitLineClamp !== "none" || style.display === "-webkit-box";
+        (Number.isInteger(lineClamp) && lineClamp > 0);
       if ((clipsX && horizontalExcess > 2) || (clipsY && verticalExcess > 2) ||
           (clamped && (horizontalExcess > 2 || verticalExcess > 2))) {
         const key = selectorFor(element) + "|self";
