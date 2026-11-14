@@ -15,7 +15,7 @@ return [
     'cookie' => env('SESSION_COOKIE', Str::slug((string) env('APP_NAME', 'nexora')).'-session'),
     'path' => env('SESSION_PATH', '/'),
     'domain' => env('SESSION_DOMAIN'),
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
     'http_only' => env('SESSION_HTTP_ONLY', true),
     'same_site' => env('SESSION_SAME_SITE', 'lax'),
     'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
