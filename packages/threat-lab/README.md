@@ -10,7 +10,7 @@ The lab does not import or couple itself to a particular JB product. Integration
 
 ## Safety boundary
 
-A scenario is accepted only when it explicitly declares `safe: true`, `network: false`, and `destructive: false`. Sample execution is prohibited. Adapters must use disposable test data, local fixtures, mocks, and explicitly authorized test environments. The lab itself never opens network connections, executes submitted samples, mutates target source, changes production data, or deploys anything.
+A scenario is accepted only when it explicitly declares `safe: true`, `network: false`, `destructive: false`, and `executesSample: false`. Sample execution is prohibited. Adapters must use disposable test data, local fixtures, mocks, and explicitly authorized test environments. The lab core itself does not open network connections, execute submitted samples, mutate target source, change production data, or deploy anything. This metadata gate is not an operating-system sandbox: adapter code is trusted code and must be reviewed, kept offline, and run against disposable local fixtures or authorized test instances.
 
 Included fixtures are inert data. The EICAR string is a harmless antivirus test pattern, not malware. Suspicious script, SQL, and path strings are text fixtures only and must never be executed or used as filesystem paths.
 
