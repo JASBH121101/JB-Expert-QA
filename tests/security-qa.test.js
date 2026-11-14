@@ -343,10 +343,12 @@ test("production-only scope still audits application code in an unrelated projec
   await withProject(async (root) => {
     await mkdir(join(root, "src"), { recursive: true });
     await writeFile(join(root, "package.json"), JSON.stringify({ name: "unrelated-app" }));
-    await writeFile(join(root, "src", "app.js"), 'const resetToken = Math.random().toString(36);');
+    await writeFile(join(root, "src", "app.js"), 'const api = "http://api.example.com/v1";');
 
     const report = await auditSecurityProject(root, { productionOnly: true });
-    assert.ok(report.diagnostics.some((item) => item.id.startsWith("SEC-RANDOM-")));
+    const httpFinding = report.diagnostics.find((item) => item.id.startsWith("SEC-HTTP-"));
+    assert.ok(httpFinding);
+    assert.match(JSON.stringify(httpFinding), /src[\\/]app\\.js/);
     assert.equal(report.securityAssessment.excludedNonProductionFiles, 0);
   });
 });
