@@ -72,3 +72,10 @@ Sequential scans and dead tuples are advisory signals, not automatic proof of a 
 ## Limitations
 
 The first version does not inspect application row contents, run arbitrary SQL, perform writes, create backups, validate backup restorability, change permissions, or certify production readiness. It cannot infer whether a missing index is wrong for a workload. The audit role may not see every object; catalog visibility limitations must be considered when interpreting results. A successful connection and report are not a security certification.
+
+
+## GitHub Actions validation
+
+The pull-request workflow runs the real `pg` driver and `src/database-cli.js` against a disposable PostgreSQL 16 service on Node.js 22 and 24. It creates one temporary table in that CI-only database and verifies the CLI's JSON report, read-only transaction confirmation, metadata-only coverage, and finding output. The test schema is removed after the audit; the hosted service is discarded with the runner.
+
+An additional Neon check is enabled only when the repository secret `QA_NEON_DEVELOPMENT_DATABASE_URL` is configured. Set it to the **development branch only**, using the dedicated read-only `jb_erp_runtime_sql` role. The workflow rejects non-Neon hosts and verifies the expected database and role. It does not print the URL or upload the report. Without that secret, the Neon step is explicitly skipped; local PostgreSQL CI success is not represented as a live Neon test.
