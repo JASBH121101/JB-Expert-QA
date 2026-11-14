@@ -290,8 +290,8 @@ async function validatePackageLayout({ installRoot, packageName, release }) {
   }
   const lock = await readJson(resolve(installRoot, "package-lock.json"), "staging package-lock.json");
   const lockEntry = lock.packages?.["node_modules/" + packageName];
-  if (lockEntry?.integrity !== release.dist.integrity) {
-    fail("Staged package integrity does not match the signed manifest");
+  if (lockEntry?.version !== release.version || lockEntry.integrity !== release.dist.integrity) {
+    fail("Staged package version/integrity does not match the signed manifest");
   }
   const resolvedTarball = assertHttpsUrl(lockEntry.resolved, "Resolved package tarball URL");
   const expectedTarball = assertHttpsUrl(release.dist.tarball, "Signed package tarball URL");

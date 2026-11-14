@@ -89,7 +89,13 @@ function fixtureNpmRunner(args, cwd) {
       main: "./index.js"
     }, null, 2) + "\n");
     writeFileSync(resolve(packageDirectory, "index.js"), "export const version = " + JSON.stringify(requested) + ";\n");
-    const lock = JSON.parse(readFileSync(resolve(cwd, "package-lock.json"), "utf8"));
+    let lock;
+    try {
+      lock = JSON.parse(readFileSync(resolve(cwd, "package-lock.json"), "utf8"));
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      lock = { name: "fixture-project", version: "1.0.0", lockfileVersion: 3, packages: { "": {} } };
+    }
     lock.packages["node_modules/@jb/expert-qa"] = {
       version: requested,
       integrity,
@@ -105,6 +111,7 @@ function fixtureNpmRunner(args, cwd) {
     writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify({
       name: "@jb/expert-qa",
       version,
+      type: "module",
       main: "./index.js"
     }, null, 2) + "\n");
     writeFileSync(resolve(packageDirectory, "index.js"), "export const version = " + JSON.stringify(version) + ";\n");
@@ -162,7 +169,6 @@ test("applies a verified patch, records a backup and supports rollback", async (
       currentVersion: "0.2.0",
       projectRoot: root,
       manifestVerified: true,
-      stageCandidate: async () => ({ lockEntry: { integrity } }),
       npmRunner: fixtureNpmRunner
     });
     assert.equal(result.decision, "auto-apply");
@@ -232,6 +238,45 @@ test("blocks local workspace/file dependencies instead of replacing them from th
       },
       npmRunner: fixtureNpmRunner
     }), /local workspace\/file dependencies/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("automatically restores the previous install when the project install fails", async () => {
+  const root = await createProject();
+  let installCalls = 0;
+  const failingNpmRunner = (args, cwd) => {
+    if (args[0] === "install") {
+      installCalls += 1;
+      const result = fixtureNpmRunner(args, cwd);
+      if (installCalls === 2) {
+        return { ...result, status: 1, stderr: "simulated project install failure" };
+      }
+      return result;
+    }
+    return fixtureNpmRunner(args, cwd);
+  };
+
+  try {
+    await assert.rejects(() => applyEngineUpdate({
+      packageName: "@jb/expert-qa",
+      release: makeManifest().packages["@jb/expert-qa"],
+      currentVersion: "0.2.0",
+      projectRoot: root,
+      manifestVerified: true,
+      npmRunner: failingNpmRunner
+    }), /previous package.json, lockfile and dependency tree were restored/i);
+
+    assert.equal(installCalls, 2);
+    const restoredPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+    const restoredLock = JSON.parse(await readFile(resolve(root, "package-lock.json"), "utf8"));
+    const restoredInstalled = JSON.parse(await readFile(
+      resolve(root, "node_modules/@jb/expert-qa/package.json"), "utf8"
+    ));
+    assert.equal(restoredPackage.dependencies["@jb/expert-qa"], "^0.2.0");
+    assert.equal(restoredLock.packages["node_modules/@jb/expert-qa"].version, "0.2.0");
+    assert.equal(restoredInstalled.version, "0.2.0");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
