@@ -28,7 +28,10 @@ function run(command, args, options = {}) {
         npm_config_audit: "false",
         npm_config_fund: "false"
       },
-      shell: process.platform === "win32" && command.toLowerCase() === npm.toLowerCase()
+      shell: process.platform === "win32" && (
+        command.toLowerCase() === npm.toLowerCase() ||
+        command.toLowerCase().endsWith(".cmd")
+      )
     });
   } catch (error) {
     const stdout = error.stdout?.toString?.() ?? "";
