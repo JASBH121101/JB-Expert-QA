@@ -9,21 +9,23 @@ const revision = process.env.NEXORA_CATALOG_REVISION ?? "unpinned-local-checkout
 if (!rootPath) {
   test.skip("NEXORA Configurable Catalog product checkout is not mounted in this runner", () => {});
 } else {
-  test("Threat Lab executes NEXORA Configurable Catalog's real offline demo tests", async () => {
-    const lab = createThreatLab({ name: "JB Threat Lab", version: "0.2.0" });
+  test("Threat Lab validates six tiers of the pinned NEXORA Configurable Catalog prototype", async () => {
+    const lab = createThreatLab({ name: "JB Threat Lab", version: "0.3.0" });
     lab.registerTarget({
       id: "nexora-configurable-catalog",
       kind: "frontend-catalog-prototype",
       version: revision,
-      capabilities: ["sample-data-validation", "local-store", "template-contract", "responsive-layout"],
+      capabilities: ["sample-data-validation", "local-store", "template-contract", "responsive-layout", "demo-boundary"],
       adapter: createNexoraCatalogAdapter({ rootPath })
     });
 
     const scenarios = [
-      ["nexora.catalog.sample-data", "basic", "Validate the sample business catalogs, product fields, identifiers, and image URL shape."],
-      ["nexora.catalog.local-store-and-escaping", "intermediate", "Validate prototype-local storage isolation, HTML escaping, and WhatsApp URL formatting."],
-      ["nexora.catalog.mobile-layout", "intermediate", "Validate mobile admin width constraints and internal table scrolling."],
-      ["nexora.catalog.setup-contract", "advanced", "Validate template setup, dynamic fields, measurement units, optional photos, and prototype-only authentication boundaries."]
+      ["nexora.catalog.sample-data", "basic", "Validate sample business/product data integrity, identifiers, and image URL shape."],
+      ["nexora.catalog.setup-contract", "intermediate", "Validate the setup wizard, editable templates, dimensions, fields, optional photos and demo-only boundary."],
+      ["nexora.catalog.local-store-and-escaping", "advanced", "Validate browser-localStorage isolation, HTML escaping and WhatsApp link normalization."],
+      ["nexora.catalog.mobile-layout", "expert", "Validate responsive admin behavior and constrained internal scrolling."],
+      ["nexora.catalog.extreme.full-demo-regression", "extreme", "Run every pinned demo contract suite together as a cross-file regression."],
+      ["nexora.catalog.superextreme.prototype-boundaries", "superextreme", "Run the complete demo suite and verify the prototype does not collect real passwords or claim server persistence."]
     ];
 
     for (const [id, difficulty, description] of scenarios) {
@@ -40,6 +42,7 @@ if (!rootPath) {
 
     const report = await lab.run({
       targetIds: ["nexora-configurable-catalog"],
+      scenarioIds: scenarios.map(([id]) => id),
       metadata: {
         product: "NEXORA Configurable Catalog prototype",
         revision,
@@ -48,11 +51,14 @@ if (!rootPath) {
       }
     });
 
-    assert.deepEqual(report.totals, { pass: 4, fail: 0, skip: 0 }, JSON.stringify(report.results, null, 2));
+    assert.deepEqual(report.totals, { pass: 6, fail: 0, skip: 0 }, JSON.stringify(report.results, null, 2));
     const target = report.assessment.targets[0];
-    assert.deepEqual(target.coveredLevels, ["basic", "intermediate", "advanced"]);
-    assert.deepEqual(target.missingLevels, ["expert", "extreme", "superextreme"]);
-    assert.equal(target.ready, false, "prototype test coverage must not imply six-tier product certification");
+    assert.deepEqual(target.coveredLevels, [
+      "basic", "intermediate", "advanced", "expert", "extreme", "superextreme"
+    ]);
+    assert.deepEqual(target.missingLevels, []);
+    assert.equal(target.ready, true, "ready applies only to the six registered prototype scenarios, including the demo boundary check");
     assert.ok(report.results.every((item) => item.metrics.exitCode === 0));
+    assert.ok(report.results.at(-1).metrics.safetyChecks && Object.values(report.results.at(-1).metrics.safetyChecks).every(Boolean));
   });
 }
