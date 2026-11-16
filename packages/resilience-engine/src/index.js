@@ -292,3 +292,5 @@ export {
 export { createFileTrustedSignalStore } from "./trusted-signal-store.js";
 export { createSecurityGuardSignalProducer } from "./producers/security-guard.js";
 export { createMalwareEngineSignalProducer } from "./producers/malware-engine.js";
+
+export { createIncidentCorrelationEngine } from "./incident-correlation-engine.js";

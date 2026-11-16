@@ -87,3 +87,7 @@ See [Trusted Signal Gateway v0.4](./docs/TRUSTED-SIGNAL-GATEWAY.md) for the enve
 ## Producer adapters and durable signal store (laboratory)
 
 The Security Guard and Malware Engine adapters are available through `./producers/security-guard` and `./producers/malware-engine`. They translate existing source outputs conservatively: Security Guard never emits a confirmed host-compromise verdict, and Malware Engine `no_match` remains `unknown`. `createFileTrustedSignalStore()` supplies a durable single-host replay ledger; it is not a cross-host database. These are integration prerequisites only and do not enable production recovery or OS actions. See [TRUSTED-SIGNAL-INTEGRATION.md](./docs/TRUSTED-SIGNAL-INTEGRATION.md).
+
+## v0.5 Incident Correlation & Decision Engine (laboratory)
+
+The `./incident-correlation-engine` module combines a Trusted Signal Gateway snapshot with bounded host-provided health observations for one exact asset, environment and service. It generates a deterministic incident identifier, deduplicates observations, detects conflicting timestamps/IDs, ranks risk and emits an auditable rule trace. It is read-only: it never authorizes recovery, executes an action or replaces the v2 policy gate. A recovery-related result only recommends a separate A1 policy evaluation.
