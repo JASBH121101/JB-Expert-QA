@@ -129,7 +129,7 @@ test("Core v1 rate-limit decisions accept enforced 429 and 503 states", () => {
 
 test("Core v1 rate-limit decisions reject contradictory enforcement states", () => {
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ unavailable: true })), /429 requires exceeded=true/);
-  assert.throws(() => normalizeCoreRateLimitDecision(decision({ status: 503, unavailable: false })), /503 decision/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ status: 503, unavailable: false })), /503 requires exceeded=false/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: false, status: null })), /denied decision/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, status: 429 })), /allowed decision/);
   const failOpen = normalizeCoreRateLimitDecision(decision({
