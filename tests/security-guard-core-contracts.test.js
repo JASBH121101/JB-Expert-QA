@@ -3,6 +3,16 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  validateRateLimitCheckV1,
+  validateRateLimitDecisionV1,
+  validateAuthenticationAttemptV1,
+  validateAuthenticationDecisionV1,
+  validateSecurityEventV1,
+  validateRateLimitPolicyV1,
+  validateThreatSignalV1,
+  validateThreatAssessmentV1
+} from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -110,12 +120,30 @@ const fixtureSchemas = [
   ["threat-detection/assessment-observe.valid.json", "urn:jb:security-guard:threat-assessment:v1"]
 ];
 
+const runtimeValidators = new Map([
+  ["urn:jb:security-guard:rate-limit:check-request:v1", validateRateLimitCheckV1],
+  ["urn:jb:security-guard:rate-limit:decision:v1", validateRateLimitDecisionV1],
+  ["urn:jb:security-guard:policies:rate-limit:v1", validateRateLimitPolicyV1],
+  ["urn:jb:security-guard:authentication:attempt:v1", validateAuthenticationAttemptV1],
+  ["urn:jb:security-guard:authentication:decision:v1", validateAuthenticationDecisionV1],
+  ["urn:jb:security-guard:security-event:v1", validateSecurityEventV1],
+  ["urn:jb:security-guard:threat-signal:v1", validateThreatSignalV1],
+  ["urn:jb:security-guard:threat-assessment:v1", validateThreatAssessmentV1]
+]);
+
 for (const [relativePath, schemaId] of fixtureSchemas) {
   test("Core fixture conforms to " + schemaId + ": " + relativePath, async () => {
     const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests", "fixtures", relativePath), "utf8"));
     const schema = schemasById.get(schemaId);
     assert.ok(schema, "schema must exist: " + schemaId);
     assert.deepEqual(validateSchema(schema, fixture), []);
+  });
+
+  test("JavaScript runtime validator accepts shared Core fixture: " + relativePath, async () => {
+    const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests", "fixtures", relativePath), "utf8"));
+    const validate = runtimeValidators.get(schemaId);
+    assert.equal(typeof validate, "function", "runtime validator must exist for " + schemaId);
+    assert.doesNotThrow(() => validate(fixture));
   });
 }
 
