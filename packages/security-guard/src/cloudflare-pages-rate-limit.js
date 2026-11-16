@@ -1,4 +1,8 @@
-const SAFE_IDENTIFIER = /^[a-zA-Z0-9:_-]{1,96}$/;
+import {
+  normalizeRateLimitCheckInput,
+  normalizeRateLimitServiceDecision
+} from "./rate-limit-contract.js";
+
 const DEFAULT_SERVICE_PATH = "/__jb/security-guard/rate-limit";
 
 function isRecord(value) {
@@ -32,33 +36,6 @@ function createFailureResponse(status, retryAfterSeconds, error) {
   });
 }
 
-function normalizeCheckInput(input = {}) {
-  if (!isRecord(input)) throw new TypeError("check input must be an object");
-  const allowed = new Set(["identity", "scope", "policy"]);
-  for (const key of Object.keys(input)) {
-    if (!allowed.has(key)) throw new TypeError("Unknown rate-limit check input: " + key);
-  }
-
-  const identity = input.identity;
-  if (typeof identity !== "string" || !identity.trim() || identity.length > 512) {
-    throw new TypeError("identity must be a non-empty trusted identifier no longer than 512 characters");
-  }
-
-  const scope = input.scope ?? "request";
-  if (typeof scope !== "string" || !SAFE_IDENTIFIER.test(scope)) {
-    throw new TypeError("scope must contain 1-96 safe identifier characters");
-  }
-
-  const normalized = { identity: identity.trim(), scope };
-  if (input.policy !== undefined) {
-    if (typeof input.policy !== "string" || !SAFE_IDENTIFIER.test(input.policy)) {
-      throw new TypeError("policy must contain 1-96 safe identifier characters");
-    }
-    normalized.policy = input.policy;
-  }
-  return normalized;
-}
-
 function unavailableDecision({ failureMode, onEvent, policy, scope }) {
   const closed = failureMode === "closed";
   const event = {
@@ -84,42 +61,18 @@ function unavailableDecision({ failureMode, onEvent, policy, scope }) {
 }
 
 function normalizeServiceDecision(value) {
-  if (!isRecord(value) ||
-      typeof value.allowed !== "boolean" ||
-      typeof value.exceeded !== "boolean" ||
-      typeof value.enforced !== "boolean" ||
-      typeof value.unavailable !== "boolean" ||
-      !(value.status === null || value.status === 429 || value.status === 503) ||
-      !(value.retryAfterSeconds === null ||
-        (Number.isSafeInteger(value.retryAfterSeconds) && value.retryAfterSeconds >= 1 && value.retryAfterSeconds <= 60)) ||
-      !(value.policy === null || (typeof value.policy === "string" && SAFE_IDENTIFIER.test(value.policy))) ||
-      !(typeof value.scope === "string" && SAFE_IDENTIFIER.test(value.scope))) {
-    throw new TypeError("Rate-limit service returned an invalid decision");
-  }
-
-  if (value.allowed && value.status !== null) {
-    throw new TypeError("Allowed service decision must not contain a response status");
-  }
-  if (!value.allowed && ![429, 503].includes(value.status)) {
-    throw new TypeError("Blocked service decision requires an HTTP 429 or 503 status");
-  }
-
+  const normalized = normalizeRateLimitServiceDecision(value);
   let response = null;
-  if (value.status === 429) {
-    response = createFailureResponse(429, value.retryAfterSeconds ?? 60, "rate_limit_exceeded");
-  } else if (value.status === 503) {
-    response = createFailureResponse(503, value.retryAfterSeconds ?? 5, "security_rate_limit_unavailable");
+  if (normalized.status === 429) {
+    response = createFailureResponse(
+      429, normalized.retryAfterSeconds ?? 60, "rate_limit_exceeded"
+    );
+  } else if (normalized.status === 503) {
+    response = createFailureResponse(
+      503, normalized.retryAfterSeconds ?? 5, "security_rate_limit_unavailable"
+    );
   }
-
-  return Object.freeze({
-    allowed: value.allowed,
-    exceeded: value.exceeded,
-    enforced: value.enforced,
-    unavailable: value.unavailable,
-    policy: value.policy,
-    scope: value.scope,
-    response
-  });
+  return Object.freeze({ ...normalized, response });
 }
 
 /**
@@ -161,7 +114,7 @@ export function createCloudflarePagesRateLimit(options = {}) {
   }
 
   async function check(input = {}) {
-    const normalizedInput = normalizeCheckInput(input);
+    const normalizedInput = normalizeRateLimitCheckInput(input);
     const request = new Request("https://jb-security-guard.internal" + path, {
       method: "POST",
       headers: {
