@@ -137,3 +137,43 @@ test("permissive missing-origin mode never treats duplicate or foreign headers a
   });
   assert.equal(trulyMissing.continued, 1);
 });
+
+
+test("Origin Core v1 emits a sanitized origin event without copying untrusted headers", () => {
+  const events = [];
+  const attackerOrigin = "https://attacker-origin.example";
+  const origin = createOriginProtection({
+    allowedOrigins: ["https://app.example.test"],
+    coreContract: { tenantId: "tenant-origin", applicationId: "browser-api" },
+    onCoreEvent: (event) => events.push(event)
+  });
+  const result = invoke(origin.middleware, {
+    method: "POST",
+    headers: { origin: attackerOrigin }
+  });
+
+  assert.equal(result.response.statusCode, 403);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].schema, "jb.security.event/v1");
+  assert.equal(events[0].category, "origin");
+  assert.equal(events[0].ruleId, "JBG-CSRF-ORIGIN-001");
+  assert.equal(events[0].action, "blocked");
+  assert.equal(events[0].outcome, "denied");
+  assert.equal(events[0].scope, "origin_check");
+  assert.equal(Object.hasOwn(events[0], "subjectKey"), false);
+  assert.equal(JSON.stringify(events).includes(attackerOrigin), false);
+});
+
+test("Origin Core v1 telemetry failures do not bypass origin enforcement", () => {
+  const origin = createOriginProtection({
+    allowedOrigins: ["https://app.example.test"],
+    coreContract: { tenantId: "tenant-origin", applicationId: "browser-api" },
+    onCoreEvent() { throw new Error("telemetry unavailable"); }
+  });
+  const result = invoke(origin.middleware, {
+    method: "POST",
+    headers: { origin: "https://attacker.example" }
+  });
+  assert.equal(result.response.statusCode, 403);
+  assert.equal(result.continued, 0);
+});
