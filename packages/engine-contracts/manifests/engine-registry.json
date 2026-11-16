@@ -1,0 +1,69 @@
+{
+  "schema": "jb.engine.registry/v1",
+  "registryVersion": "1.0.0",
+  "engines": [
+    {
+      "schema": "jb.engine.manifest/v1",
+      "engineId": "jb.expert-qa",
+      "version": "0.2.0",
+      "contractsProvided": [],
+      "contractsConsumed": [],
+      "dependencies": [],
+      "capabilities": [
+        "audit.static",
+        "audit.browser",
+        "audit.security"
+      ]
+    },
+    {
+      "schema": "jb.engine.manifest/v1",
+      "engineId": "jb.security-guard",
+      "version": "0.1.0",
+      "contractsProvided": [],
+      "contractsConsumed": [],
+      "dependencies": [],
+      "capabilities": [
+        "observe.http",
+        "inspect.upload",
+        "assess.threat"
+      ]
+    },
+    {
+      "schema": "jb.engine.manifest/v1",
+      "engineId": "jb.malware-engine",
+      "version": "0.6.2",
+      "contractsProvided": [],
+      "contractsConsumed": [],
+      "dependencies": [],
+      "capabilities": [
+        "triage.file",
+        "inspect.archive",
+        "analyze.indicator"
+      ]
+    },
+    {
+      "schema": "jb.engine.manifest/v1",
+      "engineId": "jb.resilience-engine",
+      "version": "0.1.0",
+      "contractsProvided": [],
+      "contractsConsumed": [],
+      "dependencies": [],
+      "capabilities": [
+        "observe.incident",
+        "recover.service"
+      ]
+    },
+    {
+      "schema": "jb.engine.manifest/v1",
+      "engineId": "jb.advisor-engine",
+      "version": "0.1.0",
+      "contractsProvided": [],
+      "contractsConsumed": [],
+      "dependencies": [],
+      "capabilities": [
+        "recommend.fragrance",
+        "compare.technology"
+      ]
+    }
+  ]
+}
