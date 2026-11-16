@@ -54,7 +54,7 @@ class UniversalRateLimitClient:
         self._transport = transport
 
     async def check(self, identity: str, scope: str, policy: str) -> dict[str, Any]:
-        if not isinstance(identity, str) or not identity or "\x00" in identity:
+        if not isinstance(identity, str) or not identity.strip() or "\x00" in identity:
             raise ValueError("identity must be non-empty and contain no NUL")
         try:
             identity_bytes = identity.encode("utf-8", errors="strict")
