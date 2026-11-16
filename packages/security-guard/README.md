@@ -473,3 +473,30 @@ For deployment configuration, the Worker must use the Worker-native rate-limit a
 The Worker and Pages adapters share a runtime-neutral request and service-decision contract. See [Rate-limit contract](docs/RATE-LIMIT-CONTRACT.md) for the normalized payload, validation rules, and the current boundary for future non-JavaScript integrations.
 
 This is request-rate protection for Pages Functions, not a substitute for Cloudflare DDoS protection, WAF rules, authentication, authorization, or application-level input validation.
+
+
+## Universal server-to-server rate limiting
+
+For independent applications hosted on different providers, the package provides an optional Node.js endpoint factory:
+
+~~~js
+import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service";
+
+const service = createUniversalRateLimitService({
+  store: sharedAtomicStore,
+  clients: {
+    "catalog-api": {
+      secret: process.env.CATALOG_GUARD_SECRET,
+      policies: {
+        public: { windowMs: 60_000, maxRequests: 120, scopes: ["catalog-read"] }
+      }
+    }
+  }
+});
+
+// Mount service.fetch with your Node HTTP adapter at the configured exact path.
+~~~
+
+The endpoint accepts server-to-server calls only. Keep the Bearer credential on application servers, expose the endpoint over HTTPS, register policies/scopes on the service, and provide a production atomic shared-store adapter. The included tests use an in-memory fixture; they do not certify Redis, Valkey, PostgreSQL or Neon. See [UNIVERSAL-RATE-LIMIT.md](docs/UNIVERSAL-RATE-LIMIT.md).
+
+The Core v1 subpath also exports HMAC identity derivation and strict rate-limit request, decision, policy and counter-key helpers. See [Core identity derivation](../security-guard-core/docs/IDENTITY-KEY-DERIVATION.md).
