@@ -507,6 +507,28 @@ export function createResponseOrchestrator({
       });
     }
 
+    const plannedAt = safeNow(clock);
+    if (!await persistState(decision, "PLANNED", "A1_RECOVERY_CANDIDATE", plannedAt) ||
+        !await appendAudit({
+          schema: "jb.resilience.audit-entry/v1",
+          event: "a1-plan-created",
+          incidentId: decision.incidentId,
+          assetId: decision.assetId,
+          environment: decision.environment,
+          action: ACTION,
+          reasonCode: "A1_RECOVERY_CANDIDATE",
+          at: plannedAt
+        })) {
+      return result({
+        incidentId: decision.incidentId,
+        state: "FAILED_CLOSED",
+        decision: decision.decision,
+        decisionRule: decision.decisionRule,
+        action: ACTION,
+        reason: "a1-plan-persistence-failed"
+      });
+    }
+
     const action = ACTION;
     const requestContext = {
       assetId: decision.assetId,
@@ -602,6 +624,35 @@ export function createResponseOrchestrator({
         decisionRule: decision.decisionRule,
         action,
         reason: reasonCode
+      });
+    }
+
+    const authorizationIssuedAt = safeNow(clock);
+    if (!await persistState(
+      decision,
+      "AUTHORIZED",
+      "A1_CAPABILITY_ISSUED",
+      authorizationIssuedAt
+    ) || !await appendAudit({
+      ...baseAudit,
+      event: "authorization-issued",
+      action,
+      authorizationId: authorization.authorizationId,
+      reservationId: authorization.reservationId,
+      policyId: authorization.policyId,
+      policyRevision: authorization.revision,
+      policyHash: authorization.policyHash,
+      riskClass: authorization.riskClass,
+      at: authorizationIssuedAt
+    })) {
+      return await finishBeforeExecution({
+        decision,
+        actionId: claim.actionId,
+        authorization,
+        request,
+        reason: "authorization-state-or-audit-write-failed",
+        reasonCode: "AUTHORIZATION_AUDIT_FAILED",
+        now: safeNow(clock)
       });
     }
 
@@ -765,7 +816,7 @@ export function createResponseOrchestrator({
     const beforeExecutionAt = safeNow(clock);
     if (!await appendAudit({
       ...baseAudit,
-      event: "action-authorized",
+      event: "execution-intent-recorded",
       action,
       authorizationId: authorization.authorizationId ?? null,
       riskClass: authorization.riskClass ?? "A1",
