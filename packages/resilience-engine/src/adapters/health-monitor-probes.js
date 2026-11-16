@@ -7,7 +7,7 @@ const HTTP_METHODS = new Set(["GET", "HEAD"]);
 const DEFAULT_TIMEOUT_MS = 3_000;
 const MAX_TIMEOUT_MS = 10_000;
 const MAX_PROBES = 64;
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -147,7 +147,7 @@ function probeFailure({ id, type, required, durationMs, reason, statusCode = nul
   });
 }
 
-async function runHttpProbe(probe, fetchImpl, duration) {
+async function runHttpProbe(probe, fetchImpl) {
   const controller = new AbortController();
   let timedOut = false;
   let timer;
@@ -187,7 +187,6 @@ async function runHttpProbe(probe, fetchImpl, duration) {
     };
   } finally {
     clearTimeout(timer);
-    duration();
   }
 }
 
@@ -300,6 +299,21 @@ export function createHealthMonitorProbeAdapter({
 
   const ids = new Set();
   const byService = new Map();
+  let activeProbes = 0;
+  const probeWaiters = [];
+
+  async function acquireProbeSlot() {
+    if (activeProbes >= maxConcurrentProbes) {
+      await new Promise((resolve) => probeWaiters.push(resolve));
+    }
+    activeProbes += 1;
+  }
+
+  function releaseProbeSlot() {
+    activeProbes -= 1;
+    const next = probeWaiters.shift();
+    if (next) next();
+  }
   for (const candidate of probes) {
     validateProbeBase(candidate, ids);
     const normalized = candidate.type === "http"
@@ -332,30 +346,35 @@ export function createHealthMonitorProbeAdapter({
   }
 
   async function executeProbe(probe, observedAt) {
+    await acquireProbeSlot();
     const started = performance.now();
-    let result;
     try {
-      if (probe.type === "http") {
-        result = await runHttpProbe(probe, fetchImpl, () => {});
-      } else if (probe.type === "tcp") {
-        result = await runTcpProbe(probe);
-      } else {
-        result = await runCustomProbe(probe, { observedAt });
+      let result;
+      try {
+        if (probe.type === "http") {
+          result = await runHttpProbe(probe, fetchImpl);
+        } else if (probe.type === "tcp") {
+          result = await runTcpProbe(probe);
+        } else {
+          result = await runCustomProbe(probe, { observedAt });
+        }
+      } catch {
+        result = { healthy: false, reason: "probe-failed", statusCode: null };
       }
-    } catch {
-      result = { healthy: false, reason: "probe-failed", statusCode: null };
+      const durationMs = Math.max(0, Math.round(performance.now() - started));
+      return Object.freeze({
+        id: probe.id,
+        type: probe.type,
+        required: probe.required,
+        healthy: result.healthy === true,
+        outcome: result.healthy === true ? "healthy" : result.reason === "timeout" ? "timed_out" : "failed",
+        reason: result.reason ?? null,
+        statusCode: result.statusCode ?? null,
+        durationMs
+      });
+    } finally {
+      releaseProbeSlot();
     }
-    const durationMs = Math.max(0, Math.round(performance.now() - started));
-    return Object.freeze({
-      id: probe.id,
-      type: probe.type,
-      required: probe.required,
-      healthy: result.healthy === true,
-      outcome: result.healthy === true ? "healthy" : result.reason === "timeout" ? "timed_out" : "failed",
-      reason: result.reason ?? null,
-      statusCode: result.statusCode ?? null,
-      durationMs
-    });
   }
 
   async function probeService({ serviceId, securityThreatActive = false } = {}) {
