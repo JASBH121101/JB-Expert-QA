@@ -29,8 +29,13 @@ class UniversalRateLimitClient:
         if not isinstance(endpoint, str):
             raise ValueError("endpoint must be an absolute HTTPS URL")
         parsed = urlsplit(endpoint)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("endpoint must be an absolute HTTPS URL without embedded credentials")
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                or parsed.query or parsed.fragment):
+            raise ValueError("endpoint must be an absolute HTTPS URL without embedded credentials, query, or fragment")
+        try:
+            parsed.port
+        except ValueError as exc:
+            raise ValueError("endpoint has an invalid port") from exc
         if not client_id or len(client_id) > 96 or any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-" for ch in client_id):
             raise ValueError("client_id has an invalid format")
         if not isinstance(client_secret, str) or not 32 <= len(client_secret.encode("utf-8")) <= 512:
@@ -102,6 +107,11 @@ class UniversalRateLimitClient:
             except UnicodeDecodeError:
                 return self._deny()
         if not isinstance(response_body, str):
+            return self._deny()
+        try:
+            if len(response_body.encode("utf-8", errors="strict")) > 16_384:
+                return self._deny()
+        except UnicodeEncodeError:
             return self._deny()
 
         if status == 200:
