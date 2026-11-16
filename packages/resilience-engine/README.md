@@ -74,6 +74,12 @@ The optional `./adapters/health-monitor-probes` entry point converts host-config
 
 The optional `./adapters/restricted-host-command-runner` entry point supplies a constrained `execFile` runner for the existing systemd and Windows SCM adapters. It uses fixed absolute executable paths, exact service allowlists, a fixed verb/argument grammar, `shell: false`, minimal child-process environment, timeouts and bounded output. It cannot execute arbitrary shell commands, elevate privileges, install services or expand the policy engine's authority. The runner must be injected into the existing typed adapter and executes with the host process identity. See [Restricted Host Command Runner v1](./docs/RESTRICTED-HOST-COMMAND-RUNNER-V1.md).
 
+## Signed A2 Provider Evidence (v1 laboratory)
+
+The optional `./provider-evidence` entry point verifies short-lived Ed25519 attestations for the owner-approved containment profile, reversible provider adapter and rollback plan, independent containment verification, forensic preservation and budget availability. Each attestation is bound to the exact asset, environment, incident and signed policy revision/hash. Five separately scoped provider roles are required, and the containment verifier must be a different provider identity from the containment executor.
+
+The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.

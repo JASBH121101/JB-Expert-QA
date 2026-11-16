@@ -24,7 +24,8 @@
     "./adapters/health-monitor-probes": "./src/adapters/health-monitor-probes.js",
     "./adapters/restricted-host-command-runner": "./src/adapters/restricted-host-command-runner.js",
     "./adapters/identity-policy-bridge": "./src/adapters/identity-policy-bridge.js",
-    "./continuity-gates": "./src/continuity-gates.js"
+    "./continuity-gates": "./src/continuity-gates.js",
+    "./provider-evidence": "./src/provider-evidence.js"
   },
   "files": [
     "src/**",
