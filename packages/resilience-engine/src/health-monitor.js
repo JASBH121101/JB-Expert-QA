@@ -19,14 +19,15 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
       restartCount: 0,
       lastRestartAt: null,
       lastObservedAt: null,
-      status: "unknown"
+      status: "unknown",
+      securityThreatActive: false
     };
   }
 
-  function observe({ serviceId, healthy } = {}) {
+  function observe({ serviceId, healthy, securityThreatActive = false } = {}) {
     if (typeof serviceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/.test(serviceId) ||
-        typeof healthy !== "boolean") {
-      throw new TypeError("health observation requires serviceId and boolean healthy");
+        typeof healthy !== "boolean" || typeof securityThreatActive !== "boolean") {
+      throw new TypeError("health observation requires serviceId and boolean health/securityThreatActive values");
     }
     if (!states.has(serviceId) && states.size >= maxServices) {
       throw new RangeError("health monitor service capacity reached");
@@ -46,7 +47,8 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
       ...previous,
       consecutiveFailures: healthy ? 0 : previous.consecutiveFailures + 1,
       lastObservedAt: now,
-      status: healthy ? "healthy" : "unhealthy"
+      status: healthy ? "healthy" : "unhealthy",
+      securityThreatActive
     };
     states.set(serviceId, next);
     if (healthy) return Object.freeze({ ...next, recovery: null });
@@ -54,7 +56,8 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
       serviceId,
       consecutiveFailures: next.consecutiveFailures,
       restartCount: next.restartCount,
-      lastRestartAt: next.lastRestartAt
+      lastRestartAt: next.lastRestartAt,
+      securityThreatActive: next.securityThreatActive
     });
     return Object.freeze({ ...next, recovery });
   }
