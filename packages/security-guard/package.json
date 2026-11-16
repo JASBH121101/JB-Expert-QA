@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js"
+    "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js",
+    "./cloudflare-pages-rate-limit": "./src/cloudflare-pages-rate-limit.js"
   },
   "files": [
     "src/**",
