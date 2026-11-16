@@ -121,7 +121,9 @@ export function createAdvancedPolicySigningPayload(policy) {
   const safePolicy = cloneJsonSafe(policy);
   assertExactKeys(safePolicy, POLICY_KEYS, "advanced resilience policy");
   assertExactKeys(safePolicy.signature, ["keyId", "algorithm", "value"], "policy signature");
-  if (typeof safePolicy.signature.keyId !== "string" || !POLICY_ID.test(safePolicy.policyId) ||
+  if (typeof safePolicy.policyId !== "string" || !POLICY_ID.test(safePolicy.policyId) ||
+      typeof safePolicy.signature.keyId !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/.test(safePolicy.signature.keyId) ||
       typeof safePolicy.signature.algorithm !== "string" ||
       !/^[A-Za-z0-9._-]{1,64}$/.test(safePolicy.signature.algorithm)) {
     throw new TypeError("policy signing identity is invalid");
