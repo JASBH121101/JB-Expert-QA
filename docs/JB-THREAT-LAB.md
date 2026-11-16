@@ -113,3 +113,39 @@ Verified CI for PR #41:
 PR #23 is closed as superseded. Its Advisor implementation is represented by PR #41; do not merge the obsolete `integration/jb-advisor-engine` branch.
 
 The original PR #38 run records the historical three-engine baseline (17 scenarios). PR #41 adds the three Advisor scenarios and is the current four-engine integration.
+
+
+## Six-tier difficulty model and certification gates
+
+Each scenario carries a `difficulty` field. When omitted, it defaults to `basic` so existing adapters and scenario definitions remain compatible. The `difficulty` option in `lab.run()` is an inclusive maximum: requesting `advanced` runs Basic, Intermediate, and Advanced scenarios. Leaving it unset runs every registered tier.
+
+| Tier | Weight | Intended test depth |
+| --- | ---: | --- |
+| Basic | 1 | Known patterns, deterministic outcomes, essential controls |
+| Intermediate | 2 | Input normalization, variations, malformed values, ordinary boundary cases |
+| Advanced | 4 | Multi-signal combinations, state changes, cross-feature interactions |
+| Expert | 8 | Chained failures, false-positive controls, recovery paths, invariant checks |
+| Extreme | 16 | Adversarial combinations, concurrency, bounded resource pressure, dependency degradation |
+| Superextreme | 32 | Compound failures, long sequences, recovery invariants, strict isolation boundaries |
+
+The report's `assessment` contains weighted score, execution coverage, present/missing levels, and a per-target breakdown. Weights are exponential; high-difficulty misses carry more weight than easy passes. A structural `target_scope` skip is excluded from the target's calculation. Adapter-declined and report-budget skips remain incomplete and block readiness.
+
+A target is marked ready only when every required tier has at least one applicable scenario and every applicable scenario passes without skips. This evaluates only the registered cases; it is not a claim that the engine has no unknown vulnerabilities or defects.
+
+### Baseline footprint after initial tier assignment
+
+- **JB Malware Engine:** all six tiers are represented across the local core, Trojan-defense, persistence, and synthetic-PE test suites. Superextreme is currently represented by a synthetic PE credential-access/exfiltration correlation case; the file is never executed and no network request is made.
+- **JB Security Guard:** Basic through Expert are represented. Extreme and Superextreme are open coverage gaps.
+- **JB Expert QA:** Basic through Extreme are represented. Superextreme remains open.
+- **JB Advisor Engine:** Basic, Intermediate, and Expert are represented. Advanced, Extreme, and Superextreme remain open.
+
+These gaps must stay visible in reports. Do not fill them with mock-only engine outcomes or promote the product to full six-tier readiness until each missing tier has at least one real engine-backed scenario with explicit expected findings and safe local fixtures.
+
+### Required progression for new scenarios
+
+1. Define the weakness or invariant the scenario is meant to expose.
+2. State the exact expected engine verdict, finding code, and measurable metrics.
+3. Use a deterministic, inert fixture with a bounded size and runtime.
+4. Include a control case that protects against false positives where practical.
+5. Confirm the adapter records zero network requests, no sample execution, and no production mutation.
+6. Keep failures actionable: report the missing control, observed result, and expected result rather than a generic pass/fail only.
