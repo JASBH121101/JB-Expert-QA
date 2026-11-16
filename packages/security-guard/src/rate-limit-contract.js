@@ -40,6 +40,18 @@ export function normalizeRateLimitCheckInput(input = {}) {
  * A blocked decision must carry a recognized HTTP status and coherent flags.
  */
 export function normalizeRateLimitServiceDecision(value) {
+  const allowed = new Set([
+    "allowed", "exceeded", "enforced", "unavailable",
+    "policy", "scope", "status", "retryAfterSeconds"
+  ]);
+  if (isRecord(value)) {
+    for (const key of Object.keys(value)) {
+      if (!allowed.has(key)) {
+        throw new TypeError("Unknown rate-limit service decision field: " + key);
+      }
+    }
+  }
+
   if (!isRecord(value) ||
       typeof value.allowed !== "boolean" ||
       typeof value.exceeded !== "boolean" ||
