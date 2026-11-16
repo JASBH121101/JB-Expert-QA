@@ -55,8 +55,7 @@
       "additionalProperties": false,
       "required": [
         "key",
-        "keyId",
-        "known"
+        "keyId"
       ],
       "properties": {
         "key": {
@@ -66,9 +65,6 @@
         "keyId": {
           "type": "string",
           "pattern": "^[A-Za-z0-9:_-]{1,64}$"
-        },
-        "known": {
-          "type": "boolean"
         }
       }
     },
@@ -96,5 +92,67 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "client": {
+            "properties": {
+              "key": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "client"
+        ]
+      },
+      "then": {
+        "properties": {
+          "client": {
+            "properties": {
+              "keyId": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "client": {
+            "properties": {
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "client"
+        ]
+      },
+      "then": {
+        "properties": {
+          "client": {
+            "properties": {
+              "keyId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
