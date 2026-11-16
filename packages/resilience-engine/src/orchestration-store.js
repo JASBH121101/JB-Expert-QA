@@ -7,6 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/;
+const ASSET_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const LEDGER_SCHEMA = "jb.resilience.orchestration-ledger/v1";
 const AUDIT_SCHEMA = "jb.resilience.audit-chain/v1";
@@ -43,6 +44,17 @@ function assertIdentifier(value, label) {
     throw new TypeError(label + " is invalid");
   }
   return value;
+}
+
+function assertAssetId(value, label) {
+  if (typeof value !== "string" || !ASSET_ID.test(value)) {
+    throw new TypeError(label + " is invalid");
+  }
+  return value;
+}
+
+function scopeKey(...values) {
+  return values.map((value) => encodeURIComponent(value)).join(":");
 }
 
 function assertTimestamp(value, label) {
@@ -145,9 +157,9 @@ function validateLedger(value, limits) {
   for (const [serviceKey, service] of Object.entries(value.services)) {
     if (typeof serviceKey !== "string" || !serviceKey.includes(":") ||
         !isRecord(service) ||
-        !IDENTIFIER.test(service.assetId ?? "") ||
+        !ASSET_ID.test(service.assetId ?? "") ||
         !IDENTIFIER.test(service.environment ?? "") ||
-        serviceKey !== service.environment + ":" + service.assetId ||
+        serviceKey !== scopeKey(service.environment, service.assetId) ||
         (service.lastActionAt !== null &&
           (!Number.isSafeInteger(service.lastActionAt) || service.lastActionAt < 0)) ||
         !Number.isSafeInteger(service.consecutiveFailures) || service.consecutiveFailures < 0) {
@@ -362,7 +374,7 @@ export function createFileOrchestrationStore({
       throw new TypeError("incident state record has an invalid shape");
     }
     assertIdentifier(safe.incidentId, "incidentId");
-    assertIdentifier(safe.assetId, "assetId");
+    assertAssetId(safe.assetId, "assetId");
     assertIdentifier(safe.environment, "environment");
     assertIdentifier(safe.serviceId, "serviceId");
     if (!INCIDENT_STATES.has(safe.state) ||
@@ -422,7 +434,7 @@ export function createFileOrchestrationStore({
     assertIdentifier(action, "action");
     assertTimestamp(now, "circuit clock");
     return read((ledger) => {
-      const state = ledger.circuits[environment + ":" + assetId + ":" + action];
+      const state = ledger.circuits[scopeKey(environment, assetId, action)];
       const open = Boolean(state && state.failureCount >= state.failureThreshold &&
         state.retryAtMs !== null && now < state.retryAtMs);
       return Object.freeze({
@@ -442,9 +454,10 @@ export function createFileOrchestrationStore({
         typeof safe.idempotencyKey !== "string" || !SHA256.test(safe.idempotencyKey)) {
       throw new TypeError("action claim is invalid");
     }
-    for (const key of ["incidentId", "assetId", "environment", "serviceId", "action"]) {
+    for (const key of ["incidentId", "environment", "serviceId", "action"]) {
       assertIdentifier(safe[key], key);
     }
+    assertAssetId(safe.assetId, "assetId");
     assertTimestamp(safe.claimedAt, "claimedAt");
     assertTimestamp(safe.expiresAt, "expiresAt");
     if (safe.expiresAt <= safe.claimedAt) throw new TypeError("action claim expiry is invalid");
@@ -534,7 +547,7 @@ export function createFileOrchestrationStore({
       throw new TypeError("action outcome policy is invalid");
     }
     return mutate(async (ledger) => {
-      const serviceKey = environment + ":" + assetId;
+      const serviceKey = scopeKey(environment, assetId);
       const service = ledger.services[serviceKey] ?? null;
       if (outcome === "cancelled-before-execution") {
         return { changed: false, value: true };
@@ -547,7 +560,7 @@ export function createFileOrchestrationStore({
       service.lastOutcome = outcome;
       service.consecutiveFailures = outcome === "succeeded"
         ? 0 : Math.min(1000, service.consecutiveFailures + 1);
-      const circuitKey = environment + ":" + assetId + ":" + action;
+      const circuitKey = scopeKey(environment, assetId, action);
       const prior = ledger.circuits[circuitKey] ?? {
         failureCount: 0, failureThreshold, cooldownMs, retryAtMs: null
       };
