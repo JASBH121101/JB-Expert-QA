@@ -44,7 +44,7 @@ final class UniversalRateLimitClient
 
     public function check(string $identity, string $scope, string $policy): array
     {
-        if ($identity === '' || strlen($identity) > 2048 || str_contains($identity, "\0") ||
+        if (trim($identity) === '' || strlen($identity) > 2048 || str_contains($identity, "\0") ||
             preg_match('//u', $identity) !== 1 || self::utf16CodeUnitLength($identity) > 512) {
             throw new RuntimeException('identity must be valid UTF-8, contain no NUL, and use at most 512 UTF-16 code units and 2048 bytes');
         }
