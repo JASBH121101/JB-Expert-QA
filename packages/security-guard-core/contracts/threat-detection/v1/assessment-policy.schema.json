@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:threat-assessment-policy:v1",
+  "title": "JB Security Guard threat assessment policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "tenantId",
+    "applicationId",
+    "version",
+    "enabled",
+    "windowMs",
+    "maxSignals",
+    "minimumConfidence",
+    "severityWeights",
+    "typeWeights",
+    "thresholds",
+    "blockRequirements"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.policy.threat-assessment/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "applicationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "windowMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 86400000
+    },
+    "maxSignals": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "minimumConfidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "severityWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "properties": {
+        "info": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "critical": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "typeWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brute_force",
+        "endpoint_scan",
+        "enumeration",
+        "sql_injection",
+        "parameter_tampering",
+        "api_abuse",
+        "bot_traffic",
+        "anomaly",
+        "upload_risk"
+      ],
+      "properties": {
+        "brute_force": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "endpoint_scan": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "enumeration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "sql_injection": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "parameter_tampering": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "api_abuse": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "bot_traffic": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "anomaly": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "upload_risk": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge",
+        "review",
+        "block"
+      ],
+      "properties": {
+        "challenge": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "review": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "block": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "blockRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minSignals",
+        "minDistinctRules",
+        "minDistinctTypes",
+        "minimumConfidence"
+      ],
+      "properties": {
+        "minSignals": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 128
+        },
+        "minDistinctRules": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 128
+        },
+        "minDistinctTypes": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 9
+        },
+        "minimumConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
