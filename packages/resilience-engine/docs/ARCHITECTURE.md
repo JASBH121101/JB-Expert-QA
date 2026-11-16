@@ -48,4 +48,4 @@ Approval verification and host health checks have configurable timeouts and rece
 
 ## Target autonomy architecture
 
-The selected target profile is **autonomous-advanced**. See [ADVANCED-AUTONOMY.md](./ADVANCED-AUTONOMY.md) for the target signal gateway, deterministic decision engine, capability policy gate, bounded containment, failover prerequisites, policy schema v2, hard prohibitions and validation roadmap. This specification does not change the current runtime mode or grant new permissions. The implemented v0.2 recovery foundation remains `semi-autonomous` until the staged implementation and certification gates are completed.
+The selected target profile is **autonomous-advanced**. See [ADVANCED-AUTONOMY.md](./ADVANCED-AUTONOMY-ARCHITECTURE.md) for the target signal gateway, deterministic decision engine, capability policy gate, bounded containment, failover prerequisites, policy schema v2, hard prohibitions and validation roadmap. This specification does not change the current runtime mode or grant new permissions. The implemented v0.2 recovery foundation remains `semi-autonomous` until the staged implementation and certification gates are completed.
