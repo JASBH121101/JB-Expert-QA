@@ -241,6 +241,7 @@ export function createResponseOrchestrator({
         }) === true;
         const circuitUpdated = await orchestrationStore.recordActionOutcome({
           assetId: decision.assetId,
+          environment: decision.environment,
           action: ACTION,
           outcome: "cancelled-before-execution",
           at: now,
@@ -526,6 +527,18 @@ export function createResponseOrchestrator({
     }
 
     const claimedAt = safeNow(clock);
+    const claimExpiresAt = claimedAt + ACTION_CLAIM_TTL_MS;
+    if (!Number.isSafeInteger(claimExpiresAt)) {
+      await persistState(decision, "FAILED_CLOSED", "ACTION_CLAIM_EXPIRY_INVALID", claimedAt);
+      return result({
+        incidentId: decision.incidentId,
+        state: "FAILED_CLOSED",
+        decision: decision.decision,
+        decisionRule: decision.decisionRule,
+        action,
+        reason: "action-claim-expiry-invalid"
+      });
+    }
     const idempotencyKey = makeIdempotencyKey({
       incidentId: decision.incidentId,
       assetId: decision.assetId,
@@ -542,7 +555,7 @@ export function createResponseOrchestrator({
         serviceId: decision.serviceId,
         action,
         claimedAt,
-        expiresAt: claimedAt + ACTION_CLAIM_TTL_MS
+        expiresAt: claimExpiresAt
       });
     } catch {
       claim = null;
@@ -755,6 +768,7 @@ export function createResponseOrchestrator({
       }) === true;
       circuitRecorded = await orchestrationStore.recordActionOutcome({
         assetId: decision.assetId,
+        environment: decision.environment,
         action,
         outcome: finalAuditWritten && authorizationFinalized ? outcome : "unverified",
         at: completedAt,
