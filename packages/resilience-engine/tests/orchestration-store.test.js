@@ -1,4 +1,5 @@
 import test from "node:test";
+import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -358,5 +359,46 @@ test("execution can be held when final preflight cancels before adapter invocati
       at: 1_800_000_000_002
     })), true);
     assert.equal((await store.getIncident("incident-001")).state, "HELD");
+  });
+});
+
+test("a process terminated immediately after a durable claim cannot replay the action after restart", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "orchestration.json");
+    const first = claimAction();
+    const childSource = [
+      'const { createFileOrchestrationStore } = await import(process.env.JB_RESILIENCE_STORE_MODULE);',
+      'const store = createFileOrchestrationStore({ filePath: process.env.JB_RESILIENCE_STORE_PATH });',
+      'const claim = await store.claimAction(JSON.parse(process.env.JB_RESILIENCE_CLAIM));',
+      'if (!claim.claimed) process.exit(10);',
+      'process.exit(23);'
+    ].join("\\n");
+    const child = await new Promise((resolve, reject) => {
+      const processHandle = spawn(process.execPath, ["--input-type=module", "-e", childSource], {
+        env: {
+          ...process.env,
+          JB_RESILIENCE_STORE_MODULE: new URL("../src/orchestration-store.js", import.meta.url).href,
+          JB_RESILIENCE_STORE_PATH: filePath,
+          JB_RESILIENCE_CLAIM: JSON.stringify(first)
+        },
+        stdio: "ignore",
+        windowsHide: true
+      });
+      processHandle.once("error", reject);
+      processHandle.once("close", (code, signal) => resolve({ code, signal }));
+    });
+
+    assert.deepEqual(child, { code: 23, signal: null });
+
+    const restartedStore = createFileOrchestrationStore({ filePath });
+    const afterRestart = await restartedStore.claimAction(claimAction({
+      incidentId: "incident-after-process-exit",
+      claimedAt: first.expiresAt + 1,
+      expiresAt: first.expiresAt + 30_001
+    }));
+    assert.deepEqual(afterRestart, {
+      claimed: false,
+      reason: "action-reconciliation-required"
+    });
   });
 });
