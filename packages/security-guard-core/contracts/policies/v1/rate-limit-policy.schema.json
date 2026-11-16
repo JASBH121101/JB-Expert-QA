@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:policies:rate-limit:v1",
+  "title": "JB Security Guard rate-limit policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "tenantId",
+    "applicationId",
+    "version",
+    "enabled",
+    "mode",
+    "failureMode",
+    "limits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.policy.rate-limit/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "applicationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "mode": {
+      "enum": [
+        "monitor",
+        "enforce"
+      ]
+    },
+    "failureMode": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "identityType",
+          "scope",
+          "windowSeconds",
+          "maxRequests"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+          },
+          "identityType": {
+            "enum": [
+              "ip",
+              "account",
+              "account_ip",
+              "session",
+              "anonymous"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+          },
+          "windowSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          },
+          "maxRequests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          }
+        }
+      }
+    }
+  }
+}
