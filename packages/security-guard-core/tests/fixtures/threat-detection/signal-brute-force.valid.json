@@ -1,0 +1,15 @@
+{
+  "schema": "jb.security.threat-signal/v1",
+  "signalId": "d47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "tenantId": "tenant-demo",
+  "applicationId": "admin-api",
+  "detectedAtMs": 1794837600000,
+  "source": "auth-protection",
+  "type": "brute_force",
+  "confidence": 0.92,
+  "severity": "high",
+  "ruleId": "JBG-AUTH-BRUTE-001",
+  "subjectKey": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "routeTemplate": "/api/login",
+  "evidenceCount": 8
+}
