@@ -22,6 +22,63 @@ function safeNow(clock) {
   return now;
 }
 
+function clonePlainInput(value, depth = 0, seen = new WeakSet()) {
+  if (depth > 16) throw new TypeError("incident input nesting exceeds the supported depth");
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("incident input contains a non-finite number");
+    return value;
+  }
+  if (typeof value !== "object") throw new TypeError("incident input must contain plain JSON data");
+  if (seen.has(value)) throw new TypeError("incident input contains circular data");
+  seen.add(value);
+  if (Array.isArray(value)) {
+    if (value.length > 1_000 || Object.getOwnPropertySymbols(value).length ||
+        Object.keys(value).length !== value.length) {
+      throw new TypeError("incident input arrays must be dense and bounded");
+    }
+    const output = [];
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+        throw new TypeError("incident input arrays must not contain accessors");
+      }
+      output.push(clonePlainInput(descriptor.value, depth + 1, seen));
+    }
+    seen.delete(value);
+    return output;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError("incident input objects must be plain records");
+  }
+  if (Object.getOwnPropertySymbols(value).length) {
+    throw new TypeError("incident input objects must not contain symbol properties");
+  }
+  const output = Object.create(null);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const entries = Object.entries(descriptors);
+  if (entries.length > 1_000) throw new TypeError("incident input object is too large");
+  for (const [key, descriptor] of entries) {
+    if (["__proto__", "prototype", "constructor"].includes(key) ||
+        !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("incident input contains an unsafe or accessor property");
+    }
+    output[key] = clonePlainInput(descriptor.value, depth + 1, seen);
+  }
+  seen.delete(value);
+  return output;
+}
+
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+
 function validateDecision(value) {
   if (!isRecord(value) ||
       value.schema !== "jb.resilience.incident-decision/v1" ||
@@ -287,9 +344,16 @@ export function createResponseOrchestrator({
       return result({ reason: "invalid-clock" });
     }
 
+    let safeIncidentInput;
+    try {
+      safeIncidentInput = deepFreeze(clonePlainInput(incidentInput));
+    } catch {
+      return result({ state: "FAILED_CLOSED", reason: "incident-input-invalid" });
+    }
+
     let trusted = false;
     try {
-      trusted = await trustedInputVerifier(incidentInput) === true;
+      trusted = await trustedInputVerifier(safeIncidentInput) === true;
     } catch {
       trusted = false;
     }
@@ -299,9 +363,20 @@ export function createResponseOrchestrator({
 
     let decision;
     try {
-      decision = validateDecision(await incidentEngine.evaluateIncident(incidentInput));
+      decision = validateDecision(await incidentEngine.evaluateIncident(safeIncidentInput));
     } catch {
       return result({ state: "FAILED_CLOSED", reason: "incident-decision-invalid" });
+    }
+    if (decision.assetId !== safeIncidentInput.assetId ||
+        decision.environment !== safeIncidentInput.environment ||
+        decision.serviceId !== safeIncidentInput.serviceId) {
+      return result({
+        incidentId: decision.incidentId,
+        state: "FAILED_CLOSED",
+        decision: decision.decision,
+        decisionRule: decision.decisionRule,
+        reason: "incident-decision-scope-mismatch"
+      });
     }
 
     const baseAudit = {
