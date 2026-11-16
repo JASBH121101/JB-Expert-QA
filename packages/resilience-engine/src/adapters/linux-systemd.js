@@ -15,9 +15,13 @@ export function createLinuxSystemdAdapter({ run, allowedServices = [], timeoutMs
     platform: "linux-systemd",
     async restartService(serviceId) {
       if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
-      return run("systemctl", ["restart", serviceId], {
+      const result = await run("systemctl", ["restart", serviceId], {
         shell: false, timeoutMs, windowsHide: true
       });
+      if (!result || (result.exitCode ?? result.code) !== 0) {
+        throw new Error("systemctl restart failed");
+      }
+      return result;
     }
   });
 }
