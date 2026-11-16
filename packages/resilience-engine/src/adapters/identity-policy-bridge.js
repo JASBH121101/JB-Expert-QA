@@ -70,8 +70,9 @@ function normalizeTrustedKey(input) {
     throw new TypeError("trusted policy key algorithm is invalid");
   }
   if (typeof input.publicKeyPem !== "string" ||
-      input.publicKeyPem.length < 64 || input.publicKeyPem.length > 8192) {
-    throw new TypeError("publicKeyPem is invalid");
+      input.publicKeyPem.length < 64 || input.publicKeyPem.length > 8192 ||
+      !/^\\s*-----BEGIN PUBLIC KEY-----[\\s\\S]+-----END PUBLIC KEY-----\\s*$/.test(input.publicKeyPem)) {
+    throw new TypeError("publicKeyPem must be a PEM-encoded public key");
   }
   const principalId = assertIdentifier(input.principalId, PRINCIPAL_ID, "principalId");
   const role = assertIdentifier(input.role, /^[A-Za-z][A-Za-z0-9._-]{0,63}$/, "key role");
