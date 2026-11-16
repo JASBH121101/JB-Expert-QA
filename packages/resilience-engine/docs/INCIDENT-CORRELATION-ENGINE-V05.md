@@ -6,7 +6,9 @@ The v0.5 module correlates a trusted-signal snapshot from the Trusted Signal
 Gateway with bounded host health observations for one exact asset,
 environment and service. It creates a deterministic incident identity,
 normalizes the active observation window, detects contradictory health events,
-assigns deterministic priority/risk, and emits an ordered decision trace.
+assigns deterministic priority/risk, and emits an ordered decision trace. The
+risk score is a deterministic rule-weighted index, not a statistical
+probability or calibrated likelihood.
 
 ## Input contracts
 

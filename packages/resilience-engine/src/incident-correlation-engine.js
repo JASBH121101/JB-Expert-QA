@@ -106,7 +106,7 @@ function validateEvidenceRefs(value, label) {
   }));
 }
 
-function validateSecurityState(value, assetId, environment) {
+function validateSecurityState(value, assetId, environment, now, windowMs, maxClockSkewMs) {
   assertExactKeys(value, [
     "schema", "state", "reason", "assetId", "environment",
     "sources", "evidenceRefs", "preserveEvidence", "authorizationGranted"
@@ -125,20 +125,35 @@ function validateSecurityState(value, assetId, environment) {
   }
 
   assertDenseArray(value.sources, "securityState.sources", 32);
-  const sourceIds = new Set();
+  const sourceIds = new Map();
   const sources = value.sources.map((source, index) => {
     assertExactKeys(source, [
       "sourceId", "sourceEngine", "state", "issuedAtMs", "reasonCode"
     ], ["severity"], "securityState.sources[" + index + "]");
     assertIdentifier(source.sourceId, IDENTIFIER, "security source ID");
-    if (sourceIds.has(source.sourceId)) {
-      throw new TypeError("securityState contains duplicate source IDs");
+    const priorSource = sourceIds.get(source.sourceId);
+    if (priorSource) {
+      if (value.state !== "conflicting" ||
+          priorSource.sourceEngine !== source.sourceEngine ||
+          priorSource.issuedAtMs !== source.issuedAtMs ||
+          priorSource.states.has(source.state)) {
+        throw new TypeError("securityState contains an invalid duplicate source identity");
+      }
+      priorSource.states.add(source.state);
+    } else {
+      sourceIds.set(source.sourceId, {
+        sourceEngine: source.sourceEngine,
+        issuedAtMs: source.issuedAtMs,
+        states: new Set([source.state])
+      });
     }
-    sourceIds.add(source.sourceId);
     if (!SOURCE_ENGINES.has(source.sourceEngine) || !SOURCE_STATES.has(source.state)) {
       throw new TypeError("securityState contains an unsupported source engine or state");
     }
     assertTimestamp(source.issuedAtMs, "security source issuedAtMs");
+    if (source.issuedAtMs > now + maxClockSkewMs) {
+      throw new TypeError("security source timestamp is too far in the future");
+    }
     assertIdentifier(source.reasonCode, REASON_CODE, "security source reasonCode");
     if (Object.hasOwn(source, "severity") && !SEVERITIES.has(source.severity)) {
       throw new TypeError("security source severity is invalid");
@@ -158,10 +173,17 @@ function validateSecurityState(value, assetId, environment) {
     throw new TypeError("a clear security state requires at least one clear source and no contradictory source");
   }
   const evidenceRefs = validateEvidenceRefs(value.evidenceRefs, "securityState.evidenceRefs");
+  let effectiveState = value.state;
+  let effectiveReason = value.reason;
+  if (["clear", "suspected"].includes(effectiveState) &&
+      sources.some((source) => now - source.issuedAtMs > windowMs)) {
+    effectiveState = "stale";
+    effectiveReason = "trusted-signal-snapshot-stale";
+  }
 
   return Object.freeze({
-    state: value.state,
-    reason: value.reason,
+    state: effectiveState,
+    reason: effectiveReason,
     assetId: value.assetId,
     environment: value.environment,
     sources: Object.freeze(sources),
@@ -496,7 +518,9 @@ export function createIncidentCorrelationEngine(options = {}) {
     const now = clock();
     assertTimestamp(now, "incident engine clock");
 
-    const security = validateSecurityState(input.securityState, assetId, environment);
+    const security = validateSecurityState(
+      input.securityState, assetId, environment, now, windowMs, maxClockSkewMs
+    );
     assertDenseArray(input.healthObservations, "healthObservations", maxHealthObservations);
     const health = buildHealthSummary(
       input.healthObservations,

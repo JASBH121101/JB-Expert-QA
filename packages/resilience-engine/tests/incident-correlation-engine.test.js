@@ -173,6 +173,38 @@ test("confirmed and tampered states require human review and preserve evidence",
   }
 });
 
+test("Gateway same-source conflicting signals remain valid correlation input", () => {
+  const result = engine().evaluateIncident(input({
+    security: securityState({
+      state: "conflicting",
+      reason: "same-source-conflicting-signals",
+      sources: [
+        source({ state: "clear", issuedAtMs: NOW - 1000, reasonCode: "SIGNAL_CLEAR" }),
+        source({ state: "suspected", issuedAtMs: NOW - 1000, severity: "high", reasonCode: "THREAT_SUSPECTED" })
+      ]
+    })
+  }));
+
+  assert.equal(result.security.state, "conflicting");
+  assert.equal(result.decisionRule, "SIGNAL_CONFLICT");
+  assert.equal(result.priority, "critical");
+});
+
+test("cached clear security snapshots outside the freshness window become stale", () => {
+  const result = engine().evaluateIncident(input({
+    security: securityState({
+      state: "clear",
+      reason: "all-required-sources-clear",
+      sources: [source({ state: "clear", issuedAtMs: NOW - 6 * 60_000 })]
+    })
+  }));
+
+  assert.equal(result.security.state, "stale");
+  assert.equal(result.decisionRule, "SECURITY_STALE");
+  assert.equal(result.decision, "hold");
+  assert.equal(result.authorizationGranted, false);
+});
+
 test("unknown, stale and conflicting security states never recommend recovery evaluation", () => {
   const cases = [
     ["unknown", "hold", "refresh-trusted-security-signals"],
