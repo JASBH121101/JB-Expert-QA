@@ -63,14 +63,21 @@ function normalizeEvidenceRefs(value) {
       Object.keys(value).length !== value.length) {
     throw new TypeError("evidenceRefs must be a dense array containing at most 16 references");
   }
-  return Object.freeze(value.map((item, index) => {
+  const normalized = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("evidenceRefs must not contain holes or accessors");
+    }
+    const item = descriptor.value;
     assertExactKeys(item, ["refId", "sha256"], "evidenceRefs[" + index + "]");
     assertIdentifier(item.refId, ASSET_ID, "evidenceRefs[" + index + "].refId");
     if (typeof item.sha256 !== "string" || !SHA256.test(item.sha256)) {
       throw new TypeError("evidenceRefs[" + index + "].sha256 must be a lowercase SHA-256 digest");
     }
-    return Object.freeze({ refId: item.refId, sha256: item.sha256 });
-  }));
+    normalized.push(Object.freeze({ refId: item.refId, sha256: item.sha256 }));
+  }
+  return Object.freeze(normalized);
 }
 
 function normalizeUnsignedSignal(value) {
@@ -182,12 +189,22 @@ function normalizeSources(sources) {
     if (!ENGINES.has(source.engine)) throw new TypeError("trusted source engine is unsupported");
     const environment = assertIdentifier(source.environment, IDENTIFIER, "source.environment");
     if (!Array.isArray(source.assetIds) || source.assetIds.length < 1 ||
-        source.assetIds.length > 256 || new Set(source.assetIds).size !== source.assetIds.length) {
-      throw new TypeError("source.assetIds must contain 1 to 256 unique exact asset IDs");
+        source.assetIds.length > 256 || Object.getOwnPropertySymbols(source.assetIds).length ||
+        Object.keys(source.assetIds).length !== source.assetIds.length) {
+      throw new TypeError("source.assetIds must contain 1 to 256 dense exact asset IDs");
     }
-    const assetIds = Object.freeze(source.assetIds.map((assetId) =>
-      assertIdentifier(assetId, ASSET_ID, "source.assetIds[]")
-    ));
+    const assetValues = [];
+    for (let assetIndex = 0; assetIndex < source.assetIds.length; assetIndex += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(source.assetIds, String(assetIndex));
+      if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+        throw new TypeError("source.assetIds must not contain holes or accessors");
+      }
+      assetValues.push(assertIdentifier(descriptor.value, ASSET_ID, "source.assetIds[]"));
+    }
+    if (new Set(assetValues).size !== assetValues.length) {
+      throw new TypeError("source.assetIds must contain unique exact asset IDs");
+    }
+    const assetIds = Object.freeze(assetValues);
     const entry = Object.freeze({
       sourceId,
       engine: source.engine,
@@ -208,7 +225,7 @@ function verifyEnvelope(envelope, source) {
 }
 
 function validStore(store) {
-  return isRecord(store) &&
+  return store !== null && typeof store === "object" && !Array.isArray(store) &&
     typeof store.recordSignal === "function" &&
     typeof store.listSignals === "function";
 }
@@ -403,12 +420,13 @@ export function createTrustedSignalGateway({
     let now;
     let records;
     try {
-      now = safeClock(clock);
+      const readStartedAt = safeClock(clock);
       records = await replayStore.listSignals({
         assetId,
         environment,
-        sinceMs: Math.max(0, now - historyWindowMs)
+        sinceMs: Math.max(0, readStartedAt - historyWindowMs)
       });
+      now = safeClock(clock);
     } catch {
       return stateResult({
         state: "unknown", reason: "replay-store-unavailable", assetId, environment
@@ -432,12 +450,16 @@ export function createTrustedSignalGateway({
 
     const validBySource = new Map();
     const expiredSources = new Set();
+    const seenEventIds = new Set();
     for (const record of records) {
       try {
         assertExactKeys(record, ["signal", "signalDigest", "receivedAtMs", "retentionUntilMs"], "replay record");
         const envelope = validateTrustedSignalEnvelope(record.signal);
         assertTimestamp(record.receivedAtMs, "receivedAtMs");
         assertTimestamp(record.retentionUntilMs, "retentionUntilMs");
+        const replayKey = envelope.sourceId + ":" + envelope.eventId;
+        if (seenEventIds.has(replayKey)) throw new TypeError("duplicate persisted replay key");
+        seenEventIds.add(replayKey);
         if (typeof record.signalDigest !== "string" || !SHA256.test(record.signalDigest) ||
             digestFor(envelope) !== record.signalDigest) {
           throw new TypeError("persisted signal digest mismatch");
@@ -447,8 +469,13 @@ export function createTrustedSignalGateway({
             source.environment !== envelope.environment ||
             !source.assetIds.includes(envelope.assetId) ||
             envelope.assetId !== assetId || envelope.environment !== environment ||
-            !verifyEnvelope(envelope, source)) {
-          throw new TypeError("persisted signal provenance mismatch");
+            !verifyEnvelope(envelope, source) ||
+            envelope.expiresAtMs - envelope.issuedAtMs > maxSignalLifetimeMs ||
+            envelope.issuedAtMs > now + maxClockSkewMs ||
+            record.retentionUntilMs < envelope.expiresAtMs ||
+            record.receivedAtMs < envelope.issuedAtMs - maxClockSkewMs ||
+            record.receivedAtMs > now + maxClockSkewMs) {
+          throw new TypeError("persisted signal provenance or timing mismatch");
         }
         if (envelope.expiresAtMs <= now ||
             now - envelope.issuedAtMs > maxSignalLifetimeMs) {
