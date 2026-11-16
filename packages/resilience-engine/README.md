@@ -91,3 +91,28 @@ The Security Guard and Malware Engine adapters are available through `./producer
 ## v0.5 Incident Correlation & Decision Engine (laboratory)
 
 The `./incident-correlation-engine` module combines a Trusted Signal Gateway snapshot with bounded host-provided health observations for one exact asset, environment and service. It generates a deterministic incident identifier, deduplicates observations, detects conflicting timestamps/IDs, ranks risk and emits an auditable rule trace. It is read-only: it never authorizes recovery, executes an action or replaces the v2 policy gate. A recovery-related result only recommends a separate A1 policy evaluation.
+
+
+## v0.6 Response Orchestrator (isolated laboratory)
+
+The v0.6 Response Orchestrator is being developed on the isolated branch
+`feature/jb-resilience-engine-v06-orchestrator`. It connects the read-only
+v0.5 incident decision to the signed v2 policy gate, durable action lifecycle,
+typed adapter execution, post-action verification and audit trail.
+
+The selected target mode is `autonomous-advanced`, but autonomy remains
+strictly bounded by owner-signed policy and certified capabilities. In this
+laboratory increment, the only executable capability is A1
+`restart-service` for an exact allowlisted stateless, standard-criticality
+service, with clear trusted security state, durable budgets and both
+service-manager and application-level health verification.
+
+A2 containment and A3 failover remain denied by the existing policy gate until
+their independent signal, containment, external monitoring, quorum, fencing
+and consistency certification requirements are complete. No arbitrary shell
+commands, self-modifying policy, evidence deletion, binary restoration or
+destructive data actions are permitted.
+
+Production activation is not part of this branch. The implementation must pass
+the full laboratory, fault-injection, concurrency, regression and platform
+certification gates before any merge or operational enablement.
