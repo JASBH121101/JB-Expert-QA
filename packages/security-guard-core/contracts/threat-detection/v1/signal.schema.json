@@ -84,6 +84,24 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 1000000
+    },
+    "subjectKeyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,64}$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "subjectKey"
+        ]
+      },
+      "then": {
+        "required": [
+          "subjectKeyId"
+        ]
+      }
+    }
+  ]
 }
