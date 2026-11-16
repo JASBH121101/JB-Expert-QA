@@ -84,7 +84,7 @@ async function certifySystemd() {
       "[Install]",
       "WantedBy=multi-user.target",
       ""
-    ].join("\\n"), { mode: 0o600 });
+    ].join("\n"), { mode: 0o600 });
 
     await privileged("install", ["-m", "0644", unitSource, unitTarget]);
     created = true;
@@ -92,7 +92,7 @@ async function certifySystemd() {
     await privileged("systemctl", ["start", unit]);
 
     const before = await privileged("systemctl", ["show", "--property=MainPID", "--value", unit]);
-    const pidBefore = parseInteger(before.stdout, /^\\s*(\\d+)\\s*$/m, "systemd MainPID");
+    const pidBefore = parseInteger(before.stdout, /^\s*(\d+)\s*$/m, "systemd MainPID");
 
     await adapter.restartService(unit);
     const verification = await adapter.verifyService(unit);
@@ -100,7 +100,7 @@ async function certifySystemd() {
       "systemd adapter did not verify the service as active");
 
     const after = await privileged("systemctl", ["show", "--property=MainPID", "--value", unit]);
-    const pidAfter = parseInteger(after.stdout, /^\\s*(\\d+)\\s*$/m, "systemd MainPID");
+    const pidAfter = parseInteger(after.stdout, /^\s*(\d+)\s*$/m, "systemd MainPID");
     assert(pidAfter !== pidBefore, "systemd restart did not replace the service process");
 
     return {
@@ -126,7 +126,7 @@ async function certifyWindowsScm() {
   const { createWindowsScmAdapter } = await import(
     "../packages/resilience-engine/src/adapters/windows-scm.js"
   );
-  const framework = "C:\\\\Windows\\\\Microsoft.NET\\\\Framework64\\\\v4.0.30319";
+  const framework = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319";
   const compiler = join(framework, "csc.exe");
   const serviceReference = join(framework, "System.ServiceProcess.dll");
   assert(existsSync(compiler), "Windows .NET Framework C# compiler was not found");
@@ -147,7 +147,7 @@ async function certifyWindowsScm() {
     "  protected override void OnStop() { }",
     "  public static void Main() { ServiceBase.Run(new LabService()); }",
     "}"
-  ].join("\\n");
+  ].join("\n");
   writeFileSync(source, sourceCode, { mode: 0o600 });
 
   const runSc = async (args) => {
@@ -186,7 +186,7 @@ async function certifyWindowsScm() {
 
     const before = await command("sc.exe", ["queryex", serviceName]);
     assert(before.exitCode === 0, "SCM could not query the created service");
-    const pidBefore = parseInteger(before.stdout, /PID\\s*:\\s*(\\d+)/i, "SCM process ID");
+    const pidBefore = parseInteger(before.stdout, /PID\s*:\s*(\d+)/i, "SCM process ID");
 
     await adapter.restartService(serviceName);
     const verification = await adapter.verifyService(serviceName);
@@ -195,7 +195,7 @@ async function certifyWindowsScm() {
 
     const after = await command("sc.exe", ["queryex", serviceName]);
     assert(after.exitCode === 0, "SCM could not query the restarted service");
-    const pidAfter = parseInteger(after.stdout, /PID\\s*:\\s*(\\d+)/i, "SCM process ID");
+    const pidAfter = parseInteger(after.stdout, /PID\s*:\s*(\d+)/i, "SCM process ID");
     assert(pidAfter !== pidBefore, "SCM restart did not replace the service process");
 
     return {
