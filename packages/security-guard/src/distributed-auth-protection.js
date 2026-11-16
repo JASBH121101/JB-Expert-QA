@@ -297,20 +297,24 @@ export function createDistributedAuthProtection(options = {}) {
       return;
     }
     if (status.blocked && coreContract) {
-      const identityKeys = getKeys(request);
-      publishAuthCore(coreContract, coreCallbacks, {
-        attemptId: randomUUID(),
-        occurredAtMs: now(),
-        outcome: "failure",
-        accountDigest: identityKeys.account,
-        clientDigest: identityKeys.ip,
-        decision: {
-          blocked: true,
-          enforced: mode !== "monitor" && blockSeverities.includes("high"),
-          retryAfterSeconds: status.retryAfterSeconds
-        },
-        eventScopes: []
-      });
+      try {
+        const identityKeys = getKeys(request);
+        publishAuthCore(coreContract, coreCallbacks, {
+          attemptId: randomUUID(),
+          occurredAtMs: Date.now(),
+          outcome: "failure",
+          accountDigest: identityKeys.account,
+          clientDigest: identityKeys.ip,
+          decision: {
+            blocked: true,
+            enforced: mode !== "monitor" && blockSeverities.includes("high"),
+            retryAfterSeconds: status.retryAfterSeconds
+          },
+          eventScopes: []
+        });
+      } catch {
+        // Contract telemetry must not change the established middleware decision.
+      }
     }
     if (!status.blocked || mode === "monitor" || !blockSeverities.includes("high")) {
       if (status.blocked) stats.blocked += 1;
