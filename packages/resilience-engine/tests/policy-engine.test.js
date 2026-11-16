@@ -245,7 +245,7 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   const second = await newEngine.authorize(REQUEST);
   assert.equal(second.authorized, true);
   assert.deepEqual(
-    await oldEngine.assertAuthorization({ authorization: first.authorization }),
+    await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST }),
     { valid: false, reason: "policy-revision-rollback-or-store-failure" }
   );
 });
@@ -338,7 +338,7 @@ test("authorization is short-lived, rechecks policy validity and is one-time com
   assert.equal(result.authorized, true);
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).valid, true);
   now += 1000;
-  assert.equal((await engine.assertAuthorization({ authorization: result.authorization })).reason,
+  assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).reason,
     "authorization-expired-or-stale");
   assert.equal((await engine.completeAuthorization({
     authorization: result.authorization, outcome: "succeeded"
