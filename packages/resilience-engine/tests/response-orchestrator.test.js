@@ -2,6 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createResponseOrchestrator } from "../src/response-orchestrator.js";
 import { createIncidentCorrelationEngine } from "../src/incident-correlation-engine.js";
+import {
+  computeAdvancedPolicyHash,
+  createMemoryCapabilityLedger,
+  createMemoryPolicyRevisionStore,
+  createResiliencePolicyEngine
+} from "../src/policy-engine.js";
 
 const NOW = 1_800_000_000_000;
 
@@ -539,4 +545,149 @@ test("fails closed when the one-time final authorization assertion fails", async
   assert.equal(h.calls.asserted, 1);
   assert.equal(h.calls.restart, 0);
   assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
+});
+
+
+function realPolicyFixture() {
+  const policy = {
+    schema: "jb.resilience.policy/v2",
+    policyId: "jb-prod-continuity",
+    revision: 1,
+    mode: "autonomous-advanced",
+    validity: {
+      notBefore: "2026-11-01T00:00:00Z",
+      expiresAt: "2026-12-01T00:00:00Z"
+    },
+    signature: {
+      keyId: "continuity-policy-owner-01",
+      algorithm: "test-ed25519",
+      value: "signed-policy-fixture-value"
+    },
+    policyHash: "0".repeat(64),
+    defaults: {
+      decision: "deny",
+      unknownSignal: "hold-and-escalate",
+      staleSignal: "hold-and-escalate",
+      ledgerUnavailable: "block-mutations",
+      policyInvalid: "block-mutations",
+      preserveEvidence: true,
+      requireDurableAudit: true
+    },
+    budgets: {
+      maxConcurrentActionsPerIncident: 1,
+      maxActionsPerIncident: 3,
+      maxActionsPerAssetPerHour: 2,
+      maxAutomaticContainmentsPerIncident: 1
+    },
+    services: [{
+      id: "host-erp-01",
+      environment: "production",
+      tier: "stateless",
+      criticality: "standard",
+      allowedActions: ["restart-service"],
+      recovery: {
+        failureThreshold: 3,
+        maxRestartsPerHour: 2,
+        cooldownMs: 300_000,
+        requireApplicationHealth: true
+      },
+      containmentProfile: null,
+      failoverProfile: null
+    }]
+  };
+  policy.policyHash = computeAdvancedPolicyHash(policy);
+  return policy;
+}
+
+test("executes A1 through the real signed Policy Engine v2 and completes its one-time reservation", async () => {
+  const policy = realPolicyFixture();
+  const revisionStore = createMemoryPolicyRevisionStore();
+  assert.equal(revisionStore.setCurrentPolicy({
+    policyId: policy.policyId,
+    revision: policy.revision,
+    policyHash: policy.policyHash
+  }), true);
+  const capabilityLedger = createMemoryCapabilityLedger();
+  const policyEngine = createResiliencePolicyEngine({
+    policy,
+    verifyPolicySignature: ({ signature }) =>
+      signature.value === "signed-policy-fixture-value",
+    policyRevisionStore: revisionStore,
+    capabilityLedger,
+    allowInMemoryStores: true,
+    clock: () => NOW,
+    authorizationTtlMs: 30_000
+  });
+
+  const calls = { restarts: 0, serviceChecks: 0, appChecks: 0, mutations: [] };
+  const orchestrationStore = {
+    durable: false,
+    async recordIncidentState() { return true; },
+    async getServiceState() { return { lastActionAt: null }; },
+    async getCircuitState() { return { open: false, retryAtMs: null }; },
+    async claimAction() { return { claimed: true, actionId: "action-real-policy-01" }; },
+    async completeAction() { return true; },
+    async recordActionOutcome() { return true; }
+  };
+  const auditStore = {
+    durable: false,
+    async append() { return true; }
+  };
+  const orchestrator = createResponseOrchestrator({
+    incidentEngine: createIncidentCorrelationEngine({ clock: () => NOW }),
+    policyEngine,
+    adapter: {
+      platform: "linux-systemd",
+      async restartService(serviceId) {
+        assert.equal(serviceId, "catalog-api");
+        calls.restarts += 1;
+        return { exitCode: 0 };
+      },
+      async verifyService(serviceId) {
+        assert.equal(serviceId, "catalog-api");
+        calls.serviceChecks += 1;
+        return { healthy: true, state: "active" };
+      }
+    },
+    async applicationHealthCheck() {
+      calls.appChecks += 1;
+      return { healthy: true };
+    },
+    async trustedInputVerifier(input) {
+      return input.schema === "jb.resilience.incident-input/v1";
+    },
+    async targetBindingVerifier(binding) {
+      return binding.assetId === "host-erp-01" &&
+        binding.environment === "production" &&
+        binding.serviceId === "catalog-api" &&
+        binding.platform === "linux-systemd";
+    },
+    mutationControl: {
+      async assertAllowed(context) {
+        calls.mutations.push(context.phase);
+        return true;
+      }
+    },
+    orchestrationStore,
+    auditStore,
+    allowInMemoryStores: true,
+    clock: () => NOW
+  });
+
+  const result = await orchestrator.executeIncident(realV05IncidentInput());
+
+  assert.equal(result.state, "RECOVERED");
+  assert.equal(result.decision, "review-recovery-policy");
+  assert.equal(result.decisionRule, "HEALTH_FAILURE_THRESHOLD");
+  assert.equal(result.action, "restart-service");
+  assert.equal(result.executed, true);
+  assert.equal(result.verified, true);
+  assert.equal(calls.restarts, 1);
+  assert.equal(calls.serviceChecks, 1);
+  assert.equal(calls.appChecks, 1);
+  assert.deepEqual(calls.mutations, [
+    "pre-authorization",
+    "immediately-before-execution",
+    "final-preflight"
+  ]);
 });
