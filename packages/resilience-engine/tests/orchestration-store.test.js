@@ -372,7 +372,7 @@ test("a process terminated immediately after a durable claim cannot replay the a
       'const claim = await store.claimAction(JSON.parse(process.env.JB_RESILIENCE_CLAIM));',
       'if (!claim.claimed) process.exit(10);',
       'process.exit(23);'
-    ].join("\\n");
+    ].join(" ");
     const child = await new Promise((resolve, reject) => {
       const processHandle = spawn(process.execPath, ["--input-type=module", "-e", childSource], {
         env: {
