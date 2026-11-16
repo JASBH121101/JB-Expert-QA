@@ -117,6 +117,18 @@ function signingPayloadFor(policy) {
   return canonicalJson(payload);
 }
 
+export function createAdvancedPolicySigningPayload(policy) {
+  const safePolicy = cloneJsonSafe(policy);
+  assertExactKeys(safePolicy, POLICY_KEYS, "advanced resilience policy");
+  assertExactKeys(safePolicy.signature, ["keyId", "algorithm", "value"], "policy signature");
+  if (typeof safePolicy.signature.keyId !== "string" || !POLICY_ID.test(safePolicy.policyId) ||
+      typeof safePolicy.signature.algorithm !== "string" ||
+      !/^[A-Za-z0-9._-]{1,64}$/.test(safePolicy.signature.algorithm)) {
+    throw new TypeError("policy signing identity is invalid");
+  }
+  return signingPayloadFor(safePolicy);
+}
+
 export function computeAdvancedPolicyHash(policy) {
   const safePolicy = cloneJsonSafe(policy);
   if (!isRecord(safePolicy)) throw new TypeError("policy must be an object");
