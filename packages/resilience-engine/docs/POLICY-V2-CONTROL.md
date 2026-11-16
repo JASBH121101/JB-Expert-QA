@@ -55,10 +55,10 @@ Example service policy entry:
 
 Production controller construction requires:
 
-1. `policyRevisionStore` with `durable: true` and atomic async `acceptRevision({ policyId, revision, policyHash })`. It must persist the greatest accepted revision and corresponding hash, reject lower revisions and reject a different hash for the same revision. It must remain correct across processes and restarts.
+1. `policyRevisionStore` with `durable: true` and atomic async `assertCurrent({ policyId, revision, policyHash })`. It must be pre-seeded with the latest owner-approved policy before the controller is enabled. The separate owner-controlled activation path must persist the greatest approved revision/hash, reject lower revisions and reject a different hash for the same revision, and remain correct across processes and restarts. The runtime only reads this registry; it cannot register or promote its own policy. An empty or unavailable registry denies all mutation authorizations.
 2. `capabilityLedger` with `durable: true` and atomic async `reserveAction(...)`, `assertReservation(...)`, and `completeAction(...)`. Reservations must serialize competing requests and enforce `maxConcurrentActionsPerIncident`, `maxActionsPerIncident`, `maxActionsPerAssetPerHour`, and `maxAutomaticContainmentsPerIncident`. The ledger must retain completed actions for budget accounting and release only reservations explicitly cancelled before execution.
 
-The package includes memory implementations for deterministic tests and local development. They are non-durable, single-process fixtures and require explicit `allowInMemoryStores: true`; never use them for production authorization.
+The package includes memory implementations for deterministic tests and local development. They are non-durable, single-process fixtures and require explicit `allowInMemoryStores: true`; `createMemoryPolicyRevisionStore().setCurrentPolicy(...)` simulates owner activation for tests only. Never use these fixtures for production authorization.
 
 ## API sketch
 
