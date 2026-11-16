@@ -74,3 +74,99 @@ jobs:
         run: npm run test:threat-lab
       - name: Verify independently installable package distributions
         run: npm run test:package-distributions
+
+  nexora-product-integration:
+    name: NEXORA real-product adapters · PHP 8.3 / Node 22
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout JB Threat Lab
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Checkout Configurable Catalog source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: 88c4876c9678b93dadde55f79fe9d04890900741
+          path: nexora-configurable-catalog
+          persist-credentials: false
+
+      - name: Checkout canonical Site Engine source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: 3f68126ecc58b088c071007c5116bc95426d159b
+          path: nexora-site-engine
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Set up PHP 8.3 and Composer
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        with:
+          php-version: "8.3"
+          extensions: bcmath, curl, dom, fileinfo, intl, mbstring, openssl, pdo_pgsql, pdo_sqlite, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Verify pinned NEXORA source revisions
+        shell: bash
+        run: |
+          test "$(git -C nexora-configurable-catalog rev-parse HEAD)" = "88c4876c9678b93dadde55f79fe9d04890900741"
+          test "$(git -C nexora-site-engine rev-parse HEAD)" = "3f68126ecc58b088c071007c5116bc95426d159b"
+
+      - name: Install Configurable Catalog dependencies
+        working-directory: nexora-configurable-catalog
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare isolated Configurable Catalog environment
+        working-directory: nexora-configurable-catalog
+        shell: bash
+        run: |
+          if [[ ! -f .env ]]; then cp .env.example .env; fi
+          php artisan key:generate --force
+
+      - name: Verify Configurable Catalog PHP style
+        working-directory: nexora-configurable-catalog
+        env:
+          COLUMNS: 200
+        run: composer lint
+
+      - name: Install Site Engine dependencies
+        working-directory: nexora-site-engine
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare isolated Site Engine environment
+        working-directory: nexora-site-engine
+        shell: bash
+        run: |
+          if [[ ! -f .env ]]; then cp .env.example .env; fi
+          php artisan key:generate --force
+
+      - name: Verify Site Engine PHP style
+        working-directory: nexora-site-engine
+        env:
+          COLUMNS: 200
+        run: composer lint
+
+      - name: Run the NEXORA product adapters in JB Threat Lab
+        env:
+          NEXORA_CATALOG_ROOT: ${{ github.workspace }}/nexora-configurable-catalog
+          NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/nexora-site-engine
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+          DB_URL: ""
+          CACHE_STORE: array
+          MAIL_MAILER: array
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: array
+          SESSION_ENCRYPT: "false"
+        run: node --test packages/threat-lab/tests/nexora-integration.test.js
