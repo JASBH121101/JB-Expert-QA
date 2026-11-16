@@ -163,7 +163,17 @@ function harness(overrides = {}) {
     async authorize(request) {
       calls.authorized += 1;
       calls.authorizeRequest = request;
-      return overrides.authorizationResult ?? { authorized: true, authorization };
+      const requestBoundAuthorization = Object.freeze({
+        ...authorization,
+        assetId: request.assetId,
+        environment: request.environment,
+        incidentId: request.incidentId,
+        action: request.action
+      });
+      return overrides.authorizationResult ?? {
+        authorized: true,
+        authorization: requestBoundAuthorization
+      };
     },
     async assertAuthorization(input) {
       calls.asserted += 1;
