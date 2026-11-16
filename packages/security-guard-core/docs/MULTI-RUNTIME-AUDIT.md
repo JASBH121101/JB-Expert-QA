@@ -9,7 +9,7 @@
 
 Reuse the existing Security Guard implementation. Do not create parallel security engines or replace the public JavaScript API. The language-neutral Core remains contract-only: versioned JSON Schemas, semantics and shared fixtures. It is not a central server and contains no executable runtime logic.
 
-The JavaScript/Node adapter now has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. The adapter is still **partially integrated**, not fully certified: the threat-assessment schema has a validator, but there is no calibrated multi-signal assessment engine or server-owned threat policy that creates assessments.
+The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. It now also includes a deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. This completes the initial Node aggregation stage, but does not constitute statistical calibration, full-runtime certification or autonomous enforcement.
 
 PHP/Laravel and Python/FastAPI adapters remain unimplemented. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
 
@@ -29,13 +29,13 @@ The existing Node package keeps its legacy exports and adds opt-in Core v1 outpu
 
 The Node conformance suite runs all eight shared Core v1 fixtures through both JSON Schema validation and the native JavaScript runtime validators: rate-limit check/decision, authentication attempt/decision, security event, rate-limit policy, threat signal and threat assessment. The latest module integration work was exercised in Node 22/24 and on Ubuntu/Windows CI. These checks establish tested implementation behavior for the covered paths; they are not a security certification or a statistical precision/recall study.
 
-### Threat assessment is still a separate stage
+### Threat assessment: implemented aggregator, calibration remains open
 
-- `validateThreatSignalV1()` and `validateThreatAssessmentV1()` validate the wire contracts.
-- The request inspector emits threat signals. Its confidence values are explicitly heuristic weights, not statistically calibrated probabilities.
-- There is no Core v1 multi-signal aggregation engine or server-owned threat-assessment policy that produces risk scores and `observe/challenge/block/review` decisions.
-- Do not automatically block an actor from one weak heuristic signal. A future assessment layer needs explicit policy, bounded evidence aggregation, false-positive/evasion tests and a documented calibration process.
-- The older double-filter protocol `jb.security.assessment/v1` is separate. It combines Expert QA and Security Guard verdicts for the same resource; it does not provide Core threat-assessment risk scores or Core signal IDs. It must not be translated into `threat-assessment/v1` by inventing scores or signal references.
+- `validateThreatSignalV1()`, `validateThreatAssessmentV1()` and `validateThreatAssessmentPolicyV1()` validate the wire contracts.
+- The Node-only `createThreatAssessmentEngine()` consumes validated signals under an immutable server-owned policy, enforces tenant/application and pseudonymous-subject isolation, applies a bounded time window, removes below-floor/stale/future samples, deduplicates contribution by rule, and emits the existing `threat-assessment/v1` output.
+- The score is a deterministic policy index, not a probability. Request-inspector confidence values remain heuristic weights; no statistical calibration or independent precision/recall study is claimed.
+- `block` is an assessment label only. It requires multiple strong signals across distinct rules and threat types, but the engine never blocks requests or issues challenges. Consumers must keep enforcement separate and explicitly reviewed.
+- The older double-filter protocol `jb.security.assessment/v1` remains separate. It combines Expert QA and Security Guard verdicts for the same resource; it does not provide Core threat-assessment risk scores or Core signal IDs and must not be translated by inventing scores or references.
 
 ## Existing module inventory
 
@@ -57,7 +57,7 @@ The Node conformance suite runs all eight shared Core v1 fixtures through both J
 | Security Bridge | `src/security-bridge/`, `packages/security-guard/src/security-bridge.js` | Separate local loopback double-filter protocol. Its verdicts and decisions are not Core threat signals or risk assessments. |
 | Security events | Module callbacks plus Core v1 schemas | Producers can emit versioned sanitized objects, but there is no central durable telemetry/event sink. |
 | Policy management | Per-module options and mode settings | No central tenant/application policy manager or policy-precedence engine was found. |
-| Threat scoring | Core signal/assessment validators only | No calibrated cross-module signal aggregator or policy-driven challenge/block assessment engine exists yet. |
+| Threat scoring | `createThreatAssessmentEngine()` plus Core policy/signal/assessment validators | Node deterministic aggregation is implemented; statistical calibration, operational policy management, PHP/Python parity and any enforcement integration remain out of scope. |
 
 ## Multi-runtime implementation status
 
@@ -73,7 +73,7 @@ The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and mal
 
 ## Gaps and risks
 
-1. **Threat assessment:** define a versioned, server-owned assessment policy and aggregation model before emitting risk scores or challenge/block decisions. Confidence weights from request signatures are uncalibrated heuristics.
+1. **Threat assessment calibration:** validate weights and thresholds against labeled benign/adversarial corpora; measure false-positive/false-negative rates, evasion resistance and stability before treating policy scores as calibrated or enabling any downstream enforcement. Confidence weights from request signatures remain heuristics.
 2. **Cross-runtime adapters:** PHP and Python implementations do not exist. Native validators, stores, cryptography and framework middleware must be implemented and tested independently.
 3. **Storage consistency:** distributed Node adapters depend on host-supplied atomic stores. No shared production store implementation is included in Core.
 4. **Cloudflare scope:** Worker binding counters are approximate and location-scoped; Pages/Worker support is rate-limit-specific, not full Node feature parity.
