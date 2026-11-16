@@ -55,11 +55,15 @@ The host application provides health observations and a command runner with appr
 The health monitor's observation counters are still in-memory by default, but `restoreState()` lets the host hydrate the monitor before its first observation. Use `await recoveryStore.getServiceState(serviceId)` and pass its `attemptCount` and `lastAttemptAt` as `restartCount` and `lastRestartAt`. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore failure trends should persist those observations in their monitoring system.
 
 
-## Transactional PostgreSQL storage adapter (v2 laboratory)
+## Transactional PostgreSQL storage adapter (v3 laboratory)
 
-The optional `./adapters/postgres-storage` entry point provides the v0.6 orchestration store, hash-chained audit store, PostgreSQL lease coordinator and a fenced PostgreSQL state target. The host injects a node-postgres-compatible Pool and explicitly calls `initialize()`; no driver, credential, network endpoint or hosted database is bundled.
+The optional `./adapters/postgres-storage` entry point provides the v0.6 orchestration store, hash-chained audit store, PostgreSQL lease coordinator, fenced PostgreSQL state target, and durable trusted-signal replay store. The host injects a node-postgres-compatible Pool and explicitly calls `initialize()`; no driver, credential, network endpoint or hosted database is bundled.
 
-The new `fencedTargetStore.applyState(... )` operation locks the authoritative lease and target rows in one transaction, validates lease expiry using database time, persists a monotonic fencing high-water mark and rejects stale epochs and conflicting mutation-ID reuse. This is genuine target-side fencing for application state stored in the same PostgreSQL primary. It does **not** fence systemd, Windows SCM, files or external APIs. A2 containment and A3 failover remain disabled pending independent host-agent enforcement, external monitoring, quorum and consistency certification. See [PostgreSQL Storage Adapter v2](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
+`fencedTargetStore.applyState(...)` serializes application-state mutations against the authoritative lease row and target fencing high-water mark in one PostgreSQL transaction. It rejects expired/stale lease epochs, owner mismatches and conflicting mutation IDs. Its guarantee applies only to state stored through this PostgreSQL target; it does not fence systemd, Windows SCM, files or external APIs.
+
+`trustedSignalStore.recordSignal(...)` and `listSignals(...)` back the existing Trusted Signal Gateway with a shared PostgreSQL replay registry. The database enforces uniqueness of `(sourceId,eventId)` across processes using the same primary. Signal-envelope validation and signature/source-scope verification remain the gateway's responsibility; the store recomputes and checks the envelope digest when reading. It does not grant action authorization, and the gateway continues to return `authorizationGranted: false`. Replay admission is bounded by a persistent database capacity row (`maxTrustedSignals`, default 10,000, maximum 10,000); all instances must use the same value. At capacity, the gateway fails closed and no old replay IDs are silently removed.
+
+Neither this store nor the single PostgreSQL primary provides quorum, consensus, an independent external monitor, OS-level fencing or A3 failover. A2 containment and A3 failover remain disabled until their separate enforcement, policy and lab certification gates pass. See [PostgreSQL Storage Adapter v3](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
 
 ## Bounded Health Monitor Probe Adapter (v1 laboratory)
 

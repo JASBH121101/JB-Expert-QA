@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { validateTrustedSignalEnvelope } from "../trusted-signal-gateway.js";
 
 const GENESIS_HASH = "0".repeat(64);
 const AUDIT_SCHEMA = "jb.resilience.audit-chain/v1";
@@ -214,7 +215,10 @@ const SCHEMA_STATEMENTS = [
   "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, record_schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)",
   "CREATE TABLE IF NOT EXISTS jb_resilience_coordination_leases (scope_id TEXT PRIMARY KEY, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, acquired_at BIGINT NULL, renewed_at BIGINT NULL, expires_at BIGINT NULL, CHECK ((holder_id IS NULL AND lease_id IS NULL AND acquired_at IS NULL AND renewed_at IS NULL AND expires_at IS NULL) OR (holder_id IS NOT NULL AND lease_id IS NOT NULL AND acquired_at IS NOT NULL AND renewed_at IS NOT NULL AND expires_at IS NOT NULL)))",
   "CREATE TABLE IF NOT EXISTS jb_resilience_fenced_targets (scope_id TEXT NOT NULL, target_id TEXT NOT NULL, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, state JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (scope_id, target_id))",
-  "CREATE TABLE IF NOT EXISTS jb_resilience_fenced_mutations (scope_id TEXT NOT NULL, target_id TEXT NOT NULL, mutation_id TEXT NOT NULL, payload_hash CHAR(64) NOT NULL, fencing_token BIGINT NOT NULL, applied_at BIGINT NOT NULL, PRIMARY KEY (scope_id, target_id, mutation_id))"
+  "CREATE TABLE IF NOT EXISTS jb_resilience_fenced_mutations (scope_id TEXT NOT NULL, target_id TEXT NOT NULL, mutation_id TEXT NOT NULL, payload_hash CHAR(64) NOT NULL, fencing_token BIGINT NOT NULL, applied_at BIGINT NOT NULL, PRIMARY KEY (scope_id, target_id, mutation_id))",
+  "CREATE TABLE IF NOT EXISTS jb_resilience_trusted_signals (source_id TEXT NOT NULL, event_id TEXT NOT NULL, asset_id TEXT NOT NULL, environment TEXT NOT NULL, issued_at_ms BIGINT NOT NULL, expires_at_ms BIGINT NOT NULL, signal_digest CHAR(64) NOT NULL CHECK (signal_digest ~ '^[a-f0-9]{64}$'), signal JSONB NOT NULL, received_at_ms BIGINT NOT NULL, retention_until_ms BIGINT NOT NULL, PRIMARY KEY (source_id, event_id), CHECK (expires_at_ms > issued_at_ms), CHECK (retention_until_ms >= expires_at_ms))",
+  "CREATE INDEX IF NOT EXISTS jb_resilience_trusted_signals_asset_idx ON jb_resilience_trusted_signals (asset_id, environment, issued_at_ms, event_id)",
+  "CREATE TABLE IF NOT EXISTS jb_resilience_trusted_signal_capacity (capacity_id SMALLINT PRIMARY KEY CHECK (capacity_id = 1), record_count BIGINT NOT NULL CHECK (record_count >= 0), max_records BIGINT NOT NULL CHECK (max_records BETWEEN 1 AND 10000), CHECK (record_count <= max_records))"
 ];
 
 function ensurePool(pool) {
@@ -282,8 +286,11 @@ async function verifyAuditWithClient(client, { lockHead = false } = {}) {
  * explicitly before use. No driver, connection URL, credentials, schema migration
  * runner or network client is bundled by this package.
  */
-export function createPostgresResilienceStorageAdapter({ pool } = {}) {
+export function createPostgresResilienceStorageAdapter({ pool, maxTrustedSignals = 10_000 } = {}) {
   ensurePool(pool);
+  if (!Number.isSafeInteger(maxTrustedSignals) || maxTrustedSignals < 1 || maxTrustedSignals > 10_000) {
+    throw new TypeError("maxTrustedSignals must be an integer from 1 to 10000");
+  }
   let initialized = false;
 
   function assertInitialized() {
@@ -591,6 +598,111 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     });
   }
 
+
+  function trustedSignalDigest(signal) {
+    return createHash("sha256")
+      .update(JSON.stringify({ ...signal, evidenceRefs: signal.evidenceRefs }), "utf8")
+      .digest("hex");
+  }
+
+  async function recordTrustedSignal({
+    signal: inputSignal, signalDigest, receivedAtMs, retentionUntilMs
+  } = {}) {
+    assertInitialized();
+    const signal = validateTrustedSignalEnvelope(inputSignal);
+    assertTimestamp(receivedAtMs, "receivedAtMs");
+    assertTimestamp(retentionUntilMs, "retentionUntilMs");
+    if (retentionUntilMs < signal.expiresAtMs) {
+      throw new TypeError("retentionUntilMs must be at least expiresAtMs");
+    }
+    if (typeof signalDigest !== "string" || !SHA256.test(signalDigest) ||
+        trustedSignalDigest(signal) !== signalDigest) {
+      throw new TypeError("signalDigest does not match the trusted signal");
+    }
+    return withTransaction(pool, async (client) => {
+      // Serialize capacity checks with every other adapter instance before
+      // claiming an event ID. No event IDs are silently evicted.
+      const capacity = await client.query(
+        "SELECT record_count, max_records FROM jb_resilience_trusted_signal_capacity WHERE capacity_id=1 FOR UPDATE"
+      );
+      if (capacity.rowCount !== 1 ||
+          toSafeInteger(capacity.rows[0].max_records, "trusted signal max_records") !== maxTrustedSignals) {
+        throw new Error("trusted signal capacity configuration is inconsistent");
+      }
+
+      const existing = await client.query(
+        "SELECT signal_digest FROM jb_resilience_trusted_signals WHERE source_id=$1 AND event_id=$2",
+        [signal.sourceId, signal.eventId]
+      );
+      if (existing.rowCount === 1) {
+        return Object.freeze({
+          recorded: false,
+          reason: existing.rows[0].signal_digest.trim() === signalDigest
+            ? "signal-replay" : "signal-id-conflict"
+        });
+      }
+
+      const recordCount = toSafeInteger(capacity.rows[0].record_count, "trusted signal record_count");
+      const maxRecords = toSafeInteger(capacity.rows[0].max_records, "trusted signal max_records");
+      if (recordCount >= maxRecords) {
+        return Object.freeze({ recorded: false, reason: "replay-store-capacity-exceeded" });
+      }
+
+      const inserted = await client.query(
+        "INSERT INTO jb_resilience_trusted_signals (source_id, event_id, asset_id, environment, issued_at_ms, expires_at_ms, signal_digest, signal, received_at_ms, retention_until_ms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10) ON CONFLICT (source_id, event_id) DO NOTHING RETURNING event_id",
+        [signal.sourceId, signal.eventId, signal.assetId, signal.environment,
+          signal.issuedAtMs, signal.expiresAtMs, signalDigest, JSON.stringify(signal),
+          receivedAtMs, retentionUntilMs]
+      );
+      if (inserted.rowCount === 1) {
+        await client.query(
+          "UPDATE jb_resilience_trusted_signal_capacity SET record_count=record_count+1 WHERE capacity_id=1"
+        );
+        return Object.freeze({ recorded: true });
+      }
+
+      const conflict = await client.query(
+        "SELECT signal_digest FROM jb_resilience_trusted_signals WHERE source_id=$1 AND event_id=$2",
+        [signal.sourceId, signal.eventId]
+      );
+      if (conflict.rowCount !== 1) {
+        throw new Error("trusted signal replay record disappeared during conflict resolution");
+      }
+      return Object.freeze({
+        recorded: false,
+        reason: conflict.rows[0].signal_digest.trim() === signalDigest
+          ? "signal-replay" : "signal-id-conflict"
+      });
+    });
+  }
+
+  async function listTrustedSignals({ assetId, environment, sinceMs } = {}) {
+    assertInitialized();
+    assertAssetId(assetId, "assetId");
+    assertIdentifier(environment, "environment");
+    assertTimestamp(sinceMs, "sinceMs");
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        "SELECT signal, signal_digest, received_at_ms, retention_until_ms FROM jb_resilience_trusted_signals WHERE asset_id=$1 AND environment=$2 AND issued_at_ms >= $3 ORDER BY issued_at_ms ASC, event_id ASC",
+        [assetId, environment, sinceMs]
+      );
+      const records = result.rows.map((row) => {
+        const signal = validateTrustedSignalEnvelope(row.signal);
+        const signalDigest = row.signal_digest.trim();
+        if (!SHA256.test(signalDigest) || trustedSignalDigest(signal) !== signalDigest) {
+          throw new Error("trusted signal replay record integrity check failed");
+        }
+        const receivedAtMs = toSafeInteger(row.received_at_ms, "trusted signal received_at_ms");
+        const retentionUntilMs = toSafeInteger(row.retention_until_ms, "trusted signal retention_until_ms");
+        if (retentionUntilMs < signal.expiresAtMs) {
+          throw new Error("trusted signal replay record has invalid retention");
+        }
+        return Object.freeze({ signal, signalDigest, receivedAtMs, retentionUntilMs });
+      });
+      return Object.freeze(records);
+    });
+  }
+
   async function initialize() {
     await withTransaction(pool, async (client) => {
       for (const statement of SCHEMA_STATEMENTS) await client.query(statement);
@@ -598,9 +710,19 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
         "INSERT INTO jb_resilience_audit_heads (head_id, sequence, last_hash) VALUES (1, 0, $1) ON CONFLICT (head_id) DO NOTHING",
         [GENESIS_HASH]
       );
+      await client.query(
+        "INSERT INTO jb_resilience_trusted_signal_capacity (capacity_id, record_count, max_records) VALUES (1, 0, $1) ON CONFLICT (capacity_id) DO NOTHING",
+        [maxTrustedSignals]
+      );
+      const capacity = await client.query(
+        "SELECT max_records FROM jb_resilience_trusted_signal_capacity WHERE capacity_id=1 FOR UPDATE"
+      );
+      if (capacity.rowCount !== 1 || toSafeInteger(capacity.rows[0].max_records, "trusted signal max_records") !== maxTrustedSignals) {
+        throw new Error("all PostgreSQL trusted-signal store instances must use the same maxTrustedSignals capacity");
+      }
     });
     initialized = true;
-    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 3 });
+    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 4 });
   }
 
   async function recordIncidentState(input) {
@@ -909,6 +1031,12 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     applyState: applyFencedState,
     getState: getFencedState
   });
+  const trustedSignalStore = Object.freeze({
+    durable: true,
+    dialect: "postgresql",
+    recordSignal: recordTrustedSignal,
+    listSignals: listTrustedSignals
+  });
 
   return Object.freeze({
     durable: true,
@@ -917,6 +1045,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     orchestrationStore,
     auditStore,
     coordinationStore,
-    fencedTargetStore
+    fencedTargetStore,
+    trustedSignalStore
   });
 }
