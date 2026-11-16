@@ -184,7 +184,8 @@ export function createFileRecoveryStore({
   lockStaleMs = 120_000,
   pollIntervalMs = 25,
   maxHistoryEntries = 1000,
-  maxServices = 1000
+  maxServices = 1000,
+  maxLedgerBytes = 5 * 1024 * 1024
 } = {}) {
   if (typeof filePath !== "string" || filePath.trim() === "") {
     throw new TypeError("filePath is required");
@@ -194,7 +195,8 @@ export function createFileRecoveryStore({
     ["lockStaleMs", lockStaleMs, 1000, 86_400_000],
     ["pollIntervalMs", pollIntervalMs, 5, 1000],
     ["maxHistoryEntries", maxHistoryEntries, 1, 10_000],
-    ["maxServices", maxServices, 1, 10_000]
+    ["maxServices", maxServices, 1, 10_000],
+    ["maxLedgerBytes", maxLedgerBytes, 1024, 64 * 1024 * 1024]
   ]) {
     if (!Number.isSafeInteger(value) || value < min || value > max) {
       throw new TypeError(name + " is invalid");
@@ -211,6 +213,9 @@ export function createFileRecoveryStore({
       if (metadata.isSymbolicLink() || !metadata.isFile()) {
         throw new Error("recovery ledger path must be a regular file, not a symbolic link");
       }
+      if (metadata.size > maxLedgerBytes) {
+        throw new Error("recovery ledger exceeds the configured size limit");
+      }
       const parsed = JSON.parse(await readFile(target, "utf8"));
       return validateLedger(parsed);
     } catch (error) {
@@ -224,7 +229,11 @@ export function createFileRecoveryStore({
     let handle;
     try {
       handle = await open(temporaryPath, "wx", 0o600);
-      await handle.writeFile(JSON.stringify(ledger) + "\n", "utf8");
+      const serialized = JSON.stringify(ledger) + "\n";
+      if (Buffer.byteLength(serialized, "utf8") > maxLedgerBytes) {
+        throw new Error("recovery ledger exceeds the configured size limit");
+      }
+      await handle.writeFile(serialized, "utf8");
       await handle.sync();
       await handle.close();
       handle = null;
@@ -248,6 +257,7 @@ export function createFileRecoveryStore({
     let metadata;
     try {
       [before, metadata] = await Promise.all([readFile(lockPath, "utf8"), lstat(lockPath)]);
+      if (metadata.isSymbolicLink() || !metadata.isFile()) return false;
     } catch (error) {
       if (error?.code === "ENOENT") return true;
       return false;
