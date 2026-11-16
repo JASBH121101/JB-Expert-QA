@@ -1,4 +1,8 @@
 import { createHmac, randomUUID } from "node:crypto";
+import {
+  normalizeAuthCoreContract,
+  publishAuthCore
+} from "./auth-core-contract-v1.js";
 
 const RULE_ID = "JBG-AUTH-DISTRIBUTED-001";
 const DEFAULT_POLICIES = Object.freeze({
@@ -81,7 +85,7 @@ function respondUnavailable(response) {
  */
 export function createDistributedAuthProtection(options = {}) {
   if (!isRecord(options)) throw new TypeError("Distributed authentication options must be an object");
-  const allowed = new Set(["store", "secret", "identityKeyGenerator", "clientKeyGenerator", "namespace", "mode", "blockSeverities", "policies", "windowMs", "resetAfterMs", "storeTimeoutMs", "clock", "onEvent"]);
+  const allowed = new Set(["store", "secret", "identityKeyGenerator", "clientKeyGenerator", "namespace", "mode", "blockSeverities", "policies", "windowMs", "resetAfterMs", "storeTimeoutMs", "clock", "onEvent", "coreContract", "onCoreAttempt", "onCoreDecision", "onCoreEvent"]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw new TypeError("Unknown distributed authentication option: " + key);
 
   const store = options.store;
@@ -114,6 +118,17 @@ export function createDistributedAuthProtection(options = {}) {
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
+  const coreContract = normalizeAuthCoreContract(options.coreContract, secret);
+  const coreCallbacks = {
+    onCoreAttempt: options.onCoreAttempt,
+    onCoreDecision: options.onCoreDecision,
+    onCoreEvent: options.onCoreEvent
+  };
+  for (const [name, callback] of Object.entries(coreCallbacks)) {
+    if (callback !== undefined && typeof callback !== "function") {
+      throw new TypeError(name + " must be a function");
+    }
+  }
   const stats = { failures: 0, lockouts: 0, blocked: 0, storeErrors: 0 };
 
   function now() {
@@ -183,7 +198,8 @@ export function createDistributedAuthProtection(options = {}) {
   async function recordFailure(request) {
     if (!request || typeof request !== "object") throw new TypeError("recordFailure requires the authentication request");
     const timestamp = now();
-    const keys = activeKeys(getKeys(request));
+    const identityKeys = getKeys(request);
+    const keys = activeKeys(identityKeys);
     const triggered = [];
     const statuses = await Promise.all(keys.map(async ({ scope, key }) => {
       const result = await withTimeout(() => store.recordFailure({
@@ -210,23 +226,47 @@ export function createDistributedAuthProtection(options = {}) {
     }
     const blocked = statuses.filter((item) => item.blocked);
     const retryAfterMs = Math.max(0, ...blocked.map((item) => item.retryAfterMs));
-    return Object.freeze({
+    const result = Object.freeze({
       throttled: blocked.length > 0,
       enforced: blocked.length > 0 && mode !== "monitor" && blockSeverities.includes("high"),
       retryAfterMs,
       retryAfterSeconds: blocked.length ? Math.max(1, Math.ceil(retryAfterMs / 1000)) : 0,
       scopes: Object.freeze(blocked.map((item) => item.scope))
     });
+    publishAuthCore(coreContract, coreCallbacks, {
+      attemptId: randomUUID(),
+      occurredAtMs: timestamp,
+      outcome: "failure",
+      accountDigest: identityKeys.account,
+      clientDigest: identityKeys.ip,
+      decision: {
+        blocked: result.throttled,
+        enforced: result.enforced,
+        retryAfterSeconds: result.throttled ? result.retryAfterSeconds : null
+      },
+      eventScopes: triggered
+    });
+    return result;
   }
 
   async function recordSuccess(request) {
     if (!request || typeof request !== "object") throw new TypeError("recordSuccess requires the authentication request");
-    const keys = getKeys(request);
-    const clear = activeKeys({ ip: null, accountIp: keys.accountIp, account: keys.account });
+    const timestamp = now();
+    const identityKeys = getKeys(request);
+    const clear = activeKeys({ ip: null, accountIp: identityKeys.accountIp, account: identityKeys.account });
     if (clear.length) await withTimeout(
-      () => store.clearFailures({ keys: clear, now: now(), resetAfterMs }),
+      () => store.clearFailures({ keys: clear, now: timestamp, resetAfterMs }),
       storeTimeoutMs
     );
+    publishAuthCore(coreContract, coreCallbacks, {
+      attemptId: randomUUID(),
+      occurredAtMs: timestamp,
+      outcome: "success",
+      accountDigest: identityKeys.account,
+      clientDigest: identityKeys.ip,
+      decision: { blocked: false, enforced: false },
+      eventScopes: []
+    });
   }
 
   async function middleware(request, response, next) {
@@ -238,13 +278,39 @@ export function createDistributedAuthProtection(options = {}) {
       status = await getStatus(request);
     } catch {
       stats.storeErrors += 1;
+      const failedAt = Date.now();
       notify(onEvent, {
-        id: randomUUID(), timestamp: new Date().toISOString(),
+        id: randomUUID(), timestamp: new Date(failedAt).toISOString(),
         component: "jb-security-guard", action: "distributed-auth-store-unavailable",
         mode, severity: "critical", ruleIds: [RULE_ID], scopes: []
       });
+      publishAuthCore(coreContract, coreCallbacks, {
+        attemptId: randomUUID(),
+        occurredAtMs: failedAt,
+        outcome: "failure",
+        accountDigest: null,
+        clientDigest: null,
+        decision: { unavailable: true },
+        eventScopes: ["store"]
+      });
       respondUnavailable(response);
       return;
+    }
+    if (status.blocked && coreContract) {
+      const identityKeys = getKeys(request);
+      publishAuthCore(coreContract, coreCallbacks, {
+        attemptId: randomUUID(),
+        occurredAtMs: now(),
+        outcome: "failure",
+        accountDigest: identityKeys.account,
+        clientDigest: identityKeys.ip,
+        decision: {
+          blocked: true,
+          enforced: mode !== "monitor" && blockSeverities.includes("high"),
+          retryAfterSeconds: status.retryAfterSeconds
+        },
+        eventScopes: []
+      });
     }
     if (!status.blocked || mode === "monitor" || !blockSeverities.includes("high")) {
       if (status.blocked) stats.blocked += 1;
