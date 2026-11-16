@@ -15,12 +15,19 @@ export function createWindowsScmAdapter({ run, allowedServices = [], timeoutMs =
     platform: "windows-scm",
     async restartService(serviceId) {
       if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
-      await run("sc.exe", ["stop", serviceId], {
+      const stop = await run("sc.exe", ["stop", serviceId], {
         shell: false, timeoutMs, windowsHide: true
       });
-      return run("sc.exe", ["start", serviceId], {
+      if (!stop || (stop.exitCode ?? stop.code) !== 0) {
+        throw new Error("Windows service stop failed");
+      }
+      const start = await run("sc.exe", ["start", serviceId], {
         shell: false, timeoutMs, windowsHide: true
       });
+      if (!start || (start.exitCode ?? start.code) !== 0) {
+        throw new Error("Windows service start failed");
+      }
+      return start;
     }
   });
 }
