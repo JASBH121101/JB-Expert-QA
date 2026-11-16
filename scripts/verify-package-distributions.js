@@ -13,6 +13,10 @@ const tempRoot = await mkdtemp(path.join(os.tmpdir(), "jb-package-distribution-"
 const tarballDirectory = path.join(tempRoot, "tarballs");
 await mkdir(tarballDirectory, { recursive: true });
 
+function progress(message) {
+  process.stdout.write("[package-distribution] " + message + "\n");
+}
+
 function run(command, args, options = {}) {
   try {
     return execFileSync(command, args, {
@@ -80,11 +84,14 @@ function binPath(directory, name) {
 }
 
 try {
+  progress("Preparing canonical Expert QA package source");
   // Generate ignored package source/config from canonical root files before packing.
   run(node, [path.join(repositoryRoot, "scripts/build-expert-qa-package.js")]);
 
   // Install the actual Expert QA tarball in a clean directory, separate from the monorepo.
+  progress("Packing standalone Expert QA tarball");
   const expertTarball = await pack("packages/expert-qa");
+  progress("Installing standalone Expert QA tarball");
   const expertInstall = await install(expertTarball, "install-expert-qa");
   const fixture = path.join(tempRoot, "vite-like-project");
   await mkdir(path.join(fixture, "src"), { recursive: true });
@@ -188,9 +195,10 @@ try {
     "A read-only updater check must not change the consuming project's dependencies"
   );
 
+  progress("Checking standalone Expert QA browser installer");
   // Exercise the package's own browser installer, then run real browser tests from the tarball install.
   run(binPath(expertInstall, "jb-qa"), [
-    "setup", "--browser", "chromium", "--with-deps"
+    "setup", "--browser", "chromium"
   ], { cwd: expertInstall });
 
   const browserCheck = path.join(expertInstall, "verify-complete-browser.mjs");
@@ -226,7 +234,9 @@ try {
 `, "utf8");
   run(node, [browserCheck], { cwd: expertInstall });
 
+  progress("Expert QA browser checks passed");
   // JB Security Guard.
+  progress("Packing standalone Security Guard tarball");
   const guardTarball = await pack("packages/security-guard");
   const guardInstall = await install(guardTarball, "install-security-guard");
   run(node, [
@@ -247,7 +257,14 @@ try {
     'import { createCloudflarePagesRateLimit } from "@jb/security-guard/cloudflare-pages-rate-limit"; if (typeof createCloudflarePagesRateLimit !== "function") process.exit(1); const pages = createCloudflarePagesRateLimit({ serviceBinding: { async fetch() { return new Response(JSON.stringify({ allowed: true, exceeded: false, enforced: false, unavailable: false, policy: null, scope: "distribution", status: null, retryAfterSeconds: null }), { status: 200 }); } } }); const decision = await pages.check({ identity: "package-smoke-test", scope: "distribution" }); if (!decision.allowed || decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
 
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createThreatAssessmentEngine } from "@jb/security-guard/threat-assessment"; const policy = { schema: "jb.security.policy.threat-assessment/v1", id: "distribution-policy", tenantId: "distribution-tenant", applicationId: "distribution-app", version: 1, enabled: true, windowMs: 300000, maxSignals: 8, minimumConfidence: 0.5, severityWeights: { info: 5, low: 15, medium: 35, high: 65, critical: 90 }, typeWeights: { brute_force: 100, endpoint_scan: 90, enumeration: 80, sql_injection: 110, parameter_tampering: 100, api_abuse: 95, bot_traffic: 75, anomaly: 50, upload_risk: 100 }, thresholds: { challenge: 35, review: 60, block: 85 }, blockRequirements: { minSignals: 3, minDistinctRules: 2, minDistinctTypes: 2, minimumConfidence: 0.9 } }; const engine = createThreatAssessmentEngine({ policy, clock: () => 1000000 }); if (typeof engine.assess !== "function" || engine.assess([]) !== null) process.exit(1);'
+  ], { cwd: guardInstall });
+
+  progress("Security Guard package checks passed");
   // JB Malware Engine.
+  progress("Packing standalone Malware Engine tarball");
   const malwareTarball = await pack("packages/malware-engine");
   const malwareInstall = await install(malwareTarball, "install-malware-engine");
   const sample = path.join(tempRoot, "benign-sample.txt");
@@ -260,7 +277,9 @@ try {
     'import { createMalwareEngine } from "@jb/malware-engine"; if (typeof createMalwareEngine !== "function") process.exit(1);'
   ], { cwd: malwareInstall });
 
+  progress("Malware Engine package checks passed");
   // JB Advisor Engine.
+  progress("Packing standalone Advisor Engine tarball");
   const advisorTarball = await pack("packages/advisor-engine");
   const advisorInstall = await install(advisorTarball, "install-advisor-engine");
   run(node, [
@@ -280,6 +299,7 @@ try {
   );
   assert.ok((await stat(advisorSnapshot)).size > 0, "Advisor Engine offline dataset builder must produce a knowledge snapshot");
 
+  progress("All four standalone package checks completed");
   console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });

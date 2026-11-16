@@ -8,6 +8,7 @@ import {
   validateRateLimitPolicyV1,
   validateThreatSignalV1,
   validateThreatAssessmentV1,
+  validateThreatAssessmentPolicyV1,
   toAuthenticationDecisionV1
 } from "@jb/security-guard/core-contract-v1";
 
@@ -235,4 +236,54 @@ test("threat assessment combines unique signal references with bounded risk scor
   assert.throws(() => validateThreatAssessmentV1({
     ...assessment(), decision: "auto_block"
   }));
+});
+
+
+const assessmentPolicy = () => ({
+  schema: "jb.security.policy.threat-assessment/v1",
+  id: "default-threat-policy",
+  tenantId: "tenant-demo",
+  applicationId: "catalog-api",
+  version: 1,
+  enabled: true,
+  windowMs: 300000,
+  maxSignals: 32,
+  minimumConfidence: 0.5,
+  severityWeights: { info: 5, low: 15, medium: 35, high: 65, critical: 90 },
+  typeWeights: {
+    brute_force: 100, endpoint_scan: 90, enumeration: 80, sql_injection: 110,
+    parameter_tampering: 100, api_abuse: 95, bot_traffic: 75, anomaly: 50, upload_risk: 100
+  },
+  thresholds: { challenge: 35, review: 60, block: 85 },
+  blockRequirements: {
+    minSignals: 3, minDistinctRules: 2, minDistinctTypes: 2, minimumConfidence: 0.9
+  }
+});
+
+test("threat assessment policy validates explicit weights, thresholds and independent evidence gates", () => {
+  const validated = validateThreatAssessmentPolicyV1(assessmentPolicy());
+  assert.equal(validated.thresholds.block, 85);
+  assert.equal(Object.isFrozen(validated), true);
+  assert.equal(Object.isFrozen(validated.typeWeights), true);
+  assert.equal(Object.isFrozen(validated.blockRequirements), true);
+});
+
+test("threat assessment policy rejects unsafe or ambiguous configuration", () => {
+  assert.throws(() => validateThreatAssessmentPolicyV1({
+    ...assessmentPolicy(), thresholds: { challenge: 80, review: 60, block: 85 }
+  }), /challenge <= review <= block/);
+  assert.throws(() => validateThreatAssessmentPolicyV1({
+    ...assessmentPolicy(), blockRequirements: { ...assessmentPolicy().blockRequirements, minSignals: 1 }
+  }), /minSignals/);
+  assert.throws(() => validateThreatAssessmentPolicyV1({
+    ...assessmentPolicy(), maxSignals: 2
+  }), /counts must fit/);
+  assert.throws(() => validateThreatAssessmentPolicyV1({
+    ...assessmentPolicy(), typeWeights: { ...assessmentPolicy().typeWeights, unknown: 100 }
+  }), /unsupported field/);
+  assert.throws(() => validateThreatAssessmentPolicyV1({
+    ...assessmentPolicy(), blockRequirements: {
+      ...assessmentPolicy().blockRequirements, minimumConfidence: 0.2
+    }
+  }), /minimumConfidence must be from/);
 });

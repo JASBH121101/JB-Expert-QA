@@ -414,6 +414,87 @@ export function validateThreatAssessmentV1(value) {
   return freezeContract(value);
 }
 
+/** Validate the server-owned policy used by the Core v1 threat assessor. */
+export function validateThreatAssessmentPolicyV1(value) {
+  if (!record(value)) throw new TypeError("threat assessment policy must be an object");
+  exactKeys(value, new Set([
+    "schema", "id", "tenantId", "applicationId", "version", "enabled",
+    "windowMs", "maxSignals", "minimumConfidence", "severityWeights",
+    "typeWeights", "thresholds", "blockRequirements"
+  ]), "threat assessment policy");
+  requireFields(value, [
+    "schema", "id", "tenantId", "applicationId", "version", "enabled",
+    "windowMs", "maxSignals", "minimumConfidence", "severityWeights",
+    "typeWeights", "thresholds", "blockRequirements"
+  ], "threat assessment policy");
+  if (value.schema !== "jb.security.policy.threat-assessment/v1") {
+    throw new TypeError("unsupported threat assessment policy schema");
+  }
+  identifier(value.id, "policy.id");
+  identifier(value.tenantId, "tenantId");
+  identifier(value.applicationId, "applicationId");
+  contractInteger(value.version, "version", 1);
+  if (typeof value.enabled !== "boolean") throw new TypeError("enabled must be boolean");
+  contractInteger(value.windowMs, "windowMs", 1000, 86_400_000);
+  contractInteger(value.maxSignals, "maxSignals", 1, 128);
+  if (typeof value.minimumConfidence !== "number" ||
+      !Number.isFinite(value.minimumConfidence) ||
+      value.minimumConfidence < 0 || value.minimumConfidence > 1) {
+    throw new TypeError("minimumConfidence must be a finite number from 0 to 1");
+  }
+
+  const severityNames = ["info", "low", "medium", "high", "critical"];
+  if (!record(value.severityWeights)) throw new TypeError("severityWeights must be an object");
+  exactKeys(value.severityWeights, new Set(severityNames), "severityWeights");
+  requireFields(value.severityWeights, severityNames, "severityWeights");
+  for (const severity of severityNames) {
+    contractInteger(value.severityWeights[severity], "severityWeights." + severity, 0, 100);
+  }
+
+  const threatTypes = [...THREAT_TYPES];
+  if (!record(value.typeWeights)) throw new TypeError("typeWeights must be an object");
+  exactKeys(value.typeWeights, new Set(threatTypes), "typeWeights");
+  requireFields(value.typeWeights, threatTypes, "typeWeights");
+  for (const type of threatTypes) {
+    contractInteger(value.typeWeights[type], "typeWeights." + type, 0, 200);
+  }
+
+  if (!record(value.thresholds)) throw new TypeError("thresholds must be an object");
+  exactKeys(value.thresholds, new Set(["challenge", "review", "block"]), "thresholds");
+  requireFields(value.thresholds, ["challenge", "review", "block"], "thresholds");
+  for (const name of ["challenge", "review", "block"]) {
+    contractInteger(value.thresholds[name], "thresholds." + name, 1, 100);
+  }
+  if (value.thresholds.challenge > value.thresholds.review ||
+      value.thresholds.review > value.thresholds.block) {
+    throw new TypeError("thresholds must satisfy challenge <= review <= block");
+  }
+
+  const requirements = value.blockRequirements;
+  if (!record(requirements)) throw new TypeError("blockRequirements must be an object");
+  exactKeys(requirements, new Set([
+    "minSignals", "minDistinctRules", "minDistinctTypes", "minimumConfidence"
+  ]), "blockRequirements");
+  requireFields(requirements, [
+    "minSignals", "minDistinctRules", "minDistinctTypes", "minimumConfidence"
+  ], "blockRequirements");
+  contractInteger(requirements.minSignals, "blockRequirements.minSignals", 2, 128);
+  contractInteger(requirements.minDistinctRules, "blockRequirements.minDistinctRules", 2, 128);
+  contractInteger(requirements.minDistinctTypes, "blockRequirements.minDistinctTypes", 2, threatTypes.length);
+  if (requirements.minDistinctRules > requirements.minSignals ||
+      requirements.minDistinctTypes > requirements.minSignals ||
+      requirements.minSignals > value.maxSignals) {
+    throw new TypeError("blockRequirements counts must fit within maxSignals");
+  }
+  if (typeof requirements.minimumConfidence !== "number" ||
+      !Number.isFinite(requirements.minimumConfidence) ||
+      requirements.minimumConfidence < value.minimumConfidence ||
+      requirements.minimumConfidence > 1) {
+    throw new TypeError("blockRequirements.minimumConfidence must be from minimumConfidence to 1");
+  }
+  return freezeContract(value);
+}
+
 /**
  * Build an authentication decision using a trusted attempt identifier, then
  * validate the wire shape. This does not decide whether authentication passes.
@@ -440,5 +521,6 @@ export const SECURITY_GUARD_CORE_V1_SCHEMAS = Object.freeze({
   securityEvent: "jb.security.event/v1",
   rateLimitPolicy: "jb.security.policy.rate-limit/v1",
   threatSignal: "jb.security.threat-signal/v1",
-  threatAssessment: "jb.security.threat-assessment/v1"
+  threatAssessment: "jb.security.threat-assessment/v1",
+  threatAssessmentPolicy: "jb.security.policy.threat-assessment/v1"
 });

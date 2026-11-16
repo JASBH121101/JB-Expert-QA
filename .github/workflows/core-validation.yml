@@ -53,7 +53,8 @@ jobs:
       - name: Audit resolved dependency tree for high and critical vulnerabilities
         run: npm audit --audit-level=high
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # The ubuntu-24.04 runner already provides Chromium runtime libraries; avoid flaky APT mirror provisioning.
+        run: npx playwright install chromium
       - name: Build and test the complete @jb/expert-qa package
         run: |
           node scripts/build-expert-qa-package.js

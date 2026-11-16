@@ -71,6 +71,7 @@ jobs:
           node --check src/adapters/filesystem/audit-security-url.js
           node --check src/security-url-cli.js
           node --check packages/security-guard/src/index.js
+          node --check packages/security-guard/src/threat-assessment.js
           node --check packages/security-guard/src/auth-protection.js
           node --check packages/security-guard/src/account-recovery.js
           node --check packages/security-guard/src/security-headers.js

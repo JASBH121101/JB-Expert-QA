@@ -144,6 +144,12 @@ The storage adapter must create a private quarantine write stream, return a read
 The built-in signature allowlist is intentionally narrow: JPEG, PNG, GIF, WebP and PDF. SVG, HTML, XML, ZIP, executables and arbitrary MIME types are not accepted. application/octet-stream is treated only as an unspecified client hint; Guard still verifies the signature. Signature checks inspect a bounded prefix; they are type identification, not full format validation, content disarm/reconstruction, or proof that an image/document is safe. A file can have a valid header and still contain malformed, polyglot, or active trailing content. For user-uploaded images, decode and re-encode with a maintained image library before publication. Serve PDFs as attachments by default, use a separate untrusted-content origin for previews, and retain nosniff/content-disposition controls. The default per-file cap is 5 MiB, the upload-ingestion timeout is 30 seconds (configurable up to 5 minutes), and the scan timeout is 15 seconds.
 
 A production integration still needs a real scanner, private storage adapter, bounded multipart parser, quarantine retention/cleanup policy, download authorization and operational alerts. See docs/FILE-UPLOAD-SECURITY.md for adapter contracts and acceptance criteria. The in-memory test fixtures are not production services.
+## Core v1 threat assessment (Node.js)
+
+The optional `@jb/security-guard/threat-assessment` subpath combines existing, validated Core v1 threat signals under an explicit server-owned policy. It does not replace request inspection, authenticate users, or enforce blocks. A `block` result is an assessment recommendation only; the consuming application must make a separate, reviewed enforcement decision.
+
+See [Threat Assessment design and policy semantics](docs/THREAT-ASSESSMENT.md) for the scoring formula, subject-isolation rules, thresholds, test coverage, and known calibration limits.
+
 ## Account recovery: verified email and SMS
 
 ~~~js

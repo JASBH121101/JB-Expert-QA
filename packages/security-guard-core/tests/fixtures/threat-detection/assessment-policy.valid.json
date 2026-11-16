@@ -1,0 +1,40 @@
+{
+  "schema": "jb.security.policy.threat-assessment/v1",
+  "id": "default-threat-policy",
+  "tenantId": "tenant-demo",
+  "applicationId": "admin-api",
+  "version": 1,
+  "enabled": true,
+  "windowMs": 300000,
+  "maxSignals": 32,
+  "minimumConfidence": 0.5,
+  "severityWeights": {
+    "info": 5,
+    "low": 15,
+    "medium": 35,
+    "high": 65,
+    "critical": 90
+  },
+  "typeWeights": {
+    "brute_force": 100,
+    "endpoint_scan": 90,
+    "enumeration": 80,
+    "sql_injection": 110,
+    "parameter_tampering": 100,
+    "api_abuse": 95,
+    "bot_traffic": 75,
+    "anomaly": 50,
+    "upload_risk": 100
+  },
+  "thresholds": {
+    "challenge": 35,
+    "review": 60,
+    "block": 85
+  },
+  "blockRequirements": {
+    "minSignals": 3,
+    "minDistinctRules": 2,
+    "minDistinctTypes": 2,
+    "minimumConfidence": 0.9
+  }
+}
