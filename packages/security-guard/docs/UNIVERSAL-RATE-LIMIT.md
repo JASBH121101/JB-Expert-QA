@@ -37,7 +37,7 @@ async function consumeLimit({ key, now, windowMs, maxRequests }) {
 }
 ~~~
 
-The operation must be atomic across every application instance and service replica. Do not implement it as a separate read followed by write. Use a Redis/Valkey atomic script or a database operation with proven concurrency semantics. The repository intentionally does not bundle a Redis, PostgreSQL, or Neon client. The included in-memory store exists only in tests and is not a production backend.
+The operation must be atomic across every application instance and service replica. Do not implement it as a separate read followed by write. The repository includes an optional PostgreSQL adapter at `@jb/security-guard/postgres-rate-limit-store`; it accepts an injected parameterized `query(sql, values)` function compatible with node-postgres. It does not bundle the `pg` driver, provision a database, create credentials, run migrations automatically, or certify a customer Neon/production database. Call `initialize()` explicitly during a reviewed deployment/migration step. Redis/Valkey adapters are not included. The in-memory stores used by unit tests are not production backends.
 
 Configure a different credential for each application, and register only the policies and scopes that application is allowed to consume:
 
@@ -72,7 +72,7 @@ const service = createUniversalRateLimitService({
 // Enforce proxy, TLS, body-size, and connection-timeout controls at the host.
 ~~~
 
-The factory returns fetch(request), accepts only POST to /__jb/security-guard/v1/check, and defaults to a 4 KiB bounded JSON body. The host adapter must bridge its HTTP framework to the Fetch Request/Response API and write the returned status, headers, and body to the network response.
+The factory returns fetch(request), accepts only POST to /__jb/security-guard/v1/check, and defaults to a 4 KiB bounded JSON body. It is exported from both `@jb/security-guard` and the explicit `@jb/security-guard/universal-rate-limit-service` subpath. The host adapter must bridge its HTTP framework to the Fetch Request/Response API and write the returned status, headers, and body to the network response.
 
 ## Client request
 
@@ -141,9 +141,9 @@ A central service is a dependency: if it is unreachable, the default is HTTP 503
 
 ## Verification status
 
-Automated tests use a deterministic in-memory store fixture to verify the API contract and cross-instance behavior. They do not certify a production Redis/Valkey/PostgreSQL adapter, deployment, network perimeter, or global availability. Those remain separate release gates.
+Automated tests use a deterministic in-memory store fixture for API behavior. PostgreSQL 16 is also exercised in disposable CI with a real database, including 100 concurrent requests, quota enforcement and database-clock rollover for both legacy namespaced HMAC keys and Core v1 length-prefixed keys. The PostgreSQL adapter uses `statement_timestamp()` as the authoritative shared clock; the `now` input is validated to satisfy the common store interface but is not used to set database time. These tests do not certify customer Neon/production deployment, network perimeter, backups, high availability or global availability. Redis/Valkey adapters are not provided.
 
 
 ## Release boundary
 
-This endpoint is a Node.js server-to-server adapter. It does not deploy itself, provide a Redis/PostgreSQL/Neon driver, or make an in-memory store globally atomic. Supply a production-grade atomic `consumeLimit()` implementation shared by every replica. Keep credentials server-side, expose the endpoint only over HTTPS and restrict network access. Use the service's bounded request size and exact route, and apply upstream network-level controls against credential guessing. Query strings are rejected. The current test store is a deterministic fixture only; no production backend has been certified.
+This endpoint is a Node.js server-to-server adapter. It does not deploy itself, provision PostgreSQL/Neon, bundle a database driver, or make an in-memory store globally atomic. It includes an optional PostgreSQL adapter that requires an externally supplied `pg`-compatible query function. Supply a production-grade atomic `consumeLimit()` implementation shared by every replica. Keep credentials server-side, expose the endpoint only over HTTPS and restrict network access. Use the service's bounded request size and exact route, and apply upstream network-level controls against credential guessing. Query strings are rejected. The current test store is a deterministic fixture only; no production backend has been certified.
