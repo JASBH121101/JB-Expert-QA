@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign as signBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -113,6 +114,79 @@ try {
   ]) {
     assert.ok((await stat(binPath(expertInstall, bin))).isFile(), "missing installed CLI: " + bin);
   }
+
+  // Exercise the updater from the installed tarball, not from the monorepo source tree.
+  const updaterProject = path.join(tempRoot, "updater-consumer");
+  const installedGuardPath = path.join(
+    updaterProject, "node_modules", "@jb", "security-guard"
+  );
+  await mkdir(installedGuardPath, { recursive: true });
+  const updaterProjectManifest = {
+    name: "jb-updater-distribution-fixture",
+    version: "1.0.0",
+    private: true,
+    dependencies: { "@jb/security-guard": "0.1.0" }
+  };
+  await writeFile(
+    path.join(updaterProject, "package.json"),
+    JSON.stringify(updaterProjectManifest, null, 2) + "\n"
+  );
+  await writeFile(
+    path.join(installedGuardPath, "package.json"),
+    JSON.stringify({ name: "@jb/security-guard", version: "0.1.0" }, null, 2) + "\n"
+  );
+
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const issuedAt = new Date();
+  const updaterManifest = {
+    schemaVersion: 1,
+    channel: "stable",
+    issuedAt: issuedAt.toISOString(),
+    expiresAt: new Date(issuedAt.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    packages: {
+      "@jb/security-guard": {
+        version: "0.1.1",
+        nodeMinMajor: 22,
+        dist: {
+          tarball: "https://registry.npmjs.org/@jb%2fsecurity-guard/-/security-guard-0.1.1.tgz",
+          integrity: "sha512-" + Buffer.alloc(64, 0x42).toString("base64")
+        }
+      }
+    }
+  };
+  const updaterManifestRaw = JSON.stringify(updaterManifest, null, 2) + "\n";
+  const updaterManifestPath = path.join(updaterProject, "engine-manifest.json");
+  const updaterPublicKeyPath = path.join(updaterProject, "trusted-update-key.pem");
+  await writeFile(updaterManifestPath, updaterManifestRaw, "utf8");
+  await writeFile(
+    updaterManifestPath + ".sig",
+    signBytes(null, Buffer.from(updaterManifestRaw, "utf8"), privateKey).toString("base64"),
+    "utf8"
+  );
+  await writeFile(
+    updaterPublicKeyPath,
+    publicKey.export({ type: "spki", format: "pem" }),
+    "utf8"
+  );
+
+  const updaterOutput = run(binPath(expertInstall, "jb-qa"), [
+    "update",
+    "--check",
+    "--manifest",
+    updaterManifestPath,
+    "--public-key",
+    updaterPublicKeyPath
+  ], { cwd: updaterProject });
+  assert.match(updaterOutput, /Signed update manifest verified/);
+  assert.match(
+    updaterOutput,
+    /@jb\/security-guard 0\.1\.0 -> 0\.1\.1 \| update-available \| candidate/
+  );
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(updaterProject, "package.json"), "utf8")),
+    updaterProjectManifest,
+    "A read-only updater check must not change the consuming project's dependencies"
+  );
 
   // Exercise the package's own browser installer, then run real browser tests from the tarball install.
   run(binPath(expertInstall, "jb-qa"), [

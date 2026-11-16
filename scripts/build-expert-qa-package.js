@@ -29,6 +29,9 @@ const requiredFiles = [
   "src/cli.js",
   "src/project-cli.js",
   "src/database-cli.js",
+  "src/update-manager/cli.js",
+  "src/update-manager/manager.js",
+  "src/update-manager/policy.js",
   "src/adapters/filesystem/audit-database.js",
   "src/specialists/database/index.js",
   "src/specialists/database/operational-rules.js",
@@ -59,5 +62,5 @@ for (const relativePath of requiredFiles) {
 
 console.log(
   "Prepared the complete JB Expert QA engine from canonical src/ and config/ trees (" +
-  requiredFiles.length + " required entry files verified)."
+  requiredFiles.length + " required entry files verified, including the secure updater)."
 );
