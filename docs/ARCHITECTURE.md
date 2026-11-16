@@ -60,7 +60,18 @@ When used by Security Guard, Malware Engine is invoked through the documented sc
 
 The engine is local-first and is not a certified antivirus or a replacement for Microsoft Defender.
 
-### 4. JB Resilience Engine
+### 4. JB Advisor Engine
+
+**Primary responsibility:** provide evidence-aware product research, comparison and recommendation capabilities for fragrance and personal technology.
+
+- Deterministic product normalization and category-aware comparison.
+- Pluggable research providers with provenance and trust-state handling.
+- Local knowledge snapshots and offline-first advisory workflows.
+- Human approval for staging unconfirmed candidates or changing trusted knowledge and policies.
+
+**Decision boundary:** Advisor Engine is not a security, malware-detection, or infrastructure-recovery authority. Retrieved claims remain unconfirmed until reviewed, and the engine does not require the other JB engines at runtime.
+
+### 5. JB Resilience Engine
 
 **Primary responsibility:** monitor service health and coordinate bounded, policy-controlled recovery.
 
