@@ -232,3 +232,51 @@ test("stops invoking adapters when the cumulative report output budget is reache
   assert.equal(report.totals.fail, 1);
   assert.equal(report.totals.skip, skippedAfterBudget.length);
 });
+
+
+test("keeps NEXORA Configurable Catalog and Site Engine as separate targets", async () => {
+  const lab = createThreatLab();
+  const calls = [];
+  lab.registerTarget({
+    id: "nexora-configurable-catalog",
+    kind: "frontend-catalog",
+    version: "prototype",
+    capabilities: ["editable-templates", "product-presentation", "responsive-ui"],
+    adapter: { async runScenario({ scenario }) { calls.push("catalog:" + scenario.id); return { status: "pass", summary: "Catalog profile boundary verified" }; } }
+  });
+  lab.registerTarget({
+    id: "nexora-site-engine",
+    kind: "laravel-application",
+    version: "development",
+    capabilities: ["owner-auth", "permissions", "public-site", "exports", "installation"],
+    adapter: { async runScenario({ scenario }) { calls.push("site:" + scenario.id); return { status: "pass", summary: "Site Engine profile boundary verified" }; } }
+  });
+  lab.registerScenario({
+    id: "nexora-catalog-prototype-boundary",
+    category: "scope-regression",
+    description: "Keep the frontend catalog prototype distinct from server-backed authentication and persistence.",
+    appliesTo: ["nexora-configurable-catalog"],
+    difficulty: "basic",
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
+  });
+  lab.registerScenario({
+    id: "nexora-site-engine-server-boundary",
+    category: "scope-regression",
+    description: "Keep Laravel server-side authorization and persistence checks scoped to the Site Engine target.",
+    appliesTo: ["nexora-site-engine"],
+    difficulty: "basic",
+    safety: { safe: true, network: false, destructive: false, executesSample: false }
+  });
+
+  const report = await lab.run();
+  assert.deepEqual(calls, [
+    "catalog:nexora-catalog-prototype-boundary",
+    "site:nexora-site-engine-server-boundary"
+  ]);
+  assert.deepEqual(report.totals, { pass: 2, fail: 0, skip: 2 });
+  assert.deepEqual(report.assessment.targets.map((item) => item.target.id), [
+    "nexora-configurable-catalog",
+    "nexora-site-engine"
+  ]);
+  assert.ok(report.assessment.targets.every((item) => item.coveredLevels.includes("basic")));
+});
