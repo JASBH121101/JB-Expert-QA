@@ -18,7 +18,8 @@
     "./producers/security-guard": "./src/producers/security-guard.js",
     "./producers/malware-engine": "./src/producers/malware-engine.js",
     "./incident-correlation-engine": "./src/incident-correlation-engine.js",
-    "./response-orchestrator": "./src/response-orchestrator.js"
+    "./response-orchestrator": "./src/response-orchestrator.js",
+    "./orchestration-store": "./src/orchestration-store.js"
   },
   "files": [
     "src/**",
