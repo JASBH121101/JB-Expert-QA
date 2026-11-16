@@ -76,6 +76,8 @@ export default {
     const limiter = createCloudflareWorkerRateLimit({
       binding: env.API_RATE_LIMIT,
       namespace: "jb-security-guard-pages",
+      // Keep this stable across Worker instances and outside source control.
+      identitySecret: env.JB_RATE_LIMIT_IDENTITY_SECRET,
       mode: "enforce",
       periodSeconds: 60
     });
@@ -106,6 +108,8 @@ simple = { limit = 60, period = 60 }
 \`\`\`
 
 Choose a unique numeric namespace ID for this binding within the Cloudflare account. The example threshold is only a starting point; tune it from observed traffic and application capacity. Add separate bindings and policies only when separate thresholds are necessary.
+
+For enforce mode, provide a stable secret of at least 32 bytes with `wrangler secret put JB_RATE_LIMIT_IDENTITY_SECRET`. Do not place the value in source control, Pages variables, request payloads, or logs. Worker mode still supports unkeyed SHA-256 only for monitor-mode compatibility; enforce mode refuses to start without the keyed secret. Keep the same secret across all instances that must generate the same counter key, and rotate it deliberately because rotation starts a new keyspace.
 
 Deploy this Worker without a public \`workers.dev\` endpoint and without a public route. It should be reachable from the Pages project only through its Service Binding. Verify that the Worker has no unintended public hostname or route after deployment.
 
