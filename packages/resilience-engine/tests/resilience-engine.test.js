@@ -26,16 +26,26 @@ test("Linux adapter uses a fixed executable, argument list and allowlist", async
   await assert.rejects(() => adapter.restartService("attacker; id"), /allowlisted/);
 });
 
-test("Windows adapter stops then starts only an allowlisted service", async () => {
+test("Windows adapter waits for STOPPED and confirms RUNNING before completion", async () => {
   const calls = [];
+  const states = ["STOP_PENDING", "STOPPED", "START_PENDING", "RUNNING"];
   const adapter = createWindowsScmAdapter({
     allowedServices: ["JBService"],
-    run: async (...args) => { calls.push(args); return { code: 0 }; }
+    pollIntervalMs: 10,
+    sleep: async () => {},
+    run: async (...args) => {
+      calls.push(args);
+      if (args[1][0] === "query") {
+        const state = states.shift();
+        const code = state === "STOPPED" ? 1 : state === "RUNNING" ? 4 : 3;
+        return { code: 0, stdout: "SERVICE_NAME: JBService\\n        STATE              : " + code + "  " + state };
+      }
+      return { code: 0 };
+    }
   });
-  await adapter.restartService("JBService");
-  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [
-    ["sc.exe", ["stop", "JBService"]], ["sc.exe", ["start", "JBService"]]
-  ]);
+  const result = await adapter.restartService("JBService");
+  assert.equal(result.running, true);
+  assert.deepEqual(calls.map((call) => call[1][0]), ["stop", "query", "query", "start", "query", "query"]);
   assert.ok(calls.every((call) => call[2].shell === false));
 });
 
@@ -97,6 +107,55 @@ test("forged proposals, unknown services, restart loops and invalid policy are r
   }), /policy is invalid/);
 });
 
+test("critical proposal expiry is rechecked after asynchronous approval verification", async () => {
+  let now = 20_000;
+  let restarts = 0;
+  const engine = createResilienceEngine({
+    policy,
+    adapter: { platform: "windows-scm", async restartService() { restarts += 1; } },
+    clock: () => now,
+    approvalVerifier: async ({ proposal, approval }) => {
+      assert.equal(approval.proposalId, proposal.proposalId);
+      assert.equal(approval.nonce, proposal.nonce);
+      assert.ok(proposal.issuedAt < proposal.expiresAt);
+      now = proposal.expiresAt;
+      return true;
+    }
+  });
+  const proposal = engine.evaluateRecovery({
+    serviceId: "postgresql", consecutiveFailures: 3, restartCount: 0
+  }).proposal;
+  assert.ok(proposal.proposalId && proposal.nonce);
+  const result = await engine.executeRecovery({
+    proposal,
+    approval: {
+      proposalId: proposal.proposalId,
+      nonce: proposal.nonce,
+      subjectId: "operations-user",
+      signature: "test-only-signature"
+    }
+  });
+  assert.equal(result.executed, false);
+  assert.equal(result.reason, "proposal-expired");
+  assert.equal(restarts, 0);
+});
+
+test("active security threat or tamper signal suspends recovery", () => {
+  const engine = createResilienceEngine({
+    policy,
+    adapter: { platform: "linux-systemd", async restartService() {} },
+    clock: () => 10_000
+  });
+  const result = engine.evaluateRecovery({
+    serviceId: "catalog-api.service",
+    consecutiveFailures: 3,
+    restartCount: 0,
+    securityThreatActive: true
+  });
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "security-threat-active");
+});
+
 test("recovery proposals expire", async () => {
   let now = 10000;
   let restarts = 0;
@@ -110,6 +169,50 @@ test("recovery proposals expire", async () => {
   now = proposal.expiresAt + 1;
   assert.equal((await engine.executeRecovery({ proposal })).reason, "proposal-expired");
   assert.equal(restarts, 0);
+});
+
+test("Windows adapter never starts while service remains active after stop request", async () => {
+  const calls = [];
+  let now = 0;
+  const adapter = createWindowsScmAdapter({
+    allowedServices: ["JBService"],
+    timeoutMs: 100,
+    pollIntervalMs: 25,
+    clock: () => now,
+    sleep: async (milliseconds) => { now += milliseconds; },
+    run: async (...args) => {
+      calls.push(args);
+      if (args[1][0] === "query") {
+        return { code: 0, stdout: "STATE : 4 RUNNING" };
+      }
+      return { code: 0 };
+    }
+  });
+  await assert.rejects(() => adapter.restartService("JBService"), /did not reach STOPPED/);
+  assert.equal(calls.some((call) => call[1][0] === "start"), false);
+  assert.ok(calls.filter((call) => call[1][0] === "query").length >= 4);
+});
+
+test("Windows adapter fails when start is accepted but the service never reaches RUNNING", async () => {
+  const calls = [];
+  let now = 0;
+  const adapter = createWindowsScmAdapter({
+    allowedServices: ["JBService"],
+    timeoutMs: 100,
+    pollIntervalMs: 25,
+    clock: () => now,
+    sleep: async (milliseconds) => { now += milliseconds; },
+    run: async (...args) => {
+      calls.push(args);
+      if (args[1][0] === "query") {
+        return { code: 0, stdout: calls.some((call) => call[1][0] === "start")
+          ? "STATE : 2 START_PENDING" : "STATE : 1 STOPPED" };
+      }
+      return { code: 0 };
+    }
+  });
+  await assert.rejects(() => adapter.restartService("JBService"), /did not reach RUNNING/);
+  assert.equal(calls.some((call) => call[1][0] === "start"), true);
 });
 
 test("Windows adapter never starts a service when stop fails", async () => {
