@@ -10,7 +10,6 @@ function positiveInteger(value, name, maximum) {
   return value;
 }
 
-
 async function withTimeout(operation, timeoutMs) {
   let timer;
   try {
@@ -47,6 +46,10 @@ function respond(response, statusCode, payload, headers = {}) {
 /**
  * Asynchronous request limiter backed by an atomic shared fixed-window store.
  * The store must implement consumeLimit({ key, now, windowMs, maxRequests }).
+ *
+ * check(request) exposes the same decision engine without binding it to an
+ * Express/Node response object. Framework adapters must still enforce the
+ * returned decision before invoking the protected application handler.
  */
 export function createDistributedRateLimit(options = {}) {
   if (!isRecord(options)) throw new TypeError("Distributed rate-limit options must be an object");
@@ -101,11 +104,9 @@ export function createDistributedRateLimit(options = {}) {
     return namespace + ":" + digest;
   }
 
-  async function middleware(request, response, next) {
-    if (!request || typeof request !== "object" || !response ||
-        typeof response.setHeader !== "function" || typeof response.end !== "function" ||
-        typeof next !== "function") {
-      throw new TypeError("Distributed rate-limit middleware requires (request, response, next)");
+  async function check(request = {}) {
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
+      throw new TypeError("Distributed rate-limit check requires a request-like object");
     }
     stats.requests += 1;
     let now;
@@ -128,21 +129,24 @@ export function createDistributedRateLimit(options = {}) {
         component: "jb-security-guard", action: "distributed-rate-store-unavailable",
         severity: "critical", ruleIds: [RULE_ID]
       });
-      if (failClosed) {
-        respond(response, 503, {
-          error: "security_rate_limit_unavailable",
-          message: "Request temporarily unavailable due to a security control."
-        }, { "Retry-After": 5 });
-      } else {
-        next();
-      }
-      return;
+      return Object.freeze({
+        allowed: !failClosed,
+        exceeded: false,
+        unavailable: true,
+        status: failClosed ? 503 : null,
+        retryAfterSeconds: failClosed ? 5 : null
+      });
     }
 
     if (result.allowed) {
       stats.allowed += 1;
-      next();
-      return;
+      return Object.freeze({
+        allowed: true,
+        exceeded: false,
+        unavailable: false,
+        status: null,
+        retryAfterSeconds: null
+      });
     }
 
     stats.blocked += 1;
@@ -154,14 +158,45 @@ export function createDistributedRateLimit(options = {}) {
       });
     }
     const retryAfterSeconds = Math.max(1, Math.ceil((result.retryAfterMs ?? windowMs) / 1000));
+    return Object.freeze({
+      allowed: false,
+      exceeded: true,
+      unavailable: false,
+      status: 429,
+      retryAfterSeconds
+    });
+  }
+
+  async function middleware(request, response, next) {
+    if (!request || typeof request !== "object" || !response ||
+        typeof response.setHeader !== "function" || typeof response.end !== "function" ||
+        typeof next !== "function") {
+      throw new TypeError("Distributed rate-limit middleware requires (request, response, next)");
+    }
+
+    const decision = await check(request);
+    if (decision.allowed) {
+      next();
+      return;
+    }
+
+    if (decision.status === 503) {
+      respond(response, 503, {
+        error: "security_rate_limit_unavailable",
+        message: "Request temporarily unavailable due to a security control."
+      }, { "Retry-After": decision.retryAfterSeconds });
+      return;
+    }
+
     respond(response, 429, {
       error: "rate_limit_exceeded",
       message: "Too many requests. Try again later."
-    }, { "Retry-After": retryAfterSeconds });
+    }, { "Retry-After": decision.retryAfterSeconds });
   }
 
   return Object.freeze({
     middleware,
+    check,
     getStats: () => Object.freeze({ ...stats })
   });
 }
