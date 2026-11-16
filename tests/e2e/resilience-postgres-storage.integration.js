@@ -306,6 +306,28 @@ async function main() {
     await assert.rejects(secondStorage.trustedSignalStore.listSignals({
       assetId: "host-postgres-01", environment: "test", sinceMs: issuedAtMs
     }), /integrity check failed/);
+
+    await pool.query(
+      "UPDATE jb_resilience_trusted_signal_capacity SET record_count=max_records WHERE capacity_id=1"
+    );
+    const capacitySignal = signTrustedSignalEnvelope({
+      schema: signal.schema,
+      eventId: "3d6f12c0-129a-4f80-8af1-2a02f1edb002",
+      sourceId: signal.sourceId,
+      sourceEngine: signal.sourceEngine,
+      environment: signal.environment,
+      assetId: signal.assetId,
+      issuedAtMs,
+      expiresAtMs: issuedAtMs + 120_000,
+      state: "confirmed",
+      severity: "critical",
+      reasonCode: "MALWARE_VERIFIED",
+      evidenceRefs: signal.evidenceRefs
+    }, key);
+    assert.deepEqual(await firstGateway.ingest(capacitySignal), {
+      accepted: false,
+      reason: "replay-store-capacity-exceeded"
+    });
   });
 
   await runCase("transactional incident transitions and identity/time guards", async () => {
