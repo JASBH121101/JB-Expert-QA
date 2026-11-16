@@ -199,7 +199,7 @@ export function createUniversalRateLimitService(options = {}) {
   async function fetch(request) {
     if (!(request instanceof Request)) throw new TypeError("fetch requires a Web Request");
     const url = new URL(request.url);
-    if (url.pathname !== path) return json(404, { error: "not_found" });
+    if (url.pathname !== path || url.search) return json(404, { error: "not_found" });
     if (request.method !== "POST") return json(405, { error: "method_not_allowed" }, { allow: "POST" });
     if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get("content-type") ?? "")) {
       return json(415, { error: "unsupported_media_type" });
