@@ -5,7 +5,7 @@ Independent service-health and controlled-recovery engine for Linux and Windows.
 ## v1 laboratory scope
 
 - Validated, server-owned service allowlist.
-- Bounded recovery policy: failure threshold, restart limit and cooldown.
+- Bounded recovery policy: failure threshold, restart limit and cooldown. The health monitor continues recording observations at its own attempt cap while suppressing further recovery proposals.
 - Recovery proposals include random proposal IDs/nonces and expire after 60 seconds; expiry is rechecked after any asynchronous approval verification and immediately before adapter invocation.
 - Automatic execution is limited to explicitly allowlisted, non-critical services.
 - Critical services require an injected human-approval verifier. The host verifier must validate a signed approval bound to the exact proposal ID, nonce, service, action, issue/expiry times and authorized human subject; it must also enforce durable one-time replay protection.
