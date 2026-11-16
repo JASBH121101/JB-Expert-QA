@@ -315,3 +315,4 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
 }
 
 export const THREAT_LAB_REPORT_SCHEMA = LAB_SCHEMA;
+export { assessThreatLabDifficulty, THREAT_LAB_DIFFICULTY_LEVELS };
