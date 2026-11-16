@@ -27,7 +27,7 @@ function exactKeys(value, allowed, label) {
   }
 }
 
-function safeEnvironment(platform) {
+function safeEnvironment(platform, configuredWindowsSystemRoot) {
   if (platform === "linux-systemd") {
     return Object.freeze({
       PATH: "/usr/sbin:/usr/bin:/sbin:/bin",
@@ -35,8 +35,8 @@ function safeEnvironment(platform) {
       LC_ALL: "C"
     });
   }
-  const systemRoot = process.env.SystemRoot || process.env.WINDIR;
-  if (typeof systemRoot !== "string" || systemRoot.length < 3 ||
+  const systemRoot = configuredWindowsSystemRoot ?? process.env.SystemRoot ?? process.env.WINDIR;
+  if (typeof systemRoot !== "string" || !path.win32.isAbsolute(systemRoot) ||
       /[\r\n]/.test(systemRoot)) {
     throw new Error("Windows SystemRoot is unavailable; refusing to launch the service manager");
   }
@@ -83,7 +83,8 @@ export function createRestrictedHostCommandRunner({
   binaries,
   allowedServices = [],
   timeoutMs = 10_000,
-  execFileImpl = nodeExecFile
+  execFileImpl = nodeExecFile,
+  windowsSystemRoot
 } = {}) {
   const config = PLATFORM_CONFIG[platform];
   if (!config) throw new TypeError("platform must be linux-systemd or windows-scm");
@@ -106,7 +107,7 @@ export function createRestrictedHostCommandRunner({
   if (typeof execFileImpl !== "function") throw new TypeError("execFileImpl must be a function");
 
   const allowed = new Set(allowedServices);
-  const env = safeEnvironment(platform);
+  const env = safeEnvironment(platform, windowsSystemRoot);
 
   function run(command, args, options = {}) {
     if (!isRecord(options)) throw new TypeError("host command options must be a plain object");
