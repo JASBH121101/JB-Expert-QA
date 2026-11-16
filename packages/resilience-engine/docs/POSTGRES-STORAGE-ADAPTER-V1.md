@@ -1,7 +1,7 @@
 # JB Resilience PostgreSQL Storage Adapter v3
 
 **Status:** laboratory implementation pending certification; coordination, fencing and signal-replay primitives added in v3  
-**Package:** \`@jb/resilience-engine/adapters/postgres-storage\`  
+**Package:** `@jb/resilience-engine/adapters/postgres-storage`  
 **Storage target:** PostgreSQL 16 or compatible  
 **Driver:** host-injected node-postgres-compatible Pool; no driver is bundled
 
@@ -9,18 +9,19 @@
 
 This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns five stores:
 
-- \`orchestrationStore\`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
-- \`auditStore\`: append-only, SHA-256 hash-chained audit events.
-- \`coordinationStore\`: per-scope leases with database-clock expiry and monotonic fencing-token issuance.
-- \`fencedTargetStore\`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.\n- \`trustedSignalStore\`: a durable, database-unique replay registry shared by processes using the same authoritative PostgreSQL primary.
+- `orchestrationStore`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
+- `auditStore`: append-only, SHA-256 hash-chained audit events.
+- `coordinationStore`: per-scope leases with database-clock expiry and monotonic fencing-token issuance.
+- `fencedTargetStore`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.
+- `trustedSignalStore`: a durable, database-unique replay registry shared by processes using the same authoritative PostgreSQL primary.
 
 The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The host owns the Pool and passes it in explicitly.
 
 ## Initialization
 
-Initialization is explicit and idempotent. The host must call \`initialize()\` and confirm success before passing either store to an orchestrator. Operations before initialization fail closed.
+Initialization is explicit and idempotent. The host must call `initialize()` and confirm success before passing either store to an orchestrator. Operations before initialization fail closed.
 
-\`\`\`js
+```js
 import pg from "pg";
 import {
   createPostgresResilienceStorageAdapter
@@ -36,9 +37,9 @@ await storage.initialize();
 
 // Inject storage.orchestrationStore and storage.auditStore into
 // the host-owned Resilience orchestration configuration.
-\`\`\`
+```
 
-The package only requires a Pool with \`connect()\`, and connected clients with \`query()\` and \`release()\`. The application must manage Pool lifecycle and close it when its process shuts down.
+The package only requires a Pool with `connect()`, and connected clients with `query()` and `release()`. The application must manage Pool lifecycle and close it when its process shuts down.
 
 ## Transaction and concurrency guarantees
 
@@ -46,11 +47,11 @@ Each mutating operation is enclosed in an explicit database transaction with rol
 
 - Incident transitions lock and validate the exact incident row. Asset, environment, service identity, transition legality and monotonic timestamps are checked.
 - Action idempotency keys have a database-level unique constraint.
-- A service row is locked before checking or creating an action claim. This serializes contenders for the exact \`(environment, asset_id)\` scope across processes using the same PostgreSQL primary.
-- A partial unique index is a second guard against more than one unresolved \`claimed\` action for an asset/environment.
-- An expired unresolved claim is not recycled. It returns \`action-reconciliation-required\` and remains held until an operator-controlled reconciliation path exists.
+- A service row is locked before checking or creating an action claim. This serializes contenders for the exact `(environment, asset_id)` scope across processes using the same PostgreSQL primary.
+- A partial unique index is a second guard against more than one unresolved `claimed` action for an asset/environment.
+- An expired unresolved claim is not recycled. It returns `action-reconciliation-required` and remains held until an operator-controlled reconciliation path exists.
 - Action finalization is one-time. Service and circuit-breaker updates are persisted transactionally.
-- A \`cancelled-before-execution\` outcome does not increment failure counters or last-action time.
+- A `cancelled-before-execution` outcome does not increment failure counters or last-action time.
 - The audit head row is locked while appending. The record and updated head are committed in the same transaction.
 - Audit verification checks contiguous sequence numbers, previous hashes, record hashes, and the stored head. A broken chain blocks further audit appends.
 
@@ -64,20 +65,33 @@ The target stores a durable high-water mark and mutation receipt. A lower token 
 
 **Guarantee boundary:** this closes the verify-then-write race for application state that is itself stored in this same PostgreSQL primary and modified only through this store. It does not fence `systemd`, Windows SCM, arbitrary files, remote APIs or other external side effects. Do not place network calls or OS commands behind this state API and label them fenced. A real OS fence still requires an enforcing host agent/resource that atomically consumes epochs at the destination.
 
-## PostgreSQL trusted-signal replay store\n\nThe returned \`trustedSignalStore\` implements the existing Trusted Signal Gateway replay-store contract:\n\n- \`recordSignal({ signal, signalDigest, receivedAtMs, retentionUntilMs })\` validates the normalized envelope and digest, then claims \`(source_id,event_id)\` using a database unique key. Repeated identical IDs return \`signal-replay\`; the same source/event ID with a different digest returns \`signal-id-conflict\`.\n- \`listSignals({ assetId, environment, sinceMs })\` reads records in deterministic issue-time/event-ID order, revalidates the envelope and recomputes its digest before returning it.\n\nThis allows multiple gateway processes connected to the same PostgreSQL primary to share the replay registry. The store does not authenticate producer signatures or source scopes; the existing gateway does that before recording. The gateway still emits \`authorizationGranted: false\`; persisted signals are evidence for policy evaluation, not authority to mutate a host.\n\nReplay rows are not automatically evicted. Deleting an event ID would reopen its replay window; retention and safe archival/expiry require a separate, explicitly designed policy. This table is not a consensus log and inherits the availability/consistency boundary of one PostgreSQL primary.\n\n## Database objects
+## PostgreSQL trusted-signal replay store
+
+The returned `trustedSignalStore` implements the existing Trusted Signal Gateway replay-store contract:
+
+- `recordSignal({ signal, signalDigest, receivedAtMs, retentionUntilMs })` validates the normalized envelope and digest, then claims `(source_id,event_id)` using a database unique key. Repeated identical IDs return `signal-replay`; the same source/event ID with a different digest returns `signal-id-conflict`.
+- `listSignals({ assetId, environment, sinceMs })` reads records in deterministic issue-time/event-ID order, revalidates the envelope and recomputes its digest before returning it.
+
+This allows multiple gateway processes connected to the same PostgreSQL primary to share the replay registry. The store does not authenticate producer signatures or source scopes; the existing gateway does that before recording. The gateway still emits `authorizationGranted: false`; persisted signals are evidence for policy evaluation, not authority to mutate a host.
+
+Replay rows are not automatically evicted. Deleting an event ID would reopen its replay window; retention and safe archival/expiry require a separate, explicitly designed policy. A singleton capacity row is locked by every admission transaction and enforces `maxTrustedSignals` (default 10,000; permitted range 1–10,000). Every writer instance must initialize with the same configured value. At capacity, ingest fails closed with `replay-store-capacity-exceeded`; it never evicts old replay IDs. This table is not a consensus log and inherits the availability/consistency boundary of one PostgreSQL primary.
+
+## Database objects
 
 Initialization creates only these namespaced tables and indexes:
 
-- \`jb_resilience_incidents\`
-- \`jb_resilience_incident_history\`
-- \`jb_resilience_services\`
-- \`jb_resilience_actions\`
-- \`jb_resilience_circuits\`
-- \`jb_resilience_audit_heads\`
-- \`jb_resilience_audit_records\`
-- \`jb_resilience_coordination_leases\`
-- \`jb_resilience_fenced_targets\`
-- \`jb_resilience_fenced_mutations\`\n- \`jb_resilience_trusted_signals\`
+- `jb_resilience_incidents`
+- `jb_resilience_incident_history`
+- `jb_resilience_services`
+- `jb_resilience_actions`
+- `jb_resilience_circuits`
+- `jb_resilience_audit_heads`
+- `jb_resilience_audit_records`
+- `jb_resilience_coordination_leases`
+- `jb_resilience_fenced_targets`
+- `jb_resilience_fenced_mutations`
+- `jb_resilience_trusted_signals`
+- `jb_resilience_trusted_signal_capacity`
 
 Use a dedicated database or a role/schema policy that confines the runtime role to these objects. The initializer requires DDL rights. A hardened deployment should separate one-time schema initialization privileges from the runtime role and grant only the minimum table/sequence permissions needed for reads, inserts, updates and audit appends.
 
@@ -101,24 +115,24 @@ This v3 remains laboratory-only and does not provide:
 - automatic migration from an existing file ledger;
 - production database provisioning or credential management.
 
-A single PostgreSQL primary provides transaction serialization for this adapter, but host execution fencing and failover coordination are separate certification work. Do not interpret \`distributedTransactions: true\` as proof of A3 readiness.
+A single PostgreSQL primary provides transaction serialization for this adapter, but host execution fencing and failover coordination are separate certification work. Do not interpret `distributedTransactions: true` as proof of A3 readiness.
 
 ## Laboratory certification
 
-The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation, audit-chain tamper detection, competing lease acquisition, successor epochs, fenced target writes, stale-epoch rejection, mutation idempotency, cross-adapter trusted-signal replay claims and stored-envelope integrity checks.
+The CI workflow starts a disposable PostgreSQL 16 service, installs `pg` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation, audit-chain tamper detection, competing lease acquisition, successor epochs, fenced target writes, stale-epoch rejection, mutation idempotency, cross-adapter trusted-signal replay claims and stored-envelope integrity checks.
 
 No production database or Neon credentials are used by this test.
 
 
 ## Coordination API
 
-The returned \`coordinationStore\` exposes:
+The returned `coordinationStore` exposes:
 
-- \`acquireLease({ scopeId, holderId, leaseDurationMs })\` — acquires an available/expired scope and increments its durable fencing token. Durations are restricted to 1,000–300,000 ms. A live lease is never stolen.
-- \`renewLease({ scopeId, holderId, leaseId, fencingToken, leaseDurationMs })\` — renews only the exact current, unexpired lease.
-- \`releaseLease({ scopeId, holderId, leaseId, fencingToken })\` — releases only the exact current, unexpired lease. The last fencing token is retained.
-- \`verifyLease({ scopeId, holderId, leaseId, fencingToken })\` — checks the current lease against PostgreSQL state and database time. This is a point-in-time coordination check, not a lock held across a subsequent external operation.
+- `acquireLease({ scopeId, holderId, leaseDurationMs })` — acquires an available/expired scope and increments its durable fencing token. Durations are restricted to 1,000–300,000 ms. A live lease is never stolen.
+- `renewLease({ scopeId, holderId, leaseId, fencingToken, leaseDurationMs })` — renews only the exact current, unexpired lease.
+- `releaseLease({ scopeId, holderId, leaseId, fencingToken })` — releases only the exact current, unexpired lease. The last fencing token is retained.
+- `verifyLease({ scopeId, holderId, leaseId, fencingToken })` — checks the current lease against PostgreSQL state and database time. This is a point-in-time coordination check, not a lock held across a subsequent external operation.
 
 Every newly acquired lease receives a greater fencing token for its scope, including after expiry or explicit release. Concurrent acquisition is serialized by the scope row lock. Invalid, expired, replaced or unavailable leases fail closed.
 
-**Critical integration rule:** the lease holder must pass its fencing token to the protected target, and that target must enforce a durable monotonic high-water mark atomically with each protected mutation. A preflight call to \`verifyLease()\` alone cannot close the race between verification and an OS/service action. Because systemd and Windows SCM do not currently enforce this token, this v2 coordination store is not an A3 execution authorization mechanism.
+**Critical integration rule:** the lease holder must pass its fencing token to the protected target, and that target must enforce a durable monotonic high-water mark atomically with each protected mutation. A preflight call to `verifyLease()` alone cannot close the race between verification and an OS/service action. Because systemd and Windows SCM do not currently enforce this token, this v2 coordination store is not an A3 execution authorization mechanism.
