@@ -400,21 +400,18 @@ export function createCloudflareWorkerRateLimitService(options = {}) {
       error: parsed.status === 413 ? "request_too_large" : "invalid_json"
     }, parsed.status);
 
+    let decision;
     try {
-      const decision = await limiter.check(parsed.value);
-      if (!isRecord(decision) || typeof decision.allowed !== "boolean" ||
-          typeof decision.exceeded !== "boolean" ||
-          typeof decision.enforced !== "boolean" ||
-          typeof decision.unavailable !== "boolean" ||
-          !(decision.response === null ||
-            (typeof decision.response.status === "number" &&
-              [429, 503].includes(decision.response.status)))) {
-        return serviceJsonResponse({ error: "rate_limit_service_unavailable" }, 503);
-      }
-
-      return serviceJsonResponse(createRateLimitServicePayload(decision));
+      decision = await limiter.check(parsed.value);
     } catch {
       return serviceJsonResponse({ error: "invalid_rate_limit_request" }, 400);
+    }
+
+    try {
+      return serviceJsonResponse(createRateLimitServicePayload(decision));
+    } catch {
+      // A malformed internal adapter result is a service failure, not a client error.
+      return serviceJsonResponse({ error: "rate_limit_service_unavailable" }, 503);
     }
   }
 
