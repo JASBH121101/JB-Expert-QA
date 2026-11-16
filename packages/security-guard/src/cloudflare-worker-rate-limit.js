@@ -254,3 +254,158 @@ export function createCloudflareWorkerRateLimit(options = {}) {
     getPolicies: () => Object.freeze([...policies.keys()])
   });
 }
+
+
+const DEFAULT_PAGES_SERVICE_PATH = "/__jb/security-guard/rate-limit";
+
+function serviceJsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json; charset=utf-8",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+async function readBoundedJson(request, maxBytes) {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    return { ok: false, status: 413 };
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) return { ok: false, status: 400 };
+
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+      totalBytes += chunk.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return { ok: false, status: 413 };
+      }
+      chunks.push(chunk);
+    }
+  } catch {
+    return { ok: false, status: 400 };
+  } finally {
+    reader.releaseLock?.();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false, status: 400 };
+  }
+}
+
+/**
+ * Exposes a bounded HTTP endpoint for a Pages Function Service Binding.
+ *
+ * The Worker should be deployed without a public workers.dev route or custom
+ * route. Pages calls this endpoint through a Service Binding only.
+ */
+export function createCloudflareWorkerRateLimitService(options = {}) {
+  if (!isRecord(options)) throw new TypeError("Rate-limit service options must be an object");
+  const allowed = new Set(["limiter", "path", "maxBodyBytes"]);
+  for (const key of Object.keys(options)) {
+    if (!allowed.has(key)) throw new TypeError("Unknown rate-limit service option: " + key);
+  }
+
+  const limiter = options.limiter;
+  if (!limiter || typeof limiter.check !== "function") {
+    throw new TypeError("limiter.check must be a function");
+  }
+
+  const path = options.path ?? DEFAULT_PAGES_SERVICE_PATH;
+  if (typeof path !== "string" || !/^\/[a-zA-Z0-9/_-]{1,128}$/.test(path) || path.includes("..")) {
+    throw new TypeError("path must be a safe absolute service route");
+  }
+
+  const maxBodyBytes = options.maxBodyBytes ?? 4096;
+  if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 256 || maxBodyBytes > 16384) {
+    throw new TypeError("maxBodyBytes must be between 256 and 16384");
+  }
+
+  async function fetch(request) {
+    if (!request || typeof request.method !== "string" || typeof request.url !== "string") {
+      return serviceJsonResponse({ error: "invalid_request" }, 400);
+    }
+
+    let url;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return serviceJsonResponse({ error: "invalid_request" }, 400);
+    }
+
+    if (url.pathname !== path) return serviceJsonResponse({ error: "not_found" }, 404);
+    if (request.method !== "POST") {
+      return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+        status: 405,
+        headers: {
+          "allow": "POST",
+          "cache-control": "no-store",
+          "content-type": "application/json; charset=utf-8",
+          "x-content-type-options": "nosniff"
+        }
+      });
+    }
+
+    if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+      return serviceJsonResponse({ error: "content_type_not_supported" }, 415);
+    }
+
+    const parsed = await readBoundedJson(request, maxBodyBytes);
+    if (!parsed.ok) return serviceJsonResponse({
+      error: parsed.status === 413 ? "request_too_large" : "invalid_json"
+    }, parsed.status);
+
+    try {
+      const decision = await limiter.check(parsed.value);
+      if (!isRecord(decision) || typeof decision.allowed !== "boolean" ||
+          typeof decision.exceeded !== "boolean" ||
+          typeof decision.enforced !== "boolean" ||
+          typeof decision.unavailable !== "boolean" ||
+          !(decision.response === null ||
+            (typeof decision.response.status === "number" &&
+              [429, 503].includes(decision.response.status)))) {
+        return serviceJsonResponse({ error: "rate_limit_service_unavailable" }, 503);
+      }
+
+      const retryAfter = decision.response?.headers?.get?.("retry-after") ?? null;
+      const retryAfterSeconds = retryAfter === null ? null : Number(retryAfter);
+      return serviceJsonResponse({
+        allowed: decision.allowed,
+        exceeded: decision.exceeded,
+        enforced: decision.enforced,
+        unavailable: decision.unavailable,
+        policy: decision.policy ?? null,
+        scope: decision.scope ?? "request",
+        status: decision.response?.status ?? null,
+        retryAfterSeconds: Number.isSafeInteger(retryAfterSeconds) &&
+          retryAfterSeconds >= 1 && retryAfterSeconds <= 60
+          ? retryAfterSeconds
+          : null
+      });
+    } catch {
+      return serviceJsonResponse({ error: "invalid_rate_limit_request" }, 400);
+    }
+  }
+
+  return Object.freeze({ fetch });
+}

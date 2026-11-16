@@ -426,3 +426,41 @@ if (decision.response) return decision.response;
 Policies can also be configured independently with the `policies` option. Each policy requires its own Cloudflare Rate Limiting binding. Supported periods are 10 or 60 seconds. `monitor` mode observes without blocking and defaults to fail-open on binding failure; `enforce` mode blocks excess requests and defaults to fail-closed with HTTP 503 when its binding is unavailable. Override `failureMode` only after explicitly evaluating the availability/security trade-off.
 
 The adapter hashes the supplied identity together with the namespace, policy and scope before sending a key to Cloudflare. Pass a stable opaque account/client identifier resolved by trusted application logic; do not pass passwords, tokens, raw request bodies or client-controlled identity values. Cloudflare's rate-limit counters are approximate and location-scoped; they are not a globally exact distributed counter. Configure the binding in the Worker environment and test it in the actual Cloudflare runtime before production use.
+
+
+## Cloudflare Pages Functions
+
+Pages Functions cannot bind directly to the Workers Rate Limiting API. Use a private Worker through a Pages Service Binding:
+
+1. Deploy a dedicated Worker with a Rate Limiting binding and the Worker service adapter.
+2. Disable its public workers.dev endpoint and do not attach a public route. Pages should call it only through the Service Binding.
+3. Add the Service Binding to the Pages project as JB_SECURITY_LIMITER.
+4. In server-side Pages Function code, import the Cloudflare Pages adapter and resolve the identity from trusted server-side session/authentication state.
+5. Apply the returned decision.response before continuing the protected route.
+
+Example Pages Function middleware:
+
+~~~js
+import { createCloudflarePagesRateLimit } from "@jb/security-guard/cloudflare-pages-rate-limit";
+
+export const onRequest = async (context) => {
+  const limiter = createCloudflarePagesRateLimit({
+    serviceBinding: context.env.JB_SECURITY_LIMITER,
+    failureMode: "closed"
+  });
+
+  // Resolve this identity from authenticated server-side state.
+  // For anonymous endpoints, use a carefully reviewed client identity policy.
+  const identity = context.data?.authenticatedUser?.id;
+  const decision = await limiter.check({ identity, scope: "catalog-api" });
+  if (decision.response) return decision.response;
+
+  return context.next();
+};
+~~~
+
+The Pages adapter defaults to fail-closed when the private service cannot be reached. Set failureMode to open only after explicitly accepting the availability trade-off. The Worker service returns a bounded, compact decision and never returns the caller identity.
+
+For deployment configuration, the Worker must use the Worker-native rate-limit adapter with its env binding and pass that limiter to the Worker service endpoint. Keep the Worker private and expose it to Pages through a Service Binding only. See docs/CLOUDFLARE-PAGES-INTEGRATION.md for the deployment checklist and Cloudflare Edge protections.
+
+This is request-rate protection for Pages Functions, not a substitute for Cloudflare DDoS protection, WAF rules, authentication, authorization, or application-level input validation.
