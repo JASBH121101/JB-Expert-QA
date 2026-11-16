@@ -271,6 +271,10 @@ try {
     'import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service"; if (typeof createUniversalRateLimitService !== "function") process.exit(1); const store = { async consumeLimit() { return { allowed: true, count: 1, retryAfterMs: 1000 }; } }; const service = createUniversalRateLimitService({ store, clients: { "smoke-app": { secret: "distribution-smoke-secret-at-least-32-bytes", policies: { "default": { scopes: ["catalog-read"] } } } } }); const response = await service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", { method: "POST", headers: { "content-type": "application/json", "x-jb-client-id": "smoke-app", authorization: "Bearer distribution-smoke-secret-at-least-32-bytes" }, body: JSON.stringify({ identity: "private-user-1", scope: "catalog-read", policy: "default" }) })); if (response.status !== 200) process.exit(1);'
   ], { cwd: guardInstall });
 
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store"; const store = createPostgresRateLimitStore({ query: async () => ({ rows: [] }) }); if (typeof store.initialize !== "function" || typeof store.consumeLimit !== "function" || typeof store.pruneExpired !== "function") process.exit(1);'
+  ], { cwd: guardInstall });
   progress("Security Guard package checks passed");
   // JB Malware Engine.
   progress("Packing standalone Malware Engine tarball");
