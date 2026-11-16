@@ -61,7 +61,7 @@ expect(
         'identityType' => 'account',
         'keyId' => 'k2026-01',
         'identityKey' => $key,
-    ]) === '15:jbsg-counter-v1' . '11:tenant-demo' . '11:catalog-api' . '11:public-api' . '12:catalog:list' . '7:account' . '7:k2026-01' . '64:' . $key,
+    ]) === '15:jbsg-counter-v1' . '11:tenant-demo' . '11:catalog-api' . '10:public-api' . '12:catalog:list' . '7:account' . '8:k2026-01' . '64:' . $key,
     'Counter key must match the length-prefixed Core v1 format'
 );
 
