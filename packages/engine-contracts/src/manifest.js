@@ -63,8 +63,9 @@ export function validateEngineManifest(input) {
       }
       if (typeof entry.id !== "string" || !CONTRACT_ID.test(entry.id)) errors.push("contractsConsumed[" + index + "].id is invalid");
       else ids.push(entry.id);
-      if (!parseStableVersion(entry.minVersion)) errors.push("contractsConsumed[" + index + "].minVersion is invalid");
-      if (!Number.isSafeInteger(entry.maxMajor) || entry.maxMajor < 1) errors.push("contractsConsumed[" + index + "].maxMajor is invalid");
+      const minimum = parseStableVersion(entry.minVersion);
+      if (!minimum) errors.push("contractsConsumed[" + index + "].minVersion is invalid");
+      if (!Number.isSafeInteger(entry.maxMajor) || entry.maxMajor < (minimum?.major ?? 1)) errors.push("contractsConsumed[" + index + "].maxMajor is invalid");
     }
     if (!unique(ids)) errors.push("contractsConsumed contains duplicate contract IDs");
   }
@@ -81,8 +82,9 @@ export function validateEngineManifest(input) {
         ids.push(entry.engineId);
         if (entry.engineId === input.engineId) errors.push("engine cannot depend on itself");
       }
-      if (!parseStableVersion(entry.minVersion)) errors.push("dependencies[" + index + "].minVersion is invalid");
-      if (!Number.isSafeInteger(entry.maxMajor) || entry.maxMajor < 1) errors.push("dependencies[" + index + "].maxMajor is invalid");
+      const minimum = parseStableVersion(entry.minVersion);
+      if (!minimum) errors.push("dependencies[" + index + "].minVersion is invalid");
+      if (!Number.isSafeInteger(entry.maxMajor) || entry.maxMajor < (minimum?.major ?? 1)) errors.push("dependencies[" + index + "].maxMajor is invalid");
       if (typeof entry.optional !== "boolean") errors.push("dependencies[" + index + "].optional must be boolean");
     }
     if (!unique(ids)) errors.push("dependencies contains duplicate engine IDs");
