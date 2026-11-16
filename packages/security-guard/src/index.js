@@ -1,4 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import {
+  validateRateLimitCheckV1,
+  toRateLimitDecisionV1,
+  validateSecurityEventV1,
+  validateThreatSignalV1
+} from "./core-contract-v1.js";
 import { createAuthProtection } from "./auth-protection.js";
 import { createAccountRecovery } from "./account-recovery.js";
 import { createSecurityHeaders } from "./security-headers.js";
@@ -286,7 +292,8 @@ function normalizeOptions(options) {
   const allowedOptions = new Set([
     "mode", "rateLimit", "maxRequestTargetLength", "maxHeaderBytes",
     "maxHeaderCount", "maxBodyBytes", "blockSeverities", "keyGenerator",
-    "onEvent", "includePath", "securityHeaders"
+    "onEvent", "includePath", "securityHeaders", "coreContract",
+    "onCoreSignal", "onCoreDecision", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown Security Guard option: " + key);
@@ -348,6 +355,16 @@ function normalizeOptions(options) {
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
 
+  const coreContract = normalizeInspectionCoreContract(options.coreContract);
+  const onCoreSignal = options.onCoreSignal ?? (() => {});
+  const onCoreDecision = options.onCoreDecision ?? (() => {});
+  const onCoreEvent = options.onCoreEvent ?? (() => {});
+  for (const [name, callback] of Object.entries({
+    onCoreSignal, onCoreDecision, onCoreEvent
+  })) {
+    if (typeof callback !== "function") throw new TypeError(name + " must be a function");
+  }
+
   if (options.includePath !== undefined && typeof options.includePath !== "boolean") {
     throw new TypeError("includePath must be a boolean");
   }
@@ -359,7 +376,11 @@ function normalizeOptions(options) {
     blockSeverities: Object.freeze([...blockSeverities]),
     keyGenerator,
     onEvent,
-    includePath: options.includePath ?? false
+    includePath: options.includePath ?? false,
+    coreContract,
+    onCoreSignal,
+    onCoreDecision,
+    onCoreEvent
   });
 }
 
@@ -375,6 +396,180 @@ function safeNotify(onEvent, event) {
   } catch {
     // Logging must never crash or bypass the protected application.
   }
+}
+
+const CORE_IDENTITY_TYPES = new Set(["ip", "account", "account_ip", "session", "anonymous"]);
+const CORE_SAFE_IDENTIFIER = /^[A-Za-z0-9:_-]{1,96}$/;
+const CORE_SAFE_KEY_ID = /^[A-Za-z0-9:_-]{1,64}$/;
+
+function normalizeInspectionCoreSecret(value) {
+  const secret = Buffer.isBuffer(value)
+    ? Buffer.from(value)
+    : typeof value === "string" ? Buffer.from(value, "utf8") : null;
+  if (!secret || secret.length < 32) {
+    throw new TypeError("coreContract.identitySecret must contain at least 32 bytes of stable secret material");
+  }
+  return secret;
+}
+
+function normalizeInspectionCoreContract(value) {
+  if (value === undefined) return null;
+  if (!isRecord(value)) throw new TypeError("coreContract must be an object");
+  const allowed = new Set([
+    "tenantId", "applicationId", "policyId", "scope",
+    "identityType", "identityKeyId", "identitySecret"
+  ]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) throw new TypeError("Unknown request-inspection Core option: " + key);
+  }
+  for (const key of ["tenantId", "applicationId"]) {
+    if (typeof value[key] !== "string" || !CORE_SAFE_IDENTIFIER.test(value[key])) {
+      throw new TypeError("coreContract." + key + " must be a safe identifier");
+    }
+  }
+  const policyId = value.policyId ?? "request-local";
+  const scope = value.scope ?? "request";
+  const identityType = value.identityType ?? "ip";
+  if (typeof policyId !== "string" || !CORE_SAFE_IDENTIFIER.test(policyId)) {
+    throw new TypeError("coreContract.policyId must be a safe identifier");
+  }
+  if (typeof scope !== "string" || !CORE_SAFE_IDENTIFIER.test(scope)) {
+    throw new TypeError("coreContract.scope must be a safe identifier");
+  }
+  if (!CORE_IDENTITY_TYPES.has(identityType)) {
+    throw new TypeError("coreContract.identityType must be a supported identity type");
+  }
+  if (typeof value.identityKeyId !== "string" || !CORE_SAFE_KEY_ID.test(value.identityKeyId)) {
+    throw new TypeError("coreContract.identityKeyId must be a safe key identifier");
+  }
+  return Object.freeze({
+    tenantId: value.tenantId,
+    applicationId: value.applicationId,
+    policyId,
+    scope,
+    identityType,
+    identityKeyId: value.identityKeyId,
+    identitySecret: normalizeInspectionCoreSecret(value.identitySecret)
+  });
+}
+
+function safelyCallCore(callback, value) {
+  if (typeof callback !== "function" || value === null || value === undefined) return;
+  try {
+    const result = callback(value);
+    if (result && typeof result.then === "function") Promise.resolve(result).catch(() => {});
+  } catch {
+    // Contract telemetry must never change local request inspection or enforcement.
+  }
+}
+
+function createLocalCoreRateLimitCheck(core, identity) {
+  const identityKey = createHmac("sha256", core.identitySecret)
+    .update("jb.security.rate-limit.identity/v1").update("\\0")
+    .update(core.tenantId).update("\\0")
+    .update(core.applicationId).update("\\0")
+    .update(core.identityType).update("\\0")
+    .update(identity)
+    .digest("hex");
+  return validateRateLimitCheckV1({
+    schema: "jb.security.rate-limit.check/v1",
+    requestId: randomUUID(),
+    tenantId: core.tenantId,
+    applicationId: core.applicationId,
+    policyId: core.policyId,
+    scope: core.scope,
+    identity: {
+      type: core.identityType,
+      key: identityKey,
+      keyId: core.identityKeyId
+    }
+  });
+}
+
+function createLocalCoreRateLimitEvent(check, decision, occurredAtMs) {
+  if (!decision.exceeded && !decision.unavailable) return null;
+  return validateSecurityEventV1({
+    schema: "jb.security.event/v1",
+    eventId: randomUUID(),
+    occurredAtMs,
+    tenantId: check.tenantId,
+    applicationId: check.applicationId,
+    producer: "security-guard-node",
+    category: "rate_limit",
+    ruleId: "JBG-RATE-LIMIT-LOCAL-001",
+    severity: "high",
+    action: decision.enforced ? "blocked" : "observed",
+    outcome: decision.enforced ? "denied" : "observed",
+    subjectKey: check.identity.key,
+    subjectKeyId: check.identity.keyId,
+    scope: check.scope,
+    correlationId: check.requestId
+  });
+}
+
+function publishLocalCoreRateLimit(settings, rateLimitResult, occurredAtMs) {
+  if (!settings.coreContract || !rateLimitResult) return;
+  const check = createLocalCoreRateLimitCheck(settings.coreContract, rateLimitResult.identity);
+  const enforced = rateLimitResult.exceeded &&
+    settings.mode !== "monitor" &&
+    settings.blockSeverities.includes("high");
+  const retryAfterSeconds = enforced
+    ? Math.min(60, Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 1000)))
+    : null;
+  const decision = toRateLimitDecisionV1(check, {
+    allowed: !enforced,
+    exceeded: rateLimitResult.exceeded,
+    enforced,
+    unavailable: false,
+    status: enforced ? 429 : null,
+    retryAfterSeconds
+  });
+  safelyCallCore(settings.onCoreDecision, Object.freeze({ check, decision }));
+  if (rateLimitResult.exceeded && rateLimitResult.shouldEmit) {
+    const event = createLocalCoreRateLimitEvent(check, decision, occurredAtMs);
+    safelyCallCore(settings.onCoreEvent, event);
+  }
+}
+
+function threatTypeForFinding(finding) {
+  if (finding.id.startsWith("JBG-SQLI-")) return "sql_injection";
+  if (finding.id.startsWith("JBG-RATE-")) return "api_abuse";
+  return "anomaly";
+}
+
+function threatConfidenceForFinding(finding) {
+  if (finding.id.startsWith("JBG-RATE-") || finding.id.startsWith("JBG-HTTP-")) return 0.98;
+  if (finding.id.startsWith("JBG-REQ-")) return 0.95;
+  if (finding.id.startsWith("JBG-SQLI-") || finding.id.startsWith("JBG-XSS-")) return 0.65;
+  if (finding.id.startsWith("JBG-PATH-")) return 0.7;
+  return 0.8;
+}
+
+function createCoreThreatSignal(core, finding, identity, occurredAtMs) {
+  const value = {
+    schema: "jb.security.threat-signal/v1",
+    signalId: randomUUID(),
+    tenantId: core.tenantId,
+    applicationId: core.applicationId,
+    detectedAtMs: occurredAtMs,
+    source: "security-guard-node",
+    type: threatTypeForFinding(finding),
+    confidence: threatConfidenceForFinding(finding),
+    severity: finding.severity,
+    ruleId: finding.id,
+    ...(identity && identity !== "unknown" ? {
+      subjectKey: createHmac("sha256", core.identitySecret)
+        .update("jb.security.threat.identity/v1").update("\\0")
+        .update(core.tenantId).update("\\0")
+        .update(core.applicationId).update("\\0")
+        .update(core.identityType).update("\\0")
+        .update(identity)
+        .digest("hex"),
+      subjectKeyId: core.identityKeyId
+    } : {}),
+    evidenceCount: 1
+  };
+  return validateThreatSignalV1(value);
 }
 
 export function createSecurityGuard(options = {}) {
