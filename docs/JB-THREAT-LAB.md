@@ -44,7 +44,7 @@ Dynamic malware behavior analysis, if ever approved, requires a separate isolate
 
 ## Certification reporting
 
-Reports use `jb.threat-lab.report/v1` and include target identity/version, scenario identity/category, pass/fail/skip status, findings, metrics, and duration. Future versions may add coverage and confidence metadata. Certification must list exactly which scenarios ran, skipped, and failed, and must not extrapolate beyond that scope.
+Reports now use `jb.threat-lab.report/v2`. Version 2 adds difficulty metadata, weighted coverage assessment, per-target readiness, and explicit skip reasons while retaining target identity/version, scenario identity/category, pass/fail/skip status, findings, metrics, and duration. Consumers that validate the report schema should accept v2 explicitly; do not interpret a v2 report as a v1 payload. Certification must list exactly which scenarios ran, skipped, and failed, and must not extrapolate beyond that scope.
 
 ## Trojan-focused validation
 
