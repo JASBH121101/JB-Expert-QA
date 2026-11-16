@@ -75,6 +75,8 @@ class CoreV1Tests(unittest.TestCase):
         })
         self.assertTrue(fail_open["allowed"])
         self.assertTrue(fail_open["unavailable"])
+        with self.assertRaises(ValueError):
+            normalize_rate_limit_decision({**fail_open, "enforced": True})
 
     def test_policy_and_counter_keys_are_strict(self):
         policy = normalize_rate_limit_policy({
@@ -91,7 +93,11 @@ class CoreV1Tests(unittest.TestCase):
             "policyId": "public-api", "scope": "catalog:list",
             "identityType": "account", "keyId": "k2026-01", "identityKey": DIGEST,
         })
-        self.assertTrue(key.startswith("15:jbsg-counter-v1"))
+        expected = (
+            "15:jbsg-counter-v1" + "11:tenant-demo" + "11:catalog-api"
+            + "10:public-api" + "12:catalog:list" + "7:account" + "8:k2026-01" + "64:" + DIGEST
+        )
+        self.assertEqual(key, expected)
         with self.assertRaises(TypeError):
             normalize_rate_limit_check({"schema": "bad"})
         with self.assertRaises(ValueError):
