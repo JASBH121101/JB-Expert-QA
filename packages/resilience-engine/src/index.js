@@ -273,3 +273,11 @@ export function createResilienceEngine({
 export { validateResiliencePolicy, evaluateRecoveryEligibility } from "./policy.js";
 export { createHealthMonitor } from "./health-monitor.js";
 export { createFileRecoveryStore, createMemoryRecoveryStore } from "./recovery-store.js";
+
+export {
+  computeAdvancedPolicyHash,
+  validateAdvancedResiliencePolicy,
+  createResiliencePolicyEngine,
+  createMemoryPolicyRevisionStore,
+  createMemoryCapabilityLedger
+} from "./policy-engine.js";
