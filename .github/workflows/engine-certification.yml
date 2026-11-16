@@ -54,7 +54,8 @@ jobs:
       - name: Install repository dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Install Chromium for browser QA
-        run: npx playwright install --with-deps chromium
+        # Use the runner-provided libraries; avoid APT mirror provisioning stalls.
+        run: npx playwright install chromium
       - name: Run full deterministic regression suite
         run: npm run check
       - name: Generate Expert QA security assessment
