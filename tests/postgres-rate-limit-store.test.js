@@ -67,7 +67,7 @@ test("PostgreSQL store refuses raw identifiers and malformed counter requests", 
   const store = createPostgresRateLimitStore({ async query() { return { rows: [{ count: 1, retry_after_ms: 1 }] }; } });
   await assert.rejects(() => store.consumeLimit({
     key: "customer-123", now: 1, windowMs: 1000, maxRequests: 10
-  }), /HMAC counter key/);
+  }), /raw identities are not accepted/);
   await assert.rejects(() => store.consumeLimit({
     key: KEY, now: 1, windowMs: 0, maxRequests: 10
   }), /windowMs/);
