@@ -412,8 +412,6 @@ export function createCloudflareWorkerRateLimitService(options = {}) {
         return serviceJsonResponse({ error: "rate_limit_service_unavailable" }, 503);
       }
 
-      const retryAfter = decision.response?.headers?.get?.("retry-after") ?? null;
-      const retryAfterSeconds = retryAfter === null ? null : Number(retryAfter);
       return serviceJsonResponse(createRateLimitServicePayload(decision));
     } catch {
       return serviceJsonResponse({ error: "invalid_rate_limit_request" }, 400);
