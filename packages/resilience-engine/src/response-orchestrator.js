@@ -722,24 +722,6 @@ export function createResponseOrchestrator({
       });
     }
 
-    let asserted = false;
-    try {
-      asserted = (await policyEngine.assertAuthorization({ authorization, request }))?.valid === true;
-    } catch {
-      asserted = false;
-    }
-    if (!asserted) {
-      return await finishBeforeExecution({
-        decision,
-        actionId: claim.actionId,
-        authorization,
-        request,
-        reason: "policy-authorization-no-longer-valid",
-        reasonCode: "AUTHORIZATION_ASSERTION_FAILED",
-        now: safeNow(clock)
-      });
-    }
-
     mutationAllowed = false;
     try {
       mutationAllowed = await mutationControl.assertAllowed({
