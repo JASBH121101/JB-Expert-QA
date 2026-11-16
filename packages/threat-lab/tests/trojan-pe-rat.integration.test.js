@@ -258,16 +258,17 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
   });
 
   const scenarios = [
-    ["malware.trojan.pe-rat-capability-chain", "pe-rat-detection", "Correlate process-injection and remote-command-channel import capabilities."],
-    ["malware.trojan.pe-injection-alone-not-rat", "pe-rat-false-positive", "Do not infer RAT/Trojan behavior from process-injection capability alone."],
-    ["malware.trojan.pe-service-backdoor-chain", "pe-backdoor-detection", "Correlate service persistence and remote command-channel capabilities."],
-    ["malware.trojan.pe-credential-theft-exfiltration", "pe-credential-theft", "Correlate credential-dumping capability and remote transfer behavior."]
+    ["malware.trojan.pe-rat-capability-chain", "pe-rat-detection", "Correlate process-injection and remote-command-channel import capabilities.", "extreme"],
+    ["malware.trojan.pe-injection-alone-not-rat", "pe-rat-false-positive", "Do not infer RAT/Trojan behavior from process-injection capability alone.", "advanced"],
+    ["malware.trojan.pe-service-backdoor-chain", "pe-backdoor-detection", "Correlate service persistence and remote command-channel capabilities.", "extreme"],
+    ["malware.trojan.pe-credential-theft-exfiltration", "pe-credential-theft", "Correlate credential-dumping capability and remote transfer behavior.", "superextreme"]
   ];
-  for (const [id, category, description] of scenarios) {
+  for (const [id, category, description, difficulty] of scenarios) {
     lab.registerScenario({
       id,
       category,
       description,
+      difficulty,
       appliesTo: ["jb-malware-engine"],
       safety: { safe: true, network: false, destructive: false, executesSample: false },
       tags: ["trojan-defense", "synthetic-pe", "offline"]

@@ -18,6 +18,7 @@ A lab pass means only that the named scenario produced its expected outcome. It 
 | --- | --- |
 | JB Malware Engine | EICAR harmless test string; exact test-only signatures; inert suspicious text; benign false-positive checks; unknown/incomplete coverage; ZIP, PDF and PE parser boundaries; bounded scanning |
 | JB Security Guard | XSS, SQL injection and path-traversal request patterns; ambiguous HTTP framing; upload size/type/digest checks; scanner timeout/error handling; fail-closed quarantine and promotion |
+| JB Advisor Engine | deterministic product recommendation; fragrance/technology domain separation; offline research-candidate review gates; no automatic promotion to verified evidence |
 | JB Expert QA | intentionally vulnerable source fixtures; repaired-code regression; database raw-query/TLS checks; deterministic visual regression; accessibility and responsive QA |
 | NEXORA | owner authentication; authorization boundaries; business registration; templates; product CRUD; currency rules; PDF export; upload constraints; responsive/accessibility checks |
 | Perfumaría JB (future profile) | initially a lightweight public catalogue with a private owner panel for products and photos; later, when the business grows, a separately installable modular Laravel/PHP ERP package for a VPS |
@@ -43,7 +44,7 @@ Dynamic malware behavior analysis, if ever approved, requires a separate isolate
 
 ## Certification reporting
 
-Reports use `jb.threat-lab.report/v1` and include target identity/version, scenario identity/category, pass/fail/skip status, findings, metrics, and duration. Future versions may add coverage and confidence metadata. Certification must list exactly which scenarios ran, skipped, and failed, and must not extrapolate beyond that scope.
+Reports now use `jb.threat-lab.report/v2`. Version 2 adds difficulty metadata, weighted coverage assessment, per-target readiness, and explicit skip reasons while retaining target identity/version, scenario identity/category, pass/fail/skip status, findings, metrics, and duration. Consumers that validate the report schema should accept v2 explicitly; do not interpret a v2 report as a v1 payload. Certification must list exactly which scenarios ran, skipped, and failed, and must not extrapolate beyond that scope.
 
 ## Trojan-focused validation
 
@@ -74,7 +75,7 @@ The checkpoint is caller-owned state, not protected storage. The host applicatio
 
 ## Current implementation status
 
-The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current three-engine integration matrix contains **17 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
+The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current four-engine integration matrix contains **20 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
 
 - **JB Malware Engine — 6 scenarios:** exact harmless EICAR match; benign no-match/false-positive; inert PowerShell-like text classified as suspicious, not confirmed malicious; exact configured SHA-256 signature detection; over-limit file returned as `unknown`; PDF active-action indicators classified as suspicious without an exact malware detection.
 - **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
@@ -92,3 +93,73 @@ The reusable core, target-scoped scenario registry, explicit offline/non-destruc
 The suite uses temporary directories, inert fixtures, and in-memory upload storage. It does not use production data, execute malware samples, send network requests from Threat Lab adapters, contact external malware feeds, call AI providers, or require paid services. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The PostgreSQL CLI E2E is the separate opt-in integration check and uses only a disposable CI PostgreSQL service; the Threat Lab database scenario remains static and makes zero database connections. The PNG comparison validates deterministic pixel differences, not every browser/device combination.
 
 NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
+
+- **JB Advisor Engine — 3 scenarios:** deterministic synthetic smartphone recommendation; mocked research candidate remains `unconfirmed` and `pending_review` with zero network requests; mixed smartphone/laptop comparisons are rejected by the technology domain adapter.
+
+
+## Four-engine certification update — 2026-11-14
+
+PR #41 adds JB Advisor Engine as a fourth independently versioned target to `integration/jb-threat-lab`. The current four-engine matrix contains **20 scenarios**: 6 Malware Engine, 6 Security Guard, 5 Expert QA (including Language QA), and 3 Advisor Engine.
+
+Advisor scenarios use synthetic smartphone fixtures and an in-memory research provider. Research candidates remain `unconfirmed` / `pending_review` until human review, mixed phone/laptop comparisons are rejected by domain isolation, and the integration records zero network requests.
+
+Verified CI for PR #41:
+- Core validation #43626122864: Node.js 22 and 24 passed.
+- Four-package distribution #43626122830: all four engine packages packed and installed in clean directories on Node.js 22 and 24.
+- PostgreSQL integration #43626122866: PostgreSQL 16 CLI E2E passed on Node.js 22 and 24.
+- JB Engines Certification #43626122920: Expert QA, Security Guard, Malware Engine Windows/Ubuntu regressions and the existing three-engine package-boundary jobs passed.
+- Security QA #43626122868 and Language QA #43626122855 passed.
+
+PR #23 is closed as superseded. Its Advisor implementation is represented by PR #41; do not merge the obsolete `integration/jb-advisor-engine` branch.
+
+The original PR #38 run records the historical three-engine baseline (17 scenarios). PR #41 adds the three Advisor scenarios and is the current four-engine integration.
+
+
+## Six-tier difficulty model and certification gates
+
+Each scenario carries a `difficulty` field. When omitted, it defaults to `basic` so existing adapters and scenario definitions remain compatible. The `difficulty` option in `lab.run()` is an inclusive maximum: requesting `advanced` runs Basic, Intermediate, and Advanced scenarios. Leaving it unset runs every registered tier.
+
+| Tier | Weight | Intended test depth |
+| --- | ---: | --- |
+| Basic | 1 | Known patterns, deterministic outcomes, essential controls |
+| Intermediate | 2 | Input normalization, variations, malformed values, ordinary boundary cases |
+| Advanced | 4 | Multi-signal combinations, state changes, cross-feature interactions |
+| Expert | 8 | Chained failures, false-positive controls, recovery paths, invariant checks |
+| Extreme | 16 | Adversarial combinations, concurrency, bounded resource pressure, dependency degradation |
+| Superextreme | 32 | Compound failures, long sequences, recovery invariants, strict isolation boundaries |
+
+The report's `assessment` contains weighted score, execution coverage, present/missing levels, and a per-target breakdown. Weights are exponential; high-difficulty misses carry more weight than easy passes. A structural `target_scope` skip is excluded from the target's calculation. Adapter-declined and report-budget skips remain incomplete and block readiness.
+
+A target is marked ready only when every required tier has at least one applicable scenario and every applicable scenario passes without skips. This evaluates only the registered cases; it is not a claim that the engine has no unknown vulnerabilities or defects.
+
+### Baseline footprint after initial tier assignment
+
+
+The footprint above is an inventory across separate local test files, not yet one consolidated cross-suite report. CI runs these suites independently. Each Threat Lab report assesses only the scenarios selected and executed in that run; cross-suite aggregation remains a future lab capability.
+- **JB Malware Engine:** all six tiers are represented across the local core, Trojan-defense, persistence, and synthetic-PE test suites. Superextreme is currently represented by a synthetic PE credential-access/exfiltration correlation case; the file is never executed and no network request is made.
+- **JB Security Guard:** Basic through Expert are represented. Extreme and Superextreme are open coverage gaps.
+- **JB Expert QA:** Basic through Extreme are represented. Superextreme remains open.
+- **JB Advisor Engine:** Basic, Intermediate, and Expert are represented. Advanced, Extreme, and Superextreme remain open.
+
+These gaps must stay visible in reports. Do not fill them with mock-only engine outcomes or promote the product to full six-tier readiness until each missing tier has at least one real engine-backed scenario with explicit expected findings and safe local fixtures.
+
+### Required progression for new scenarios
+
+1. Define the weakness or invariant the scenario is meant to expose.
+2. State the exact expected engine verdict, finding code, and measurable metrics.
+3. Use a deterministic, inert fixture with a bounded size and runtime.
+4. Include a control case that protects against false positives where practical.
+5. Confirm the adapter records zero network requests, no sample execution, and no production mutation.
+6. Keep failures actionable: report the missing control, observed result, and expected result rather than a generic pass/fail only.
+
+
+## NEXORA profiles — separate certification targets
+
+The NEXORA repository contains two distinct deliverables and they must not be collapsed into one Threat Lab target:
+
+- **NEXORA Configurable Catalog (frontend/catalog studio):** the independently scoped configurable-catalog prototype, including editable business templates, catalog fields, product presentation, responsive behavior, and browser-side demo persistence. Its tests must treat localStorage/demo behavior as prototype-only and must not mistake it for real authentication, server persistence, or secure file upload.
+- **NEXORA Site Engine (Laravel/PHP distributable):** the separate Laravel application and server-side engine. Its profile must validate installation and database setup, owner authentication, role/permission boundaries, product/category CRUD, public-site exposure, export generation, upload validation/storage, and package/deployment safety using disposable local databases and filesystem fixtures.
+
+They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
+
+**Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.

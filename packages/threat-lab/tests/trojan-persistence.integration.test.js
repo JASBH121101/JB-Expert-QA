@@ -10,17 +10,20 @@ const VARIANTS = [
   {
     id: "malware.trojan.scheduled-task-persistence",
     marker: "Register-ScheduledTask",
-    signal: "scheduled-task-persistence"
+    signal: "scheduled-task-persistence",
+    difficulty: "intermediate"
   },
   {
     id: "malware.trojan.service-persistence",
     marker: "New-Service",
-    signal: "service-persistence"
+    signal: "service-persistence",
+    difficulty: "advanced"
   },
   {
     id: "malware.trojan.wmi-persistence",
     marker: "Register-WmiEvent",
-    signal: "wmi-event-subscription-persistence"
+    signal: "wmi-event-subscription-persistence",
+    difficulty: "expert"
   }
 ];
 
@@ -97,6 +100,7 @@ test("JB Threat Lab validates Trojan-like script chains across persistence mecha
       id: variant.id,
       category: "trojan-persistence",
       description: `Correlate inert download and dynamic-execution markers with ${variant.signal}.`,
+      difficulty: variant.difficulty,
       appliesTo: ["jb-malware-engine"],
       safety: { safe: true, network: false, destructive: false, executesSample: false },
       tags: ["trojan-defense", "inert-script", "offline"]
