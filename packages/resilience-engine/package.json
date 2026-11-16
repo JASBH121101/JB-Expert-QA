@@ -11,7 +11,8 @@
     "./policy": "./src/policy.js",
     "./adapters/linux-systemd": "./src/adapters/linux-systemd.js",
     "./adapters/windows-scm": "./src/adapters/windows-scm.js",
-    "./recovery-store": "./src/recovery-store.js"
+    "./recovery-store": "./src/recovery-store.js",
+    "./policy-engine": "./src/policy-engine.js"
   },
   "files": [
     "src/**",
