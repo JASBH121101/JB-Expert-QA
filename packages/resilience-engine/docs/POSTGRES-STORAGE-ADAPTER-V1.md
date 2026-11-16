@@ -1,13 +1,13 @@
-# JB Resilience PostgreSQL Storage Adapter v1
+# JB Resilience PostgreSQL Storage Adapter v2
 
-**Status:** laboratory implementation pending certification  
+**Status:** laboratory implementation pending certification; coordination primitives added in v2  
 **Package:** \`@jb/resilience-engine/adapters/postgres-storage\`  
 **Storage target:** PostgreSQL 16 or compatible  
 **Driver:** host-injected node-postgres-compatible Pool; no driver is bundled
 
 ## Scope
 
-This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns two stores:
+This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns three stores:
 
 - \`orchestrationStore\`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
 - \`auditStore\`: append-only, SHA-256 hash-chained audit events.
@@ -52,7 +52,7 @@ Each mutating operation is enclosed in an explicit database transaction with rol
 - The audit head row is locked while appending. The record and updated head are committed in the same transaction.
 - Audit verification checks contiguous sequence numbers, previous hashes, record hashes, and the stored head. A broken chain blocks further audit appends.
 
-The adapter preserves the current file-store method shapes so it can be introduced behind the existing dependency-injection boundary. The PostgreSQL store is shareable across multiple application processes attached to the same authoritative database primary. This is transactional storage, not a complete distributed coordinator.
+The adapter preserves the current file-store method shapes so it can be introduced behind the existing dependency-injection boundary. The PostgreSQL store is shareable across multiple application processes attached to the same authoritative database primary. The coordination store adds exclusive per-scope leases and monotonically increasing fencing-token issuance, serialized by a PostgreSQL row lock. Database time, rather than a host clock, determines lease expiry. This is a single-primary coordination primitive, not a consensus or quorum implementation.
 
 ## Database objects
 
@@ -80,7 +80,7 @@ Use a dedicated database or a role/schema policy that confines the runtime role 
 
 This v1 is not production-certified and does not provide:
 
-- monotonic fencing tokens consumed by OS execution adapters;
+- target-enforced consumption of fencing tokens by OS execution adapters or application resources;
 - leader election, quorum, split-brain resolution or multi-region consensus;
 - A2 containment or A3 failover authorization;
 - automatic retries of uncertain actions;
@@ -95,3 +95,17 @@ A single PostgreSQL primary provides transaction serialization for this adapter,
 The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation and audit-chain tamper detection.
 
 No production database or Neon credentials are used by this test.
+
+
+## Coordination API
+
+The returned \`coordinationStore\` exposes:
+
+- \`acquireLease({ scopeId, holderId, leaseDurationMs })\` — acquires an available/expired scope and increments its durable fencing token. Durations are restricted to 1,000–300,000 ms. A live lease is never stolen.
+- \`renewLease({ scopeId, holderId, leaseId, fencingToken, leaseDurationMs })\` — renews only the exact current, unexpired lease.
+- \`releaseLease({ scopeId, holderId, leaseId, fencingToken })\` — releases only the exact current, unexpired lease. The last fencing token is retained.
+- \`verifyLease({ scopeId, holderId, leaseId, fencingToken })\` — checks the current lease against PostgreSQL state and database time. This is a point-in-time coordination check, not a lock held across a subsequent external operation.
+
+Every newly acquired lease receives a greater fencing token for its scope, including after expiry or explicit release. Concurrent acquisition is serialized by the scope row lock. Invalid, expired, replaced or unavailable leases fail closed.
+
+**Critical integration rule:** the lease holder must pass its fencing token to the protected target, and that target must enforce a durable monotonic high-water mark atomically with each protected mutation. A preflight call to \`verifyLease()\` alone cannot close the race between verification and an OS/service action. Because systemd and Windows SCM do not currently enforce this token, this v2 coordination store is not an A3 execution authorization mechanism.
