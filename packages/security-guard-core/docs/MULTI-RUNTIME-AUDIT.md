@@ -47,7 +47,7 @@ The existing SECURITY-INTEROPERABILITY.md defines cross-engine finding and malwa
 ## Gaps and risks
 
 1. The current rate-limit helper is a JavaScript API; the new schemas must be consumed by native PHP/Python validators rather than imported as executable JS.
-2. Existing Node distributed limiters depend on host-supplied atomic stores. Test fixtures do not establish production-grade distributed consistency.
+2. Existing Node distributed limiters depend on host-supplied atomic stores. The current Node HMAC namespace and Worker HMAC key composition differ; the new JS bridge must normalize tenant/application/identity-type context without changing the legacy API. Test fixtures do not establish production-grade distributed consistency.
 3. Worker rate-limit bindings are suitable as a low-latency approximate option, not as a strict globally exact counter.
 4. Authentication/account-recovery semantics must remain distinct from anonymous API quotas. Progressive account lockout can be abused to deny a victim access unless IP/account risk, generic responses, recovery paths, and thresholds are considered together.
 5. Threat patterns are heuristic signals. Blocking must be confidence- and policy-driven, with false-positive and evasion tests.
