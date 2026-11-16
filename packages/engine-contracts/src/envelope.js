@@ -32,18 +32,21 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
   if (!Array.isArray(value) && !isRecord(value)) return false;
   const keys = Object.keys(value);
   if (keys.length > MAX_COLLECTION_SIZE) return false;
+  seen.add(value);
+  let valid = true;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
-      if (!Object.hasOwn(value, index) || !isJsonValue(value[index], depth + 1, seen)) return false;
+      if (!Object.hasOwn(value, index) || !isJsonValue(value[index], depth + 1, seen)) {
+        valid = false;
+        break;
+      }
     }
   } else {
-    seen.add(value);
-    const valid = Object.entries(value).every(([key, entry]) =>
+    valid = Object.entries(value).every(([key, entry]) =>
       !FORBIDDEN_KEYS.has(key) && isJsonValue(entry, depth + 1, seen));
-    seen.delete(value);
-    return valid;
   }
-  return true;
+  seen.delete(value);
+  return valid;
 }
 
 export function validateMessageEnvelope(input) {
