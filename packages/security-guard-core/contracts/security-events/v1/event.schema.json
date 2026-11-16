@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:security-event:v1",
+  "title": "JB Security Guard sanitized event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "eventId",
+    "occurredAtMs",
+    "tenantId",
+    "applicationId",
+    "producer",
+    "category",
+    "ruleId",
+    "severity",
+    "action",
+    "outcome"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.event/v1"
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAtMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "applicationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "producer": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,63}$"
+    },
+    "category": {
+      "enum": [
+        "request",
+        "rate_limit",
+        "authentication",
+        "recovery",
+        "csrf",
+        "origin",
+        "upload",
+        "threat",
+        "system"
+      ]
+    },
+    "ruleId": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9_-]{2,95}$"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "action": {
+      "enum": [
+        "observed",
+        "allowed",
+        "blocked",
+        "challenged",
+        "quarantined",
+        "promoted",
+        "rejected"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "success",
+        "denied",
+        "unavailable",
+        "error",
+        "observed"
+      ]
+    },
+    "subjectKey": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}
