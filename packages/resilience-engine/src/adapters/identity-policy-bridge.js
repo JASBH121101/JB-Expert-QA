@@ -71,7 +71,7 @@ function normalizeTrustedKey(input) {
   }
   if (typeof input.publicKeyPem !== "string" ||
       input.publicKeyPem.length < 64 || input.publicKeyPem.length > 8192 ||
-      !/^\\s*-----BEGIN PUBLIC KEY-----[\\s\\S]+-----END PUBLIC KEY-----\\s*$/.test(input.publicKeyPem)) {
+      !/^\s*-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----\s*$/.test(input.publicKeyPem)) {
     throw new TypeError("publicKeyPem must be a PEM-encoded public key");
   }
   const principalId = assertIdentifier(input.principalId, PRINCIPAL_ID, "principalId");
@@ -110,9 +110,22 @@ function normalizeTrustedKey(input) {
   }
 
   const publicKeyDer = publicKey.export({ type: "spki", format: "der" });
+  // Every authority-bearing field is part of the version fingerprint. A
+  // same-version change to status, validity, role, principal, algorithm or
+  // policy scope is a substitution, not a legitimate registry update.
   const materialFingerprint = createHash("sha256")
-    .update(publicKeyDer)
-    .update("\0" + principalId + "\0" + input.role + "\0" + policyIds.slice().sort().join("\0"))
+    .update(JSON.stringify({
+      keyId,
+      keyVersion: input.keyVersion,
+      algorithm: input.algorithm,
+      publicKeyDer: publicKeyDer.toString("base64"),
+      principalId,
+      role,
+      status: input.status,
+      notBefore,
+      expiresAt,
+      policyIds: policyIds.slice().sort()
+    }), "utf8")
     .digest("hex");
 
   return Object.freeze({
