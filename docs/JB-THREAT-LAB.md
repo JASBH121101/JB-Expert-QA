@@ -167,7 +167,7 @@ They are separate registered targets (nexora-configurable-catalog and nexora-sit
 
 ## NEXORA real-product adapters — 2026-11-16
 
-The placeholder target-separation regression is retained, but product-level execution is now defined through a dedicated, offline integration workflow. The workflow checks out two immutable NEXORA revisions into separate directories; it does not treat a pass in one profile as evidence for the other.
+The placeholder target-separation regression is retained, but product-level execution is now defined through an offline integration job inside Core Validation. The Core Validation job checks out two immutable NEXORA revisions into separate directories; it does not treat a pass in one profile as evidence for the other.
 
 **Pinned inputs**
 - Configurable Catalog: `JASBH121101/Nexora@88c4876c9678b93dadde55f79fe9d04890900741` from `feature/nexora-configurable-catalog`.
@@ -187,6 +187,6 @@ The placeholder target-separation regression is retained, but product-level exec
 - Extreme: ownership TXT and fake DNS/TLS readiness plus published-domain middleware.
 - Superextreme: complete Laravel feature regression suite.
 
-The workflow uses only local checkouts, SQLite memory databases, temporary test fixtures and injected fake DNS/TLS adapters. It does not query real DNS, open external TLS connections, deploy, alter production data, or enable paid services. Passing the Site Engine suite indicates readiness for these registered tests only; it is not proof of absence of defects. The Configurable Catalog deliberately remains not-ready above Advanced until real scenarios are added.
+The Core Validation job uses only local checkouts, SQLite memory databases, temporary test fixtures and injected fake DNS/TLS adapters. It does not query real DNS, open external TLS connections, deploy, alter production data, or enable paid services. Passing the Site Engine suite indicates readiness for these registered tests only; it is not proof of absence of defects. The Configurable Catalog deliberately remains not-ready above Advanced until real scenarios are added.
 
 The demo's `localStorage` behavior remains prototype-only. It is never counted as real server authentication, durable persistence or secure file upload. The Laravel tests are run separately against the pinned application branch.
