@@ -271,6 +271,10 @@ try {
     "--input-type=module", "-e",
     `import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service"; if (typeof createUniversalRateLimitService !== "function") process.exit(1); const serviceSecret = ${JSON.stringify(universalServiceSmokeSecret)}; const store = { async consumeLimit() { return { allowed: true, count: 1, retryAfterMs: 1000 }; } }; const service = createUniversalRateLimitService({ store, clients: { "smoke-app": { secret: serviceSecret, policies: { "default": { scopes: ["catalog-read"] } } } } }); const response = await service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", { method: "POST", headers: { "content-type": "application/json", "x-jb-client-id": "smoke-app", authorization: "Bearer " + serviceSecret }, body: JSON.stringify({ identity: "private-user-1", scope: "catalog-read", policy: "default" }) })); if (response.status !== 200) process.exit(1);`
   ], { cwd: guardInstall });
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createUniversalRateLimitService } from "@jb/security-guard"; if (typeof createUniversalRateLimitService !== "function") process.exit(1);'
+  ], { cwd: guardInstall });
 
   run(node, [
     "--input-type=module", "-e",
