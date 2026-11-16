@@ -4,7 +4,7 @@ Independent, policy-bounded service health and recovery engine for Linux and Win
 
 ## Target autonomy profile
 
-The selected target profile is **autonomous-advanced**. Its architecture and policy are specified in [ADVANCED-AUTONOMY.md](./docs/ADVANCED-AUTONOMY.md). This is a design target, not a runtime capability yet: the current implementation remains `semi-autonomous`, with bounded allowlisted restarts and the existing approval boundary for critical services. Do not configure or advertise advanced autonomy as enabled until the implementation roadmap and certification gates in that specification are complete.
+The selected target profile is **autonomous-advanced**. Its architecture and policy are specified in [ADVANCED-AUTONOMY.md](./docs/ADVANCED-AUTONOMY-ARCHITECTURE.md). This is a design target, not a runtime capability yet: the current implementation remains `semi-autonomous`, with bounded allowlisted restarts and the existing approval boundary for critical services. Do not configure or advertise advanced autonomy as enabled until the implementation roadmap and certification gates in that specification are complete.
 
 ## v0.2 laboratory scope
 
