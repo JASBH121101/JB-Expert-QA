@@ -54,6 +54,7 @@ test("non-critical recovery proposal can run only after threshold and policy che
   assert.equal(result.eligible, true);
   assert.equal((await engine.executeRecovery({ proposal: result.proposal })).executed, true);
   assert.equal(restarts, 1);
+  assert.equal((await engine.executeRecovery({ proposal: result.proposal })).reason, "proposal-already-consumed");
 });
 
 test("critical recovery requires a verified human approval", async () => {
@@ -73,6 +74,7 @@ test("critical recovery requires a verified human approval", async () => {
     proposal: result.proposal, approval: { signed: true }
   })).executed, true);
   assert.equal(restarts, 1);
+  assert.equal((await engine.executeRecovery({ proposal: result.proposal, approval: { signed: true } })).reason, "proposal-already-consumed");
 });
 
 test("forged proposals, unknown services, restart loops and invalid policy are rejected", async () => {
@@ -108,4 +110,17 @@ test("recovery proposals expire", async () => {
   now = proposal.expiresAt + 1;
   assert.equal((await engine.executeRecovery({ proposal })).reason, "proposal-expired");
   assert.equal(restarts, 0);
+});
+
+test("Windows adapter never starts a service when stop fails", async () => {
+  const calls = [];
+  const adapter = createWindowsScmAdapter({
+    allowedServices: ["JBService"],
+    run: async (...args) => {
+      calls.push(args);
+      return { code: args[1][0] === "stop" ? 5 : 0 };
+    }
+  });
+  await assert.rejects(() => adapter.restartService("JBService"), /stop failed/);
+  assert.equal(calls.length, 1);
 });
