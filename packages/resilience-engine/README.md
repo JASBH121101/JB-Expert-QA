@@ -65,7 +65,7 @@ The v2 policy engine is available as `@jb/resilience-engine/policy-engine`. It v
 
 Production use requires two host-provided durable transactional components:
 
-- `policyRevisionStore.acceptRevision({ policyId, revision, policyHash })` atomically accepts only a non-decreasing revision and rejects equal-revision hash substitution or rollback.
+- `policyRevisionStore.assertCurrent({ policyId, revision, policyHash })` confirms the exact owner-activated revision/hash. The host's policy activation path must atomically advance revisions and reject rollback or equal-revision hash substitution; the runtime only reads this state and cannot activate its own policy.
 - `capabilityLedger.reserveAction(...)`, `assertReservation(...)` and `completeAction(...)` atomically enforce incident concurrency and per-incident/per-asset budgets.
 
 The policy gate uses exact service IDs, exact environments and explicit action capabilities. Unknown actions, wildcard grants, unsafe policy defaults, invalid signatures, stale policies, unknown security state and unavailable stores fail closed. The policy object is defensively copied, deeply frozen and re-verified before authorization and immediately before a caller uses its short-lived in-process authorization.
