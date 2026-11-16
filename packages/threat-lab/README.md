@@ -85,3 +85,39 @@ Verified CI for PR #41:
 PR #23 is closed as superseded. Its Advisor implementation is represented by PR #41; do not merge the obsolete `integration/jb-advisor-engine` branch.
 
 The original PR #38 run records the historical three-engine baseline (17 scenarios). PR #41 adds the three Advisor scenarios and is the current four-engine integration.
+
+
+## Six-tier difficulty and engine readiness
+
+Every registered scenario now has a difficulty tier. Existing scenarios that do not declare one remain compatible and default to `basic`.
+
+| Tier | Weight | Validation focus |
+| --- | ---: | --- |
+| Basic | 1 | Known behavior, deterministic checks, essential controls |
+| Intermediate | 2 | Input variations, normalization, malformed data, common boundaries |
+| Advanced | 4 | Combined signals, state transitions, cross-feature behavior |
+| Expert | 8 | Chained failures, false-positive resistance, recovery and invariants |
+| Extreme | 16 | Adversarial combinations, concurrency, resource ceilings, degraded dependencies |
+| Superextreme | 32 | Compound failure paths, long sequences, recovery invariants, strict disposable boundaries |
+
+Use `lab.run({ difficulty: "advanced" })` to execute all registered scenarios from Basic through Advanced. Omitting the option runs every registered tier. Scenario selection by ID still works and is intersected with the chosen maximum tier.
+
+The report adds:
+- `difficulty`: selected ceiling and included levels.
+- `assessment`: weighted score, execution coverage, covered/missing tiers, and a separate assessment for each target.
+- `skipReason`: distinguishes a structural target-scope skip from an adapter that declined a test or a report-budget stop.
+
+Weights increase exponentially so a missed high-difficulty case cannot be hidden by many easy passes. Structural target-scope skips are excluded from scoring. Adapter skips and report-budget skips remain visible, lower execution coverage, and prevent readiness. A target is ready only when every required tier has at least one applicable scenario and all such scenarios pass without skips. This is readiness for the registered scenario set only, not proof that an engine is free of defects.
+
+### Initial coverage map
+
+The first classification of existing scenarios currently gives these per-engine tier footprints:
+
+| Engine | Covered tiers | Current gaps |
+| --- | --- | --- |
+| JB Malware Engine | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | None in tier presence; expand scenario depth within each tier |
+| JB Security Guard | Basic, Intermediate, Advanced, Expert | Extreme, Superextreme |
+| JB Expert QA | Basic, Intermediate, Advanced, Expert, Extreme | Superextreme |
+| JB Advisor Engine | Basic, Intermediate, Expert | Advanced, Extreme, Superextreme |
+
+A missing tier is an explicit testing gap, not a pass. The next lab iterations should add real engine-backed, offline scenarios for those gaps before claiming full six-tier readiness. Keep all fixtures inert, bounded, local, and non-destructive; do not execute samples or send traffic to production services.
