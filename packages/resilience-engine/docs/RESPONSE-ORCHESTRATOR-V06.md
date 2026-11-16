@@ -111,7 +111,7 @@ The store must atomically implement:
 
 - `recordIncidentState(record)` — append or validate a legal monotonic incident transition; return literal `true` on durable success.
 - `getServiceState({ assetId, environment })` — return the last durable action timestamp and state for policy cooldown evaluation.
-- `getCircuitState({ assetId, action, now })` — return the current circuit state and retry deadline.
+- `getCircuitState({ assetId, environment, action, now })` — return the current circuit state and retry deadline for the exact asset/environment/action tuple.
 - `claimAction({ idempotencyKey, incidentId, assetId, environment, serviceId, action, claimedAt, expiresAt })` — enforce a unique idempotency claim and one active mutation per asset/incident.
 - `completeAction({ actionId, outcome, completedAt, reasonCode })` — finalize a claimed action exactly once.
 - `recordActionOutcome({ assetId, environment, action, outcome, at, failureThreshold, cooldownMs })` — atomically update the circuit breaker and last-action state for the exact asset/environment pair.
