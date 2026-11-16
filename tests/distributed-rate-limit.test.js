@@ -162,3 +162,92 @@ test("store timeout configuration is validated", () => {
     store: createAtomicMemoryStore(), secret: SECRET, storeTimeoutMs: 60001
   }), /storeTimeoutMs/);
 });
+
+
+test("Node distributed limiter emits validated Core v1 request and decision contracts", async () => {
+  const decisions = [];
+  const events = [];
+  const limiter = createDistributedRateLimit({
+    store: createAtomicMemoryStore(),
+    secret: SECRET,
+    maxRequests: 1,
+    keyGenerator: (request) => request.account,
+    coreContract: {
+      tenantId: "tenant-demo",
+      applicationId: "catalog-api",
+      policyId: "login-attempts",
+      scope: "login",
+      identityType: "account",
+      identityKeyId: "identity-key-2026"
+    },
+    onCoreDecision(value) { decisions.push(value); },
+    onCoreEvent(value) { events.push(value); }
+  });
+
+  const first = await invoke(limiter.middleware, { account: "private-user@example.test" });
+  const second = await invoke(limiter.middleware, { account: "private-user@example.test" });
+
+  assert.equal(first.continued, 1);
+  assert.equal(second.response.statusCode, 429);
+  assert.equal(decisions.length, 2);
+  assert.equal(decisions[0].check.schema, "jb.security.rate-limit.check/v1");
+  assert.equal(decisions[0].check.identity.type, "account");
+  assert.equal(decisions[0].check.identity.key.length, 64);
+  assert.equal(decisions[0].check.identity.keyId, "identity-key-2026");
+  assert.equal(decisions[0].decision.allowed, true);
+  assert.equal(decisions[1].decision.status, 429);
+  assert.equal(decisions[1].decision.enforced, true);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].schema, "jb.security.event/v1");
+  assert.equal(events[0].category, "rate_limit");
+  assert.equal(events[0].action, "blocked");
+  assert.equal(events[0].subjectKey, decisions[1].check.identity.key);
+  assert.equal(JSON.stringify({ decisions, events }).includes("private-user@example.test"), false);
+});
+
+test("Node distributed limiter emits a Core v1 unavailable decision on store outage", async () => {
+  const decisions = [];
+  const events = [];
+  const limiter = createDistributedRateLimit({
+    store: { async consumeLimit() { throw new Error("private store failure"); } },
+    secret: SECRET,
+    keyGenerator: () => "sensitive-account",
+    coreContract: {
+      tenantId: "tenant-demo",
+      applicationId: "catalog-api",
+      policyId: "api-requests",
+      identityType: "account",
+      identityKeyId: "identity-key-2026"
+    },
+    onCoreDecision(value) { decisions.push(value); },
+    onCoreEvent(value) { events.push(value); }
+  });
+
+  const result = await invoke(limiter.middleware);
+  assert.equal(result.response.statusCode, 503);
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].decision.unavailable, true);
+  assert.equal(decisions[0].decision.status, 503);
+  assert.equal(events[0].outcome, "unavailable");
+  assert.equal(JSON.stringify({ decisions, events }).includes("sensitive-account"), false);
+});
+
+test("Node distributed Core v1 configuration rejects unsupported retry windows and identity types", () => {
+  assert.throws(() => createDistributedRateLimit({
+    store: createAtomicMemoryStore(),
+    secret: SECRET,
+    windowMs: 120_000,
+    coreContract: {
+      tenantId: "tenant-demo", applicationId: "catalog-api", policyId: "api-requests",
+      identityType: "ip", identityKeyId: "key-2026"
+    }
+  }), /windowMs must be 60000 or less/);
+  assert.throws(() => createDistributedRateLimit({
+    store: createAtomicMemoryStore(),
+    secret: SECRET,
+    coreContract: {
+      tenantId: "tenant-demo", applicationId: "catalog-api", policyId: "api-requests",
+      identityType: "browser", identityKeyId: "key-2026"
+    }
+  }), /identityType/);
+});

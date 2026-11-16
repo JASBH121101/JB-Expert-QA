@@ -3,6 +3,12 @@ import {
   createRateLimitServicePayload
 } from "./rate-limit-contract.js";
 
+import {
+  validateRateLimitCheckV1,
+  toRateLimitDecisionV1,
+  validateSecurityEventV1
+} from "./core-contract-v1.js";
+
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const SAFE_IDENTIFIER = /^[a-zA-Z0-9:_-]{1,96}$/;
 
@@ -346,9 +352,14 @@ async function readBoundedJson(request, maxBytes) {
  */
 export function createCloudflareWorkerRateLimitService(options = {}) {
   if (!isRecord(options)) throw new TypeError("Rate-limit service options must be an object");
-  const allowed = new Set(["limiter", "path", "maxBodyBytes"]);
+  const allowed = new Set(["limiter", "path", "maxBodyBytes", "onCoreEvent"]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("Unknown rate-limit service option: " + key);
+  }
+
+  const onCoreEvent = options.onCoreEvent;
+  if (onCoreEvent !== undefined && typeof onCoreEvent !== "function") {
+    throw new TypeError("onCoreEvent must be a function");
   }
 
   const limiter = options.limiter;
@@ -401,14 +412,73 @@ export function createCloudflareWorkerRateLimitService(options = {}) {
     }, parsed.status);
 
     let decision;
+    let coreCheck = null;
     try {
-      decision = await limiter.check(parsed.value);
+      if (isRecord(parsed.value) &&
+          parsed.value.schema === "jb.security.rate-limit.check/v1") {
+        coreCheck = validateRateLimitCheckV1(parsed.value);
+        decision = await limiter.check({
+          identity: coreCheck.identity.key,
+          scope: coreCheck.scope,
+          policy: coreCheck.policyId
+        });
+      } else {
+        decision = await limiter.check(parsed.value);
+      }
     } catch {
       return serviceJsonResponse({ error: "invalid_rate_limit_request" }, 400);
     }
 
     try {
-      return serviceJsonResponse(createRateLimitServicePayload(decision));
+      const payload = createRateLimitServicePayload(decision);
+      if (!coreCheck) return serviceJsonResponse(payload);
+
+      const coreDecision = toRateLimitDecisionV1(coreCheck, {
+        allowed: decision.allowed,
+        exceeded: decision.exceeded,
+        enforced: decision.enforced,
+        unavailable: decision.unavailable,
+        status: payload.status,
+        retryAfterSeconds: payload.retryAfterSeconds
+      });
+
+      let coreEvent = null;
+      if (coreDecision.exceeded || coreDecision.unavailable) {
+        coreEvent = validateSecurityEventV1({
+          schema: "jb.security.event/v1",
+          eventId: globalThis.crypto.randomUUID(),
+          occurredAtMs: Date.now(),
+          tenantId: coreCheck.tenantId,
+          applicationId: coreCheck.applicationId,
+          producer: "security-guard-worker",
+          category: "rate_limit",
+          ruleId: "JBG-RATE-LIMIT-001",
+          severity: coreDecision.unavailable && coreDecision.enforced ? "critical" : "high",
+          action: coreDecision.unavailable
+            ? (coreDecision.enforced ? "rejected" : "observed")
+            : (coreDecision.enforced ? "blocked" : "observed"),
+          outcome: coreDecision.unavailable
+            ? "unavailable"
+            : (coreDecision.enforced ? "denied" : "observed"),
+          subjectKey: coreCheck.identity.key,
+          subjectKeyId: coreCheck.identity.keyId,
+          scope: coreCheck.scope,
+          correlationId: coreCheck.requestId
+        });
+        if (onCoreEvent) {
+          try {
+            const callbackResult = onCoreEvent(coreEvent);
+            if (callbackResult && typeof callbackResult.then === "function") {
+              Promise.resolve(callbackResult).catch(() => {});
+            }
+          } catch {
+            // Telemetry must never interrupt the service decision.
+          }
+        }
+      }
+
+      return serviceJsonResponse({ ...payload, coreDecision, coreEvent });
+
     } catch {
       // A malformed internal adapter result is a service failure, not a client error.
       return serviceJsonResponse({ error: "rate_limit_service_unavailable" }, 503);
