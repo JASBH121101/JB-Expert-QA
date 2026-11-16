@@ -57,6 +57,19 @@ function request(service, body, options = {}) {
   return service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", init));
 }
 
+test("universal service rejects malformed Unicode identities and enforces the shared envelope", async () => {
+  const store = createAtomicStore();
+  const service = makeService(store);
+  const valid = request(service, { identity: "€".repeat(512), scope: "catalog-read", policy: "general" });
+  assert.equal((await valid).status, 200);
+
+  const tooManyUtf16Units = request(service, { identity: "😀".repeat(257), scope: "catalog-read", policy: "general" });
+  assert.equal((await tooManyUtf16Units).status, 400);
+
+  const malformedSurrogate = request(service, { identity: "\\ud800", scope: "catalog-read", policy: "general" });
+  assert.equal((await malformedSurrogate).status, 400);
+});
+
 test("valid server-to-server request is allowed and the raw identity is not used as a counter key", async () => {
   const store = createAtomicStore();
   const service = makeService(store);
