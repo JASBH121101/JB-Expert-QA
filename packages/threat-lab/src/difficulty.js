@@ -125,7 +125,7 @@ export function assessThreatLabDifficulty(results, requestedDifficulty = "supere
 
   const targets = targetIds.map((id) => {
     const targetResults = applicable.filter((result) => result.target?.id === id);
-    const first = targetResults[0]?.target ?? {};
+    const first = results.find((result) => result.target?.id === id)?.target ?? {};
     return {
       target: { id: first.id, kind: first.kind ?? "unknown", version: first.version ?? "unknown" },
       ...summarizeResults(targetResults, requiredLevels)
