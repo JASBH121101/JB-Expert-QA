@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit";
+import { createCloudflareWorkerRateLimit, createCloudflareWorkerRateLimitService } from "@jb/security-guard/cloudflare-worker-rate-limit";
 
 const TEST_SECRET = "jb-security-guard-test-secret-32-bytes-minimum";
 
@@ -214,4 +214,80 @@ test("Worker adapter uses only Web APIs and generates route-scoped opaque keys",
 
   assert.notEqual(binding.keys[0], binding.keys[1]);
   assert.equal(binding.keys.every((key) => !key.includes("same-opaque-user")), true);
+});
+
+
+test("Worker Service Binding validates Core v1 wire identities before counting", async () => {
+  let calls = 0;
+  const service = createCloudflareWorkerRateLimitService({
+    limiter: {
+      async check(input) {
+        calls += 1;
+        assert.equal(input.identity.length, 64);
+        return {
+          allowed: true, exceeded: false, enforced: false, unavailable: false,
+          policy: "default", scope: "login", response: null
+        };
+      }
+    }
+  });
+
+  const invalid = await service.fetch(new Request(
+    "https://internal.invalid/__jb/security-guard/rate-limit",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        schema: "jb.security.rate-limit.check/v1",
+        requestId: "5f4c1f7e-0f5c-4f5c-8f6a-6f7b6e1f4c21",
+        tenantId: "tenant-demo",
+        applicationId: "catalog-api",
+        policyId: "default",
+        scope: "login",
+        identity: { type: "account", key: "192.0.2.10", keyId: "key-2026" }
+      })
+    }
+  ));
+  assert.equal(invalid.status, 400);
+  assert.equal(calls, 0);
+});
+
+test("Worker Service Binding returns Core v1 decisions and sanitized events for valid contracts", async () => {
+  const events = [];
+  const limiter = createCloudflareWorkerRateLimit({
+    binding: { async limit() { return { success: false }; } },
+    identitySecret: TEST_SECRET,
+    mode: "enforce",
+    periodSeconds: 10
+  });
+  const service = createCloudflareWorkerRateLimitService({
+    limiter,
+    onCoreEvent(event) { events.push(event); }
+  });
+  const response = await service.fetch(new Request(
+    "https://internal.invalid/__jb/security-guard/rate-limit",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        schema: "jb.security.rate-limit.check/v1",
+        requestId: "5f4c1f7e-0f5c-4f5c-8f6a-6f7b6e1f4c21",
+        tenantId: "tenant-demo",
+        applicationId: "catalog-api",
+        policyId: "default",
+        scope: "login",
+        identity: {
+          type: "account",
+          key: "a".repeat(64),
+          keyId: "pages-key-2026"
+        }
+      })
+    }
+  ));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.coreDecision.schema, "jb.security.rate-limit.decision/v1");
+  assert.equal(payload.coreDecision.status, 429);
+  assert.equal(payload.coreEvent.schema, "jb.security.event/v1");
+  assert.equal(events.length, 1);
 });
