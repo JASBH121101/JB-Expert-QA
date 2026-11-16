@@ -145,9 +145,18 @@ test("rejects expired, stale, too-long and future-dated signals", async () => {
   const expired = signal({ now: now - 120_000 });
   assert.equal((await gateway.ingest(expired)).reason, "signal-expired");
   const tooLong = signTrustedSignalEnvelope({
-    ...signal({ now }),
+    schema: "jb.resilience.trusted-signal/v1",
+    eventId: eventId(),
+    sourceId: "guard-primary",
+    sourceEngine: "security-guard",
+    environment: ENV,
+    assetId: ASSET,
+    issuedAtMs: now,
     expiresAtMs: now + 600_000,
-    signature: undefined
+    state: "clear",
+    severity: "info",
+    reasonCode: "SIGNAL_CLEAR",
+    evidenceRefs: []
   }, GUARD_KEY);
   assert.equal((await gateway.ingest(tooLong)).reason, "signal-lifetime-exceeded");
   const future = signal({ now: now + 60_000 });
@@ -181,8 +190,9 @@ test("claims event IDs atomically and rejects replay or conflicting reuse", asyn
   const item = signal();
   assert.equal((await gateway.ingest(item)).accepted, true);
   assert.equal((await gateway.ingest(item)).reason, "signal-replay");
+  const { signature: ignoredSignature, ...unsigned } = item;
   const reused = signTrustedSignalEnvelope({
-    ...item,
+    ...unsigned,
     state: "suspected",
     reasonCode: "THREAT_SUSPECTED",
     severity: "high"
@@ -229,9 +239,9 @@ test("conflicting clear and threat signals fail closed", async () => {
 test("confirmed and tampered findings retain evidence and never grant authorization", async () => {
   const now = 1_800_000_000_000;
   const { gateway } = setup({ clock: () => now });
-  await ingestBoth(gateway, now, "clear", "confirmed");
+  await ingestBoth(gateway, now, "suspected", "confirmed");
   const confirmed = await gateway.getSecurityState({ assetId: ASSET, environment: ENV });
-  assert.equal(confirmed.state, "conflicting");
+  assert.equal(confirmed.state, "confirmed");
   assert.equal(confirmed.evidenceRefs.length, 1);
   assert.equal(confirmed.authorizationGranted, false);
 
