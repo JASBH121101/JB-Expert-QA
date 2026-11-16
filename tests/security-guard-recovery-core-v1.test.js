@@ -189,3 +189,92 @@ test("Core callbacks are opt-in, isolated, and configuration is constrained to r
     credential: "invalid", request: REQUEST
   }), { valid: false });
 });
+
+
+test("generic suppression and request rate limiting emit different recovery events", async () => {
+  const suppressed = capture();
+  const response = await suppressed.recovery.requestRecovery({
+    accountId: null, channel: "sms", destination: null,
+    contactVerified: false, request: REQUEST
+  });
+  assert.equal(response.accepted, true);
+  assert.equal(suppressed.attempts.length, 0);
+  assert.ok(suppressed.events.some((event) =>
+    event.action === "observed" && event.outcome === "observed"
+  ));
+
+  let deliveries = 0;
+  const limited = capture({
+    requestPolicies: {
+      ip: { maxRequests: 1, windowMs: 60_000 },
+      account: { maxRequests: 50, windowMs: 60_000 },
+      destination: { maxRequests: 50, windowMs: 60_000 }
+    },
+    smsProvider: { async send() { deliveries += 1; } }
+  });
+  const input = {
+    accountId: "limited-account", channel: "sms", destination: "+50588881111",
+    contactVerified: true, request: REQUEST
+  };
+  assert.equal((await limited.recovery.requestRecovery(input)).accepted, true);
+  assert.equal((await limited.recovery.requestRecovery(input)).accepted, true);
+  await flush();
+  assert.equal(deliveries, 1);
+  assert.ok(limited.events.some((event) =>
+    event.ruleId === "JBG-RECOVERY-RATE-001" &&
+    event.action === "blocked" && event.outcome === "denied"
+  ));
+});
+
+test("provider delivery failures are reported only after rejection and remain sanitized", async () => {
+  const state = capture({
+    smsProvider: {
+      async send() {
+        throw new Error("private provider token and destination");
+      }
+    }
+  });
+  const result = await state.recovery.requestRecovery({
+    accountId: "provider-failure-account", channel: "sms",
+    destination: "+50588880000", contactVerified: true, request: REQUEST
+  });
+  assert.equal(result.accepted, true);
+  await flush();
+  const failure = state.events.find((event) =>
+    event.ruleId === "JBG-RECOVERY-REQUEST-001" && event.outcome === "error"
+  );
+  assert.ok(failure);
+  assert.equal(failure.action, "rejected");
+  assert.equal(JSON.stringify(state.events).includes("private provider token"), false);
+  assert.equal(JSON.stringify(state.events).includes("+50588880000"), false);
+  assert.equal(state.recovery.getStats().deliveryFailures, 1);
+});
+
+test("verification challenge-store outage publishes unavailable Core decision and event", async () => {
+  const attempts = [];
+  const decisions = [];
+  const events = [];
+  const store = {
+    async putChallenge() { return true; },
+    async consumeLimit() { return { allowed: true, retryAfterMs: 0 }; },
+    async consumeChallenge() { throw new Error("private challenge-store connection string"); },
+    async deleteChallenge() { return true; }
+  };
+  const recovery = createAccountRecovery({
+    secret: SECRET, store, coreContract: CORE,
+    onCoreAttempt: (value) => attempts.push(value),
+    onCoreDecision: (value) => decisions.push(value),
+    onCoreEvent: (value) => events.push(value)
+  });
+  await assert.rejects(recovery.verifyRecovery({
+    requestId: "00000000-0000-4000-8000-000000000000",
+    credential: "wrong", request: REQUEST
+  }), /private challenge-store connection string/);
+  assert.equal(attempts[0].outcome, "failure");
+  assert.equal(decisions[0].decision.outcome, "unavailable");
+  assert.equal(decisions[0].decision.status, 503);
+  assert.ok(events.some((event) =>
+    event.ruleId === "JBG-RECOVERY-STORE-001" && event.outcome === "unavailable"
+  ));
+  assert.equal(JSON.stringify({ attempts, decisions, events }).includes("connection string"), false);
+});
