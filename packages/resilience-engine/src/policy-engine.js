@@ -637,7 +637,7 @@ export function createResiliencePolicyEngine({
       acceptedRevision = false;
     }
     if (!acceptedRevision) {
-      return Object.freeze({ authorized: false, reason: "policy-revision-rollback-or-store-failure" });
+      return Object.freeze({ authorized: false, reason: "policy-revision-not-current-or-store-failure" });
     }
 
     const expiresAt = Math.min(now + authorizationTtlMs, integrity.expiresAt);
@@ -749,7 +749,7 @@ export function createResiliencePolicyEngine({
       reserved = false;
     }
     if (!acceptedRevision) {
-      return Object.freeze({ valid: false, reason: "policy-revision-rollback-or-store-failure" });
+      return Object.freeze({ valid: false, reason: "policy-revision-not-current-or-store-failure" });
     }
     return reserved
       ? Object.freeze({ valid: true, reason: null })
