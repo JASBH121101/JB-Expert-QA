@@ -406,6 +406,44 @@ test("successful outcomes require a one-time pre-execution authorization asserti
   })).recorded, true);
 });
 
+
+test("authorization expiry is rechecked after asynchronous policy-store verification", async () => {
+  let now = NOW;
+  let revisionChecks = 0;
+  const revisionStore = {
+    durable: true,
+    async assertCurrent() {
+      revisionChecks += 1;
+      if (revisionChecks === 2) now += 1000;
+      return true;
+    }
+  };
+  const ledger = {
+    durable: true,
+    async reserveAction() {
+      return { reserved: true, reservationId: "reservation-12345678" };
+    },
+    async assertReservation({ now: checkedAt }) {
+      return checkedAt < NOW + 1000;
+    },
+    async completeAction() { return true; }
+  };
+  const engine = createResiliencePolicyEngine({
+    policy: makePolicy(),
+    verifyPolicySignature: verifySignature,
+    policyRevisionStore: revisionStore,
+    capabilityLedger: ledger,
+    clock: () => now,
+    authorizationTtlMs: 1000
+  });
+  const result = await engine.authorize(REQUEST);
+  assert.equal(result.authorized, true);
+  assert.deepEqual(
+    await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST }),
+    { valid: false, reason: "authorization-expired-or-stale" }
+  );
+});
+
 test("signature is checked again before each authorization", async () => {
   let valid = true;
   const engine = createResiliencePolicyEngine({
