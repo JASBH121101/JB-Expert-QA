@@ -184,7 +184,7 @@ test("compatibility rejects unsupported major versions", () => {
 
 test("compatibility detects dependency cycles", () => {
   const first = manifest("jb.security-guard", "1.0.0", {
-    dependencies: [{ engineId: "jb.resilience-engine", minVersion: "0.6.0", maxMajor: 0, optional: false }]
+    dependencies: [{ engineId: "jb.resilience-engine", minVersion: "0.6.0", maxMajor: 1, optional: false }]
   });
   const second = manifest("jb.resilience-engine", "0.6.0", {
     dependencies: [{ engineId: "jb.security-guard", minVersion: "1.0.0", maxMajor: 1, optional: false }]
