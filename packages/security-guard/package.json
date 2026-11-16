@@ -9,7 +9,8 @@
     "./cloudflare-pages-rate-limit": "./src/cloudflare-pages-rate-limit.js",
     "./rate-limit-contract": "./src/rate-limit-contract.js",
     "./core-contract-v1": "./src/core-contract-v1.js",
-    "./threat-assessment": "./src/threat-assessment.js"
+    "./threat-assessment": "./src/threat-assessment.js",
+    "./universal-rate-limit-service": "./src/universal-rate-limit-service.js"
   },
   "files": [
     "src/**",
