@@ -37,7 +37,7 @@ Cloudflare Worker and Pages integrations cover the rate-limit adapter path; they
 
 The Node conformance suite validates the shared fixtures against all eight Core v1 runtime validators. This is module-level implementation and test coverage, not a declaration that the full JavaScript runtime is certified or that the system has production-grade global storage.
 
-The threat signal and assessment schemas have validators, but **there is not yet a calibrated threat-assessment aggregator or server-owned threat policy that creates Core risk scores and challenge/block decisions**. A signal is evidence, not an enforcement decision. Existing request-pattern confidence weights are heuristic and must not be treated as statistically calibrated probabilities.
+The threat signal and assessment schemas have validators, and the Node.js adapter now includes an opt-in deterministic aggregator driven by a server-owned threat-assessment policy. It creates a bounded Core v1 risk score and one of the `observe/challenge/block/review` assessment labels. The assessment is advisory: it does not enforce a block or issue a challenge. The risk score is a policy index, not a probability; request-pattern confidence values remain heuristic and have not been statistically calibrated.
 
 The separate local double-filter protocol `jb.security.assessment/v1` is not interchangeable with `jb.security.threat-assessment/v1`; it does not provide the required Core risk score or signal references.
 
