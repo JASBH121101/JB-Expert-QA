@@ -133,3 +133,11 @@ destructive data actions are permitted.
 Production activation is not part of this branch. The implementation must pass
 the full laboratory, fault-injection, concurrency, regression and platform
 certification gates before any merge or operational enablement.
+
+## Identity & Policy Bridge v1 (laboratory)
+
+The optional `./adapters/identity-policy-bridge` entry point verifies owner-signed v2 policy payloads with Ed25519 using an exact trusted-key record resolved by the host. It delegates policy evaluation, authorization, pre-execution assertions and completion to the existing Policy Engine; it does not duplicate that engine, its capability ledger, or PostgreSQL persistence.
+
+The host owns the authoritative trust registry. Its synchronous resolver must return the current durable key status/version for every check and enforce monotonic versions and revocation. The bridge's in-process rollback tracker is defense in depth only; it is not durable across restarts or processes. No trust registry, private key, signing service, production credential or key vault is provisioned by this package. See [Identity & Policy Bridge v1](./docs/IDENTITY-POLICY-BRIDGE-V1.md).
+
+The bridge does not expand the capability matrix: A2 containment and A3 failover remain denied pending their separate certification gates.
