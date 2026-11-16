@@ -12,7 +12,8 @@
     "./adapters/linux-systemd": "./src/adapters/linux-systemd.js",
     "./adapters/windows-scm": "./src/adapters/windows-scm.js",
     "./recovery-store": "./src/recovery-store.js",
-    "./policy-engine": "./src/policy-engine.js"
+    "./policy-engine": "./src/policy-engine.js",
+    "./trusted-signal-gateway": "./src/trusted-signal-gateway.js"
   },
   "files": [
     "src/**",
