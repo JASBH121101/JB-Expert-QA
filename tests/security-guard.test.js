@@ -594,3 +594,214 @@ test("authentication configuration rejects unknown options, duplicate severities
     socket: { remoteAddress: "192.0.2.22" }
   }), /non-negative safe integer timestamp/);
 });
+
+
+const REQUEST_CORE_SECRET = "request-inspection-core-test-secret-material-32-bytes";
+
+function requestCoreContract(overrides = {}) {
+  return {
+    tenantId: "tenant-request-inspection",
+    applicationId: "catalog-api",
+    policyId: "catalog-request-local",
+    scope: "request",
+    identityType: "ip",
+    identityKeyId: "request-client-hmac-v1",
+    identitySecret: REQUEST_CORE_SECRET,
+    ...overrides
+  };
+}
+
+test("request inspection Core v1 converts SQL injection findings into sanitized threat signals", () => {
+  const signals = [];
+  const guard = createSecurityGuard({
+    mode: "monitor",
+    rateLimit: { enabled: false },
+    coreContract: requestCoreContract(),
+    onCoreSignal: (signal) => signals.push(signal)
+  });
+  const rawIp = "203.0.113.71";
+  const rawTarget = "/search?q=%27%20OR%201%3D1";
+  const result = invokeGuardDirect(guard, {
+    url: rawTarget,
+    method: "GET",
+    headers: {},
+    rawHeaders: [],
+    socket: { remoteAddress: rawIp }
+  });
+
+  assert.equal(result.continued, 1);
+  assert.equal(result.response.statusCode, 200);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].schema, "jb.security.threat-signal/v1");
+  assert.equal(signals[0].tenantId, "tenant-request-inspection");
+  assert.equal(signals[0].applicationId, "catalog-api");
+  assert.equal(signals[0].source, "security-guard-node");
+  assert.equal(signals[0].type, "sql_injection");
+  assert.equal(signals[0].ruleId, "JBG-SQLI-001");
+  assert.equal(signals[0].severity, "high");
+  assert.equal(signals[0].confidence, 0.65);
+  assert.equal(signals[0].evidenceCount, 1);
+  assert.equal(signals[0].subjectKey.length, 64);
+  assert.equal(signals[0].subjectKeyId, "request-client-hmac-v1");
+  assert.equal(Object.hasOwn(signals[0], "routeTemplate"), false);
+  const serialized = JSON.stringify(signals);
+  assert.equal(serialized.includes(rawIp), false);
+  assert.equal(serialized.includes(rawTarget), false);
+  assert.equal(serialized.includes("1%3D1"), false);
+  assert.equal(serialized.includes(REQUEST_CORE_SECRET), false);
+});
+
+test("local rate limiting publishes Core v1 check and exact enforcement decisions without leaking identity", () => {
+  const decisions = [];
+  const events = [];
+  const guard = createSecurityGuard({
+    mode: "balanced",
+    rateLimit: { enabled: true, max: 1, windowMs: 60_000, maxKeys: 10 },
+    coreContract: requestCoreContract(),
+    onCoreDecision: (value) => decisions.push(value),
+    onCoreEvent: (event) => events.push(event)
+  });
+  const request = {
+    url: "/health",
+    method: "GET",
+    headers: {},
+    rawHeaders: [],
+    socket: { remoteAddress: "192.0.2.91" }
+  };
+
+  const first = invokeGuardDirect(guard, request);
+  const second = invokeGuardDirect(guard, request);
+  const repeated = invokeGuardDirect(guard, request);
+
+  assert.equal(first.continued, 1);
+  assert.equal(second.response.statusCode, 429);
+  assert.equal(second.continued, 0);
+  assert.equal(repeated.response.statusCode, 429);
+  assert.equal(decisions.length, 3);
+  assert.equal(decisions[0].check.schema, "jb.security.rate-limit.check/v1");
+  assert.equal(decisions[0].decision.schema, "jb.security.rate-limit.decision/v1");
+  assert.equal(decisions[0].decision.allowed, true);
+  assert.equal(decisions[0].decision.exceeded, false);
+  assert.equal(decisions[1].decision.allowed, false);
+  assert.equal(decisions[1].decision.exceeded, true);
+  assert.equal(decisions[1].decision.enforced, true);
+  assert.equal(decisions[1].decision.status, 429);
+  assert.ok(decisions[1].decision.retryAfterSeconds >= 1);
+  assert.ok(decisions[1].decision.retryAfterSeconds <= 60);
+  assert.equal(events.length, 1, "repeated rate-limit hits must not flood Core events");
+  assert.equal(events[0].schema, "jb.security.event/v1");
+  assert.equal(events[0].category, "rate_limit");
+  assert.equal(events[0].ruleId, "JBG-RATE-LIMIT-LOCAL-001");
+  assert.equal(events[0].action, "blocked");
+  assert.equal(events[0].outcome, "denied");
+  assert.equal(events[0].correlationId, decisions[1].check.requestId);
+  const serialized = JSON.stringify({ decisions, events });
+  assert.equal(serialized.includes("192.0.2.91"), false);
+  assert.equal(serialized.includes(REQUEST_CORE_SECRET), false);
+});
+
+test("monitor mode reports local quota exceedance as observed, never as an enforced denial", () => {
+  const decisions = [];
+  const events = [];
+  const guard = createSecurityGuard({
+    mode: "monitor",
+    rateLimit: { enabled: true, max: 1, windowMs: 60_000, maxKeys: 10 },
+    coreContract: requestCoreContract(),
+    onCoreDecision: (value) => decisions.push(value),
+    onCoreEvent: (event) => events.push(event)
+  });
+  const request = {
+    url: "/health", method: "GET", headers: {}, rawHeaders: [],
+    socket: { remoteAddress: "192.0.2.92" }
+  };
+  invokeGuardDirect(guard, request);
+  const exceeded = invokeGuardDirect(guard, request);
+
+  assert.equal(exceeded.continued, 1);
+  assert.equal(exceeded.response.statusCode, 200);
+  assert.equal(decisions[1].decision.allowed, true);
+  assert.equal(decisions[1].decision.exceeded, true);
+  assert.equal(decisions[1].decision.enforced, false);
+  assert.equal(decisions[1].decision.status, null);
+  assert.equal(decisions[1].decision.retryAfterSeconds, null);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].action, "observed");
+  assert.equal(events[0].outcome, "observed");
+});
+
+test("request-inspection Core callbacks are isolated and configuration is validated", () => {
+  assert.throws(() => createSecurityGuard({
+    coreContract: requestCoreContract({ identitySecret: "weak" })
+  }), /at least 32 bytes/);
+  assert.throws(() => createSecurityGuard({
+    coreContract: requestCoreContract({ identityKeyId: "invalid key id" })
+  }), /identityKeyId/);
+  assert.throws(() => createSecurityGuard({
+    coreContract: requestCoreContract(),
+    onCoreSignal: {}
+  }), /onCoreSignal must be a function/);
+
+  const callbackCounts = { signal: 0, decision: 0, event: 0 };
+  const guard = createSecurityGuard({
+    mode: "balanced",
+    rateLimit: { enabled: true, max: 1, windowMs: 60_000, maxKeys: 10 },
+    coreContract: requestCoreContract(),
+    onCoreSignal() {
+      callbackCounts.signal += 1;
+      throw new Error("signal sink unavailable");
+    },
+    onCoreDecision() {
+      callbackCounts.decision += 1;
+      throw new Error("decision sink unavailable");
+    },
+    onCoreEvent() {
+      callbackCounts.event += 1;
+      throw new Error("event sink unavailable");
+    }
+  });
+  const request = {
+    url: "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+    method: "GET",
+    headers: {},
+    rawHeaders: [],
+    socket: { remoteAddress: "192.0.2.93" }
+  };
+  const first = invokeGuardDirect(guard, request);
+  const second = invokeGuardDirect(guard, request);
+  assert.equal(first.response.statusCode, 403);
+  assert.equal(first.continued, 0);
+  assert.equal(second.response.statusCode, 429);
+  assert.equal(second.continued, 0);
+  assert.ok(callbackCounts.signal >= 2);
+  assert.equal(callbackCounts.decision, 2);
+  assert.equal(callbackCounts.event, 1);
+});
+
+test("request-inspection HMAC subjects are isolated by tenant and application", () => {
+  const firstChecks = [];
+  const secondChecks = [];
+  const request = {
+    url: "/health", method: "GET", headers: {}, rawHeaders: [],
+    socket: { remoteAddress: "192.0.2.94" }
+  };
+  const first = createSecurityGuard({
+    mode: "monitor",
+    rateLimit: { enabled: true, max: 10, windowMs: 60_000 },
+    coreContract: requestCoreContract(),
+    onCoreDecision: (value) => firstChecks.push(value)
+  });
+  const second = createSecurityGuard({
+    mode: "monitor",
+    rateLimit: { enabled: true, max: 10, windowMs: 60_000 },
+    coreContract: requestCoreContract({ tenantId: "tenant-other" }),
+    onCoreDecision: (value) => secondChecks.push(value)
+  });
+
+  invokeGuardDirect(first, request);
+  invokeGuardDirect(second, request);
+  assert.notEqual(
+    firstChecks[0].check.identity.key,
+    secondChecks[0].check.identity.key,
+    "the same client identity must derive different Core keys across tenants"
+  );
+});
