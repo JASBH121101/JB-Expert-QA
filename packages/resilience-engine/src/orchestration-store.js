@@ -500,7 +500,7 @@ export function createFileOrchestrationStore({
         reasonCode: null
       };
       ledger.idempotency[safe.idempotencyKey] = actionId;
-      const serviceKey = safe.environment + ":" + safe.assetId;
+      const serviceKey = scopeKey(safe.environment, safe.assetId);
       ledger.services[serviceKey] ??= {
         assetId: safe.assetId,
         environment: safe.environment,
