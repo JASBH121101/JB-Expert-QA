@@ -239,6 +239,10 @@ try {
   ], { cwd: guardInstall });
   run(node, [
     "--input-type=module", "-e",
+    'import { createCoreRateLimitCounterKey, deriveCoreIdentityKey, normalizeCoreRateLimitCheckRequest } from "@jb/security-guard/core-contract-v1"; const secret = Uint8Array.from({ length: 32 }, (_, index) => index); const key = await deriveCoreIdentityKey({ secret, keyId: "k2026-01", tenantId: "tenant-demo", applicationId: "catalog-api", identityType: "account", canonicalIdentity: "user-123" }); if (key !== "c1f6faa9f5d251b0447a6e47a0310ccd54706aa4a5e239e8bcf4e3f14e26863e") throw new Error("Core v1 HMAC vector mismatch"); const request = normalizeCoreRateLimitCheckRequest({ schema: "jb.security.rate-limit.check/v1", requestId: "b37a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a", tenantId: "tenant-demo", applicationId: "catalog-api", policyId: "public-api", scope: "catalog:list", identity: { type: "account", key, keyId: "k2026-01" } }); const counterKey = createCoreRateLimitCounterKey({ tenantId: request.tenantId, applicationId: request.applicationId, policyId: request.policyId, scope: request.scope, identityType: request.identity.type, keyId: request.identity.keyId, identityKey: request.identity.key }); if (!counterKey.startsWith("15:jbsg-counter-v1")) throw new Error("Core v1 counter key mismatch");'
+  ], { cwd: guardInstall });
+  run(node, [
+    "--input-type=module", "-e",
     'import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit"; if (typeof createCloudflareWorkerRateLimit !== "function") process.exit(1); const limiter = createCloudflareWorkerRateLimit({ binding: { async limit() { return { success: true }; } } }); const decision = await limiter.check({ identity: "package-smoke-test", scope: "distribution" }); if (!decision.allowed || decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
 
