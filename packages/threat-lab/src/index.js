@@ -1,6 +1,6 @@
 import { assessThreatLabDifficulty, normalizeDifficulty, THREAT_LAB_DIFFICULTY_LEVELS } from "./difficulty.js";
 
-const LAB_SCHEMA = "jb.threat-lab.report/v1";
+const LAB_SCHEMA = "jb.threat-lab.report/v2";
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,79}$/i;
 
 const LIMITS = Object.freeze({
