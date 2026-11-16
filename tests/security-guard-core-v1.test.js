@@ -130,7 +130,7 @@ test("Core v1 rate-limit decisions accept enforced 429 and 503 states", () => {
 test("Core v1 rate-limit decisions reject contradictory enforcement states", () => {
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ unavailable: true })), /429 requires exceeded=true/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ status: 503, unavailable: false })), /503 requires exceeded=false/);
-  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: false, status: null })), /denied decision/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: false, status: null })), /blocked decisions require HTTP 429 or 503/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, status: 429 })), /allowed decision/);
   const failOpen = normalizeCoreRateLimitDecision(decision({
     allowed: true, exceeded: false, enforced: false, unavailable: true,
@@ -142,7 +142,7 @@ test("Core v1 rate-limit decisions reject contradictory enforcement states", () 
     allowed: true, exceeded: false, enforced: true, unavailable: true,
     status: null, retryAfterSeconds: null
   })), /cannot be enforced/);
-  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, enforced: true, exceeded: true, status: null, retryAfterSeconds: null })), /exceeded quota/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, enforced: true, exceeded: true, status: null, retryAfterSeconds: null })), /cannot be enforced/);
 });
 
 test("Core v1 rate-limit policies enforce strict shapes, bounds, and unique IDs", () => {
