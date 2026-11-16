@@ -66,13 +66,15 @@ function normalizeTrustedKey(input) {
   if (!Number.isSafeInteger(input.keyVersion) || input.keyVersion < 1) {
     throw new TypeError("keyVersion must be a positive safe integer");
   }
-  if (input.algorithm !== "Ed25519") throw new TypeError("only Ed25519 policy keys are supported");
+  if (typeof input.algorithm !== "string" || !/^[A-Za-z0-9._-]{1,32}$/.test(input.algorithm)) {
+    throw new TypeError("trusted policy key algorithm is invalid");
+  }
   if (typeof input.publicKeyPem !== "string" ||
       input.publicKeyPem.length < 64 || input.publicKeyPem.length > 8192) {
     throw new TypeError("publicKeyPem is invalid");
   }
   const principalId = assertIdentifier(input.principalId, PRINCIPAL_ID, "principalId");
-  if (input.role !== "policy-owner") throw new TypeError("trusted key must have the policy-owner role");
+  const role = assertIdentifier(input.role, /^[A-Za-z][A-Za-z0-9._-]{0,63}$/, "key role");
   if (!["active", "revoked", "suspended"].includes(input.status)) {
     throw new TypeError("trusted key status is invalid");
   }
@@ -118,7 +120,7 @@ function normalizeTrustedKey(input) {
     algorithm: input.algorithm,
     publicKey,
     principalId,
-    role: input.role,
+    role,
     status: input.status,
     notBefore,
     expiresAt,
@@ -199,12 +201,7 @@ export function createEd25519PolicySignatureVerifier({
       if (!resolved) return false;
 
       const key = normalizeTrustedKey(resolved);
-      if (key.keyId !== normalizedContext.keyId ||
-          key.status !== "active" ||
-          now < key.notBefore || now >= key.expiresAt ||
-          !key.policyIds.includes(normalizedContext.policyId)) {
-        return false;
-      }
+      if (key.keyId !== normalizedContext.keyId) return false;
 
       const previous = observedKeys.get(key.keyId);
       if (previous) {
@@ -214,11 +211,22 @@ export function createEd25519PolicySignatureVerifier({
         if (key.keyVersion > previous.keyVersion &&
             key.principalId !== previous.principalId) return false;
       }
+      // Record every structurally valid newer registry version, including revoked
+      // or suspended entries, so a later stale snapshot cannot roll revocation back.
       observedKeys.set(key.keyId, {
         keyVersion: key.keyVersion,
         materialFingerprint: key.materialFingerprint,
         principalId: key.principalId
       });
+
+      if (key.algorithm !== "Ed25519" ||
+          key.publicKey.asymmetricKeyType !== "ed25519" ||
+          key.role !== "policy-owner" ||
+          key.status !== "active" ||
+          now < key.notBefore || now >= key.expiresAt ||
+          !key.policyIds.includes(normalizedContext.policyId)) {
+        return false;
+      }
 
       return verifySignature(
         null,
