@@ -57,9 +57,9 @@ The health monitor's observation counters are still in-memory by default, but `r
 
 ## Transactional PostgreSQL storage adapter (v2 laboratory)
 
-The optional \`./adapters/postgres-storage\` entry point provides the v0.6 orchestration store, hash-chained audit store, PostgreSQL lease coordinator and a fenced PostgreSQL state target. The host injects a node-postgres-compatible Pool and explicitly calls \`initialize()\`; no driver, credential, network endpoint or hosted database is bundled.
+The optional `./adapters/postgres-storage` entry point provides the v0.6 orchestration store, hash-chained audit store, PostgreSQL lease coordinator and a fenced PostgreSQL state target. The host injects a node-postgres-compatible Pool and explicitly calls `initialize()`; no driver, credential, network endpoint or hosted database is bundled.
 
-The new \`fencedTargetStore.applyState(... )\` operation locks the authoritative lease and target rows in one transaction, validates lease expiry using database time, persists a monotonic fencing high-water mark and rejects stale epochs and conflicting mutation-ID reuse. This is genuine target-side fencing for application state stored in the same PostgreSQL primary. It does **not** fence systemd, Windows SCM, files or external APIs. A2 containment and A3 failover remain disabled pending independent host-agent enforcement, external monitoring, quorum and consistency certification. See [PostgreSQL Storage Adapter v2](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
+The new `fencedTargetStore.applyState(... )` operation locks the authoritative lease and target rows in one transaction, validates lease expiry using database time, persists a monotonic fencing high-water mark and rejects stale epochs and conflicting mutation-ID reuse. This is genuine target-side fencing for application state stored in the same PostgreSQL primary. It does **not** fence systemd, Windows SCM, files or external APIs. A2 containment and A3 failover remain disabled pending independent host-agent enforcement, external monitoring, quorum and consistency certification. See [PostgreSQL Storage Adapter v2](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
 
 ## Bounded Health Monitor Probe Adapter (v1 laboratory)
 
