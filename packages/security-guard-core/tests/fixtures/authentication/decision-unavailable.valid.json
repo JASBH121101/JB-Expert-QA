@@ -1,0 +1,8 @@
+{
+  "schema": "jb.security.authentication.decision/v1",
+  "attemptId": "f47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "outcome": "unavailable",
+  "enforced": true,
+  "status": 503,
+  "retryAfterSeconds": null
+}
