@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync, sign as signBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes, sign as signBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -266,9 +266,10 @@ try {
     "--input-type=module", "-e",
     'import { deriveCoreIdentityKey, normalizeCoreRateLimitDecision, createCoreRateLimitCounterKey } from "@jb/security-guard/core-contract-v1"; import { webcrypto } from "node:crypto"; const key = await deriveCoreIdentityKey({ secret: new Uint8Array(32).fill(7), keyId: "dist-1", tenantId: "tenant", applicationId: "catalog", identityType: "account", canonicalIdentity: "user-1", cryptoApi: webcrypto }); if (key.length !== 64) process.exit(1); const counter = createCoreRateLimitCounterKey({ tenantId: "tenant", applicationId: "catalog", policyId: "public", scope: "login", identityType: "account", keyId: "dist-1", identityKey: key }); if (!counter.startsWith("15:jbsg-counter-v1")) process.exit(1); const decision = normalizeCoreRateLimitDecision({ schema: "jb.security.rate-limit.decision/v1", requestId: "b37a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a", tenantId: "tenant", applicationId: "catalog", policyId: "public", scope: "login", allowed: true, exceeded: false, enforced: false, unavailable: true, status: null, retryAfterSeconds: null }); if (!decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
+  const universalServiceSmokeSecret = randomBytes(32).toString("hex");
   run(node, [
     "--input-type=module", "-e",
-    'import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service"; if (typeof createUniversalRateLimitService !== "function") process.exit(1); const store = { async consumeLimit() { return { allowed: true, count: 1, retryAfterMs: 1000 }; } }; const service = createUniversalRateLimitService({ store, clients: { "smoke-app": { secret: "distribution-smoke-secret-at-least-32-bytes", policies: { "default": { scopes: ["catalog-read"] } } } } }); const response = await service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", { method: "POST", headers: { "content-type": "application/json", "x-jb-client-id": "smoke-app", authorization: "Bearer distribution-smoke-secret-at-least-32-bytes" }, body: JSON.stringify({ identity: "private-user-1", scope: "catalog-read", policy: "default" }) })); if (response.status !== 200) process.exit(1);'
+    `import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service"; if (typeof createUniversalRateLimitService !== "function") process.exit(1); const serviceSecret = ${JSON.stringify(universalServiceSmokeSecret)}; const store = { async consumeLimit() { return { allowed: true, count: 1, retryAfterMs: 1000 }; } }; const service = createUniversalRateLimitService({ store, clients: { "smoke-app": { secret: serviceSecret, policies: { "default": { scopes: ["catalog-read"] } } } } }); const response = await service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", { method: "POST", headers: { "content-type": "application/json", "x-jb-client-id": "smoke-app", authorization: "Bearer " + serviceSecret }, body: JSON.stringify({ identity: "private-user-1", scope: "catalog-read", policy: "default" }) })); if (response.status !== 200) process.exit(1);`
   ], { cwd: guardInstall });
 
   run(node, [
