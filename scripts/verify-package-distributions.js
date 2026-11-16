@@ -247,6 +247,11 @@ try {
     'import { createCloudflarePagesRateLimit } from "@jb/security-guard/cloudflare-pages-rate-limit"; if (typeof createCloudflarePagesRateLimit !== "function") process.exit(1); const pages = createCloudflarePagesRateLimit({ serviceBinding: { async fetch() { return new Response(JSON.stringify({ allowed: true, exceeded: false, enforced: false, unavailable: false, policy: null, scope: "distribution", status: null, retryAfterSeconds: null }), { status: 200 }); } } }); const decision = await pages.check({ identity: "package-smoke-test", scope: "distribution" }); if (!decision.allowed || decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
 
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createThreatAssessmentEngine } from "@jb/security-guard/threat-assessment"; const policy = { schema: "jb.security.policy.threat-assessment/v1", id: "distribution-policy", tenantId: "distribution-tenant", applicationId: "distribution-app", version: 1, enabled: true, windowMs: 300000, maxSignals: 8, minimumConfidence: 0.5, severityWeights: { info: 5, low: 15, medium: 35, high: 65, critical: 90 }, typeWeights: { brute_force: 100, endpoint_scan: 90, enumeration: 80, sql_injection: 110, parameter_tampering: 100, api_abuse: 95, bot_traffic: 75, anomaly: 50, upload_risk: 100 }, thresholds: { challenge: 35, review: 60, block: 85 }, blockRequirements: { minSignals: 3, minDistinctRules: 2, minDistinctTypes: 2, minimumConfidence: 0.9 } }; const engine = createThreatAssessmentEngine({ policy, clock: () => 1000000 }); if (typeof engine.assess !== "function" || engine.assess([]) !== null) process.exit(1);'
+  ], { cwd: guardInstall });
+
   // JB Malware Engine.
   const malwareTarball = await pack("packages/malware-engine");
   const malwareInstall = await install(malwareTarball, "install-malware-engine");
