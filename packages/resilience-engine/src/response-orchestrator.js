@@ -425,6 +425,7 @@ export function createResponseOrchestrator({
       });
       circuitState = await orchestrationStore.getCircuitState({
         assetId: decision.assetId,
+        environment: decision.environment,
         action,
         now: safeNow(clock)
       });
