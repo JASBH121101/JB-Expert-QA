@@ -7,10 +7,12 @@
 
 ## Scope
 
-This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns three stores:
+This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns four stores:
 
 - \`orchestrationStore\`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
 - \`auditStore\`: append-only, SHA-256 hash-chained audit events.
+- \`coordinationStore\`: per-scope leases with database-clock expiry and monotonic fencing-token issuance.
+- \`fencedTargetStore\`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.
 
 The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The host owns the Pool and passes it in explicitly.
 
@@ -54,6 +56,14 @@ Each mutating operation is enclosed in an explicit database transaction with rol
 
 The adapter preserves the current file-store method shapes so it can be introduced behind the existing dependency-injection boundary. The PostgreSQL store is shareable across multiple application processes attached to the same authoritative database primary. The coordination store adds exclusive per-scope leases and monotonically increasing fencing-token issuance, serialized by a PostgreSQL row lock. Database time, rather than a host clock, determines lease expiry. This is a single-primary coordination primitive, not a consensus or quorum implementation.
 
+## Fenced PostgreSQL state targets
+
+`fencedTargetStore.applyState({ scopeId, targetId, holderId, leaseId, fencingToken, mutationId, state })` writes one JSON state object under the current lease. The lease row is locked for the full transaction, lease identity and expiry are checked against PostgreSQL state/database time, the target row is locked, and the target's persisted fencing token is checked before the state is updated. `getState({ scopeId, targetId })` reads the committed state and accepted token.
+
+The target stores a durable high-water mark and mutation receipt. A lower token is rejected; equal tokens are accepted only from the same lease identity; a duplicate mutation ID with the same payload is a no-op, while reusing it with different content is rejected. State payloads are limited to 64 KiB and must be plain JSON objects.
+
+**Guarantee boundary:** this closes the verify-then-write race for application state that is itself stored in this same PostgreSQL primary and modified only through this store. It does not fence `systemd`, Windows SCM, arbitrary files, remote APIs or other external side effects. Do not place network calls or OS commands behind this state API and label them fenced. A real OS fence still requires an enforcing host agent/resource that atomically consumes epochs at the destination.
+
 ## Database objects
 
 Initialization creates only these namespaced tables and indexes:
@@ -65,6 +75,9 @@ Initialization creates only these namespaced tables and indexes:
 - \`jb_resilience_circuits\`
 - \`jb_resilience_audit_heads\`
 - \`jb_resilience_audit_records\`
+- \`jb_resilience_coordination_leases\`
+- \`jb_resilience_fenced_targets\`
+- \`jb_resilience_fenced_mutations\`
 
 Use a dedicated database or a role/schema policy that confines the runtime role to these objects. The initializer requires DDL rights. A hardened deployment should separate one-time schema initialization privileges from the runtime role and grant only the minimum table/sequence permissions needed for reads, inserts, updates and audit appends.
 
@@ -78,9 +91,9 @@ Use a dedicated database or a role/schema policy that confines the runtime role 
 
 ## Explicit limitations
 
-This v1 is not production-certified and does not provide:
+This v2 remains laboratory-only and does not provide:
 
-- target-enforced consumption of fencing tokens by OS execution adapters or application resources;
+- target-enforced consumption of fencing tokens by OS execution adapters, external services or resources outside this PostgreSQL primary;
 - leader election, quorum, split-brain resolution or multi-region consensus;
 - A2 containment or A3 failover authorization;
 - automatic retries of uncertain actions;
@@ -92,7 +105,7 @@ A single PostgreSQL primary provides transaction serialization for this adapter,
 
 ## Laboratory certification
 
-The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation and audit-chain tamper detection.
+The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation, audit-chain tamper detection, competing lease acquisition, successor epochs, fenced target writes, stale-epoch rejection and mutation idempotency.
 
 No production database or Neon credentials are used by this test.
 
