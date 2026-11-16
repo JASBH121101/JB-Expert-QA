@@ -3,7 +3,6 @@ import { promisify } from "node:util";
 import {
   existsSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   writeFileSync
 } from "node:fs";
