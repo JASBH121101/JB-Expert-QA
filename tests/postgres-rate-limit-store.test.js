@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";\nimport { createCoreRateLimitCounterKey } from "@jb/security-guard/core-contract-v1";
+import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";
+import { createCoreRateLimitCounterKey } from "@jb/security-guard/core-contract-v1";
 
 const KEY = "jb-guard:api:" + "a".repeat(64);
 const CORE_KEY = createCoreRateLimitCounterKey({
