@@ -29,8 +29,6 @@ const A3_REQUIREMENTS = Object.freeze([
   "budgetAvailable"
 ]);
 
-const VALID_GATES = new Set([...A2_REQUIREMENTS, ...A3_REQUIREMENTS]);
-
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
