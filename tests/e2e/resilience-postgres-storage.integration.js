@@ -283,9 +283,18 @@ async function main() {
     assert.equal(state.preserveEvidence, true);
 
     const conflictingSignal = signTrustedSignalEnvelope({
-      ...signal,
+      schema: signal.schema,
+      eventId: signal.eventId,
+      sourceId: signal.sourceId,
+      sourceEngine: signal.sourceEngine,
+      environment: signal.environment,
+      assetId: signal.assetId,
+      issuedAtMs: signal.issuedAtMs,
+      expiresAtMs: signal.expiresAtMs,
+      state: signal.state,
+      severity: signal.severity,
       reasonCode: "DIFFERENT_VERDICT",
-      signature: undefined
+      evidenceRefs: signal.evidenceRefs
     }, key);
     const conflict = await firstGateway.ingest(conflictingSignal);
     assert.deepEqual(conflict, { accepted: false, reason: "signal-id-conflict" });
