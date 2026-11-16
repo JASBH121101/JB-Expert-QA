@@ -39,7 +39,7 @@ function createFixture({ providerOverrides = {} } = {}) {
     keys.set(keyId, {
       schema: "jb.resilience.provider-trust-key/v1",
       keyId,
-      keyVersion: 1,
+      keyVersion: overrides.keyVersion ?? 1,
       algorithm: "Ed25519",
       publicKeyPem: publicKey.export({ type: "spki", format: "pem" }),
       providerId,
@@ -233,20 +233,25 @@ test("rejects unknown, inactive, substituted and rolled-back provider keys", () 
     keyVersion: 2,
     status: "revoked"
   });
+  const revokedBundle = inactive.makeBundle({
+    "policy-authority": { keyVersion: 2 }
+  });
   assert.equal(verifyA2ProviderEvidenceBundle({
-    attestations: inactive.makeBundle(), expected: SCOPE, verifier: inactive.verifier
+    attestations: revokedBundle, expected: SCOPE, verifier: inactive.verifier
   }).verified, false);
 
   const rollback = createFixture();
-  const attestation = rollback.makeAttestation("policy-authority");
-  assert.equal(rollback.verifier.verify(attestation, SCOPE).verified, true);
+  const originalKey = rollback.keys.get("key-policy-authority");
   rollback.keys.set("key-policy-authority", {
-    ...rollback.keys.get("key-policy-authority"),
-    keyVersion: 2,
-    expiresAtMs: NOW + 600_001
+    ...originalKey,
+    keyVersion: 2
   });
   assert.equal(rollback.verifier.verify(
-    rollback.makeAttestation("policy-authority"), SCOPE
+    rollback.makeAttestation("policy-authority", { keyVersion: 2 }), SCOPE
+  ).verified, true);
+  rollback.keys.set("key-policy-authority", originalKey);
+  assert.equal(rollback.verifier.verify(
+    rollback.makeAttestation("policy-authority", { keyVersion: 1 }), SCOPE
   ).verified, false);
 });
 
