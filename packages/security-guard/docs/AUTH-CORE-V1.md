@@ -19,9 +19,9 @@ const auth = guard.createAuthProtection({
   onCoreAttempt(attempt) {
     // A validated authentication.attempt/v1, with opaque HMAC subjects.
   },
-  onCoreDecision(({ attempt, decision }) => {
+  onCoreDecision: ({ attempt, decision }) => {
     // A validated authentication.decision/v1 paired with its attempt.
-  }),
+  },
   onCoreEvent(event) {
     // Optional sanitized security-event/v1 sink.
   }
@@ -49,7 +49,7 @@ const auth = createDistributedAuthProtection({
     clientKeyId: "client-hmac-2026-01"
   },
   onCoreAttempt(attempt) {},
-  onCoreDecision(({ attempt, decision }) => {}),
+  onCoreDecision: ({ attempt, decision }) => {},
   onCoreEvent(event) {}
 });
 ```
@@ -62,6 +62,7 @@ The distributed protector still requires a real store that atomically implements
 - `recordSuccess(request)` emits `outcome: "success"`.
 - The paired decision describes the security throttle only. `allow` means the throttle did not block the authentication handler; it does **not** mean that credentials were correct or accepted.
 - `monitor` reports a would-be lockout without claiming that the request was denied. `deny` maps to HTTP 429. Store failures map to enforced `unavailable`/503 in distributed middleware.
+- Core v1 limits `retryAfterSeconds` to 3600, so longer configured lockouts are capped in Core telemetry; the existing middleware response retains its runtime retry interval.
 - Events are emitted when a lockout is first triggered, not for each subsequent rejected request, to avoid flooding telemetry.
 - Raw account identifiers, IP addresses, passwords, cookies, session tokens, recovery codes, and request bodies are not included. The Core bridge derives tenant/application-separated HMAC keys from the runtime's existing HMAC identity digests.
 - The Core attempt schema requires an account key. When an application resolver cannot provide an account, the bridge uses a tenant/application-separated anonymous-subject HMAC; configure a reliable server-side account resolver whenever possible.
