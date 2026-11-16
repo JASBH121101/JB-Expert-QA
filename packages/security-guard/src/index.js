@@ -732,7 +732,13 @@ export function createSecurityGuard(options = {}) {
     const rateLimitResult = getRateLimitFinding(request, now, coreIdentity);
     if (rateLimitResult?.finding) findings.push(rateLimitResult.finding);
 
-    publishLocalCoreRateLimit(settings, rateLimitResult, now);
+    if (settings.coreContract && rateLimitResult) {
+      try {
+        publishLocalCoreRateLimit(settings, rateLimitResult, now);
+      } catch {
+        // A Core contract construction failure must never alter local rate-limit enforcement.
+      }
+    }
 
     if (findings.length === 0) {
       next();
