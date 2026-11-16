@@ -58,7 +58,7 @@ The v2 policy authority is implemented in `src/policy-engine.js` and exported as
 - Policy schema and allowed fields are strict; unknown fields, wildcard assets/actions and unknown capability names are rejected.
 - The canonical hash is SHA-256 over canonical JSON excluding only `policyHash` and `signature.value`; the key ID and algorithm remain covered. The host verifier receives the immutable normalized policy, canonical signing payload, hash and signature metadata. A successful signature result must be the literal boolean `true`; asynchronous or truthy non-boolean results are rejected.
 - Validity windows are checked at controller creation, each evaluation/authorization and before use of a short-lived authorization.
-- The durable revision store atomically rejects revision rollback and same-revision hash substitution.
+- The durable revision registry confirms the exact owner-activated revision/hash. Its separate owner-controlled activation path must be pre-seeded and enforce monotonic revisions, rejecting rollback and same-revision hash substitution; the runtime cannot promote its own policy.
 - The durable capability ledger atomically reserves actions and enforces incident concurrency, per-incident budgets and per-asset hourly budgets.
 - Authorization tokens are opaque in-process object capabilities, expire within 30 seconds by default, are revalidated before use and can be completed only once.
 - Test-only memory stores are explicitly marked non-durable and rejected by default.
