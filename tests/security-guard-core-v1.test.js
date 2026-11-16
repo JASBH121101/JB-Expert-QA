@@ -172,3 +172,38 @@ test("Core v1 counter keys are length-prefixed and isolate tenant, policy, scope
     createCoreRateLimitCounterKey({ ...base, tenantId: "a", applicationId: "bc" })
   );
 });
+
+test("Core v1 strict normalizers reject prototype-bearing and accessor-based input objects", () => {
+  const inherited = Object.create({ tenantId: "tenant-demo" });
+  Object.assign(inherited, request());
+  assert.throws(() => normalizeCoreRateLimitCheckRequest(inherited), /plain object/);
+
+  const accessor = request();
+  Object.defineProperty(accessor, "scope", { enumerable: true, get() { throw new Error("getter executed"); } });
+  assert.throws(() => normalizeCoreRateLimitCheckRequest(accessor), /accessor properties/);
+
+  const nested = request();
+  nested.identity = Object.create({ type: "anonymous" });
+  Object.assign(nested.identity, {
+    type: "anonymous",
+    key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    keyId: "k2026-01"
+  });
+  assert.throws(() => normalizeCoreRateLimitCheckRequest(nested), /plain object/);
+});
+
+test("Core v1 policy and counter-key normalizers reject duplicate and ambiguous inputs", () => {
+  const duplicate = policy();
+  duplicate.limits[1].id = duplicate.limits[0].id;
+  assert.throws(() => normalizeCoreRateLimitPolicy(duplicate), /must be unique/);
+
+  const counter = {
+    tenantId: "tenant-demo", applicationId: "catalog-api", policyId: "public-api",
+    scope: "catalog:list", identityType: "account", keyId: "k2026-01",
+    identityKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  };
+  const key = createCoreRateLimitCounterKey(counter);
+  assert.ok(key.startsWith("15:jbsg-counter-v1"));
+  assert.notEqual(key, createCoreRateLimitCounterKey({ ...counter, keyId: "k2026-02" }));
+  assert.throws(() => createCoreRateLimitCounterKey({ ...counter, extra: "raw-user-id" }), /unsupported field/);
+});
