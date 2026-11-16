@@ -109,23 +109,23 @@ test("Linux command grammar rejects unapproved operations, services and argument
     execFileImpl: stub.run
   });
   assert.throws(
-    runner.run("systemctl", ["restart", "other.service"], { shell: false }),
+    () => runner.run("systemctl", ["restart", "other.service"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("systemctl", ["restart", "catalog-api.service;id"], { shell: false }),
+    () => runner.run("systemctl", ["restart", "catalog-api.service;id"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("systemctl", ["status", "catalog-api.service"], { shell: false }),
+    () => runner.run("systemctl", ["status", "catalog-api.service"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("sh", ["-c", "id"], { shell: false }),
+    () => runner.run("sh", ["-c", "id"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("systemctl", ["restart", "catalog-api.service"], { shell: true }),
+    () => runner.run("systemctl", ["restart", "catalog-api.service"], { shell: true }),
     /shell execution is prohibited/
   );
   assert.equal(stub.calls.length, 0);
@@ -141,19 +141,19 @@ test("Windows command grammar rejects powershell, arbitrary sc verbs and unknown
     execFileImpl: stub.run
   });
   assert.throws(
-    runner.run("sc.exe", ["delete", "JBService"], { shell: false }),
+    () => runner.run("sc.exe", ["delete", "JBService"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("sc.exe", ["stop", "OtherService"], { shell: false }),
+    () => runner.run("sc.exe", ["stop", "OtherService"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("powershell.exe", ["-Command", "Stop-Service JBService"], { shell: false }),
+    () => runner.run("powershell.exe", ["-Command", "Stop-Service JBService"], { shell: false }),
     /allowlist/
   );
   assert.throws(
-    runner.run("sc.exe", ["stop", "JBService", "&&", "whoami"], { shell: false }),
+    () => runner.run("sc.exe", ["stop", "JBService", "&&", "whoami"], { shell: false }),
     /allowlist/
   );
   assert.equal(stub.calls.length, 0);
@@ -218,7 +218,7 @@ test("runner clamps command timeouts and rejects oversized or unsupported option
   assert.equal(stub.calls[0].options.timeout, 15_000);
   assert.equal(stub.calls[0].options.windowsHide, true);
   assert.throws(
-    runner.run("systemctl", ["restart", "catalog.service"], {
+    () => runner.run("systemctl", ["restart", "catalog.service"], {
       shell: false,
       timeoutMs: 50,
       cwd: "/tmp"
@@ -226,7 +226,7 @@ test("runner clamps command timeouts and rejects oversized or unsupported option
     /unsupported fields/
   );
   assert.throws(
-    runner.run("systemctl", ["restart", "catalog.service"], { shell: false, timeoutMs: 20 }),
+    () => runner.run("systemctl", ["restart", "catalog.service"], { shell: false, timeoutMs: 20 }),
     /at least 100/
   );
 });
