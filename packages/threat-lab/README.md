@@ -135,3 +135,16 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
 **Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
+
+## NEXORA product adapters
+
+The Threat Lab now has dedicated product adapters for two separate NEXORA deliverables. The adapters invoke only fixed, allow-listed local test files and use bounded child processes without a shell:
+
+- **Configurable Catalog prototype:** runs the Node built-in tests under `demo/tests/`. These checks validate the browser-side demonstration, localStorage behavior, setup contract, sample data, and responsive layout. They do not certify real authentication, server persistence, uploads, or a backend.
+- **Site Engine:** runs selected Laravel PHPUnit feature suites with a disposable SQLite in-memory database. Coverage includes installation/template seeding, published/private public-data boundaries, inventory-assistant field isolation, export permissions/formula safety, and role/field authorization.
+
+The dedicated workflow checks out immutable NEXORA revisions:
+- Catalog prototype: `88c4876c9678b93dadde55f79fe9d04890900741`
+- Site Engine: `ebdf403d105add03b5aaa4b9018e45e42b6cd8ee`
+
+These are separate profiles with independent results. Current adapter scenarios cover Basic through Advanced for the prototype and Basic through Expert for Site Engine. Extreme and Superextreme remain explicitly missing; neither target is marked ready. Product changes belong in the NEXORA repository's corresponding branch, not in this lab adapter package.
