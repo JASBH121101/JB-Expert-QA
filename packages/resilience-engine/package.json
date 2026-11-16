@@ -22,7 +22,8 @@
     "./orchestration-store": "./src/orchestration-store.js",
     "./adapters/postgres-storage": "./src/adapters/postgres-storage.js",
     "./adapters/health-monitor-probes": "./src/adapters/health-monitor-probes.js",
-    "./adapters/restricted-host-command-runner": "./src/adapters/restricted-host-command-runner.js"
+    "./adapters/restricted-host-command-runner": "./src/adapters/restricted-host-command-runner.js",
+    "./adapters/identity-policy-bridge": "./src/adapters/identity-policy-bridge.js"
   },
   "files": [
     "src/**",
