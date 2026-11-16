@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import { createPostgresResilienceStorageAdapter } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
+import {
+  createTrustedSignalGateway,
+  signTrustedSignalEnvelope
+} from "../../packages/resilience-engine/src/trusted-signal-gateway.js";
 
 const connectionString = process.env.QA_DATABASE_URL;
 if (!connectionString) throw new Error("QA_DATABASE_URL is required for the PostgreSQL resilience adapter integration test");
@@ -68,7 +72,7 @@ async function main() {
     /not initialized/
   );
   const initialized = await storage.initialize();
-  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 3 });
+  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 4 });
   await secondStorage.initialize();
   process.stdout.write("PASS: injected Pool and explicit initialization\n");
 
@@ -218,6 +222,81 @@ async function main() {
     })).state }, { version: "initial" });
     await secondStorage.coordinationStore.releaseLease(successor.lease);
     await storage.coordinationStore.releaseLease(highWaterLease.lease);
+  });
+
+
+  await runCase("PostgreSQL trusted signal store enforces cross-instance replay and integrity", async () => {
+    const issuedAtMs = 1_800_000_000_000;
+    const key = "ci-only-multi-host-trusted-signal-key";
+    const sources = [{
+      sourceId: "malware-ci",
+      engine: "malware-engine",
+      environment: "test",
+      assetIds: ["host-postgres-01"],
+      key
+    }];
+    const clock = () => issuedAtMs + 1_000;
+    const firstGateway = createTrustedSignalGateway({
+      sources, replayStore: storage.trustedSignalStore, clock
+    });
+    const secondGateway = createTrustedSignalGateway({
+      sources, replayStore: secondStorage.trustedSignalStore, clock
+    });
+    const signal = signTrustedSignalEnvelope({
+      schema: "jb.resilience.trusted-signal/v1",
+      eventId: "3d6f12c0-129a-4f80-8af1-2a02f1edb001",
+      sourceId: "malware-ci",
+      sourceEngine: "malware-engine",
+      environment: "test",
+      assetId: "host-postgres-01",
+      issuedAtMs,
+      expiresAtMs: issuedAtMs + 120_000,
+      state: "confirmed",
+      severity: "critical",
+      reasonCode: "MALWARE_VERIFIED",
+      evidenceRefs: [{
+        refId: "artifact:incident-001",
+        sha256: "a".repeat(64)
+      }]
+    }, key);
+
+    const ingested = await Promise.all([
+      firstGateway.ingest(signal),
+      secondGateway.ingest(signal)
+    ]);
+    assert.equal(ingested.filter((item) => item.accepted).length, 1);
+    assert.equal(ingested.filter((item) => item.reason === "signal-replay").length, 1);
+
+    const records = await secondStorage.trustedSignalStore.listSignals({
+      assetId: "host-postgres-01", environment: "test", sinceMs: issuedAtMs
+    });
+    assert.equal(records.length, 1);
+    assert.equal(records[0].signal.eventId, signal.eventId);
+    assert.equal(records[0].signalDigest.length, 64);
+    assert.equal(records[0].retentionUntilMs >= signal.expiresAtMs, true);
+
+    const state = await secondGateway.getSecurityState({
+      assetId: "host-postgres-01", environment: "test"
+    });
+    assert.equal(state.state, "confirmed");
+    assert.equal(state.authorizationGranted, false);
+    assert.equal(state.preserveEvidence, true);
+
+    const conflictingSignal = signTrustedSignalEnvelope({
+      ...signal,
+      reasonCode: "DIFFERENT_VERDICT",
+      signature: undefined
+    }, key);
+    const conflict = await firstGateway.ingest(conflictingSignal);
+    assert.deepEqual(conflict, { accepted: false, reason: "signal-id-conflict" });
+
+    await pool.query(
+      "UPDATE jb_resilience_trusted_signals SET signal=jsonb_set(signal, '{reasonCode}', '\\"TAMPERED\\"'::jsonb) WHERE source_id=$1 AND event_id=$2",
+      ["malware-ci", signal.eventId]
+    );
+    await assert.rejects(secondStorage.trustedSignalStore.listSignals({
+      assetId: "host-postgres-01", environment: "test", sinceMs: issuedAtMs
+    }), /integrity check failed/);
   });
 
   await runCase("transactional incident transitions and identity/time guards", async () => {
