@@ -131,6 +131,35 @@ class UniversalClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(captured["headers"]["Authorization"].startswith("Bearer "))
         self.assertNotIn("python-client-secret", captured["body"].decode("utf-8"))
 
+        boundary = await client.check("€" * 512, "catalog-read", "public")
+        self.assertTrue(boundary["allowed"])
+        with self.assertRaises(ValueError):
+            await client.check("€" * 513, "catalog-read", "public")
+
+    async def test_client_rejects_url_userinfo_query_and_fragment(self):
+        for endpoint in (
+            "https://user:password@guard.example/check",
+            "https://guard.example/check?token=secret",
+            "https://guard.example/check#fragment",
+        ):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaises(ValueError):
+                    UniversalRateLimitClient(
+                        endpoint, "catalog-api", "python-client-secret-at-least-32-bytes"
+                    )
+
+    async def test_client_rejects_oversized_transport_response(self):
+        async def oversized(*args):
+            return {"status": 200, "headers": {}, "body": "x" * 16385}
+
+        client = UniversalRateLimitClient(
+            "https://guard.example/check", "catalog-api",
+            "python-client-secret-at-least-32-bytes", failure_mode="open", transport=oversized,
+        )
+        result = await client.check("user-123", "catalog-read", "public")
+        self.assertFalse(result["allowed"])
+        self.assertTrue(result["enforced"])
+
     async def test_client_maps_429_and_fail_open_or_closed_outages(self):
         async def limited(*args):
             return {"status": 429, "headers": {"retry-after": "17"}, "body": "{}"}
