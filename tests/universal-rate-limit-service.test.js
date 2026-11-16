@@ -89,6 +89,17 @@ test("rate limit is shared across independent service instances using the same a
   });
 });
 
+test("concurrent requests across service replicas never exceed the atomic quota", async () => {
+  const store = createAtomicStore();
+  const services = [makeService(store), makeService(store), makeService(store)];
+  const payload = { identity: "contended-account", scope: "catalog-write", policy: "general" };
+  const responses = await Promise.all(Array.from({ length: 30 }, (_, index) =>
+    request(services[index % services.length], payload)
+  ));
+  assert.equal(responses.filter((response) => response.status === 200).length, 2);
+  assert.equal(responses.filter((response) => response.status === 429).length, 28);
+});
+
 test("client credentials are required and compared without exposing details", async () => {
   const store = createAtomicStore();
   const service = makeService(store);
