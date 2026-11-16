@@ -580,6 +580,7 @@ export function createResiliencePolicyEngine({
   });
   const issued = new WeakSet();
   const completed = new WeakSet();
+  const requestContext = new WeakMap();
 
   function currentPolicy(now) {
     return verifyPolicySnapshot(validatedPolicy, verifyPolicySignature, now);
@@ -680,10 +681,11 @@ export function createResiliencePolicyEngine({
       expiresAt
     });
     issued.add(authorization);
+    requestContext.set(authorization, safeRequest);
     return Object.freeze({ authorized: true, authorization });
   }
 
-  async function assertAuthorization({ authorization } = {}) {
+  async function assertAuthorization({ authorization, request } = {}) {
     if (!authorization || typeof authorization !== "object" || !issued.has(authorization) ||
         completed.has(authorization)) {
       return Object.freeze({ valid: false, reason: "unknown-or-consumed-authorization" });
@@ -700,6 +702,24 @@ export function createResiliencePolicyEngine({
         authorization.revision !== validatedPolicy.revision ||
         authorization.policyHash !== integrity.policyHash) {
       return Object.freeze({ valid: false, reason: "authorization-expired-or-stale" });
+    }
+    const originalRequest = requestContext.get(authorization);
+    const freshRequest = validateRequest(request);
+    if (!freshRequest.valid) {
+      return Object.freeze({ valid: false, reason: "fresh-capability-context-required" });
+    }
+    for (const key of ["assetId", "environment", "incidentId", "action"]) {
+      if (freshRequest.request[key] !== originalRequest[key]) {
+        return Object.freeze({ valid: false, reason: "authorization-context-mismatch" });
+      }
+    }
+    const refreshedDecision = evaluatePolicyCapability(validatedPolicy, freshRequest.request, now);
+    if (!refreshedDecision.permitted || refreshedDecision.riskClass === "A0") {
+      return Object.freeze({
+        valid: false,
+        reason: "capability-conditions-no-longer-met",
+        detail: refreshedDecision.reason
+      });
     }
     let acceptedRevision = false;
     let reserved = false;
@@ -750,6 +770,7 @@ export function createResiliencePolicyEngine({
     }
     if (!recorded) return Object.freeze({ recorded: false, reason: "capability-ledger-finalization-failed" });
     completed.add(authorization);
+    requestContext.delete(authorization);
     return Object.freeze({ recorded: true, reason: null });
   }
 
