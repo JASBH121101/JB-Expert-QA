@@ -43,8 +43,8 @@ export function createWindowsScmAdapter({
         { shell: false, timeoutMs: Math.max(1, Math.min(timeoutMs, remaining || 1)), windowsHide: true }
       ), "query");
       const output = [response.stdout, response.output, response.stderr]
-        .filter((value) => typeof value === "string").join("\\n");
-      const match = output.match(/\\bSTATE\\s*:\\s*\\d+\\s+([A-Z_]+)\\b/i);
+        .filter((value) => typeof value === "string").join("\n");
+      const match = output.match(/\bSTATE\s*:\s*\d+\s+([A-Z_]+)\b/i);
       const state = match?.[1]?.toUpperCase() ?? null;
       if (state === expectedState && clock() <= deadline) return response;
       const afterQuery = deadline - clock();
