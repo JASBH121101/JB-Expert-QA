@@ -258,7 +258,26 @@ test("runner returns bounded sanitized output and a stable timeout result", asyn
   );
   assert.equal(timeout.exitCode, 1);
   assert.equal(timeout.timedOut, true);
+  assert.equal(timeout.reason, "timeout");
   assert.equal(timeout.status, "timed_out");
+
+  const outputLimitedRunner = createRestrictedHostCommandRunner({
+    platform: "linux-systemd",
+    binaries: { systemctl: "/usr/bin/systemctl" },
+    allowedServices: ["catalog.service"],
+    execFileImpl: execStub(() => ({
+      error: Object.assign(new Error("maxBuffer exceeded"), {
+        code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+        killed: true
+      })
+    })).run
+  });
+  const outputLimited = await outputLimitedRunner.run(
+    "systemctl", ["restart", "catalog.service"], { shell: false }
+  );
+  assert.equal(outputLimited.timedOut, false);
+  assert.equal(outputLimited.reason, "output-limit");
+  assert.equal(outputLimited.status, "failed");
 });
 
 test("non-zero system-manager exit remains a failed result and adapter rejects it", async () => {
