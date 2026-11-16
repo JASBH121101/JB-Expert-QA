@@ -465,10 +465,10 @@ function safelyCallCore(callback, value) {
 
 function createLocalCoreRateLimitCheck(core, identity) {
   const identityKey = createHmac("sha256", core.identitySecret)
-    .update("jb.security.rate-limit.identity/v1").update("\\0")
-    .update(core.tenantId).update("\\0")
-    .update(core.applicationId).update("\\0")
-    .update(core.identityType).update("\\0")
+    .update("jb.security.rate-limit.identity/v1").update("\0")
+    .update(core.tenantId).update("\0")
+    .update(core.applicationId).update("\0")
+    .update(core.identityType).update("\0")
     .update(identity)
     .digest("hex");
   return validateRateLimitCheckV1({
@@ -559,10 +559,10 @@ function createCoreThreatSignal(core, finding, identity, occurredAtMs) {
     ruleId: finding.id,
     ...(identity && identity !== "unknown" ? {
       subjectKey: createHmac("sha256", core.identitySecret)
-        .update("jb.security.threat.identity/v1").update("\\0")
-        .update(core.tenantId).update("\\0")
-        .update(core.applicationId).update("\\0")
-        .update(core.identityType).update("\\0")
+        .update("jb.security.threat.identity/v1").update("\0")
+        .update(core.tenantId).update("\0")
+        .update(core.applicationId).update("\0")
+        .update(core.identityType).update("\0")
         .update(identity)
         .digest("hex"),
       subjectKeyId: core.identityKeyId
