@@ -28,6 +28,42 @@ test("health monitor counts failures, proposes recovery at threshold and resets 
   assert.equal(monitor.observe({ serviceId: "api", healthy: true }).consecutiveFailures, 0);
 });
 
+test("healthy observations continue after recovery-attempt capacity is exhausted", () => {
+  let now = 1000;
+  const monitor = createHealthMonitor({
+    clock: () => now,
+    maxServices: 1,
+    maxRecoveryAttempts: 1,
+    engine: { evaluateRecovery: () => ({ eligible: false }) }
+  });
+  monitor.recordRecoveryAttempt({ serviceId: "api", executed: true });
+  now += 1000;
+  const healthy = monitor.observe({ serviceId: "api", healthy: true });
+  assert.equal(healthy.status, "healthy");
+  assert.equal(healthy.consecutiveFailures, 0);
+  assert.equal(healthy.restartCount, 1);
+  assert.throws(
+    () => monitor.recordRecoveryAttempt({ serviceId: "api", executed: false }),
+    /recovery-attempt limit/
+  );
+  assert.throws(
+    () => monitor.recordRecoveryAttempt({ serviceId: "another-api", executed: true }),
+    /service capacity/
+  );
+});
+
+test("security threat observations are passed to the recovery eligibility gate", () => {
+  const inputs = [];
+  const monitor = createHealthMonitor({
+    engine: { evaluateRecovery(input) { inputs.push(input); return { eligible: false, reason: "security-threat-active" }; } }
+  });
+  const result = monitor.observe({
+    serviceId: "api", healthy: false, securityThreatActive: true
+  });
+  assert.equal(result.recovery.reason, "security-threat-active");
+  assert.equal(inputs[0].securityThreatActive, true);
+});
+
 test("health monitor rejects malformed observations and recovery outcomes", () => {
   const monitor = createHealthMonitor({
     engine: { evaluateRecovery: () => ({ eligible: false }) }
