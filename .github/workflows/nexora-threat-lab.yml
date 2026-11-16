@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nexora-threat-lab-\${{ github.ref }}
+  group: nexora-threat-lab-profiles
   cancel-in-progress: true
 
 jobs:
@@ -88,8 +88,8 @@ jobs:
 
       - name: Run NEXORA profile scenarios in JB Threat Lab
         env:
-          NEXORA_CATALOG_ROOT: \${{ github.workspace }}/nexora-catalog
-          NEXORA_SITE_ENGINE_ROOT: \${{ github.workspace }}/nexora-site-engine
+          NEXORA_CATALOG_ROOT: ${{ github.workspace }}/nexora-catalog
+          NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/nexora-site-engine
           NEXORA_CATALOG_SHA: 88c4876c9678b93dadde55f79fe9d04890900741
           NEXORA_SITE_ENGINE_SHA: 3f68126ecc58b088c071007c5116bc95426d159b
         run: node --test packages/threat-lab/tests/nexora-profiles.integration.test.js
