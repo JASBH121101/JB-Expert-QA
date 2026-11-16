@@ -58,7 +58,7 @@ async function main() {
     /not initialized/
   );
   const initialized = await storage.initialize();
-  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 2 });
+  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 3 });
   await secondStorage.initialize();
   process.stdout.write("PASS: injected Pool and explicit initialization\n");
 
@@ -133,6 +133,81 @@ async function main() {
     assert.equal(next.lease.fencingToken, expired.lease.fencingToken + 1);
     assert.equal((await storage.coordinationStore.verifyLease(expired.lease)).valid, false);
     assert.equal((await secondStorage.coordinationStore.releaseLease(next.lease)).released, true);
+  });
+
+
+  await runCase("fenced PostgreSQL targets reject stale epochs and duplicate mutation IDs", async () => {
+    const scopeId = "fenced-target-scope";
+    const targetId = "catalog-state-record";
+    const firstLease = await storage.coordinationStore.acquireLease({
+      scopeId, holderId: "target-holder-a", leaseDurationMs: 5_000
+    });
+    assert.equal(firstLease.acquired, true);
+    const firstState = { status: "ready", revision: 1 };
+    const firstApplied = await storage.fencedTargetStore.applyState({
+      ...firstLease.lease, targetId, mutationId: "mutation-001", state: firstState
+    });
+    assert.equal(firstApplied.applied, true);
+    assert.equal(firstApplied.fencingToken, firstLease.lease.fencingToken);
+    assert.deepEqual(await secondStorage.fencedTargetStore.applyState({
+      ...firstLease.lease, targetId, mutationId: "mutation-001", state: firstState
+    }), { applied: false, reason: "duplicate-mutation" });
+    assert.deepEqual(await storage.fencedTargetStore.applyState({
+      ...firstLease.lease, targetId, mutationId: "mutation-001",
+      state: { status: "tampered", revision: 99 }
+    }), { applied: false, reason: "mutation-id-conflict" });
+
+    assert.equal((await storage.fencedTargetStore.applyState({
+      ...firstLease.lease, targetId, mutationId: "mutation-002",
+      state: { status: "ready", revision: 2 }
+    })).applied, true);
+    assert.equal((await storage.coordinationStore.releaseLease(firstLease.lease)).released, true);
+
+    const successor = await secondStorage.coordinationStore.acquireLease({
+      scopeId, holderId: "target-holder-b", leaseDurationMs: 5_000
+    });
+    assert.equal(successor.acquired, true);
+    assert.equal(successor.lease.fencingToken, firstLease.lease.fencingToken + 1);
+    assert.equal((await secondStorage.fencedTargetStore.applyState({
+      ...successor.lease, targetId, mutationId: "mutation-003",
+      state: { status: "recovered", revision: 3 }
+    })).applied, true);
+
+    const beforeStaleWrite = await storage.fencedTargetStore.getState({ scopeId, targetId });
+    assert.deepEqual(beforeStaleWrite.state, { status: "recovered", revision: 3 });
+    assert.deepEqual(await storage.fencedTargetStore.applyState({
+      ...firstLease.lease, targetId, mutationId: "mutation-stale",
+      state: { status: "stale-overwrite", revision: 4 }
+    }), { applied: false, reason: "lease-not-current" });
+    assert.deepEqual((await storage.fencedTargetStore.getState({ scopeId, targetId })).state,
+      { status: "recovered", revision: 3 });
+
+    const highWaterScope = "fenced-highwater-scope";
+    const highWaterLease = await storage.coordinationStore.acquireLease({
+      scopeId: highWaterScope, holderId: "highwater-holder", leaseDurationMs: 5_000
+    });
+    assert.equal(highWaterLease.acquired, true);
+    await storage.fencedTargetStore.applyState({
+      ...highWaterLease.lease, targetId: "highwater-target", mutationId: "highwater-init",
+      state: { version: "initial" }
+    });
+    await pool.query(
+      "UPDATE jb_resilience_fenced_targets SET fencing_token=$3 WHERE scope_id=$1 AND target_id=$2",
+      [highWaterScope, "highwater-target", highWaterLease.lease.fencingToken + 1]
+    );
+    assert.deepEqual(await storage.fencedTargetStore.applyState({
+      ...highWaterLease.lease, targetId: "highwater-target", mutationId: "highwater-stale",
+      state: { version: "must-not-apply" }
+    }), {
+      applied: false,
+      reason: "stale-fencing-token",
+      currentFencingToken: highWaterLease.lease.fencingToken + 1
+    });
+    assert.deepEqual((await storage.fencedTargetStore.getState({
+      scopeId: highWaterScope, targetId: "highwater-target"
+    })).state, { version: "initial" });
+    await secondStorage.coordinationStore.releaseLease(successor.lease);
+    await storage.coordinationStore.releaseLease(highWaterLease.lease);
   });
 
   await runCase("transactional incident transitions and identity/time guards", async () => {
