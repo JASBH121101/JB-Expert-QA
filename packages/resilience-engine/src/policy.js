@@ -34,15 +34,20 @@ export function validateResiliencePolicy(policy) {
 }
 
 export function evaluateRecoveryEligibility(policy, {
-  serviceId, consecutiveFailures, restartCount, lastRestartAt = null, now
+  serviceId, consecutiveFailures, restartCount, lastRestartAt = null,
+  securityThreatActive = false, now
 } = {}) {
   const service = policy.services.find((entry) => entry.id === serviceId);
   if (!service) return Object.freeze({ eligible: false, reason: "service-not-allowlisted" });
   if (!Number.isSafeInteger(consecutiveFailures) || consecutiveFailures < 0 ||
       !Number.isSafeInteger(restartCount) || restartCount < 0 ||
       !Number.isSafeInteger(now) || now < 0 ||
+      typeof securityThreatActive !== "boolean" ||
       (lastRestartAt !== null && (!Number.isSafeInteger(lastRestartAt) || lastRestartAt < 0))) {
     return Object.freeze({ eligible: false, reason: "invalid-recovery-state" });
+  }
+  if (securityThreatActive) {
+    return Object.freeze({ eligible: false, reason: "security-threat-active" });
   }
   if (consecutiveFailures < policy.failureThreshold) {
     return Object.freeze({ eligible: false, reason: "failure-threshold-not-reached" });
