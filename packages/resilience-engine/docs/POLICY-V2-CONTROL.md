@@ -102,7 +102,7 @@ if (result.authorized) {
 }
 ```
 
-The authorization object is an opaque in-process capability. Do not serialize it, accept a client-supplied replacement, or treat its presence as evidence that an operating-system action succeeded. The host executor must re-check it immediately before a typed adapter invocation and record the outcome exactly once.
+The authorization object is an opaque in-process capability. Do not serialize it, accept a client-supplied replacement, or treat its presence as evidence that an operating-system action succeeded. The host executor must supply a fresh host health/security context to `assertAuthorization()` immediately before a typed adapter invocation and record the outcome exactly once. The service/environment/incident/action binding cannot change between authorization and execution.
 
 ## Current capability matrix
 
