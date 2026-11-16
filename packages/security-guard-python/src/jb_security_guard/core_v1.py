@@ -89,7 +89,7 @@ def normalize_rate_limit_check(value: Any) -> dict[str, Any]:
     policy_id = _identifier(item["policyId"], "policyId")
     scope = _identifier(item["scope"], "scope")
     identity = _exact_keys(item["identity"], {"type", "key", "keyId"}, "identity")
-    if identity["type"] not in _IDENTITY_TYPES:
+    if not isinstance(identity["type"], str) or identity["type"] not in _IDENTITY_TYPES:
         raise ValueError("identity.type is unsupported")
     if not isinstance(identity["key"], str) or _SHA256_HEX.fullmatch(identity["key"]) is None:
         raise ValueError("identity.key must be a lowercase HMAC-SHA-256 digest")
@@ -175,7 +175,7 @@ def normalize_rate_limit_policy(value: Any) -> dict[str, Any]:
         if limit["id"] in seen:
             raise ValueError("policy limit IDs must be unique")
         seen.add(limit["id"])
-        if limit["identityType"] not in _IDENTITY_TYPES:
+        if not isinstance(limit["identityType"], str) or limit["identityType"] not in _IDENTITY_TYPES:
             raise ValueError(f"policy.limits[{index}].identityType is unsupported")
         if type(limit["windowSeconds"]) is not int or not 1 <= limit["windowSeconds"] <= 86400:
             raise ValueError(f"policy.limits[{index}].windowSeconds is out of bounds")
@@ -203,7 +203,7 @@ def create_rate_limit_counter_key(value: Any) -> str:
         _identifier(item["policyId"], "counterKey.policyId"),
         _identifier(item["scope"], "counterKey.scope"),
     ]
-    if item["identityType"] not in _IDENTITY_TYPES:
+    if not isinstance(item["identityType"], str) or item["identityType"] not in _IDENTITY_TYPES:
         raise ValueError("counterKey.identityType is unsupported")
     values.append(item["identityType"])
     values.append(_key_id(item["keyId"], "counterKey.keyId"))
