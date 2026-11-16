@@ -142,6 +142,29 @@ function validateLedger(value, limits) {
       throw new Error("orchestration ledger contains an invalid action");
     }
   }
+  for (const [serviceKey, service] of Object.entries(value.services)) {
+    if (typeof serviceKey !== "string" || !serviceKey.includes(":") ||
+        !isRecord(service) ||
+        !IDENTIFIER.test(service.assetId ?? "") ||
+        !IDENTIFIER.test(service.environment ?? "") ||
+        serviceKey !== service.environment + ":" + service.assetId ||
+        (service.lastActionAt !== null &&
+          (!Number.isSafeInteger(service.lastActionAt) || service.lastActionAt < 0)) ||
+        !Number.isSafeInteger(service.consecutiveFailures) || service.consecutiveFailures < 0) {
+      throw new Error("orchestration ledger contains invalid service state");
+    }
+  }
+  for (const [circuitKey, circuit] of Object.entries(value.circuits)) {
+    if (typeof circuitKey !== "string" || !circuitKey.includes(":") ||
+        !isRecord(circuit) ||
+        !Number.isSafeInteger(circuit.failureCount) || circuit.failureCount < 0 ||
+        !Number.isSafeInteger(circuit.failureThreshold) || circuit.failureThreshold < 1 ||
+        !Number.isSafeInteger(circuit.cooldownMs) || circuit.cooldownMs < 1_000 ||
+        (circuit.retryAtMs !== null &&
+          (!Number.isSafeInteger(circuit.retryAtMs) || circuit.retryAtMs < 0))) {
+      throw new Error("orchestration ledger contains invalid circuit state");
+    }
+  }
   for (const [key, actionId] of Object.entries(value.idempotency)) {
     if (!SHA256.test(key) || typeof actionId !== "string" || !value.actions[actionId] ||
         value.actions[actionId].idempotencyKey !== key) {
@@ -464,6 +487,8 @@ export function createFileOrchestrationStore({
       ledger.idempotency[safe.idempotencyKey] = actionId;
       const serviceKey = safe.environment + ":" + safe.assetId;
       ledger.services[serviceKey] ??= {
+        assetId: safe.assetId,
+        environment: safe.environment,
         lastActionAt: null,
         lastOutcome: "unknown",
         consecutiveFailures: 0
@@ -496,9 +521,10 @@ export function createFileOrchestrationStore({
   }
 
   async function recordActionOutcome({
-    assetId, action, outcome, at, failureThreshold, cooldownMs
+    assetId, environment, action, outcome, at, failureThreshold, cooldownMs
   } = {}) {
     assertIdentifier(assetId, "assetId");
+    assertIdentifier(environment, "environment");
     assertIdentifier(action, "action");
     assertTimestamp(at, "action outcome timestamp");
     if (!ACTION_OUTCOMES.has(outcome) ||
@@ -507,9 +533,8 @@ export function createFileOrchestrationStore({
       throw new TypeError("action outcome policy is invalid");
     }
     return mutate(async (ledger) => {
-      const matching = Object.values(ledger.services).filter((entry) => entry.assetId === assetId);
-      const serviceKey = Object.keys(ledger.services).find((key) => key.endsWith(":" + assetId));
-      const service = serviceKey ? ledger.services[serviceKey] : null;
+      const serviceKey = environment + ":" + assetId;
+      const service = ledger.services[serviceKey] ?? null;
       if (outcome === "cancelled-before-execution") {
         return { changed: false, value: true };
       }
@@ -593,7 +618,7 @@ function validateAuditLog(content, maxBytes) {
       throw new Error("audit log contains malformed JSON");
     }
     if (!isRecord(record) ||
-        Object.keys(record).length !== 4 ||
+        Object.keys(record).length !== 5 ||
         !["schema", "sequence", "previousHash", "hash", "entry"].every((key) => Object.hasOwn(record, key))) {
       throw new Error("audit log record has an invalid shape");
     }
