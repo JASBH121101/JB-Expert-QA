@@ -75,3 +75,5 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
 }
 
 export { validateResiliencePolicy, evaluateRecoveryEligibility } from "./policy.js";
+
+export { createHealthMonitor } from "./health-monitor.js";
