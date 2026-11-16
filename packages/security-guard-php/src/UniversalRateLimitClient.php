@@ -22,8 +22,9 @@ final class UniversalRateLimitClient
         ?Closure $transport = null
     ) {
         $url = parse_url($endpoint);
-        if (!is_array($url) || ($url['scheme'] ?? null) !== 'https' || empty($url['host'])) {
-            throw new RuntimeException('endpoint must be an absolute HTTPS URL');
+        if (!is_array($url) || ($url['scheme'] ?? null) !== 'https' || empty($url['host']) ||
+            isset($url['user']) || isset($url['pass']) || isset($url['query']) || isset($url['fragment'])) {
+            throw new RuntimeException('endpoint must be an absolute HTTPS URL without embedded credentials, query, or fragment');
         }
         if (!preg_match('/^[A-Za-z0-9:_-]{1,96}$/D', $clientId)) {
             throw new RuntimeException('clientId has an invalid format');
@@ -43,8 +44,9 @@ final class UniversalRateLimitClient
 
     public function check(string $identity, string $scope, string $policy): array
     {
-        if ($identity === '' || strlen($identity) > 512 || str_contains($identity, "\0") || preg_match('//u', $identity) !== 1) {
-            throw new RuntimeException('identity must be a non-empty valid UTF-8 string without NUL and at most 512 bytes');
+        if ($identity === '' || strlen($identity) > 2048 || str_contains($identity, "\0") ||
+            preg_match('//u', $identity) !== 1 || self::utf16CodeUnitLength($identity) > 512) {
+            throw new RuntimeException('identity must be valid UTF-8, contain no NUL, and use at most 512 UTF-16 code units and 2048 bytes');
         }
         if (!preg_match('/^[A-Za-z0-9:_-]{1,96}$/D', $scope) ||
             !preg_match('/^[A-Za-z0-9:_-]{1,96}$/D', $policy)) {
@@ -66,7 +68,8 @@ final class UniversalRateLimitClient
         try {
             $response = ($this->transport)($this->endpoint, $headers, $payload, $this->timeoutMs);
             if (!is_array($response) || !is_int($response['status'] ?? null) ||
-                !is_array($response['headers'] ?? null) || !is_string($response['body'] ?? null)) {
+                !is_array($response['headers'] ?? null) || !is_string($response['body'] ?? null) ||
+                strlen($response['body']) > 16384) {
                 return $this->deny();
             }
         } catch (Throwable) {
@@ -128,6 +131,19 @@ final class UniversalRateLimitClient
         ];
     }
 
+    private static function utf16CodeUnitLength(string $value): int
+    {
+        $matches = [];
+        if (preg_match_all('/./us', $value, $matches) === false) {
+            throw new RuntimeException('identity must be valid UTF-8');
+        }
+        $units = 0;
+        foreach ($matches[0] as $character) {
+            $units += strlen($character) === 4 ? 2 : 1;
+        }
+        return $units;
+    }
+
     private function sendHttpRequest(string $url, array $headers, string $body, int $timeoutMs): array
     {
         $lines = [];
@@ -145,7 +161,13 @@ final class UniversalRateLimitClient
             ],
             'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
         ]);
-        $responseBody = @file_get_contents($url, false, $context);
+        $responseStream = @fopen($url, 'rb', false, $context);
+        if ($responseStream === false) {
+            throw new RuntimeException('Universal rate-limit endpoint did not respond');
+        }
+        // Read one byte beyond the accepted cap so oversized responses fail closed.
+        $responseBody = stream_get_contents($responseStream, 16385);
+        fclose($responseStream);
         $rawHeaders = $http_response_header ?? [];
         $status = 0;
         $responseHeaders = [];
