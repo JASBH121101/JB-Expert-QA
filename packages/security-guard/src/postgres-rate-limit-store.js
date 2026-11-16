@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS jb_security_guard_rate_limits (
   request_count bigint NOT NULL CHECK (request_count > 0),
   last_seen_at timestamptz NOT NULL
 );
-CREATE INDEX IF NOT EXISTS jb_security_guard_rate_limits_last_seen_idx
-  ON jb_security_guard_rate_limits (last_seen_at);
 `;
+
+const CREATE_INDEX_SQL = `CREATE INDEX IF NOT EXISTS jb_security_guard_rate_limits_last_seen_idx ON jb_security_guard_rate_limits (last_seen_at)`;
 
 const CONSUME_SQL = `
 INSERT INTO jb_security_guard_rate_limits (
@@ -87,6 +87,7 @@ export function createPostgresRateLimitStore(options = {}) {
 
   async function initialize() {
     await query(CREATE_TABLE_SQL, []);
+    await query(CREATE_INDEX_SQL, []);
     return Object.freeze({ initialized: true });
   }
 
