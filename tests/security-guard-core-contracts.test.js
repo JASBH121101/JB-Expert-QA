@@ -11,7 +11,8 @@ import {
   validateSecurityEventV1,
   validateRateLimitPolicyV1,
   validateThreatSignalV1,
-  validateThreatAssessmentV1
+  validateThreatAssessmentV1,
+  validateThreatAssessmentPolicyV1
 } from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
@@ -117,7 +118,8 @@ const fixtureSchemas = [
   ["authentication/decision-unavailable.valid.json", "urn:jb:security-guard:authentication:decision:v1"],
   ["security-events/request-blocked.valid.json", "urn:jb:security-guard:security-event:v1"],
   ["threat-detection/signal-brute-force.valid.json", "urn:jb:security-guard:threat-signal:v1"],
-  ["threat-detection/assessment-observe.valid.json", "urn:jb:security-guard:threat-assessment:v1"]
+  ["threat-detection/assessment-observe.valid.json", "urn:jb:security-guard:threat-assessment:v1"],
+  ["threat-detection/assessment-policy.valid.json", "urn:jb:security-guard:threat-assessment-policy:v1"]
 ];
 
 const runtimeValidators = new Map([
@@ -128,7 +130,8 @@ const runtimeValidators = new Map([
   ["urn:jb:security-guard:authentication:decision:v1", validateAuthenticationDecisionV1],
   ["urn:jb:security-guard:security-event:v1", validateSecurityEventV1],
   ["urn:jb:security-guard:threat-signal:v1", validateThreatSignalV1],
-  ["urn:jb:security-guard:threat-assessment:v1", validateThreatAssessmentV1]
+  ["urn:jb:security-guard:threat-assessment:v1", validateThreatAssessmentV1],
+  ["urn:jb:security-guard:threat-assessment-policy:v1", validateThreatAssessmentPolicyV1]
 ]);
 
 for (const [relativePath, schemaId] of fixtureSchemas) {
