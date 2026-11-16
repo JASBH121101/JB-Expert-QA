@@ -300,3 +300,9 @@ export { createSecurityGuardSignalProducer } from "./producers/security-guard.js
 export { createMalwareEngineSignalProducer } from "./producers/malware-engine.js";
 
 export { createIncidentCorrelationEngine } from "./incident-correlation-engine.js";
+
+export {
+  evaluateA2ContainmentReadiness,
+  evaluateA3FailoverReadiness,
+  CONTINUITY_GATE_REQUIREMENTS
+} from "./continuity-gates.js";
