@@ -158,7 +158,9 @@ function harness(overrides = {}) {
     async assertAuthorization(input) {
       calls.asserted += 1;
       calls.assertRequest = input.request;
-      return overrides.assertResult ?? { valid: true };
+      return typeof overrides.assertResult === "function"
+        ? overrides.assertResult(input, calls.asserted)
+        : overrides.assertResult ?? { valid: true };
     },
     async completeAuthorization(input) {
       calls.completed.push(input.outcome);
@@ -496,4 +498,36 @@ test("integrates the real v0.5 read-only correlation engine with the v0.6 respon
   assert.equal(h.calls.request.assetId, "host-erp-01");
   assert.equal(h.calls.request.environment, "production");
   assert.equal(h.calls.request.incidentId, result.incidentId);
+});
+
+
+test("rechecks the mutation stop switch after authorization and audit, immediately before restart", async () => {
+  const h = harness({
+    mutationAllowed: (_context, count) => count < 3
+  });
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
+
+  assert.equal(result.state, "HELD");
+  assert.equal(result.reason, "mutation-stopped-at-final-preflight");
+  assert.deepEqual(h.calls.mutationPhases, [
+    "pre-authorization",
+    "immediately-before-execution",
+    "final-preflight"
+  ]);
+  assert.equal(h.calls.restart, 0);
+  assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
+  assert.equal(h.calls.states.some((entry) => entry.state === "HELD"), true);
+});
+
+test("reasserts the signed capability immediately before adapter invocation", async () => {
+  const h = harness({
+    assertResult: (_input, count) => ({ valid: count === 1 })
+  });
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
+
+  assert.equal(result.state, "HELD");
+  assert.equal(result.reason, "policy-authorization-expired-before-adapter");
+  assert.equal(h.calls.asserted, 2);
+  assert.equal(h.calls.restart, 0);
+  assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
 });
