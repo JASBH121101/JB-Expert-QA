@@ -426,3 +426,18 @@ if (decision.response) return decision.response;
 Policies can also be configured independently with the `policies` option. Each policy requires its own Cloudflare Rate Limiting binding. Supported periods are 10 or 60 seconds. `monitor` mode observes without blocking and defaults to fail-open on binding failure; `enforce` mode blocks excess requests and defaults to fail-closed with HTTP 503 when its binding is unavailable. Override `failureMode` only after explicitly evaluating the availability/security trade-off.
 
 The adapter hashes the supplied identity together with the namespace, policy and scope before sending a key to Cloudflare. Pass a stable opaque account/client identifier resolved by trusted application logic; do not pass passwords, tokens, raw request bodies or client-controlled identity values. Cloudflare's rate-limit counters are approximate and location-scoped; they are not a globally exact distributed counter. Configure the binding in the Worker environment and test it in the actual Cloudflare runtime before production use.
+
+## Universal cross-platform rate limiting
+
+Security Guard also exposes a server-to-server HTTP API for applications hosted on Cloudflare, VPS providers, Laravel, Node.js, Python, or any platform with HTTPS support. It reuses the distributed rate-limit decision engine; it is not a separate product or counter implementation.
+
+The Node.js service factory is available as:
+
+~~~js
+import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service";
+~~~
+
+It authenticates each registered application with its own server-side bearer credential and enforces only that application's configured policies and scopes. The application must resolve the user/client identity on its server; never expose the credential to browser code.
+
+The service requires a shared atomic store. This package defines the store contract but does not bundle a production Redis, Valkey, PostgreSQL, or Neon driver. The in-memory test store is not suitable for deployment. See [Universal Rate Limiting](docs/UNIVERSAL-RATE-LIMIT.md) for deployment requirements, API requests, Laravel example, fail-closed behavior, and consistency limits.
+
