@@ -160,10 +160,10 @@ lab.registerTarget({
   version: "feature/nexora-configurable-catalog@88c4876c9678b93dadde55f79fe9d04890900741",
   capabilities: ["industry-templates", "dynamic-fields", "measurement-units", "demo-ui", "setup-installer"],
   adapter: {
-    async runScenario({ scenario, target }) {
+    async runScenario({ scenario, context }) {
       const factory = catalogCommands[scenario.id];
       if (!factory) return { status: "skip", summary: "No Configurable Catalog adapter is registered for this scenario." };
-      return executeCommands(catalogRoot, { ...scenario, target: target.id }, factory(catalogRoot));
+      return executeCommands(catalogRoot, { ...scenario, target: context.targetId }, factory(catalogRoot));
     }
   }
 });
@@ -173,10 +173,10 @@ lab.registerTarget({
   version: "docs/nexora-approved-upgrades-2026-11@3f68126ecc58b088c071007c5116bc95426d159b",
   capabilities: ["public-catalog", "owner-permissions", "exports", "basic-inventory", "domain-dns-tls"],
   adapter: {
-    async runScenario({ scenario, target }) {
+    async runScenario({ scenario, context }) {
       const factory = siteCommands[scenario.id];
       if (!factory) return { status: "skip", summary: "No Site Engine adapter is registered for this scenario." };
-      return executeCommands(siteRoot, { ...scenario, target: target.id }, factory(siteRoot));
+      return executeCommands(siteRoot, { ...scenario, target: context.targetId }, factory(siteRoot));
     }
   }
 });
@@ -217,6 +217,15 @@ test("NEXORA Configurable Catalog and Site Engine run as separate real-product t
       productionMutations: 0
     }
   });
+
+  console.log("[NEXORA adapter results]", JSON.stringify(report.results.map((result) => ({
+    target: result.target.id,
+    scenario: result.scenario.id,
+    status: result.status,
+    summary: result.summary,
+    findingCodes: (result.findings ?? []).map((finding) => finding.code),
+    commandMetrics: result.metrics?.commandMetrics ?? []
+  }))));
 
   assert.deepEqual(report.totals, { pass: 9, fail: 0, skip: 9 });
   assert.equal(report.results.filter((result) => result.skipReason === "target_scope").length, 9);
