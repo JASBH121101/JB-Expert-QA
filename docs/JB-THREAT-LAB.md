@@ -164,17 +164,18 @@ They are separate registered targets (nexora-configurable-catalog and nexora-sit
 
 **Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
 
-## NEXORA product adapter validation
 
-The earlier registry-only test remains a structural boundary regression: it confirms that the two NEXORA targets cannot cross-certify one another. Separate product-level integration tests now execute real, pinned test suites through the Threat Lab adapters:
+## NEXORA product adapter validation — six-tier matrix
 
-| Target | Pinned product revision | Executed product suites | Current tier coverage |
-| --- | --- | --- | --- |
-| NEXORA Configurable Catalog prototype | `88c4876c9678b93dadde55f79fe9d04890900741` | `demo/tests/catalog-data.test.js`, `store.test.js`, `admin-responsive.test.js`, `setup-contract.test.js` | Basic, Intermediate, Advanced |
-| NEXORA Site Engine | `ebdf403d105add03b5aaa4b9018e45e42b6cd8ee` | `SetupHealthTest.php`, `PublicSiteEngineTest.php`, `InventoryAssistantTest.php`, `ExportEngineTest.php`, `PermissionEngineTest.php` | Basic, Intermediate, Advanced, Expert |
+The earlier registry-only test remains a structural boundary regression. Real-product adapters now execute allow-listed tests from two pinned checkouts, with separate target reports, independent readiness, minimal child-process environments, no shell, 2 MiB output caps, 120-second standard timeouts, and symlink-safe path resolution.
 
-The adapter uses fixed test-file allowlists, no shell, bounded runtime/output, and a separate checkout per target. The Site Engine runner uses PHPUnit with SQLite in-memory; it does not connect to a persistent database or deployment. The workflow resolves Composer dependencies before the isolated feature tests execute.
+| Target | Pinned product revision | Six-tier coverage |
+| --- | --- | --- |
+| NEXORA Configurable Catalog prototype | \`JASBH121101/Nexora@88c4876c9678b93dadde55f79fe9d04890900741\` | Basic sample data; Intermediate setup/template contract; Advanced local storage and escaping; Expert responsive admin; Extreme full demo regression; Superextreme full demo regression plus explicit prototype-boundary checks |
+| NEXORA Site Engine | \`JASBH121101/Nexora@3f68126ecc58b088c071007c5116bc95426d159b\` | Basic owner installation/template seeding; Intermediate public-data boundaries; Advanced role/field authorization; Expert export plus inventory least privilege; Extreme domain/DNS/TLS fake-adapter and published-host checks; Superextreme complete Laravel Feature and Unit suite |
 
-The Catalog prototype is validated as a browser-side demo only. Its localStorage behavior is not real server persistence, and these tests do not certify authentication or secure image uploads. The Site Engine tests cover only implemented and documented features; they do not imply ERP/POS/payment or centralized multi-tenant behavior.
+The Catalog profile is a frontend demonstration. Its Superextreme scenario verifies that it remains demo-only, does not collect real passwords, and uses browser localStorage rather than claiming server authentication or persistence. Its six-tier readiness applies only to these registered prototype invariants.
 
-The catalog's Expert, Extreme, and Superextreme tiers and the Site Engine's Extreme and Superextreme tiers remain missing. A clean run of the selected suites is not a six-tier certification or a production approval. Any NEXORA product defect discovered by these tests must be fixed and validated in that product's own branch; this Threat Lab change must remain adapter/test orchestration only.
+The Site Engine profile uses PHPUnit with an in-memory SQLite database for every tier, including the full-suite gate. Its domain checks use deterministic fake DNS/TLS behavior and never connect to public DNS or an external TLS endpoint. The dedicated workflow also executes the full Laravel suite against an ephemeral PostgreSQL 16 service. No persistent database, production domain, customer data, deployment, paid service, or external provider is used.
+
+Both targets are pinned to immutable source commits. Updating a product revision requires updating the workflow and test metadata together, then rerunning both profile validations. A six-tier ready result means only that all six registered scenarios for that revision passed; it is not a guarantee of no unknown vulnerabilities or of capabilities outside the documented product scope. Product defects must be fixed in the corresponding NEXORA product branch, not in this Threat Lab adapter package.
