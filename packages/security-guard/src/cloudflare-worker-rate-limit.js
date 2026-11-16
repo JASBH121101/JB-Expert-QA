@@ -1,3 +1,8 @@
+import {
+  normalizeRateLimitCheckInput,
+  createRateLimitServicePayload
+} from "./rate-limit-contract.js";
+
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const SAFE_IDENTIFIER = /^[a-zA-Z0-9:_-]{1,96}$/;
 
@@ -11,21 +16,49 @@ function notify(callback, event) {
   }
 }
 
-async function digestKey(namespace, policy, scope, identity) {
-  const cryptoApi = globalThis.crypto;
-  if (!cryptoApi?.subtle || typeof cryptoApi.subtle.digest !== "function") {
-    throw new Error("Web Crypto is unavailable");
+function normalizeIdentitySecret(value) {
+  if (value === undefined || value === null) return null;
+  let bytes;
+  if (typeof value === "string") {
+    bytes = new TextEncoder().encode(value);
+  } else if (value instanceof Uint8Array) {
+    bytes = new Uint8Array(value);
+  } else if (value instanceof ArrayBuffer) {
+    bytes = new Uint8Array(value.slice(0));
+  } else {
+    throw new TypeError("identitySecret must be a string, Uint8Array, or ArrayBuffer");
   }
+  if (bytes.byteLength < 32) {
+    throw new TypeError("identitySecret must contain at least 32 bytes");
+  }
+  return bytes;
+}
 
-  // The input is domain-separated so the same identity cannot share counters
-  // across policies, scopes, or applications.
+async function digestKey(namespace, policy, scope, identity, identitySecret) {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.subtle) throw new Error("Web Crypto is unavailable");
+
+  // Domain separation prevents counter reuse across applications, policies and scopes.
   const input = new TextEncoder().encode(
     [namespace, policy, scope, identity].join("\0")
   );
-  const digest = new Uint8Array(await cryptoApi.subtle.digest("SHA-256", input));
+  let digest;
+  if (identitySecret) {
+    const key = await cryptoApi.subtle.importKey(
+      "raw",
+      identitySecret,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    digest = new Uint8Array(await cryptoApi.subtle.sign("HMAC", key, input));
+  } else {
+    // Legacy-compatible digest is permitted only in monitor mode.
+    digest = new Uint8Array(await cryptoApi.subtle.digest("SHA-256", input));
+  }
+
   let hex = "";
   for (const byte of digest) hex += byte.toString(16).padStart(2, "0");
-  // A fixed 64-character opaque key; no account identifier is sent to Cloudflare.
   return hex;
 }
 
@@ -97,13 +130,14 @@ export function createCloudflareWorkerRateLimit(options = {}) {
   if (!isRecord(options)) throw new TypeError("Cloudflare rate-limit options must be an object");
 
   const allowed = new Set([
-    "binding", "policies", "namespace", "mode", "periodSeconds", "failureMode", "onEvent"
+    "binding", "policies", "namespace", "mode", "periodSeconds", "failureMode", "onEvent", "identitySecret"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("Unknown Cloudflare rate-limit option: " + key);
   }
 
   const namespace = options.namespace ?? "jb-security-guard";
+  const identitySecret = normalizeIdentitySecret(options.identitySecret);
   if (typeof namespace !== "string" || !SAFE_IDENTIFIER.test(namespace)) {
     throw new TypeError("namespace must contain 1-96 safe identifier characters");
   }
@@ -156,34 +190,25 @@ export function createCloudflareWorkerRateLimit(options = {}) {
     }
   }
 
-  async function check(input = {}) {
-    if (!isRecord(input)) throw new TypeError("check input must be an object");
-    const allowedInput = new Set(["identity", "scope", "policy"]);
-    for (const key of Object.keys(input)) {
-      if (!allowedInput.has(key)) throw new TypeError("Unknown rate-limit check input: " + key);
-    }
+  if (!identitySecret && [...policies.values()].some((policy) => policy.mode === "enforce")) {
+    throw new TypeError("identitySecret is required for every enforce-mode policy");
+  }
 
-    const policyName = input.policy ?? (policies.has("default")
+  async function check(input = {}) {
+    const normalizedInput = normalizeRateLimitCheckInput(input);
+    const policyName = normalizedInput.policy ?? (policies.has("default")
       ? "default"
       : policies.size === 1 ? policies.keys().next().value : null);
     if (typeof policyName !== "string" || !policies.has(policyName)) {
       throw new TypeError("A configured rate-limit policy must be selected");
     }
 
-    const identity = input.identity;
-    if (typeof identity !== "string" || !identity.trim() || identity.length > 512) {
-      throw new TypeError("identity must be a non-empty trusted identifier no longer than 512 characters");
-    }
-
-    const scope = input.scope ?? "request";
-    if (typeof scope !== "string" || !SAFE_IDENTIFIER.test(scope)) {
-      throw new TypeError("scope must contain 1-96 safe identifier characters");
-    }
-
+    const identity = normalizedInput.identity;
+    const scope = normalizedInput.scope;
     const policy = policies.get(policyName);
     let result;
     try {
-      const key = await digestKey(namespace, policyName, scope, identity.trim());
+      const key = await digestKey(namespace, policyName, scope, identity, identitySecret);
       result = await policy.binding.limit({ key });
       if (!isRecord(result) || typeof result.success !== "boolean") {
         throw new TypeError("Cloudflare Rate Limiting binding returned an invalid result");
@@ -389,19 +414,7 @@ export function createCloudflareWorkerRateLimitService(options = {}) {
 
       const retryAfter = decision.response?.headers?.get?.("retry-after") ?? null;
       const retryAfterSeconds = retryAfter === null ? null : Number(retryAfter);
-      return serviceJsonResponse({
-        allowed: decision.allowed,
-        exceeded: decision.exceeded,
-        enforced: decision.enforced,
-        unavailable: decision.unavailable,
-        policy: decision.policy ?? null,
-        scope: decision.scope ?? "request",
-        status: decision.response?.status ?? null,
-        retryAfterSeconds: Number.isSafeInteger(retryAfterSeconds) &&
-          retryAfterSeconds >= 1 && retryAfterSeconds <= 60
-          ? retryAfterSeconds
-          : null
-      });
+      return serviceJsonResponse(createRateLimitServicePayload(decision));
     } catch {
       return serviceJsonResponse({ error: "invalid_rate_limit_request" }, 400);
     }
