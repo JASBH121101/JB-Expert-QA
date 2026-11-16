@@ -238,6 +238,6 @@ test("Windows adapter never starts a service when stop fails", async () => {
       return { code: args[1][0] === "stop" ? 5 : 0 };
     }
   });
-  await assert.rejects(() => adapter.restartService("JBService"), /stop failed/);
+  await assert.rejects(() => adapter.restartService("JBService"), /stop command failed/);
   assert.equal(calls.length, 1);
 });
