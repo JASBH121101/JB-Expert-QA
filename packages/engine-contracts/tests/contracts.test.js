@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   assertEngineManifest,
   assertMessageEnvelope,
@@ -82,6 +83,14 @@ test("manifest rejects duplicate contracts, dependencies and capabilities", () =
   assert.ok(result.errors.some((error) => error.includes("capabilities contains duplicates")));
 });
 
+test("manifest rejects compatibility ranges below the minimum major", () => {
+  const result = validateEngineManifest(manifest("jb.resilience-engine", "0.6.0", {
+    dependencies: [{ engineId: "jb.security-guard", minVersion: "2.0.0", maxMajor: 1, optional: false }]
+  }));
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => error.includes("maxMajor is invalid")));
+});
+
 test("manifest rejects self dependencies", () => {
   const result = validateEngineManifest(manifest("jb.security-guard", "1.0.0", {
     dependencies: [{ engineId: "jb.security-guard", minVersion: "1.0.0", maxMajor: 1, optional: false }]
@@ -115,10 +124,17 @@ test("message rejects unsafe nested keys and non-JSON values", () => {
   assert.equal(validateMessageEnvelope(envelope({ payload: { value: undefined } })).valid, false);
 });
 
-test("message rejects cyclic payloads and excessive depth", () => {
+test("message rejects cyclic objects, cyclic arrays, sparse arrays and excessive depth", () => {
   const cyclic = {};
   cyclic.self = cyclic;
   assert.equal(validateMessageEnvelope(envelope({ payload: cyclic })).valid, false);
+  const cyclicArray = [];
+  cyclicArray.push(cyclicArray);
+  assert.equal(validateMessageEnvelope(envelope({ payload: { values: cyclicArray } })).valid, false);
+  const sparseArray = [];
+  sparseArray.length = 2;
+  sparseArray[1] = "value";
+  assert.equal(validateMessageEnvelope(envelope({ payload: { values: sparseArray } })).valid, false);
   let deep = {};
   let cursor = deep;
   for (let index = 0; index < 14; index += 1) {
@@ -192,4 +208,33 @@ test("compatibility detects dependency cycles", () => {
   const result = evaluateEngineCompatibility({ engines: [first, second] });
   assert.equal(result.compatible, false);
   assert.ok(result.errors.some((error) => error.includes("dependency cycle detected")));
+});
+
+test("central registry declares all five independent JB Engines", async () => {
+  const registry = JSON.parse(await readFile(new URL("../manifests/engine-registry.json", import.meta.url), "utf8"));
+  assert.equal(registry.schema, "jb.engine.registry/v1");
+  assert.deepEqual(registry.engines.map((entry) => entry.engineId).sort(), [
+    "jb.advisor-engine",
+    "jb.expert-qa",
+    "jb.malware-engine",
+    "jb.resilience-engine",
+    "jb.security-guard"
+  ]);
+  const result = evaluateEngineCompatibility({ engines: registry.engines });
+  assert.equal(result.compatible, true, result.errors.join("; "));
+});
+
+test("registry engine versions remain synchronized with workspace package versions", async () => {
+  const registry = JSON.parse(await readFile(new URL("../manifests/engine-registry.json", import.meta.url), "utf8"));
+  const packagePaths = {
+    "jb.expert-qa": "../../expert-qa/package.json",
+    "jb.security-guard": "../../security-guard/package.json",
+    "jb.malware-engine": "../../malware-engine/package.json",
+    "jb.resilience-engine": "../../resilience-engine/package.json",
+    "jb.advisor-engine": "../../advisor-engine/package.json"
+  };
+  for (const entry of registry.engines) {
+    const metadata = JSON.parse(await readFile(new URL(packagePaths[entry.engineId], import.meta.url), "utf8"));
+    assert.equal(entry.version, metadata.version, entry.engineId + " registry version is stale");
+  }
 });
