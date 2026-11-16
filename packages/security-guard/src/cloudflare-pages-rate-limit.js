@@ -72,7 +72,15 @@ function normalizeServiceDecision(value) {
       503, normalized.retryAfterSeconds ?? 5, "security_rate_limit_unavailable"
     );
   }
-  return Object.freeze({ ...normalized, response });
+  return Object.freeze({
+    allowed: normalized.allowed,
+    exceeded: normalized.exceeded,
+    enforced: normalized.enforced,
+    unavailable: normalized.unavailable,
+    policy: normalized.policy,
+    scope: normalized.scope,
+    response
+  });
 }
 
 /**
