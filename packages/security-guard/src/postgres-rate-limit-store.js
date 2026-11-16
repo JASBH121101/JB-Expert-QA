@@ -1,4 +1,41 @@
-const SAFE_COUNTER_KEY = /^[A-Za-z0-9:_-]{1,96}:[a-f0-9]{64}$/;
+const LEGACY_COUNTER_KEY = /^[A-Za-z0-9:_-]{1,96}:[a-f0-9]{64}$/;
+const CORE_V1_IDENTIFIERS = /^[A-Za-z0-9:_-]{1,96}$/;
+const CORE_V1_KEY_ID = /^[A-Za-z0-9:_-]{1,64}$/;
+const CORE_V1_IDENTITY_TYPES = new Set(["ip", "account", "account_ip", "session", "anonymous"]);
+const CORE_V1_DIGEST = /^[a-f0-9]{64}$/;
+
+function isCoreV1CounterKey(value) {
+  if (typeof value !== "string" || !value.startsWith("15:jbsg-counter-v1")) return false;
+  let offset = 0;
+  const readField = (maximumBytes, validate) => {
+    const separator = value.indexOf(":", offset);
+    if (separator < 0) return null;
+    const lengthText = value.slice(offset, separator);
+    if (!/^[1-9][0-9]*$/.test(lengthText)) return null;
+    const length = Number(lengthText);
+    if (!Number.isSafeInteger(length) || length > maximumBytes) return null;
+    const start = separator + 1;
+    const end = start + length;
+    if (end > value.length) return null;
+    const field = value.slice(start, end);
+    if (Buffer.byteLength(field, "utf8") !== length || !validate(field)) return null;
+    offset = end;
+    return field;
+  };
+
+  if (readField(15, (field) => field === "jbsg-counter-v1") === null) return false;
+  for (let index = 0; index < 4; index += 1) {
+    if (readField(96, (field) => CORE_V1_IDENTIFIERS.test(field)) === null) return false;
+  }
+  if (readField(10, (field) => CORE_V1_IDENTITY_TYPES.has(field)) === null) return false;
+  if (readField(64, (field) => CORE_V1_KEY_ID.test(field)) === null) return false;
+  if (readField(64, (field) => CORE_V1_DIGEST.test(field)) === null) return false;
+  return offset === value.length;
+}
+
+function isSafeCounterKey(value) {
+  return typeof value === "string" && (LEGACY_COUNTER_KEY.test(value) || isCoreV1CounterKey(value));
+}
 
 const CREATE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS jb_security_guard_rate_limits (
@@ -98,10 +135,10 @@ export function createPostgresRateLimitStore(options = {}) {
         throw new TypeError("Unknown consumeLimit field: " + key);
       }
     }
-    if (typeof input.key !== "string" || !SAFE_COUNTER_KEY.test(input.key)) {
-      throw new TypeError("key must be a namespaced HMAC counter key; raw identities are not accepted");
+    if (!isSafeCounterKey(input.key)) {
+      throw new TypeError("key must be a valid namespaced HMAC key or Core v1 length-prefixed counter key; raw identities are not accepted");
     }
-    safeInteger(input.now, "now", 0);
+    // The shared store contract carries caller time; PostgreSQL's statement clock is authoritative here.\n    safeInteger(input.now, "now", 0);
     const windowMs = safeInteger(input.windowMs, "windowMs", 1, 86_400_000);
     safeInteger(input.maxRequests, "maxRequests", 1, 1_000_000);
 
