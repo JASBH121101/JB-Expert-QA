@@ -211,7 +211,8 @@ const SCHEMA_STATEMENTS = [
   "CREATE UNIQUE INDEX IF NOT EXISTS jb_resilience_one_claim_per_asset_idx ON jb_resilience_actions (environment, asset_id) WHERE status = 'claimed'",
   "CREATE TABLE IF NOT EXISTS jb_resilience_circuits (environment TEXT NOT NULL, asset_id TEXT NOT NULL, action TEXT NOT NULL, failure_count INTEGER NOT NULL CHECK (failure_count >= 0), failure_threshold INTEGER NOT NULL CHECK (failure_threshold BETWEEN 1 AND 10), cooldown_ms BIGINT NOT NULL CHECK (cooldown_ms BETWEEN 1000 AND 86400000), retry_at_ms BIGINT NULL, PRIMARY KEY (environment, asset_id, action))",
   "CREATE TABLE IF NOT EXISTS jb_resilience_audit_heads (head_id SMALLINT PRIMARY KEY CHECK (head_id = 1), sequence BIGINT NOT NULL, last_hash CHAR(64) NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, record_schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)"
+  "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, record_schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS jb_resilience_coordination_leases (scope_id TEXT PRIMARY KEY, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, acquired_at BIGINT NULL, renewed_at BIGINT NULL, expires_at BIGINT NULL, CHECK ((holder_id IS NULL AND lease_id IS NULL AND acquired_at IS NULL AND renewed_at IS NULL AND expires_at IS NULL) OR (holder_id IS NOT NULL AND lease_id IS NOT NULL AND acquired_at IS NOT NULL AND renewed_at IS NOT NULL AND expires_at IS NOT NULL)))"
 ];
 
 function ensurePool(pool) {
@@ -287,6 +288,191 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     if (!initialized) throw new Error("PostgreSQL resilience storage is not initialized; call initialize() first");
   }
 
+  async function databaseNow(client) {
+    const result = await client.query(
+      "SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS now_ms"
+    );
+    if (result.rowCount !== 1) throw new Error("database clock is unavailable");
+    return toSafeInteger(result.rows[0].now_ms, "database clock");
+  }
+
+  function validateLeaseDuration(leaseDurationMs) {
+    if (!Number.isSafeInteger(leaseDurationMs) ||
+        leaseDurationMs < 1_000 || leaseDurationMs > 300_000) {
+      throw new TypeError("leaseDurationMs must be between 1000 and 300000 milliseconds");
+    }
+    return leaseDurationMs;
+  }
+
+  function validateLeaseIdentity(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      throw new TypeError("lease identity is invalid");
+    }
+    assertIdentifier(input.scopeId, "scopeId");
+    assertIdentifier(input.holderId, "holderId");
+    if (typeof input.leaseId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.leaseId) ||
+        !Number.isSafeInteger(input.fencingToken) || input.fencingToken < 1) {
+      throw new TypeError("lease identity or fencing token is invalid");
+    }
+    return {
+      scopeId: input.scopeId,
+      holderId: input.holderId,
+      leaseId: input.leaseId,
+      fencingToken: input.fencingToken
+    };
+  }
+
+  function mapLease(row) {
+    return Object.freeze({
+      scopeId: row.scope_id,
+      holderId: row.holder_id,
+      leaseId: row.lease_id,
+      fencingToken: toSafeInteger(row.fencing_token, "fencing_token"),
+      acquiredAt: toSafeInteger(row.acquired_at, "lease acquired_at"),
+      renewedAt: toSafeInteger(row.renewed_at, "lease renewed_at"),
+      expiresAt: toSafeInteger(row.expires_at, "lease expires_at")
+    });
+  }
+
+  function leaseIdentityMatches(row, identity) {
+    return Boolean(row && row.holder_id === identity.holderId &&
+      row.lease_id === identity.leaseId &&
+      toSafeInteger(row.fencing_token, "fencing_token") === identity.fencingToken);
+  }
+
+  async function acquireLease({ scopeId, holderId, leaseDurationMs } = {}) {
+    assertInitialized();
+    assertIdentifier(scopeId, "scopeId");
+    assertIdentifier(holderId, "holderId");
+    validateLeaseDuration(leaseDurationMs);
+
+    return withTransaction(pool, async (client) => {
+      await client.query(
+        "INSERT INTO jb_resilience_coordination_leases (scope_id, fencing_token) VALUES ($1, 0) ON CONFLICT (scope_id) DO NOTHING",
+        [scopeId]
+      );
+      const selected = await client.query(
+        "SELECT scope_id, fencing_token, holder_id, lease_id, acquired_at, renewed_at, expires_at FROM jb_resilience_coordination_leases WHERE scope_id=$1 FOR UPDATE",
+        [scopeId]
+      );
+      if (selected.rowCount !== 1) throw new Error("coordination lease row is unavailable");
+      const current = selected.rows[0];
+      const now = await databaseNow(client);
+      if (current.lease_id !== null &&
+          toSafeInteger(current.expires_at, "lease expires_at") > now) {
+        return Object.freeze({
+          acquired: false,
+          reason: "lease-held",
+          leaseExpiresAt: toSafeInteger(current.expires_at, "lease expires_at")
+        });
+      }
+
+      const priorToken = toSafeInteger(current.fencing_token, "fencing_token");
+      if (priorToken >= Number.MAX_SAFE_INTEGER) {
+        throw new Error("fencing token exhausted; coordination is blocked");
+      }
+      const fencingToken = priorToken + 1;
+      const expiresAt = now + leaseDurationMs;
+      if (!Number.isSafeInteger(expiresAt)) {
+        throw new Error("lease expiry exceeds the supported timestamp range");
+      }
+      const leaseId = randomUUID();
+      const updated = await client.query(
+        "UPDATE jb_resilience_coordination_leases SET fencing_token=$2, holder_id=$3, lease_id=$4, acquired_at=$5, renewed_at=$5, expires_at=$6 WHERE scope_id=$1 RETURNING scope_id, fencing_token, holder_id, lease_id, acquired_at, renewed_at, expires_at",
+        [scopeId, fencingToken, holderId, leaseId, now, expiresAt]
+      );
+      if (updated.rowCount !== 1) throw new Error("coordination lease acquisition did not persist");
+      return Object.freeze({ acquired: true, lease: mapLease(updated.rows[0]) });
+    });
+  }
+
+  async function renewLease({ scopeId, holderId, leaseId, fencingToken, leaseDurationMs } = {}) {
+    assertInitialized();
+    const identity = validateLeaseIdentity({ scopeId, holderId, leaseId, fencingToken });
+    validateLeaseDuration(leaseDurationMs);
+
+    return withTransaction(pool, async (client) => {
+      const selected = await client.query(
+        "SELECT scope_id, fencing_token, holder_id, lease_id, acquired_at, renewed_at, expires_at FROM jb_resilience_coordination_leases WHERE scope_id=$1 FOR UPDATE",
+        [identity.scopeId]
+      );
+      if (selected.rowCount !== 1) {
+        return Object.freeze({ renewed: false, reason: "lease-not-current" });
+      }
+      const current = selected.rows[0];
+      if (!leaseIdentityMatches(current, identity)) {
+        return Object.freeze({ renewed: false, reason: "lease-not-current" });
+      }
+      const now = await databaseNow(client);
+      if (toSafeInteger(current.expires_at, "lease expires_at") <= now) {
+        return Object.freeze({ renewed: false, reason: "lease-expired" });
+      }
+      const expiresAt = now + leaseDurationMs;
+      if (!Number.isSafeInteger(expiresAt)) throw new Error("lease expiry exceeds the supported timestamp range");
+      const updated = await client.query(
+        "UPDATE jb_resilience_coordination_leases SET renewed_at=$2, expires_at=$3 WHERE scope_id=$1 AND holder_id=$4 AND lease_id=$5 AND fencing_token=$6 RETURNING scope_id, fencing_token, holder_id, lease_id, acquired_at, renewed_at, expires_at",
+        [identity.scopeId, now, expiresAt, identity.holderId, identity.leaseId, identity.fencingToken]
+      );
+      if (updated.rowCount !== 1) return Object.freeze({ renewed: false, reason: "lease-not-current" });
+      return Object.freeze({ renewed: true, lease: mapLease(updated.rows[0]) });
+    });
+  }
+
+  async function releaseLease(input = {}) {
+    assertInitialized();
+    const identity = validateLeaseIdentity(input);
+    return withTransaction(pool, async (client) => {
+      const selected = await client.query(
+        "SELECT scope_id, fencing_token, holder_id, lease_id, expires_at FROM jb_resilience_coordination_leases WHERE scope_id=$1 FOR UPDATE",
+        [identity.scopeId]
+      );
+      if (selected.rowCount !== 1 || !leaseIdentityMatches(selected.rows[0], identity)) {
+        return Object.freeze({ released: false, reason: "lease-not-current" });
+      }
+      const now = await databaseNow(client);
+      if (toSafeInteger(selected.rows[0].expires_at, "lease expires_at") <= now) {
+        return Object.freeze({ released: false, reason: "lease-expired" });
+      }
+      const updated = await client.query(
+        "UPDATE jb_resilience_coordination_leases SET holder_id=NULL, lease_id=NULL, acquired_at=NULL, renewed_at=NULL, expires_at=NULL WHERE scope_id=$1 AND lease_id=$2 AND fencing_token=$3",
+        [identity.scopeId, identity.leaseId, identity.fencingToken]
+      );
+      return Object.freeze({
+        released: updated.rowCount === 1,
+        reason: updated.rowCount === 1 ? null : "lease-not-current"
+      });
+    });
+  }
+
+  async function verifyLease(input = {}) {
+    assertInitialized();
+    const identity = validateLeaseIdentity(input);
+    return withTransaction(pool, async (client) => {
+      const selected = await client.query(
+        "SELECT scope_id, fencing_token, holder_id, lease_id, expires_at FROM jb_resilience_coordination_leases WHERE scope_id=$1",
+        [identity.scopeId]
+      );
+      if (selected.rowCount !== 1) {
+        return Object.freeze({ valid: false, reason: "lease-not-current" });
+      }
+      const current = selected.rows[0];
+      const fencingToken = toSafeInteger(current.fencing_token, "fencing_token");
+      if (!leaseIdentityMatches(current, identity)) {
+        return Object.freeze({ valid: false, reason: "lease-not-current", currentFencingToken: fencingToken });
+      }
+      const now = await databaseNow(client);
+      if (toSafeInteger(current.expires_at, "lease expires_at") <= now) {
+        return Object.freeze({ valid: false, reason: "lease-expired", currentFencingToken: fencingToken });
+      }
+      return Object.freeze({
+        valid: true,
+        fencingToken,
+        expiresAt: toSafeInteger(current.expires_at, "lease expires_at")
+      });
+    });
+  }
+
   async function initialize() {
     await withTransaction(pool, async (client) => {
       for (const statement of SCHEMA_STATEMENTS) await client.query(statement);
@@ -296,7 +482,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
       );
     });
     initialized = true;
-    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 1 });
+    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 2 });
   }
 
   async function recordIncidentState(input) {
@@ -590,11 +776,21 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     verify: verifyAudit
   });
 
+  const coordinationStore = Object.freeze({
+    durable: true,
+    dialect: "postgresql",
+    acquireLease,
+    renewLease,
+    releaseLease,
+    verifyLease
+  });
+
   return Object.freeze({
     durable: true,
     dialect: "postgresql",
     initialize,
     orchestrationStore,
-    auditStore
+    auditStore,
+    coordinationStore
   });
 }

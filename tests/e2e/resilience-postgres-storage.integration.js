@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import { createPostgresResilienceStorageAdapter } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
 
@@ -57,9 +58,82 @@ async function main() {
     /not initialized/
   );
   const initialized = await storage.initialize();
-  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 1 });
+  assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 2 });
   await secondStorage.initialize();
   process.stdout.write("PASS: injected Pool and explicit initialization\n");
+
+  await runCase("concurrent lease acquisition, renewal, release and monotonic fencing", async () => {
+    const scopeId = "cluster-lab-scope";
+    const firstInput = { scopeId, holderId: "host-lab-a", leaseDurationMs: 5_000 };
+    const secondInput = { scopeId, holderId: "host-lab-b", leaseDurationMs: 5_000 };
+    const [first, second] = await Promise.all([
+      storage.coordinationStore.acquireLease(firstInput),
+      secondStorage.coordinationStore.acquireLease(secondInput)
+    ]);
+    assert.equal([first, second].filter((item) => item.acquired).length, 1);
+    assert.equal([first, second].filter((item) => !item.acquired && item.reason === "lease-held").length, 1);
+
+    const winner = first.acquired ? first.lease : second.lease;
+    const losingStore = first.acquired ? secondStorage.coordinationStore : storage.coordinationStore;
+    const winningStore = first.acquired ? storage.coordinationStore : secondStorage.coordinationStore;
+    assert.deepEqual(await losingStore.acquireLease(secondInput), {
+      acquired: false,
+      reason: "lease-held",
+      leaseExpiresAt: winner.expiresAt
+    });
+
+    const renewed = await winningStore.renewLease({ ...winner, leaseDurationMs: 5_000 });
+    assert.equal(renewed.renewed, true);
+    assert.ok(renewed.lease.expiresAt >= winner.expiresAt);
+    assert.equal((await winningStore.verifyLease(renewed.lease)).valid, true);
+    assert.deepEqual(await losingStore.verifyLease({
+      ...renewed.lease,
+      fencingToken: renewed.lease.fencingToken + 1
+    }).then((value) => ({ valid: value.valid, reason: value.reason })), {
+      valid: false,
+      reason: "lease-not-current"
+    });
+    assert.equal((await winningStore.releaseLease(renewed.lease)).released, true);
+    assert.equal((await winningStore.verifyLease(renewed.lease)).valid, false);
+
+    const successor = await losingStore.acquireLease({
+      scopeId,
+      holderId: "host-lab-b",
+      leaseDurationMs: 5_000
+    });
+    assert.equal(successor.acquired, true);
+    assert.equal(successor.lease.fencingToken, winner.fencingToken + 1);
+    assert.equal((await winningStore.verifyLease(winner)).valid, false);
+    assert.equal((await losingStore.releaseLease(successor.lease)).released, true);
+  });
+
+  await runCase("expired leases cannot renew and successors receive a higher fence", async () => {
+    const scopeId = "cluster-expiry-scope";
+    const expired = await storage.coordinationStore.acquireLease({
+      scopeId,
+      holderId: "host-expired",
+      leaseDurationMs: 1_000
+    });
+    assert.equal(expired.acquired, true);
+    await delay(1_100);
+    assert.deepEqual(await secondStorage.coordinationStore.renewLease({
+      ...expired.lease,
+      leaseDurationMs: 2_000
+    }), { renewed: false, reason: "lease-expired" });
+    assert.deepEqual(await secondStorage.coordinationStore.verifyLease(expired.lease).then(
+      (value) => ({ valid: value.valid, reason: value.reason })
+    ), { valid: false, reason: "lease-expired" });
+
+    const next = await secondStorage.coordinationStore.acquireLease({
+      scopeId,
+      holderId: "host-successor",
+      leaseDurationMs: 3_000
+    });
+    assert.equal(next.acquired, true);
+    assert.equal(next.lease.fencingToken, expired.lease.fencingToken + 1);
+    assert.equal((await storage.coordinationStore.verifyLease(expired.lease)).valid, false);
+    assert.equal((await secondStorage.coordinationStore.releaseLease(next.lease)).released, true);
+  });
 
   await runCase("transactional incident transitions and identity/time guards", async () => {
     const store = storage.orchestrationStore;
