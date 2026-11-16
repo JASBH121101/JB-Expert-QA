@@ -10,7 +10,7 @@ const SITE_ROOT = process.env.NEXORA_SITE_ENGINE_ROOT ?? "";
 const CATALOG_SHA = process.env.NEXORA_CATALOG_SHA ?? "";
 const SITE_SHA = process.env.NEXORA_SITE_ENGINE_SHA ?? "";
 
-const EXPECTED_CATALOG_SHA = "88c4876c9678b93dadde55f79fe9d04890900741";
+const EXPECTED_CATALOG_SHA = "63f0608d0b00d633b1ad147ab2318fc099b8a99e";
 const EXPECTED_SITE_SHA = "3f68126ecc58b088c071007c5116bc95426d159b";
 
 const profileEnvironmentReady =
@@ -19,6 +19,22 @@ const profileEnvironmentReady =
   && existsSync(path.join(CATALOG_ROOT, "demo", "tests"))
   && existsSync(path.join(SITE_ROOT, "vendor", "bin", "phpunit"));
 const profileRequired = process.env.NEXORA_PROFILE_REQUIRED === "true";
+
+function assertPinnedCheckout(root, expectedSha, label) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 10_000,
+    windowsHide: true
+  });
+  assert.equal(result.error, undefined, label + " checkout revision could not be read");
+  assert.equal(result.status, 0, label + " checkout revision command failed");
+  assert.equal(
+    result.stdout.trim(),
+    expectedSha,
+    label + " checkout HEAD does not match the declared source pin"
+  );
+}
 
 const safety = Object.freeze({
   safe: true,
@@ -179,6 +195,8 @@ test("Threat Lab certifies NEXORA Catalog prototype and Laravel Site Engine inde
   assert.ok(profileEnvironmentReady, "Required NEXORA checkouts and installed Site Engine dependencies must exist");
   assert.equal(CATALOG_SHA, EXPECTED_CATALOG_SHA, "catalog source pin changed; update this test and its CI checkout together");
   assert.equal(SITE_SHA, EXPECTED_SITE_SHA, "Site Engine source pin changed; update this test and its CI checkout together");
+  assertPinnedCheckout(CATALOG_ROOT, CATALOG_SHA, "NEXORA Configurable Catalog");
+  assertPinnedCheckout(SITE_ROOT, SITE_SHA, "NEXORA Site Engine");
 
   const lab = createThreatLab({ name: "JB Threat Lab — NEXORA Profiles", version: "0.3.0" });
   lab.registerTarget({

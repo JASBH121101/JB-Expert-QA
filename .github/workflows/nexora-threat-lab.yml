@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           repository: JASBH121101/Nexora
-          ref: 88c4876c9678b93dadde55f79fe9d04890900741
+          ref: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
           path: nexora-catalog
 
       - name: Checkout pinned NEXORA Laravel Site Engine
@@ -90,8 +90,9 @@ jobs:
         env:
           NEXORA_CATALOG_ROOT: ${{ github.workspace }}/nexora-catalog
           NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/nexora-site-engine
-          NEXORA_CATALOG_SHA: 88c4876c9678b93dadde55f79fe9d04890900741
+          NEXORA_CATALOG_SHA: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
           NEXORA_SITE_ENGINE_SHA: 3f68126ecc58b088c071007c5116bc95426d159b
+          NEXORA_PROFILE_REQUIRED: "true"
         run: node --test packages/threat-lab/tests/nexora-profiles.integration.test.js
 
       - name: Run full Laravel suite on PostgreSQL 16
