@@ -19,7 +19,7 @@ jobs:
   publish-expert-qa:
     if: startsWith(github.ref, 'refs/tags/npm-expert-qa-v')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -33,19 +33,21 @@ jobs:
         run: npm install --global npm@latest
       - name: Verify npm Trusted Publishing CLI version
         run: node -e "const v=require('child_process').execSync('npm --version',{encoding:'utf8'}).trim().split('.').map(Number); if(v[0]<11 || (v[0]===11 && v[1]<5) || (v[0]===11 && v[1]===5 && v[2]<1)) process.exit(1)"
-      - name: Install Core dependency
-        working-directory: packages/expert-qa
+      - name: Install repository dependencies without lifecycle scripts
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Test Core package
-        working-directory: packages/expert-qa
-        run: npm test
+      - name: Run full repository regression suite
+        run: npm run check
+      - name: Build the generated Expert QA package tree
+        run: node scripts/build-expert-qa-package.js
+      - name: Pack, install and smoke-test the published engine distributions
+        run: npm run test:package-distributions
       - name: Publish through npm Trusted Publishing (OIDC)
         run: npm publish ./packages/expert-qa --access public
 
   publish-security-guard:
     if: startsWith(github.ref, 'refs/tags/npm-security-guard-v')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -63,8 +65,8 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Run the complete Security Guard regression suite
         run: npm run test:security-guard
-      - name: Verify the distributable package contents
-        run: npm pack --workspace @jb/security-guard --dry-run
+      - name: Verify all engine tarballs install and expose their public entry points
+        run: npm run test:package-distributions
       - name: Publish through npm Trusted Publishing (OIDC)
         run: npm publish ./packages/security-guard --access public
 
