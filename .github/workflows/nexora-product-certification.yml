@@ -20,10 +20,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: nexora-threat-lab-profiles
-  cancel-in-progress: true
-
 jobs:
   nexora-profiles:
     name: NEXORA pinned product profiles · Node 22 / PHP 8.3
