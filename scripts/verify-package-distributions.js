@@ -174,6 +174,10 @@ try {
     "--input-type=module", "-e",
     'import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit"; if (typeof createCloudflareWorkerRateLimit !== "function") process.exit(1); const limiter = createCloudflareWorkerRateLimit({ binding: { async limit() { return { success: true }; } } }); const decision = await limiter.check({ identity: "package-smoke-test", scope: "distribution" }); if (!decision.allowed || decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service"; if (typeof createUniversalRateLimitService !== "function") process.exit(1); const service = createUniversalRateLimitService({ store: { async consumeLimit() { return { allowed: true, count: 1, retryAfterMs: 60000 }; } }, clients: { "package-smoke": { secret: "package-smoke-test-secret-with-more-than-32-bytes", policies: { general: { scopes: ["distribution"] } } } } }); if (typeof service.fetch !== "function" || service.getClients()[0] !== "package-smoke") process.exit(1);'
+  ], { cwd: guardInstall });
 
   // JB Malware Engine.
   const malwareTarball = await pack("packages/malware-engine");
