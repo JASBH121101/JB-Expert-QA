@@ -279,4 +279,8 @@ test("keeps NEXORA Configurable Catalog and Site Engine as separate targets", as
     "nexora-site-engine"
   ]);
   assert.ok(report.assessment.targets.every((item) => item.coveredLevels.includes("basic")));
+  assert.ok(report.assessment.targets.every((item) => item.ready === false));
+  assert.ok(report.assessment.targets.every((item) =>
+    item.missingLevels.includes("superextreme")
+  ));
 });
