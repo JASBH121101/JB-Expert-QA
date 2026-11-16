@@ -444,29 +444,33 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
       });
     }
     const attestation = descriptor.value;
-    const role = attestation?.role;
-    if (!ROLES.includes(role) || byRole.has(role)) {
-      return Object.freeze({
-        schema: BUNDLE_SCHEMA,
-        verified: false,
-        executable: false,
-        reason: "missing-or-duplicate-provider-role"
-      });
-    }
     let result;
     try {
       result = verifier.verify(attestation, scope);
     } catch {
       result = null;
     }
-    if (!isRecord(result) || result.verified !== true) {
+    if (!isRecord(result) || result.verified !== true ||
+        !ROLES.includes(result.role)) {
       return Object.freeze({
         schema: BUNDLE_SCHEMA,
         verified: false,
         executable: false,
         reason: "provider-attestation-rejected",
-        deniedRole: role,
-        detail: result.reason
+        detail: isRecord(result) ? result.reason : "invalid-provider-evidence"
+      });
+    }
+
+    // Use the verifier's normalized role, never read the role property from
+    // an untrusted caller object before its exact-shape validation.
+    const role = result.role;
+    if (byRole.has(role)) {
+      return Object.freeze({
+        schema: BUNDLE_SCHEMA,
+        verified: false,
+        executable: false,
+        reason: "missing-or-duplicate-provider-role",
+        deniedRole: role
       });
     }
     byRole.set(role, result);
