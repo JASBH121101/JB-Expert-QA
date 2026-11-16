@@ -763,25 +763,6 @@ export function createResponseOrchestrator({
       });
     }
 
-    let finalAuthorizationValid = false;
-    try {
-      finalAuthorizationValid =
-        (await policyEngine.assertAuthorization({ authorization, request }))?.valid === true;
-    } catch {
-      finalAuthorizationValid = false;
-    }
-    if (!finalAuthorizationValid) {
-      return await finishBeforeExecution({
-        decision,
-        actionId: claim.actionId,
-        authorization,
-        request,
-        reason: "policy-authorization-expired-before-adapter",
-        reasonCode: "FINAL_AUTHORIZATION_ASSERTION_FAILED",
-        now: safeNow(clock)
-      });
-    }
-
     let finalMutationAllowed = false;
     try {
       finalMutationAllowed = await mutationControl.assertAllowed({
@@ -799,6 +780,25 @@ export function createResponseOrchestrator({
         request,
         reason: "mutation-stopped-at-final-preflight",
         reasonCode: "FINAL_MUTATION_CHECK_FAILED",
+        now: safeNow(clock)
+      });
+    }
+
+    let finalAuthorizationValid = false;
+    try {
+      finalAuthorizationValid =
+        (await policyEngine.assertAuthorization({ authorization, request }))?.valid === true;
+    } catch {
+      finalAuthorizationValid = false;
+    }
+    if (!finalAuthorizationValid) {
+      return await finishBeforeExecution({
+        decision,
+        actionId: claim.actionId,
+        authorization,
+        request,
+        reason: "policy-authorization-expired-before-adapter",
+        reasonCode: "FINAL_AUTHORIZATION_ASSERTION_FAILED",
         now: safeNow(clock)
       });
     }
