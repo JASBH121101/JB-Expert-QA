@@ -220,36 +220,43 @@ export function createResponseOrchestrator({
     reasonCode,
     now
   }) {
+    let cleanupOkay = true;
     if (authorization) {
       try {
-        await policyEngine.completeAuthorization({
+        cleanupOkay = (await policyEngine.completeAuthorization({
           authorization,
           outcome: "cancelled-before-execution"
-        });
-      } catch {}
+        }))?.recorded === true;
+      } catch {
+        cleanupOkay = false;
+      }
     }
     if (actionId) {
       try {
-        await orchestrationStore.completeAction({
+        const actionClosed = await orchestrationStore.completeAction({
           actionId,
           outcome: "cancelled-before-execution",
           completedAt: now,
           reasonCode
-        });
-        await orchestrationStore.recordActionOutcome({
+        }) === true;
+        const circuitUpdated = await orchestrationStore.recordActionOutcome({
           assetId: decision.assetId,
           action: ACTION,
           outcome: "cancelled-before-execution",
           at: now,
           failureThreshold: circuitFailureThreshold,
           cooldownMs: circuitCooldownMs
-        });
-      } catch {}
+        }) === true;
+        cleanupOkay = cleanupOkay && actionClosed && circuitUpdated;
+      } catch {
+        cleanupOkay = false;
+      }
     }
-    await persistState(decision, "HELD", reasonCode, now);
-    await appendAudit({
+    const state = cleanupOkay ? "HELD" : "RECONCILIATION_REQUIRED";
+    const stateWritten = await persistState(decision, state, reasonCode, now);
+    const auditWritten = await appendAudit({
       schema: "jb.resilience.audit-entry/v1",
-      event: "action-blocked",
+      event: cleanupOkay ? "action-blocked" : "action-cleanup-reconciliation-required",
       incidentId: decision.incidentId,
       assetId: decision.assetId,
       environment: decision.environment,
@@ -257,15 +264,17 @@ export function createResponseOrchestrator({
       policyRevision: policyEngine.policy?.revision ?? null,
       action: ACTION,
       reasonCode,
+      cleanupOkay,
       at: now
     });
     return result({
       incidentId: decision.incidentId,
-      state: "HELD",
+      state: cleanupOkay && stateWritten && auditWritten ? state : "RECONCILIATION_REQUIRED",
       decision: decision.decision,
       decisionRule: decision.decisionRule,
       action: ACTION,
-      reason
+      reason: cleanupOkay && stateWritten && auditWritten
+        ? reason : "pre-execution-cleanup-or-audit-reconciliation-required"
     });
   }
 
@@ -320,6 +329,14 @@ export function createResponseOrchestrator({
       targetBindingValid = false;
     }
     if (!targetBindingValid) {
+      const at = safeNow(clock);
+      await persistState(decision, "FAILED_CLOSED", "ASSET_SERVICE_BINDING_REJECTED", at);
+      await appendAudit({
+        ...baseAudit,
+        event: "asset-service-binding-rejected",
+        reasonCode: "ASSET_SERVICE_BINDING_REJECTED",
+        at
+      });
       return result({
         incidentId: decision.incidentId,
         state: "FAILED_CLOSED",
@@ -530,7 +547,9 @@ export function createResponseOrchestrator({
     } catch {
       claim = null;
     }
-    if (!claim || claim.claimed !== true || typeof claim.actionId !== "string") {
+    if (!claim || claim.claimed !== true ||
+        typeof claim.actionId !== "string" ||
+        claim.actionId.length < 8 || claim.actionId.length > 128) {
       const reasonCode = claim?.reason ?? "ACTION_CLAIM_FAILED";
       await persistState(decision, "HELD", reasonCode, safeNow(clock));
       await appendAudit({ ...baseAudit, event: "action-claim-rejected", action, reasonCode });
@@ -549,17 +568,33 @@ export function createResponseOrchestrator({
       const issued = await policyEngine.authorize(request);
       if (issued?.authorized === true && isRecord(issued.authorization)) {
         const candidate = issued.authorization;
+        authorization = candidate;
         const authorizationMatchesRequest =
           candidate.riskClass === "A1" &&
           candidate.assetId === decision.assetId &&
           candidate.environment === decision.environment &&
           candidate.incidentId === decision.incidentId &&
           candidate.action === ACTION &&
+          candidate.policyId === policyEngine.policy?.policyId &&
+          candidate.revision === policyEngine.policy?.revision &&
+          candidate.policyHash === policyEngine.policy?.policyHash &&
+          typeof candidate.authorizationId === "string" &&
+          candidate.authorizationId.length >= 8 &&
           typeof candidate.reservationId === "string" &&
           candidate.reservationId.length >= 8 &&
           Number.isSafeInteger(candidate.expiresAt) &&
           candidate.expiresAt > safeNow(clock);
-        if (authorizationMatchesRequest) authorization = candidate;
+        if (!authorizationMatchesRequest) {
+          return await finishBeforeExecution({
+            decision,
+            actionId: claim.actionId,
+            authorization,
+            request,
+            reason: "policy-authorization-context-mismatch",
+            reasonCode: "POLICY_AUTHORIZATION_CONTEXT_MISMATCH",
+            now: safeNow(clock)
+          });
+        }
       } else {
         return await finishBeforeExecution({
           decision,
