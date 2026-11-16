@@ -4,7 +4,7 @@ const ENVELOPE_KEYS = ["schema", "messageId", "correlationId", "producer", "cont
 const PRODUCER_KEYS = ["engineId", "version"];
 const CONTRACT_KEYS = ["id", "version"];
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
-const NAMESPACE = /^jb\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+const NAMESPACE = /^jb\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const KIND = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const CLASSIFICATIONS = new Set(["public", "internal", "sensitive"]);
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
@@ -30,14 +30,20 @@ function isJsonValue(value, depth = 0, seen = new Set()) {
   if (typeof value === "number") return Number.isFinite(value);
   if (typeof value !== "object" || seen.has(value)) return false;
   if (!Array.isArray(value) && !isRecord(value)) return false;
-  if (Object.keys(value).length > MAX_COLLECTION_SIZE) return false;
-  seen.add(value);
-  const valid = Array.isArray(value)
-    ? value.every((entry) => isJsonValue(entry, depth + 1, seen))
-    : Object.entries(value).every(([key, entry]) =>
-        !FORBIDDEN_KEYS.has(key) && isJsonValue(entry, depth + 1, seen));
-  seen.delete(value);
-  return valid;
+  const keys = Object.keys(value);
+  if (keys.length > MAX_COLLECTION_SIZE) return false;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.hasOwn(value, index) || !isJsonValue(value[index], depth + 1, seen)) return false;
+    }
+  } else {
+    seen.add(value);
+    const valid = Object.entries(value).every(([key, entry]) =>
+      !FORBIDDEN_KEYS.has(key) && isJsonValue(entry, depth + 1, seen));
+    seen.delete(value);
+    return valid;
+  }
+  return true;
 }
 
 export function validateMessageEnvelope(input) {
@@ -63,7 +69,7 @@ export function validateMessageEnvelope(input) {
   }
   if (typeof input.kind !== "string" || !KIND.test(input.kind)) errors.push("kind is invalid");
   if (typeof input.occurredAt !== "string" ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(input.occurredAt) ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(input.occurredAt) ||
       !Number.isFinite(Date.parse(input.occurredAt))) errors.push("occurredAt must be an ISO-8601 timestamp with timezone");
   if (!CLASSIFICATIONS.has(input.classification)) errors.push("classification is invalid");
   if (input.semantics !== "advisory") errors.push("semantics must be advisory; messages cannot grant authority");
