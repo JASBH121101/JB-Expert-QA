@@ -43,7 +43,16 @@ function harness(overrides = {}) {
   const decision = overrides.decision ?? incidentDecision();
   const authorization = Object.freeze({
     authorizationId: "authorization-0001",
-    riskClass: "A1"
+    policyId: "jb-prod",
+    revision: 4,
+    policyHash: "a".repeat(64),
+    assetId: "host-erp-01",
+    environment: "production",
+    incidentId: "incident-0001",
+    action: "restart-service",
+    riskClass: "A1",
+    reservationId: "reservation-0001",
+    expiresAt: NOW + 30_000
   });
   const orchestrationStore = {
     durable: overrides.durable ?? true,
@@ -82,7 +91,13 @@ function harness(overrides = {}) {
     evaluate(request) {
       calls.evaluated += 1;
       calls.request = request;
-      return overrides.policyDecision ?? { permitted: true, riskClass: "A1", reason: "policy-permits-bounded-action" };
+      return overrides.policyDecision ?? {
+        permitted: true,
+        riskClass: "A1",
+        action: "restart-service",
+        assetId: "host-erp-01",
+        reason: "policy-permits-bounded-action"
+      };
     },
     async authorize(request) {
       calls.authorized += 1;
