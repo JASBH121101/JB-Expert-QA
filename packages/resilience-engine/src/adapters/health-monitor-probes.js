@@ -303,16 +303,18 @@ export function createHealthMonitorProbeAdapter({
   const probeWaiters = [];
 
   async function acquireProbeSlot() {
-    if (activeProbes >= maxConcurrentProbes) {
-      await new Promise((resolve) => probeWaiters.push(resolve));
+    if (activeProbes < maxConcurrentProbes) {
+      activeProbes += 1;
+      return;
     }
-    activeProbes += 1;
+    // A released slot is transferred directly to the next waiter.
+    await new Promise((resolve) => probeWaiters.push(resolve));
   }
 
   function releaseProbeSlot() {
-    activeProbes -= 1;
     const next = probeWaiters.shift();
     if (next) next();
+    else activeProbes -= 1;
   }
   for (const candidate of probes) {
     validateProbeBase(candidate, ids);
