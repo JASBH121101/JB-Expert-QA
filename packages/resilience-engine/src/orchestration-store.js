@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
 
-const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/;
+const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.@:-]{0,127}$/;
 const ASSET_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const LEDGER_SCHEMA = "jb.resilience.orchestration-ledger/v1";
