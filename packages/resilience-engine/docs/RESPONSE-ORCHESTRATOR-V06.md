@@ -132,14 +132,14 @@ The exact transition graph must be encoded and tested. A failed or uncertain ver
 
 For each admitted incident:
 
-1. Evaluate the trusted input with v0.5 and durably record its deterministic decision.
+1. Copy and freeze the untrusted input as bounded plain JSON data, authenticate its host-owned provenance, evaluate it with v0.5 and verify that the resulting asset/environment/service scope exactly matches the input.
 2. If the decision is not `review-recovery-policy`, do not mutate. Persist the appropriate observe, hold or escalation outcome.
 3. If security state is not exactly `clear`, or health is not exactly `unhealthy`, hold/ escalate. Unknown, stale, suspected, confirmed, tampered or conflicting evidence can never enter the A1 path.
 4. Read the durable service action state and circuit state. If either read fails or the circuit is open, fail closed.
 5. Build the fixed A1 request using the v0.5 incident ID and health failure count plus the durable last-action timestamp. Ask the policy engine to evaluate it.
 6. Atomically claim the incident/action idempotency key. A duplicate claim is a no-op, not a second execution.
 7. Obtain the short-lived capability authorization from the policy engine. A deny, stale policy, unavailable revision store or budget failure ends the response without mutation.
-8. Persist the planned/authorized audit record. Immediately before invoking the adapter, re-assert the authorization, re-check the live policy and re-check global/scoped mutation control.
+8. Persist the authorization audit record and execution intent. Re-assert the short-lived capability and re-check the mutation stop control at the final preflight immediately before invoking the adapter; a failed preflight cancels the claim without dispatching the action.
 9. Execute only `adapter.restartService(exactServiceId)`. The adapter must keep fixed executables/arguments, shell disabled and bounded timeouts.
 10. Verify the service-manager state and then run the host-owned application health check. Command success alone is not recovery.
 11. Finalize the policy reservation, action claim, incident state, circuit outcome and audit record. If the command result is uncertain, record `RECONCILIATION_REQUIRED`, consume the action budget and do not blindly retry.
