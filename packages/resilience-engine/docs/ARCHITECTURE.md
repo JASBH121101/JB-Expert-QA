@@ -44,3 +44,8 @@ The health monitor's detailed observation counters remain in-memory. The persist
 The engine never deletes files, restores databases, changes firewall or ACL policy, disables security controls, installs services, runs arbitrary shell text, or changes production infrastructure. Cross-host failover is deferred: a dead host requires an independent external monitor and a separately provisioned target. Database restore and infrastructure changes remain human-approved operations.
 
 Approval verification and host health checks have configurable timeouts and receive an `AbortSignal`; host callbacks should observe it and stop work when aborted. Critical-service approval signatures, subject authorization and durable nonce replay checks remain the responsibility of the injected host approval verifier. The engine's in-process WeakSets are defense in depth and are not a replacement for a durable store or a trusted verifier.
+
+
+## Target autonomy architecture
+
+The selected target profile is **autonomous-advanced**. See [ADVANCED-AUTONOMY.md](./ADVANCED-AUTONOMY.md) for the target signal gateway, deterministic decision engine, capability policy gate, bounded containment, failover prerequisites, policy schema v2, hard prohibitions and validation roadmap. This specification does not change the current runtime mode or grant new permissions. The implemented v0.2 recovery foundation remains `semi-autonomous` until the staged implementation and certification gates are completed.
