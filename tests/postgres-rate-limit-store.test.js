@@ -17,6 +17,7 @@ test("PostgreSQL rate-limit store initializes an indexed table without connectin
   assert.match(calls[0].sql, /CREATE TABLE IF NOT EXISTS jb_security_guard_rate_limits/);
   assert.match(calls[0].sql, /PRIMARY KEY/);
   assert.match(calls[0].sql, /last_seen_at/);
+  assert.match(calls[1].sql, /CREATE INDEX IF NOT EXISTS/);
 });
 
 test("PostgreSQL consume uses a parameterized atomic UPSERT and database clock", async () => {
