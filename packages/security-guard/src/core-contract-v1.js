@@ -253,7 +253,7 @@ export function validateAuthenticationDecisionV1(value) {
       (value.enforced || value.status !== null || value.retryAfterSeconds !== null)) {
     throw new TypeError("allow requires enforced=false and null status/retryAfterSeconds");
   }
-  if (value.outcome === "monitor" && (!value.enforced === false || value.status !== null)) {
+  if (value.outcome === "monitor" && (value.enforced || value.status !== null)) {
     throw new TypeError("monitor requires enforced=false and status=null");
   }
   if (value.outcome === "deny" && (!value.enforced || value.status !== 429)) {
