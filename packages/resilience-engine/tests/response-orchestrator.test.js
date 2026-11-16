@@ -248,8 +248,16 @@ test("executes only a policy-authorized A1 restart and verifies both service and
   assert.deepEqual(h.calls.completed, ["succeeded"]);
   assert.equal(h.calls.states.some((entry) => entry.state === "EXECUTING"), true);
   assert.equal(h.calls.states.some((entry) => entry.state === "RECOVERED"), true);
-  assert.equal(h.calls.audit.some((entry) => entry.event === "action-authorized"), true);
+  assert.equal(h.calls.audit.some((entry) => entry.event === "a1-plan-created"), true);
+  assert.equal(h.calls.audit.some((entry) => entry.event === "authorization-issued"), true);
+  assert.equal(h.calls.audit.some((entry) => entry.event === "execution-intent-recorded"), true);
   assert.equal(h.calls.audit.some((entry) => entry.event === "action-verified"), true);
+  assert.deepEqual(
+    h.calls.states.map((entry) => entry.state).filter((state) =>
+      ["PLANNED", "AUTHORIZED", "EXECUTING", "VERIFYING", "RECOVERED"].includes(state)
+    ),
+    ["PLANNED", "AUTHORIZED", "EXECUTING", "VERIFYING", "RECOVERED"]
+  );
 });
 
 test("rejects input whose provenance is not confirmed by the trusted host verifier", async () => {
