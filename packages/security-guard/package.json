@@ -10,7 +10,8 @@
     "./rate-limit-contract": "./src/rate-limit-contract.js",
     "./core-contract-v1": "./src/core-contract-v1.js",
     "./threat-assessment": "./src/threat-assessment.js",
-    "./universal-rate-limit-service": "./src/universal-rate-limit-service.js"
+    "./universal-rate-limit-service": "./src/universal-rate-limit-service.js",
+    "./postgres-rate-limit-store": "./src/postgres-rate-limit-store.js"
   },
   "files": [
     "src/**",
