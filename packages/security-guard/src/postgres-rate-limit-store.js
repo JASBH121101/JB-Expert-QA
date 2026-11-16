@@ -138,7 +138,8 @@ export function createPostgresRateLimitStore(options = {}) {
     if (!isSafeCounterKey(input.key)) {
       throw new TypeError("key must be a valid namespaced HMAC key or Core v1 length-prefixed counter key; raw identities are not accepted");
     }
-    // The shared store contract carries caller time; PostgreSQL's statement clock is authoritative here.\n    safeInteger(input.now, "now", 0);
+    // The shared store contract carries caller time; PostgreSQL's statement clock is authoritative here.
+    safeInteger(input.now, "now", 0);
     const windowMs = safeInteger(input.windowMs, "windowMs", 1, 86_400_000);
     safeInteger(input.maxRequests, "maxRequests", 1, 1_000_000);
 
