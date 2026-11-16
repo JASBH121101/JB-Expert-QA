@@ -138,8 +138,30 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  resilience-engine:
+    name: Resilience Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run Resilience Engine policy, recovery and platform-adapter tests
+        run: npm --workspace @jb/resilience-engine run test
+
   package-boundaries:
-    name: Three-engine package boundary / Node ${{ matrix.node }}
+    name: Five-package distribution boundary / Node ${{ matrix.node }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
@@ -156,5 +178,5 @@ jobs:
           package-manager-cache: false
       - name: Install repository dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Verify all three independently installable packages
+      - name: Verify all five independently installable packages
         run: npm run test:package-distributions
