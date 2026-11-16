@@ -341,7 +341,7 @@ test("an unavailable audit sink blocks action execution", async () => {
   const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
-  assert.equal(result.reason, "pre-execution-audit-or-state-write-failed");
+  assert.equal(result.reason, "authorization-state-or-audit-write-failed");
   assert.equal(h.calls.restart, 0);
   assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
 });
