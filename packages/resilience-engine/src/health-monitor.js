@@ -2,11 +2,15 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function createHealthMonitor({ engine, clock = Date.now } = {}) {
+export function createHealthMonitor({ engine, clock = Date.now, maxServices = 1000, maxRecoveryAttempts = 5 } = {}) {
   if (!isRecord(engine) || typeof engine.evaluateRecovery !== "function") {
     throw new TypeError("a resilience engine instance is required");
   }
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
+  if (!Number.isSafeInteger(maxServices) || maxServices < 1 || maxServices > 10_000 ||
+      !Number.isSafeInteger(maxRecoveryAttempts) || maxRecoveryAttempts < 1 || maxRecoveryAttempts > 20) {
+    throw new TypeError("health monitor capacity limits are invalid");
+  }
   const states = new Map();
 
   function getState(serviceId) {
@@ -20,11 +24,20 @@ export function createHealthMonitor({ engine, clock = Date.now } = {}) {
   }
 
   function observe({ serviceId, healthy } = {}) {
-    if (typeof serviceId !== "string" || !serviceId ||
+    if (typeof serviceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/.test(serviceId) ||
         typeof healthy !== "boolean") {
       throw new TypeError("health observation requires serviceId and boolean healthy");
     }
+    if (!states.has(serviceId) && states.size >= maxServices) {
+      throw new RangeError("health monitor service capacity reached");
+    }
+    if (!states.has(serviceId) && states.size >= maxServices) {
+      throw new RangeError("health monitor service capacity reached");
+    }
     const previous = getState(serviceId);
+    if (previous.restartCount >= maxRecoveryAttempts) {
+      throw new RangeError("health monitor recovery-attempt limit reached");
+    }
     const now = clock();
     if (!Number.isSafeInteger(now) || now < 0) {
       throw new TypeError("clock must return a non-negative safe integer");
@@ -47,7 +60,7 @@ export function createHealthMonitor({ engine, clock = Date.now } = {}) {
   }
 
   function recordRecoveryAttempt({ serviceId, executed } = {}) {
-    if (typeof serviceId !== "string" || !serviceId || typeof executed !== "boolean") {
+    if (typeof serviceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/.test(serviceId) || typeof executed !== "boolean") {
       throw new TypeError("recovery result requires serviceId and boolean executed");
     }
     const previous = getState(serviceId);
