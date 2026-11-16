@@ -59,9 +59,12 @@ jobs:
         run: npm install --global npm@latest
       - name: Verify npm Trusted Publishing CLI version
         run: node -e "const v=require('child_process').execSync('npm --version',{encoding:'utf8'}).trim().split('.').map(Number); if(v[0]<11 || (v[0]===11 && v[1]<5) || (v[0]===11 && v[1]===5 && v[2]<1)) process.exit(1)"
-      - name: Test Security Guard package
-        working-directory: packages/security-guard
-        run: npm test
+      - name: Install monorepo test dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run the complete Security Guard regression suite
+        run: npm run test:security-guard
+      - name: Verify the distributable package contents
+        run: npm pack --workspace @jb/security-guard --dry-run
       - name: Publish through npm Trusted Publishing (OIDC)
         run: npm publish ./packages/security-guard --access public
 
