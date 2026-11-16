@@ -1,0 +1,21 @@
+{
+  "name": "@jb/engine-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal, dependency-free contracts and compatibility checks shared by JB Engines.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./manifest": "./src/manifest.js",
+    "./envelope": "./src/envelope.js",
+    "./compatibility": "./src/compatibility.js",
+    "./semver": "./src/semver.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "UNLICENSED"
+}
