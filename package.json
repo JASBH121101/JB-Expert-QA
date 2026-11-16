@@ -2,7 +2,7 @@
   "name": "jb-expert-qa",
   "version": "0.8.0",
   "private": true,
-  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, JB Malware Engine, and JB Advisor Engine packages.",
+  "description": "Monorepo for independently versioned JB Expert QA, JB Security Guard, JB Malware Engine, JB Advisor Engine and JB Resilience Engine packages.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -25,7 +25,8 @@
     "audit:database": "node src/database-cli.js",
     "test:threat-lab": "npm --workspace @jb/threat-lab run check",
     "audit:database:postgres": "node src/postgres-database-cli.js",
-    "audit:language": "node src/language-cli.js"
+    "audit:language": "node src/language-cli.js",
+    "test:resilience-engine": "node --test packages/resilience-engine/tests/*.test.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -41,6 +42,7 @@
     "packages/security-guard-core",
     "packages/malware-engine",
     "packages/threat-lab",
-    "packages/advisor-engine"
+    "packages/advisor-engine",
+    "packages/resilience-engine"
   ]
 }
