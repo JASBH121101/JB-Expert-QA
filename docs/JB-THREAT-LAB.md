@@ -134,6 +134,8 @@ A target is marked ready only when every required tier has at least one applicab
 
 ### Baseline footprint after initial tier assignment
 
+
+The footprint above is an inventory across separate local test files, not yet one consolidated cross-suite report. CI runs these suites independently. Each Threat Lab report assesses only the scenarios selected and executed in that run; cross-suite aggregation remains a future lab capability.
 - **JB Malware Engine:** all six tiers are represented across the local core, Trojan-defense, persistence, and synthetic-PE test suites. Superextreme is currently represented by a synthetic PE credential-access/exfiltration correlation case; the file is never executed and no network request is made.
 - **JB Security Guard:** Basic through Expert are represented. Extreme and Superextreme are open coverage gaps.
 - **JB Expert QA:** Basic through Extreme are represented. Superextreme remains open.
