@@ -298,3 +298,75 @@ test("source definitions reject duplicate IDs and wildcard capabilities", () => 
     requireDurableStore: false, allowInMemoryStore: true
   }), /invalid format/);
 });
+
+
+test("rejects accessor-backed envelopes without evaluating getters", async () => {
+  const { gateway } = setup();
+  const item = signal();
+  const hostile = { ...item };
+  Object.defineProperty(hostile, "signature", {
+    enumerable: true,
+    get() { throw new Error("getter must not run"); }
+  });
+  assert.equal((await gateway.ingest(hostile)).reason, "invalid-envelope");
+});
+
+test("same-source events at one timestamp with different states resolve as conflicting", async () => {
+  const now = 1_800_000_000_000;
+  const { gateway } = setup({ clock: () => now });
+  const first = signal({ state: "clear", now });
+  const second = signTrustedSignalEnvelope({
+    schema: "jb.resilience.trusted-signal/v1",
+    eventId: eventId(),
+    sourceId: "guard-primary",
+    sourceEngine: "security-guard",
+    environment: ENV,
+    assetId: ASSET,
+    issuedAtMs: now,
+    expiresAtMs: now + 60_000,
+    state: "suspected",
+    severity: "high",
+    reasonCode: "THREAT_SUSPECTED",
+    evidenceRefs: []
+  }, GUARD_KEY);
+  const malware = signal({
+    sourceId: "malware-primary",
+    sourceEngine: "malware-engine",
+    key: MALWARE_KEY,
+    now
+  });
+  assert.equal((await gateway.ingest(first)).accepted, true);
+  assert.equal((await gateway.ingest(second)).accepted, true);
+  assert.equal((await gateway.ingest(malware)).accepted, true);
+  const result = await gateway.getSecurityState({ assetId: ASSET, environment: ENV });
+  assert.equal(result.state, "conflicting");
+  assert.equal(result.reason, "same-source-conflicting-signals");
+});
+
+test("rechecks signal freshness after asynchronous persisted reads", async () => {
+  let now = 1_800_000_000_000;
+  const records = [];
+  const store = {
+    durable: true,
+    async recordSignal(record) {
+      records.push(record);
+      return { recorded: true };
+    },
+    async listSignals() {
+      now += 61_000;
+      return records;
+    }
+  };
+  const { gateway } = setup({ replayStore: store, clock: () => now });
+  const guard = signal({ now });
+  const malware = signal({
+    sourceId: "malware-primary",
+    sourceEngine: "malware-engine",
+    key: MALWARE_KEY,
+    now
+  });
+  assert.equal((await gateway.ingest(guard)).accepted, true);
+  assert.equal((await gateway.ingest(malware)).accepted, true);
+  const result = await gateway.getSecurityState({ assetId: ASSET, environment: ENV });
+  assert.equal(result.state, "stale");
+});
