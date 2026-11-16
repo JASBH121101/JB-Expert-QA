@@ -145,6 +145,11 @@ function harness(overrides = {}) {
       calls.trustedInput += 1;
       return overrides.trustedInput ?? true;
     },
+    targetBindingVerifier: async (binding) => {
+      calls.targetBinding ??= [];
+      calls.targetBinding.push(binding);
+      return overrides.targetBindingValid ?? true;
+    },
     mutationControl: {
       async assertAllowed(context) {
         calls.mutationChecks = (calls.mutationChecks ?? 0) + 1;
