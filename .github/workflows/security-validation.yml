@@ -80,6 +80,8 @@ jobs:
           node --check packages/security-guard/src/distributed-rate-limit.js
           node --check packages/security-guard/src/distributed-auth-protection.js
           node --check packages/security-guard/src/upload-inspector.js
+          node --check packages/security-guard/src/core-contract-v1.js
+          node --check tests/security-guard-core-v1.test.js
           node --check tests/csrf-protection.test.js
           node --check tests/distributed-rate-limit.test.js
           node --check tests/distributed-auth-protection.test.js
