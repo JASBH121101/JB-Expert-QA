@@ -915,7 +915,7 @@ export function createResponseOrchestrator({
       finalState,
       finalReason,
       safeNow(clock)
-    });
+    );
 
     if (!fullyVerified || !finalStatePersisted) {
       await appendAudit({
