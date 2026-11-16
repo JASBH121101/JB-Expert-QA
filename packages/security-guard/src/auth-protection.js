@@ -340,7 +340,7 @@ export function createAuthProtection(options = {}) {
     if (!request || typeof request !== "object") {
       throw new TypeError("recordSuccess requires the authentication request");
     }
-    const now = coreContract ? readNow() : null;
+    const now = coreContract ? Date.now() : null;
     const keys = getKeys(request);
     for (const scope of ["accountIp", "account"]) {
       if (keys[scope]) buckets[scope].delete(keys[scope]);
