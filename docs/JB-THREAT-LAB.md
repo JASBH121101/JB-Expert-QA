@@ -24,7 +24,7 @@ A lab pass means only that the named scenario produced its expected outcome. It 
 | Perfumaría JB (future profile) | initially a lightweight public catalogue with a private owner panel for products and photos; later, when the business grows, a separately installable modular Laravel/PHP ERP package for a VPS |
 | Client ERP projects | disposable database; inventory arithmetic; stock movement invariants; roles; audit trail; input validation; backup/restore; export integrity; performance budgets |
 
-NEXORA and Perfumaría JB are independent future integration targets, not dependencies of the current lab package. The Perfumaría JB storefront and its future ERP are not being developed in this PR.
+NEXORA is now validated through two pinned, independent Threat Lab profiles described below. Perfumaría JB and disposable client ERP projects remain future integration targets; their source, data, and release lifecycles stay outside this laboratory.
 
 ## Malware testing boundary
 
@@ -92,7 +92,7 @@ The reusable core, target-scoped scenario registry, explicit offline/non-destruc
 
 The suite uses temporary directories, inert fixtures, and in-memory upload storage. It does not use production data, execute malware samples, send network requests from Threat Lab adapters, contact external malware feeds, call AI providers, or require paid services. Static triage is not antivirus-grade certification and does not prove detection of every malware family. The PostgreSQL CLI E2E is the separate opt-in integration check and uses only a disposable CI PostgreSQL service; the Threat Lab database scenario remains static and makes zero database connections. The PNG comparison validates deterministic pixel differences, not every browser/device combination.
 
-NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
+Perfumaría JB and client ERP profiles remain future integrations. NEXORA has dedicated read-only catalog-prototype and Laravel Site Engine profiles; all product source, data, and releases remain separate from the lab package.
 
 - **JB Advisor Engine — 6 scenarios:** the three existing recommendation, research-review and product-type-isolation checks, plus insufficient-coverage no-winner gating, four-candidate order-independent weighted ranking, and atomic research-candidate capacity rejection.
 
@@ -162,12 +162,12 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
-**Product-backed integration:** both NEXORA profiles now have dedicated adapters in `packages/threat-lab/integrations/nexora/` and run through `.github/workflows/nexora-product-certification.yml` against their own product branches. The Configurable Catalog profile executes four real Node.js demo suites (Basic through Expert) and certifies only the frontend prototype contract. The Site Engine profile executes six real Laravel/PHP scenarios (Basic through Superextreme), including the complete PHPUnit suite, using an ephemeral SQLite database. A pass in the catalog profile does not certify server authentication, persistence, or authorization; a pass in the Site Engine profile does not certify the separate demo's responsive/UI contract. The workflow checks out both product branches read-only; test execution is local, offline, non-destructive, and does not deploy or mutate either branch.
+**Product-backed integration (official route):** both NEXORA profiles run through `packages/threat-lab/tests/nexora-profiles.integration.test.js` and `.github/workflows/nexora-threat-lab.yml`. The workflow checks out immutable source pins: Configurable Catalog commit `88c4876c9678b93dadde55f79fe9d04890900741` and Site Engine commit `3f68126ecc58b088c071007c5116bc95426d159b`. Each target has six real scenarios (Basic through Superextreme) and its own report/readiness result. The catalog remains a browser-local prototype; the Site Engine runs Laravel Feature/Unit tests against in-memory SQLite and a separate full PostgreSQL 16 suite. DNS/TLS tests use deterministic fakes. The retired branch-following adapters are not a second certification path.
 
 
 ## NEXORA product-backed profile validation
 
-- `nexora-configurable-catalog`: reads the current `feature/nexora-configurable-catalog` branch and runs the four demo test files independently. This profile is intentionally limited to the frontend prototype and its browser-side demo behavior.
-- `nexora-site-engine`: reads the current `feature/nexora-site-engine-certification` branch and runs real Laravel feature/unit tests through PHP 8.3. Test execution forces `DB_CONNECTION=sqlite` and `DB_DATABASE=:memory:`; PHPUnit configuration is checked before the suite is invoked.
-- Each profile has a separate Threat Lab report and readiness assessment. Their results are never combined into one shared certification claim.
-- The Site Engine branch's own Laravel workflow remains responsible for the additional PostgreSQL 16 compatibility check. The Threat Lab integration workflow is the local, scenario-oriented product adapter layer.
+- **Configurable Catalog:** pinned to `JASBH121101/Nexora@88c4876c9678b93dadde55f79fe9d04890900741`, the head of draft PR #5. Six scenarios run the prototype's actual Node.js demo suites, then verify the localStorage-only/no-real-password boundary. It does not certify backend authentication, server persistence, or secure uploads.
+- **Site Engine:** pinned to `JASBH121101/Nexora@3f68126ecc58b088c071007c5116bc95426d159b`, the dedicated approved-upgrades branch. Six scenarios exercise setup, public catalogue, permissions, exports, fake DNS/TLS domain boundaries, and the full Laravel Feature/Unit suite on in-memory SQLite. The dedicated workflow also runs the complete suite on PostgreSQL 16.
+- The dedicated workflow is the only official NEXORA product-certification entry point. It requires both pinned checkouts and does not silently skip a missing product dependency.
+- Each product report is independent. A ready result covers only the six registered scenarios for that exact commit, not unknown defects or capabilities outside the tested scope.
