@@ -762,6 +762,67 @@ export function createResiliencePolicyEngine({
     if (!reserved) {
       return Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
     }
+
+    // Store checks are asynchronous. Recheck policy validity, signature, live
+    // conditions and authorization expiry after they complete, not only before.
+    const postCheckNow = clock();
+    try {
+      currentPolicy(postCheckNow);
+    } catch {
+      return Object.freeze({ valid: false, reason: "policy-invalid-or-expired" });
+    }
+    if (!Number.isSafeInteger(postCheckNow) || postCheckNow < 0 ||
+        postCheckNow >= authorization.expiresAt) {
+      return Object.freeze({ valid: false, reason: "authorization-expired-or-stale" });
+    }
+    const postCheckDecision = evaluatePolicyCapability(
+      validatedPolicy, freshRequest.request, postCheckNow
+    );
+    if (!postCheckDecision.permitted || postCheckDecision.riskClass !== authorization.riskClass) {
+      return Object.freeze({
+        valid: false,
+        reason: "capability-conditions-no-longer-met",
+        detail: postCheckDecision.reason
+      });
+    }
+
+    let revisionStillCurrent = false;
+    let reservationStillValid = false;
+    try {
+      revisionStillCurrent = await policyRevisionStore.assertCurrent({
+        policyId: authorization.policyId,
+        revision: authorization.revision,
+        policyHash: authorization.policyHash
+      }) === true;
+      if (revisionStillCurrent) {
+        reservationStillValid = await capabilityLedger.assertReservation({
+          reservationId: authorization.reservationId,
+          policyId: authorization.policyId,
+          revision: authorization.revision,
+          policyHash: authorization.policyHash,
+          now: postCheckNow
+        }) === true;
+      }
+    } catch {
+      reservationStillValid = false;
+    }
+    if (!revisionStillCurrent) {
+      return Object.freeze({ valid: false, reason: "policy-revision-not-current-or-store-failure" });
+    }
+    if (!reservationStillValid) {
+      return Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    }
+
+    const finalNow = clock();
+    try {
+      currentPolicy(finalNow);
+    } catch {
+      return Object.freeze({ valid: false, reason: "policy-invalid-or-expired" });
+    }
+    if (!Number.isSafeInteger(finalNow) || finalNow < 0 ||
+        finalNow >= authorization.expiresAt) {
+      return Object.freeze({ valid: false, reason: "authorization-expired-or-stale" });
+    }
     asserted.add(authorization);
     return Object.freeze({ valid: true, reason: null });
   }
