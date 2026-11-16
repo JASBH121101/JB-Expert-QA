@@ -312,3 +312,91 @@ test("unknown or non-recovery v0.5 decisions remain read-only", async () => {
   assert.equal(h.calls.evaluated, 0);
   assert.equal(h.calls.restart, 0);
 });
+
+
+test("rejects an asset-to-service mapping not approved by the host registry", async () => {
+  const h = harness({ targetBindingValid: false });
+  const result = await h.orchestrator.executeIncident({});
+
+  assert.equal(result.state, "FAILED_CLOSED");
+  assert.equal(result.reason, "asset-service-binding-rejected");
+  assert.equal(h.calls.targetBinding.length, 1);
+  assert.deepEqual(h.calls.targetBinding[0], {
+    assetId: "host-erp-01",
+    environment: "production",
+    serviceId: "catalog-api",
+    platform: "linux-systemd"
+  });
+  assert.equal(h.calls.evaluated, 0);
+  assert.equal(h.calls.restart, 0);
+});
+
+test("rejects a policy result that claims permission outside A1 restart-service", async () => {
+  const h = harness({
+    policyDecision: {
+      permitted: true,
+      riskClass: "A2",
+      action: "apply-containment-profile",
+      assetId: "host-erp-01"
+    }
+  });
+  const result = await h.orchestrator.executeIncident({});
+
+  assert.equal(result.state, "HELD");
+  assert.equal(result.reason, "POLICY_RISK_CLASS_NOT_A1");
+  assert.equal(h.calls.authorized, 0);
+  assert.equal(h.calls.restart, 0);
+});
+
+test("rejects authorization not bound to the exact incident, asset and policy revision", async () => {
+  const h = harness({
+    authorizationResult: {
+      authorized: true,
+      authorization: Object.freeze({
+        authorizationId: "authorization-0002",
+        policyId: "jb-prod",
+        revision: 4,
+        policyHash: "a".repeat(64),
+        assetId: "different-host",
+        environment: "production",
+        incidentId: "incident-0001",
+        action: "restart-service",
+        riskClass: "A1",
+        reservationId: "reservation-0002",
+        expiresAt: NOW + 30_000
+      })
+    }
+  });
+  const result = await h.orchestrator.executeIncident({});
+
+  assert.equal(result.state, "HELD");
+  assert.equal(result.reason, "policy-authorization-context-mismatch");
+  assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
+  assert.equal(h.calls.restart, 0);
+});
+
+test("fails closed when the durable service-state response omits lastActionAt", async () => {
+  const h = harness({ serviceState: {} });
+  const result = await h.orchestrator.executeIncident({});
+
+  assert.equal(result.state, "FAILED_CLOSED");
+  assert.equal(result.reason, "orchestration-state-invalid");
+  assert.equal(h.calls.authorized, 0);
+  assert.equal(h.calls.restart, 0);
+});
+
+test("a contradictory v0.5 recovery recommendation is persisted as held, not executed", async () => {
+  const h = harness({
+    decision: incidentDecision({
+      health: { state: "healthy", consecutiveFailures: 0 }
+    })
+  });
+  const result = await h.orchestrator.executeIncident({});
+
+  assert.equal(result.state, "HELD");
+  assert.equal(result.reason, "A1_REQUIRES_CLEAR_SECURITY_AND_UNHEALTHY_SERVICE");
+  assert.equal(h.calls.states.some((entry) => entry.state === "HELD"), true);
+  assert.equal(h.calls.audit.some((entry) => entry.event === "a1-precondition-rejected"), true);
+  assert.equal(h.calls.evaluated, 0);
+  assert.equal(h.calls.restart, 0);
+});
