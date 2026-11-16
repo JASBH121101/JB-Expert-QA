@@ -57,3 +57,21 @@ The health monitor's observation counters are still in-memory by default, but `r
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
+
+
+## v0.3 policy and capability control
+
+The v2 policy engine is available as `@jb/resilience-engine/policy-engine`. It validates the complete `jb.resilience.policy/v2` contract, computes and verifies a canonical SHA-256 policy hash, and delegates cryptographic signature verification to an injected host-owned verifier. No signing key, trust root or permissive verifier is bundled.
+
+Production use requires two host-provided durable transactional components:
+
+- `policyRevisionStore.acceptRevision({ policyId, revision, policyHash })` atomically accepts only a non-decreasing revision and rejects equal-revision hash substitution or rollback.
+- `capabilityLedger.reserveAction(...)`, `assertReservation(...)` and `completeAction(...)` atomically enforce incident concurrency and per-incident/per-asset budgets.
+
+The policy gate uses exact service IDs, exact environments and explicit action capabilities. Unknown actions, wildcard grants, unsafe policy defaults, invalid signatures, stale policies, unknown security state and unavailable stores fail closed. The policy object is defensively copied, deeply frozen and re-verified before authorization and immediately before a caller uses its short-lived in-process authorization.
+
+The included `createMemoryPolicyRevisionStore()` and `createMemoryCapabilityLedger()` are test/development fixtures only. They have `durable: false` and are rejected unless `allowInMemoryStores: true` is explicitly set. They are not suitable for production or multiple processes.
+
+**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. A2 containment remains blocked until the trusted signal gateway is certified. A3 failover remains blocked until external monitoring, transactional coordination, quorum and fencing are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
+
+See [POLICY-V2-CONTROL.md](./docs/POLICY-V2-CONTROL.md) for the schema, injected-store contracts and integration boundary.
