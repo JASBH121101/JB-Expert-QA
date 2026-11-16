@@ -1,7 +1,7 @@
 import { parseStableVersion } from "./semver.js";
 
-const ENGINE_ID = /^jb\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
-const CONTRACT_ID = /^jb\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+const ENGINE_ID = /^jb\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+const CONTRACT_ID = /^jb\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const CAPABILITY_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const ROOT_KEYS = ["schema", "engineId", "version", "contractsProvided", "contractsConsumed", "dependencies", "capabilities"];
 const CONTRACT_KEYS = ["id", "version"];
@@ -16,8 +16,9 @@ function isRecord(value) {
 
 function exactKeys(value, expected) {
   const actual = Object.keys(value).sort();
-  return actual.length === expected.length &&
-    actual.every((key, index) => key === [...expected].sort()[index]);
+  const wanted = [...expected].sort();
+  return actual.length === wanted.length &&
+    actual.every((key, index) => key === wanted[index]);
 }
 
 function unique(values) {
