@@ -3,6 +3,11 @@ import {
   randomUUID,
   timingSafeEqual
 } from "node:crypto";
+import {
+  createSecurityEventCoreV1,
+  normalizeSecurityEventCoreContract,
+  safelyEmitSecurityEventCore
+} from "./security-event-core-v1.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_HEADER_NAME = "x-csrf-token";
@@ -34,7 +39,7 @@ function safeNotify(onEvent, event) {
 
 function normalizeOptions(options) {
   if (!isRecord(options)) throw new TypeError("CSRF protection options must be an object");
-  const allowed = new Set(["secret", "sessionKeyGenerator", "headerName", "onEvent"]);
+  const allowed = new Set(["secret", "sessionKeyGenerator", "headerName", "onEvent", "coreContract", "onCoreEvent"]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("Unknown CSRF protection option: " + key);
   }
@@ -49,12 +54,19 @@ function normalizeOptions(options) {
   }
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
+  const coreContract = normalizeSecurityEventCoreContract(options.coreContract, {
+    requireSubjectKeyId: options.coreContract !== undefined
+  });
+  const onCoreEvent = options.onCoreEvent ?? (() => {});
+  if (typeof onCoreEvent !== "function") throw new TypeError("onCoreEvent must be a function");
 
   return Object.freeze({
     secret,
     sessionKeyGenerator: options.sessionKeyGenerator,
     headerName,
-    onEvent
+    onEvent,
+    coreContract,
+    onCoreEvent
   });
 }
 
@@ -106,6 +118,32 @@ export function createCsrfProtection(options = {}) {
       timingSafeEqual(expectedBytes, suppliedBytes);
   }
 
+  function emitCoreRejection(request, occurredAtMs) {
+    if (!settings.coreContract) return;
+    let subjectValue = null;
+    try {
+      subjectValue = sessionKey(request);
+    } catch {
+      // Missing session context is never replaced with an untrusted header value.
+    }
+    try {
+      const event = createSecurityEventCoreV1(settings.coreContract, {
+        occurredAtMs,
+        category: "csrf",
+        ruleId: "JBG-CSRF-TOKEN-001",
+        severity: "high",
+        action: "blocked",
+        outcome: "denied",
+        scope: "csrf_token",
+        subjectType: "session",
+        subjectValue
+      }, settings.secret);
+      safelyEmitSecurityEventCore(settings.onCoreEvent, event);
+    } catch {
+      // Contract telemetry must not change the CSRF decision.
+    }
+  }
+
   function middleware(request, response, next) {
     if (!request || !response || typeof next !== "function") {
       throw new TypeError("CSRF middleware requires (request, response, next)");
@@ -131,15 +169,17 @@ export function createCsrfProtection(options = {}) {
     }
 
     stats.blocked += 1;
+    const occurredAtMs = Date.now();
     safeNotify(settings.onEvent, {
       id: randomUUID(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(occurredAtMs).toISOString(),
       component: "jb-security-guard",
       action: "csrf-token-rejected",
       severity: "high",
       ruleIds: ["JBG-CSRF-TOKEN-001"],
       method: method.slice(0, 32)
     });
+    emitCoreRejection(request, occurredAtMs);
 
     if (response.headersSent || response.writableEnded) {
       response.destroy?.();
