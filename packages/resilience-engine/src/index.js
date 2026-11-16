@@ -281,3 +281,10 @@ export {
   createMemoryPolicyRevisionStore,
   createMemoryCapabilityLedger
 } from "./policy-engine.js";
+
+export {
+  createTrustedSignalGateway,
+  createMemoryTrustedSignalStore,
+  signTrustedSignalEnvelope,
+  validateTrustedSignalEnvelope
+} from "./trusted-signal-gateway.js";
