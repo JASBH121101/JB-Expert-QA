@@ -155,7 +155,7 @@ function validateLedger(value, limits) {
     }
   }
   for (const [circuitKey, circuit] of Object.entries(value.circuits)) {
-    if (typeof circuitKey !== "string" || !circuitKey.includes(":") ||
+    if (typeof circuitKey !== "string" || circuitKey.split(":").length !== 3 ||
         !isRecord(circuit) ||
         !Number.isSafeInteger(circuit.failureCount) || circuit.failureCount < 0 ||
         !Number.isSafeInteger(circuit.failureThreshold) || circuit.failureThreshold < 1 ||
@@ -416,12 +416,13 @@ export function createFileOrchestrationStore({
     }));
   }
 
-  async function getCircuitState({ assetId, action, now } = {}) {
+  async function getCircuitState({ assetId, environment, action, now } = {}) {
     assertIdentifier(assetId, "assetId");
+    assertIdentifier(environment, "environment");
     assertIdentifier(action, "action");
     assertTimestamp(now, "circuit clock");
     return read((ledger) => {
-      const state = ledger.circuits[assetId + ":" + action];
+      const state = ledger.circuits[environment + ":" + assetId + ":" + action];
       const open = Boolean(state && state.failureCount >= state.failureThreshold &&
         state.retryAtMs !== null && now < state.retryAtMs);
       return Object.freeze({
@@ -546,13 +547,13 @@ export function createFileOrchestrationStore({
       service.lastOutcome = outcome;
       service.consecutiveFailures = outcome === "succeeded"
         ? 0 : Math.min(1000, service.consecutiveFailures + 1);
-      const circuitKey = assetId + ":" + action;
+      const circuitKey = environment + ":" + assetId + ":" + action;
       const prior = ledger.circuits[circuitKey] ?? {
         failureCount: 0, failureThreshold, cooldownMs, retryAtMs: null
       };
       prior.failureThreshold = failureThreshold;
       prior.cooldownMs = cooldownMs;
-      prior.failureCount = outcome === "succeeded" ? 0 : prior.failureCount + 1;
+      prior.failureCount = outcome === "succeeded" ? 0 : Math.min(1_000_000, prior.failureCount + 1);
       prior.retryAtMs = prior.failureCount >= failureThreshold ? at + cooldownMs : null;
       if (prior.retryAtMs !== null && !Number.isSafeInteger(prior.retryAtMs)) {
         return { changed: false, value: false };
