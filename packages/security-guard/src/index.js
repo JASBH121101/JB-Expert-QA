@@ -586,16 +586,18 @@ export function createSecurityGuard(options = {}) {
     byRule: Object.create(null)
   };
 
-  function getRateLimitFinding(request, now) {
+  function resolveClientIdentity(request) {
+    try {
+      return String(settings.keyGenerator(request) ?? "unknown").slice(0, 256) || "unknown";
+    } catch {
+      return "unknown";
+    }
+  }
+
+  function getRateLimitFinding(request, now, resolvedIdentity) {
     if (!settings.rateLimit.enabled) return null;
 
-    let clientKey;
-    try {
-      clientKey = String(settings.keyGenerator(request) ?? "unknown").slice(0, 256);
-    } catch {
-      clientKey = "unknown";
-    }
-
+    const clientKey = resolvedIdentity ?? resolveClientIdentity(request);
     let entry = rateState.get(clientKey);
     if (!entry && rateState.size >= settings.rateLimit.maxKeys) {
       // Only scan for expired keys at capacity; never evict a live client's bucket.
@@ -620,6 +622,13 @@ export function createSecurityGuard(options = {}) {
         overflowState.incidentId = randomUUID();
         overflowState.windowStartedAt = now;
       }
+      let retryAfterMs = Number.POSITIVE_INFINITY;
+      for (const knownEntry of rateState.values()) {
+        retryAfterMs = Math.min(
+          retryAfterMs,
+          Math.max(1, knownEntry.windowStartedAt + settings.rateLimit.windowMs - now)
+        );
+      }
       return {
         finding: {
           id: "JBG-RATE-002",
@@ -627,6 +636,10 @@ export function createSecurityGuard(options = {}) {
           reason: "rate-limit-capacity-exceeded",
           statusCode: 429
         },
+        identity: clientKey,
+        allowed: false,
+        exceeded: true,
+        retryAfterMs: Number.isFinite(retryAfterMs) ? retryAfterMs : settings.rateLimit.windowMs,
         shouldEmit: !overflowState.alerted,
         incidentId: overflowState.incidentId,
         markAlerted() { overflowState.alerted = true; }
@@ -644,7 +657,21 @@ export function createSecurityGuard(options = {}) {
     }
 
     entry.count += 1;
-    if (entry.count <= settings.rateLimit.max) return null;
+    const retryAfterMs = Math.max(
+      1,
+      entry.windowStartedAt + settings.rateLimit.windowMs - now
+    );
+    if (entry.count <= settings.rateLimit.max) {
+      return {
+        identity: clientKey,
+        allowed: true,
+        exceeded: false,
+        retryAfterMs,
+        shouldEmit: false,
+        incidentId: null,
+        markAlerted() {}
+      };
+    }
 
     if (!entry.incidentId) entry.incidentId = randomUUID();
     return {
@@ -654,6 +681,10 @@ export function createSecurityGuard(options = {}) {
         reason: "rate-limit-exceeded",
         statusCode: 429
       },
+      identity: clientKey,
+      allowed: false,
+      exceeded: true,
+      retryAfterMs,
       shouldEmit: !entry.alerted,
       incidentId: entry.incidentId,
       markAlerted() { entry.alerted = true; }
@@ -696,9 +727,12 @@ export function createSecurityGuard(options = {}) {
     counters.inspected += 1;
 
     const now = Date.now();
+    const coreIdentity = settings.coreContract ? resolveClientIdentity(request) : undefined;
     const findings = detectRequestThreats(request, settings);
-    const rateLimitResult = getRateLimitFinding(request, now);
-    if (rateLimitResult) findings.push(rateLimitResult.finding);
+    const rateLimitResult = getRateLimitFinding(request, now, coreIdentity);
+    if (rateLimitResult?.finding) findings.push(rateLimitResult.finding);
+
+    publishLocalCoreRateLimit(settings, rateLimitResult, now);
 
     if (findings.length === 0) {
       next();
@@ -736,6 +770,21 @@ export function createSecurityGuard(options = {}) {
     if (shouldEmitEvent) {
       counters.incidents += 1;
       safeNotify(settings.onEvent, event);
+      if (settings.coreContract) {
+        for (const finding of findings) {
+          try {
+            const signal = createCoreThreatSignal(
+              settings.coreContract,
+              finding,
+              coreIdentity ?? rateLimitResult?.identity ?? "unknown",
+              now
+            );
+            safelyCallCore(settings.onCoreSignal, signal);
+          } catch {
+            // Invalid or unavailable telemetry never changes the local enforcement decision.
+          }
+        }
+      }
       rateLimitResult?.markAlerted();
     }
 
