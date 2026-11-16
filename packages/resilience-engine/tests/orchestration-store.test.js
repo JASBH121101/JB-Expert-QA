@@ -188,6 +188,7 @@ test("action finalization is one-time and updates durable service/circuit state"
 
     const circuit = await store.getCircuitState({
       assetId: input.assetId,
+      environment: input.environment,
       action: input.action,
       now: input.claimedAt + 2
     });
@@ -219,6 +220,7 @@ test("circuit breaker opens at its configured failure threshold and expires afte
 
     const open = await store.getCircuitState({
       assetId: first.assetId,
+      environment: first.environment,
       action: first.action,
       now: first.claimedAt + 2
     });
@@ -227,6 +229,7 @@ test("circuit breaker opens at its configured failure threshold and expires afte
 
     const expired = await store.getCircuitState({
       assetId: first.assetId,
+      environment: first.environment,
       action: first.action,
       now: first.claimedAt + 60_002
     });
