@@ -251,7 +251,6 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   const oldEngine = makeEngine(makePolicy({ revision: 1 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const first = await oldEngine.authorize(REQUEST);
   assert.equal(first.authorized, true);
-  assert.equal((await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST })).valid, true);
 
   const newEngine = makeEngine(makePolicy({ revision: 2 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const second = await newEngine.authorize({
@@ -353,7 +352,9 @@ test("authorization is short-lived, rechecks policy validity and is one-time com
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).valid, true);
   now += 1000;
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).reason,
-    "authorization-expired-or-stale");
+    "authorization-already-asserted-or-checking");
+  // A successful execution may be finalized after the TTL if the one-time pre-execution
+  // assertion was valid before expiry.
   assert.equal((await engine.completeAuthorization({
     authorization: result.authorization, outcome: "succeeded"
   })).recorded, true);
@@ -372,6 +373,28 @@ test("authorization rechecks live security and health conditions immediately bef
   });
   assert.equal(changed.valid, false);
   assert.equal(changed.reason, "capability-conditions-no-longer-met");
+});
+
+
+test("successful outcomes require a one-time pre-execution authorization assertion", async () => {
+  const engine = makeEngine();
+  const result = await engine.authorize(REQUEST);
+  assert.equal(result.authorized, true);
+  assert.deepEqual(
+    await engine.completeAuthorization({
+      authorization: result.authorization, outcome: "succeeded"
+    }),
+    { recorded: false, reason: "execution-authorization-not-asserted" }
+  );
+  assert.equal((await engine.assertAuthorization({
+    authorization: result.authorization, request: REQUEST
+  })).valid, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: result.authorization, request: REQUEST
+  })).reason, "authorization-already-asserted-or-checking");
+  assert.equal((await engine.completeAuthorization({
+    authorization: result.authorization, outcome: "succeeded"
+  })).recorded, true);
 });
 
 test("signature is checked again before each authorization", async () => {
