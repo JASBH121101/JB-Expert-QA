@@ -6,10 +6,10 @@ Threat Lab validates the two NEXORA deliverables as separate targets. A pass in 
 
 | Target | Pinned source | Product boundary |
 | --- | --- | --- |
-| \`nexora-configurable-catalog\` | \`JASBH121101/Nexora\` commit \`88c4876c9678b93dadde55f79fe9d04890900741\`, branch \`feature/nexora-configurable-catalog\` (PR #5) | Frontend demonstration only: HTML/CSS/JS, editable setup/template contract, browser localStorage and responsive admin. It is not real authentication, server persistence, or secure image upload. |
+| \`nexora-configurable-catalog\` | \`JASBH121101/Nexora\` commit \`63f0608d0b00d633b1ad147ab2318fc099b8a99e\`, branch \`feature/nexora-configurable-catalog\` (PR #5) | Frontend demonstration only: HTML/CSS/JS, editable setup/template contract, browser localStorage and responsive admin. It is not real authentication, server persistence, or secure image upload. |
 | \`nexora-site-engine\` | \`JASBH121101/Nexora\` commit \`3f68126ecc58b088c071007c5116bc95426d159b\`, branch \`docs/nexora-approved-upgrades-2026-11\` | Laravel 13 / PHP 8.3 application with independent installation, public catalogue, permissions, exports and owner-only domain management. |
 
-The catalog source is the head of draft PR #5; this certification applies to that exact proposed prototype, not to the repository's \`main\` branch. The Site Engine pin is the dedicated upgrades branch, including the merged Site Engine and domain improvements. Updating either pin requires an intentional Threat Lab change and a new CI run.
+The Catalog pin is the repaired head of `feature/nexora-configurable-catalog` after PR #12 was merged. That fix hardens the browser demo storage contract and adds four focused regression cases; this certification applies to that exact proposed prototype, not to the repository's \`main\` branch. The Site Engine pin is the dedicated upgrades branch, including the merged Site Engine and domain improvements. Updating either pin requires an intentional Threat Lab change and a new CI run.
 
 ## Scenario matrix
 
@@ -44,6 +44,17 @@ The profile integration test is intentionally skipped by generic Threat Lab CI w
 ## Scope of claims
 
 A six-tier \`ready\` result means all six registered scenarios for that pinned source passed. It does not establish that a product is free of unknown defects or certify capabilities outside these scenarios. In particular, the Configurable Catalog remains a frontend prototype; the test suite does not upgrade it into the Laravel Site Engine.
+
+
+## Catalog storage hardening regression set
+
+The pinned Catalog source includes the NEXORA demo storage fix merged through PR #12:
+- Invalid but parseable localStorage product values (for example `null`, primitive values, or objects) fall back to a detached copy of the demo catalogue.
+- Product writes reject non-array payloads and preserve the last valid stored catalogue.
+- Settings reads ignore arrays and primitive records; settings writes accept only plain object-shaped values.
+- Repeated bounded round-trips across two business IDs verify there is no cross-business data leakage and no mutation through detached reads.
+
+These are browser-demo reliability tests only. They do not imply server-side persistence, authentication, or production data protection.
 
 
 ## Catalog storage hardening regression set
