@@ -2,6 +2,8 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+const SERVICE_ID = /^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/;
+
 export function createHealthMonitor({ engine, clock = Date.now, maxServices = 1000, maxRecoveryAttempts = 5 } = {}) {
   if (!isRecord(engine) || typeof engine.evaluateRecovery !== "function") {
     throw new TypeError("a resilience engine instance is required");
@@ -24,25 +26,28 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
     };
   }
 
-  function observe({ serviceId, healthy, securityThreatActive = false } = {}) {
-    if (typeof serviceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/.test(serviceId) ||
-        typeof healthy !== "boolean" || typeof securityThreatActive !== "boolean") {
-      throw new TypeError("health observation requires serviceId and boolean health/securityThreatActive values");
-    }
+  function assertCanTrack(serviceId) {
     if (!states.has(serviceId) && states.size >= maxServices) {
       throw new RangeError("health monitor service capacity reached");
     }
-    if (!states.has(serviceId) && states.size >= maxServices) {
-      throw new RangeError("health monitor service capacity reached");
-    }
-    const previous = getState(serviceId);
-    if (previous.restartCount >= maxRecoveryAttempts) {
-      throw new RangeError("health monitor recovery-attempt limit reached");
-    }
+  }
+
+  function readClock() {
     const now = clock();
     if (!Number.isSafeInteger(now) || now < 0) {
       throw new TypeError("clock must return a non-negative safe integer");
     }
+    return now;
+  }
+
+  function observe({ serviceId, healthy, securityThreatActive = false } = {}) {
+    if (typeof serviceId !== "string" || !SERVICE_ID.test(serviceId) ||
+        typeof healthy !== "boolean" || typeof securityThreatActive !== "boolean") {
+      throw new TypeError("health observation requires serviceId and boolean health/securityThreatActive values");
+    }
+    assertCanTrack(serviceId);
+    const previous = getState(serviceId);
+    const now = readClock();
     const next = {
       ...previous,
       consecutiveFailures: healthy ? 0 : previous.consecutiveFailures + 1,
@@ -63,14 +68,15 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
   }
 
   function recordRecoveryAttempt({ serviceId, executed } = {}) {
-    if (typeof serviceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/.test(serviceId) || typeof executed !== "boolean") {
+    if (typeof serviceId !== "string" || !SERVICE_ID.test(serviceId) || typeof executed !== "boolean") {
       throw new TypeError("recovery result requires serviceId and boolean executed");
     }
+    assertCanTrack(serviceId);
     const previous = getState(serviceId);
-    const now = clock();
-    if (!Number.isSafeInteger(now) || now < 0) {
-      throw new TypeError("clock must return a non-negative safe integer");
+    if (previous.restartCount >= maxRecoveryAttempts) {
+      throw new RangeError("health monitor recovery-attempt limit reached");
     }
+    const now = readClock();
     const next = {
       ...previous,
       restartCount: previous.restartCount + 1,
@@ -82,8 +88,8 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
   }
 
   function getSnapshot(serviceId) {
-    if (typeof serviceId !== "string" || !serviceId) {
-      throw new TypeError("serviceId is required");
+    if (typeof serviceId !== "string" || !SERVICE_ID.test(serviceId)) {
+      throw new TypeError("serviceId is required and must be valid");
     }
     return Object.freeze({ ...getState(serviceId) });
   }
