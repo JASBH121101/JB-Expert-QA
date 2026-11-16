@@ -323,7 +323,7 @@ try {
   const resilienceInstall = await install(resilienceTarball, "install-resilience-engine");
   run(node, [
     "--input-type=module", "-e",
-    'import { createResilienceEngine, createHealthMonitor } from "@jb/resilience-engine"; import { createLinuxSystemdAdapter } from "@jb/resilience-engine/adapters/linux-systemd"; import { createWindowsScmAdapter } from "@jb/resilience-engine/adapters/windows-scm"; import { createPostgresResilienceStorageAdapter } from "@jb/resilience-engine/adapters/postgres-storage"; if ([createResilienceEngine, createHealthMonitor, createLinuxSystemdAdapter, createWindowsScmAdapter, createPostgresResilienceStorageAdapter].some((value) => typeof value !== "function")) process.exit(1);'
+    'import { createResilienceEngine, createHealthMonitor } from "@jb/resilience-engine"; import { createLinuxSystemdAdapter } from "@jb/resilience-engine/adapters/linux-systemd"; import { createWindowsScmAdapter } from "@jb/resilience-engine/adapters/windows-scm"; import { createPostgresResilienceStorageAdapter } from "@jb/resilience-engine/adapters/postgres-storage"; import { createHealthMonitorProbeAdapter } from "@jb/resilience-engine/adapters/health-monitor-probes"; if ([createResilienceEngine, createHealthMonitor, createLinuxSystemdAdapter, createWindowsScmAdapter, createPostgresResilienceStorageAdapter, createHealthMonitorProbeAdapter].some((value) => typeof value !== "function")) process.exit(1);'
   ], { cwd: resilienceInstall });
   progress("Resilience Engine package checks passed");
 
