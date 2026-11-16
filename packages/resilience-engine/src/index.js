@@ -19,6 +19,25 @@ function isHealthyResult(value) {
   return isRecord(value) && value.healthy === true;
 }
 
+async function invokeWithTimeout(callback, input, timeoutMs, label) {
+  const controller = new AbortController();
+  let timeoutHandle;
+  const timeout = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      controller.abort();
+      reject(new Error(label + " timed out"));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => callback({ ...input, signal: controller.signal })),
+      timeout
+    ]);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 export function createResilienceEngine({
   policy,
   adapter,
@@ -27,6 +46,8 @@ export function createResilienceEngine({
   requireDurableStore = false,
   requireHealthVerification = false,
   healthCheck = null,
+  approvalTimeoutMs = 10_000,
+  healthCheckTimeoutMs = 5_000,
   clock = Date.now
 } = {}) {
   const validatedPolicy = validateResiliencePolicy(policy);
@@ -39,6 +60,10 @@ export function createResilienceEngine({
   }
   if (typeof requireDurableStore !== "boolean" || typeof requireHealthVerification !== "boolean") {
     throw new TypeError("recovery safety requirements must be boolean");
+  }
+  if (!Number.isSafeInteger(approvalTimeoutMs) || approvalTimeoutMs < 100 || approvalTimeoutMs > 60_000 ||
+      !Number.isSafeInteger(healthCheckTimeoutMs) || healthCheckTimeoutMs < 100 || healthCheckTimeoutMs > 60_000) {
+    throw new TypeError("approval and health-check timeouts must be between 100 and 60000 milliseconds");
   }
   if (healthCheck !== null && typeof healthCheck !== "function") {
     throw new TypeError("healthCheck must be a function");
@@ -117,7 +142,9 @@ export function createResilienceEngine({
         let approved = false;
         try {
           approved = approvalVerifier && approval &&
-            await approvalVerifier({ proposal, approval }) === true;
+            await invokeWithTimeout(
+              approvalVerifier, { proposal, approval }, approvalTimeoutMs, "approval verifier"
+            ) === true;
         } catch {
           approved = false;
         }
@@ -195,7 +222,9 @@ export function createResilienceEngine({
         }
         if (healthCheck !== null) {
           verificationResults.push(isHealthyResult(
-            await healthCheck(Object.freeze({ proposal, adapterResult }))
+            await invokeWithTimeout(
+              healthCheck, { proposal, adapterResult }, healthCheckTimeoutMs, "health check"
+            )
           ));
         }
       } catch {
