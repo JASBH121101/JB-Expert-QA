@@ -5,6 +5,13 @@ import {
   randomUUID,
   timingSafeEqual
 } from "node:crypto";
+import {
+  createAuthCoreAttempt,
+  createAuthCoreDecision,
+  normalizeAuthCoreContract,
+  safelyEmitAuthCore
+} from "./auth-core-contract-v1.js";
+import { validateSecurityEventV1 } from "./core-contract-v1.js";
 
 const REQUEST_RULE = "JBG-RECOVERY-REQUEST-001";
 const VERIFY_RULE = "JBG-RECOVERY-VERIFY-001";
@@ -45,6 +52,35 @@ function safeNotify(onEvent, event) {
     // Audit delivery must never interrupt account recovery.
   }
 }
+
+function createRecoveryCoreEvent(core, input) {
+  if (!core) return null;
+  const attempt = createAuthCoreAttempt(core, {
+    attemptId: randomUUID(),
+    occurredAtMs: input.occurredAtMs,
+    outcome: "failure",
+    accountDigest: input.subjectDigest ?? null,
+    clientDigest: null
+  });
+  return validateSecurityEventV1({
+    schema: "jb.security.event/v1",
+    eventId: randomUUID(),
+    occurredAtMs: input.occurredAtMs,
+    tenantId: core.tenantId,
+    applicationId: core.applicationId,
+    producer: "security-guard-node",
+    category: "recovery",
+    ruleId: input.ruleId,
+    severity: input.severity,
+    action: input.action,
+    outcome: input.outcome,
+    subjectKey: attempt.account.key,
+    subjectKeyId: attempt.account.keyId,
+    scope: input.scopes?.length ? input.scopes.join("_") : "account_recovery",
+    correlationId: input.correlationId ?? attempt.attemptId
+  });
+}
+
 
 function normalizePolicy(input, defaults, name) {
   if (!isRecord(input)) throw new TypeError(name + " must be an object");
@@ -272,7 +308,8 @@ export function createAccountRecovery(options = {}) {
   const allowedOptions = new Set([
     "secret", "store", "emailProvider", "smsProvider", "clientKeyGenerator",
     "onEvent", "clock", "requestPolicies", "verifyIpPolicy", "emailTtlMs",
-    "smsTtlMs", "maxAttempts"
+    "smsTtlMs", "maxAttempts", "coreContract", "onCoreAttempt",
+    "onCoreDecision", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown account recovery option: " + key);
@@ -280,6 +317,24 @@ export function createAccountRecovery(options = {}) {
 
   const secret = normalizeSecret(options.secret);
   const store = validateStore(options.store ?? createMemoryRecoveryStore());
+  if (options.coreContract?.operation !== undefined &&
+      options.coreContract.operation !== "account_recovery") {
+    throw new TypeError("coreContract.operation must be account_recovery for account recovery");
+  }
+  const core = options.coreContract === undefined
+    ? null
+    : normalizeAuthCoreContract({
+      ...options.coreContract,
+      operation: "account_recovery"
+    }, secret);
+  const onCoreAttempt = options.onCoreAttempt ?? (() => {});
+  const onCoreDecision = options.onCoreDecision ?? (() => {});
+  const onCoreEvent = options.onCoreEvent ?? (() => {});
+  for (const [name, callback] of Object.entries({
+    onCoreAttempt, onCoreDecision, onCoreEvent
+  })) {
+    if (typeof callback !== "function") throw new TypeError(name + " must be a function");
+  }
   const emailProvider = options.emailProvider ?? null;
   const smsProvider = options.smsProvider ?? null;
 
@@ -332,10 +387,11 @@ export function createAccountRecovery(options = {}) {
     return now;
   }
 
-  function emit(action, ruleId, channel, scopes = [], severity = "medium") {
+  function emit(action, ruleId, channel, scopes = [], severity = "medium", context = {}) {
+    const occurredAtMs = context.occurredAtMs ?? readNow();
     safeNotify(onEvent, {
       id: randomUUID(),
-      timestamp: new Date(readNow()).toISOString(),
+      timestamp: new Date(occurredAtMs).toISOString(),
       component: "jb-security-guard",
       action,
       severity,
@@ -343,6 +399,75 @@ export function createAccountRecovery(options = {}) {
       channel,
       scopes
     });
+
+    if (!core) return;
+    const mappings = {
+      "request-rate-limited": ["blocked", "denied"],
+      "request-suppressed": ["observed", "observed"],
+      "challenge-issued": ["challenged", "success"],
+      "delivery-failed": ["rejected", "error"],
+      "verification-rate-limited": ["blocked", "denied"],
+      "verification-failed": ["rejected", "denied"],
+      "verification-succeeded": ["allowed", "success"]
+    };
+    const [coreAction, outcome] = mappings[action] ?? ["observed", "observed"];
+    const event = createRecoveryCoreEvent(core, {
+      occurredAtMs,
+      ruleId,
+      severity,
+      action: coreAction,
+      outcome,
+      scopes,
+      subjectDigest: context.subjectDigest ?? null,
+      correlationId: context.correlationId
+    });
+    safelyEmitAuthCore(onCoreEvent, event);
+  }
+
+  function publishVerificationCore({
+    occurredAtMs,
+    outcome,
+    accountId = null,
+    requestId = "",
+    clientDigest,
+    blocked = false,
+    unavailable = false,
+    retryAfterMs = 0
+  }) {
+    if (!core) return null;
+    const subjectDigest = accountId !== null
+      ? digest("account", String(accountId))
+      : digest("recovery-challenge", requestId || "anonymous");
+    const attempt = createAuthCoreAttempt(core, {
+      attemptId: randomUUID(),
+      occurredAtMs,
+      outcome,
+      accountDigest: subjectDigest,
+      clientDigest
+    });
+    const decision = createAuthCoreDecision(attempt.attemptId, {
+      blocked,
+      enforced: blocked,
+      unavailable,
+      retryAfterSeconds: blocked ? Math.max(1, Math.ceil(retryAfterMs / 1000)) : null
+    });
+    safelyEmitAuthCore(onCoreAttempt, attempt);
+    safelyEmitAuthCore(onCoreDecision, Object.freeze({ attempt, decision }));
+    return Object.freeze({ attempt, decision });
+  }
+
+  function emitCoreUnavailable(channel, occurredAtMs, subjectDigest = null, scopes = []) {
+    if (!core) return;
+    const event = createRecoveryCoreEvent(core, {
+      occurredAtMs,
+      ruleId: "JBG-RECOVERY-STORE-001",
+      severity: "critical",
+      action: "rejected",
+      outcome: "unavailable",
+      scopes: scopes.length ? scopes : ["recoveryStore"],
+      subjectDigest
+    });
+    safelyEmitAuthCore(onCoreEvent, event);
   }
 
   async function applyLimits(scopes, policies, now) {
@@ -418,17 +543,27 @@ export function createAccountRecovery(options = {}) {
       }
     ];
     const policyMap = requestPolicies;
-    const limited = await applyLimits(scopes, policyMap, now);
+    let limited;
+    try {
+      limited = await applyLimits(scopes, policyMap, now);
+    } catch (error) {
+      emitCoreUnavailable(channel, now, accountDigest, ["requestLimits"]);
+      throw error;
+    }
     if (!limited.allowed) {
       stats.rateLimited += 1;
-      emit("request-rate-limited", RATE_RULE, channel, limited.blockedScopes, "high");
+      emit("request-rate-limited", RATE_RULE, channel, limited.blockedScopes, "high", {
+        occurredAtMs: now, subjectDigest: accountDigest, correlationId: requestId
+      });
       return Object.freeze({ accepted: true, requestId });
     }
 
     const provider = channel === "email" ? emailProvider : smsProvider;
     if (!eligible || !provider) {
       stats.suppressed += 1;
-      emit("request-suppressed", REQUEST_RULE, channel, [], "medium");
+      emit("request-suppressed", REQUEST_RULE, channel, [], "medium", {
+        occurredAtMs: now, subjectDigest: accountDigest, correlationId: requestId
+      });
       return Object.freeze({ accepted: true, requestId });
     }
 
@@ -439,18 +574,27 @@ export function createAccountRecovery(options = {}) {
     const subjectKey = digest("subject-index", accountDigest + "\0" + channel);
     const credentialDigest = digest("credential", requestId + "\0" + credential);
 
-    const stored = await store.putChallenge({
-      id: requestId,
-      subjectKey,
-      accountId,
-      channel,
-      credentialDigest,
-      createdAt: now,
-      expiresAt
-    });
+    let stored;
+    try {
+      stored = await store.putChallenge({
+        id: requestId,
+        subjectKey,
+        accountId,
+        channel,
+        credentialDigest,
+        createdAt: now,
+        expiresAt
+      });
+    } catch (error) {
+      emitCoreUnavailable(channel, now, accountDigest, ["challengeStore"]);
+      throw error;
+    }
     if (stored === false) {
       stats.suppressed += 1;
-      emit("request-suppressed", REQUEST_RULE, channel, [], "medium");
+      emitCoreUnavailable(channel, now, accountDigest, ["challengeCapacity"]);
+      emit("request-suppressed", REQUEST_RULE, channel, [], "medium", {
+        occurredAtMs: now, subjectDigest: accountDigest, correlationId: requestId
+      });
       return Object.freeze({ accepted: true, requestId });
     }
     stats.challengesIssued += 1;
@@ -464,7 +608,9 @@ export function createAccountRecovery(options = {}) {
     Promise.resolve()
       .then(() => provider.send(delivery))
       .then(() => {
-        emit("challenge-issued", REQUEST_RULE, channel, [], "info");
+        emit("challenge-issued", REQUEST_RULE, channel, [], "info", {
+          subjectDigest: accountDigest, correlationId: requestId
+        });
       })
       .catch(async () => {
         try {
@@ -473,7 +619,9 @@ export function createAccountRecovery(options = {}) {
           // Keep the public recovery response generic even if cleanup fails.
         }
         stats.deliveryFailures += 1;
-        emit("delivery-failed", REQUEST_RULE, channel, [], "high");
+        emit("delivery-failed", REQUEST_RULE, channel, [], "high", {
+          subjectDigest: accountDigest, correlationId: requestId
+        });
       });
 
     return Object.freeze({ accepted: true, requestId });
@@ -485,12 +633,23 @@ export function createAccountRecovery(options = {}) {
     const credential = typeof input.credential === "string" ? input.credential : "";
 
     const now = readNow();
-    const limit = await store.consumeLimit({
-      key: digest("verify-ip", getClientDigest(input.request)),
-      now,
-      windowMs: verifyIpPolicy.windowMs,
-      maxRequests: verifyIpPolicy.maxRequests
-    });
+    const clientDigest = getClientDigest(input.request);
+    const subjectDigest = digest("recovery-challenge", requestId || "anonymous");
+    let limit;
+    try {
+      limit = await store.consumeLimit({
+        key: digest("verify-ip", clientDigest),
+        now,
+        windowMs: verifyIpPolicy.windowMs,
+        maxRequests: verifyIpPolicy.maxRequests
+      });
+    } catch (error) {
+      publishVerificationCore({
+        occurredAtMs: now, outcome: "failure", requestId, clientDigest, unavailable: true
+      });
+      emitCoreUnavailable(null, now, subjectDigest, ["verifyLimits"]);
+      throw error;
+    }
 
     if (!limit || typeof limit.allowed !== "boolean") {
       throw new TypeError("store.consumeLimit returned an invalid result");
@@ -498,32 +657,64 @@ export function createAccountRecovery(options = {}) {
     if (!limit.allowed) {
       stats.rateLimited += 1;
       stats.verificationFailed += 1;
-      emit("verification-rate-limited", RATE_RULE, null, ["verifyIp"], "high");
+      emit("verification-rate-limited", RATE_RULE, null, ["verifyIp"], "high", {
+        occurredAtMs: now, subjectDigest, correlationId: requestId
+      });
+      publishVerificationCore({
+        occurredAtMs: now, outcome: "failure", requestId, clientDigest,
+        blocked: true, retryAfterMs: limit.retryAfterMs
+      });
       return Object.freeze({ valid: false });
     }
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) || credential.length < 1 || credential.length > 2048) {
       stats.verificationFailed += 1;
-      emit("verification-failed", VERIFY_RULE, null, [], "medium");
+      emit("verification-failed", VERIFY_RULE, null, [], "medium", {
+        occurredAtMs: now, subjectDigest, correlationId: requestId
+      });
+      publishVerificationCore({
+        occurredAtMs: now, outcome: "failure", requestId, clientDigest
+      });
       return Object.freeze({ valid: false });
     }
 
     const credentialDigest = digest("credential", requestId + "\0" + credential);
-    const result = await store.consumeChallenge({
-      id: requestId,
-      credentialDigest,
-      now,
-      maxAttempts
-    });
+    let result;
+    try {
+      result = await store.consumeChallenge({
+        id: requestId,
+        credentialDigest,
+        now,
+        maxAttempts
+      });
+    } catch (error) {
+      publishVerificationCore({
+        occurredAtMs: now, outcome: "failure", requestId, clientDigest, unavailable: true
+      });
+      emitCoreUnavailable(null, now, subjectDigest, ["challengeStore"]);
+      throw error;
+    }
 
     if (!result || result.status !== "valid") {
       stats.verificationFailed += 1;
-      emit("verification-failed", VERIFY_RULE, null, [], "medium");
+      emit("verification-failed", VERIFY_RULE, null, [], "medium", {
+        occurredAtMs: now, subjectDigest, correlationId: requestId
+      });
+      publishVerificationCore({
+        occurredAtMs: now, outcome: "failure", requestId, clientDigest
+      });
       return Object.freeze({ valid: false });
     }
 
     stats.verificationSucceeded += 1;
-    emit("verification-succeeded", VERIFY_RULE, result.channel, [], "info");
+    const verifiedAccountDigest = digest("account", String(result.accountId));
+    emit("verification-succeeded", VERIFY_RULE, result.channel, [], "info", {
+      occurredAtMs: now, subjectDigest: verifiedAccountDigest, correlationId: requestId
+    });
+    publishVerificationCore({
+      occurredAtMs: now, outcome: "success", accountId: result.accountId,
+      requestId, clientDigest
+    });
     return Object.freeze({
       valid: true,
       accountId: result.accountId,
