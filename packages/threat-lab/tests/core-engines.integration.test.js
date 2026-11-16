@@ -758,4 +758,21 @@ return [
     new Set(report.results.filter((item) => item.status === "pass").map((item) => item.target.id)),
     new Set(["jb-malware-engine", "jb-security-guard", "jb-expert-qa"])
   );
+
+  const byTarget = new Map(report.assessment.targets.map((item) => [item.target.id, item]));
+  const allSixLevels = ["basic", "intermediate", "advanced", "expert", "extreme", "superextreme"];
+  for (const targetId of ["jb-security-guard", "jb-expert-qa"]) {
+    const assessment = byTarget.get(targetId);
+    assert.ok(assessment, `Missing assessment for ${targetId}`);
+    assert.deepEqual(assessment.coveredLevels, allSixLevels);
+    assert.deepEqual(assessment.missingLevels, []);
+    assert.equal(assessment.ready, true);
+  }
+
+  const malwareAssessment = byTarget.get("jb-malware-engine");
+  assert.ok(malwareAssessment);
+  assert.deepEqual(malwareAssessment.coveredLevels, ["basic", "intermediate", "advanced"]);
+  assert.deepEqual(malwareAssessment.missingLevels, ["expert", "extreme", "superextreme"]);
+  assert.equal(malwareAssessment.ready, false,
+    "A single three-tier suite must not claim full Malware Engine readiness");
 });
