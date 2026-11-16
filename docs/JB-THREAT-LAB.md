@@ -151,3 +151,15 @@ These gaps must stay visible in reports. Do not fill them with mock-only engine 
 4. Include a control case that protects against false positives where practical.
 5. Confirm the adapter records zero network requests, no sample execution, and no production mutation.
 6. Keep failures actionable: report the missing control, observed result, and expected result rather than a generic pass/fail only.
+
+
+## NEXORA profiles — separate certification targets
+
+The NEXORA repository contains two distinct deliverables and they must not be collapsed into one Threat Lab target:
+
+- **NEXORA Configurable Catalog (frontend/catalog studio):** the independently scoped configurable-catalog prototype, including editable business templates, catalog fields, product presentation, responsive behavior, and browser-side demo persistence. Its tests must treat localStorage/demo behavior as prototype-only and must not mistake it for real authentication, server persistence, or secure file upload.
+- **NEXORA Site Engine (Laravel/PHP distributable):** the separate Laravel application and server-side engine. Its profile must validate installation and database setup, owner authentication, role/permission boundaries, product/category CRUD, public-site exposure, export generation, upload validation/storage, and package/deployment safety using disposable local databases and filesystem fixtures.
+
+They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
+
+**Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
