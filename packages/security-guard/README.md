@@ -461,6 +461,8 @@ export const onRequest = async (context) => {
 
 The Pages adapter defaults to fail-closed when the private service cannot be reached. Set failureMode to open only after explicitly accepting the availability trade-off. The Worker service returns a bounded, compact decision and never returns the caller identity.
 
-For deployment configuration, the Worker must use the Worker-native rate-limit adapter with its env binding and pass that limiter to the Worker service endpoint. Keep the Worker private and expose it to Pages through a Service Binding only. See docs/CLOUDFLARE-PAGES-INTEGRATION.md for the deployment checklist and Cloudflare Edge protections.
+For deployment configuration, the Worker must use the Worker-native rate-limit adapter with its env binding and pass that limiter to the Worker service endpoint. Enforce-mode policies require a stable `identitySecret` of at least 32 bytes, loaded from a Worker secret and used consistently across instances. Keep the Worker private and expose it to Pages through a Service Binding only. See docs/CLOUDFLARE-PAGES-INTEGRATION.md for the deployment checklist and Cloudflare Edge protections.
+
+The Worker and Pages adapters share a runtime-neutral request and service-decision contract. See [Rate-limit contract](docs/RATE-LIMIT-CONTRACT.md) for the normalized payload, validation rules, and the current boundary for future non-JavaScript integrations.
 
 This is request-rate protection for Pages Functions, not a substitute for Cloudflare DDoS protection, WAF rules, authentication, authorization, or application-level input validation.
