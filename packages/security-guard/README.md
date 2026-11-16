@@ -408,6 +408,7 @@ import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-w
 const limiter = createCloudflareWorkerRateLimit({
   binding: env.LOGIN_RATE_LIMIT,
   namespace: "my-application",
+  identitySecret: env.JB_RATE_LIMIT_IDENTITY_SECRET,
   mode: "enforce",
   periodSeconds: 60
 });
