@@ -1,0 +1,13 @@
+{
+  "schema": "jb.security.threat-assessment/v1",
+  "assessmentId": "e47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "tenantId": "tenant-demo",
+  "applicationId": "admin-api",
+  "assessedAtMs": 1794837600000,
+  "riskScore": 28,
+  "decision": "observe",
+  "signalIds": [
+    "d47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a"
+  ],
+  "policyId": "default-threat-policy"
+}
