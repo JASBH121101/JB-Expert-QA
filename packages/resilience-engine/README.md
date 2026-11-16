@@ -75,3 +75,11 @@ The included `createMemoryPolicyRevisionStore()` and `createMemoryCapabilityLedg
 **Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. A2 containment remains blocked until the trusted signal gateway is certified. A3 failover remains blocked until external monitoring, transactional coordination, quorum and fencing are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
 
 See [POLICY-V2-CONTROL.md](./docs/POLICY-V2-CONTROL.md) for the schema, injected-store contracts and integration boundary.
+
+## Trusted Signal Gateway (v0.4)
+
+The optional `./trusted-signal-gateway` entry point authenticates signed, time-bounded signals from explicitly registered Security Guard and Malware Engine sources. Producer identity is bound to an exact engine, environment and asset allowlist. HMAC keys are injected by the host; none are bundled.
+
+A durable, atomic replay store is required by default. The in-memory store is available only for tests/development with explicit opt-in. Missing, stale, replayed, tampered, unknown or contradictory signals fail closed. Evidence references are preserved. The gateway never grants authorization and performs no operating-system or containment action.
+
+See [Trusted Signal Gateway v0.4](./docs/TRUSTED-SIGNAL-GATEWAY.md) for the envelope, store contract and aggregation rules.
