@@ -17,7 +17,8 @@
     "./trusted-signal-store": "./src/trusted-signal-store.js",
     "./producers/security-guard": "./src/producers/security-guard.js",
     "./producers/malware-engine": "./src/producers/malware-engine.js",
-    "./incident-correlation-engine": "./src/incident-correlation-engine.js"
+    "./incident-correlation-engine": "./src/incident-correlation-engine.js",
+    "./response-orchestrator": "./src/response-orchestrator.js"
   },
   "files": [
     "src/**",
