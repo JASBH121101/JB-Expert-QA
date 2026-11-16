@@ -228,6 +228,7 @@ export function createUniversalRateLimitService(options = {}) {
 
     const { identity, scope, policy } = body.value;
     if (typeof identity !== "string" || !identity.trim() || identity.length > 512 ||
+        !identity.isWellFormed() || Buffer.byteLength(identity, "utf8") > 2048 ||
         typeof scope !== "string" || !SAFE_ID.test(scope) ||
         typeof policy !== "string" || !SAFE_ID.test(policy)) {
       return json(400, { error: "invalid_request" });
