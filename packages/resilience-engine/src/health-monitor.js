@@ -57,6 +57,22 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
     };
     states.set(serviceId, next);
     if (healthy) return Object.freeze({ ...next, recovery: null });
+
+    // Keep observing unhealthy services, but never issue a new proposal after the monitor's attempt cap.
+    // Security-threat suspension remains the most informative reason when both conditions apply.
+    if (next.securityThreatActive) {
+      return Object.freeze({
+        ...next,
+        recovery: Object.freeze({ eligible: false, reason: "security-threat-active" })
+      });
+    }
+    if (next.restartCount >= maxRecoveryAttempts) {
+      return Object.freeze({
+        ...next,
+        recovery: Object.freeze({ eligible: false, reason: "recovery-attempt-limit-reached" })
+      });
+    }
+
     const recovery = engine.evaluateRecovery({
       serviceId,
       consecutiveFailures: next.consecutiveFailures,
