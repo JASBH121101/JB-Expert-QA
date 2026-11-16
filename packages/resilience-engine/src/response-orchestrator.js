@@ -627,35 +627,6 @@ export function createResponseOrchestrator({
       });
     }
 
-    const authorizationIssuedAt = safeNow(clock);
-    if (!await persistState(
-      decision,
-      "AUTHORIZED",
-      "A1_CAPABILITY_ISSUED",
-      authorizationIssuedAt
-    ) || !await appendAudit({
-      ...baseAudit,
-      event: "authorization-issued",
-      action,
-      authorizationId: authorization.authorizationId,
-      reservationId: authorization.reservationId,
-      policyId: authorization.policyId,
-      policyRevision: authorization.revision,
-      policyHash: authorization.policyHash,
-      riskClass: authorization.riskClass,
-      at: authorizationIssuedAt
-    })) {
-      return await finishBeforeExecution({
-        decision,
-        actionId: claim.actionId,
-        authorization,
-        request,
-        reason: "authorization-state-or-audit-write-failed",
-        reasonCode: "AUTHORIZATION_AUDIT_FAILED",
-        now: safeNow(clock)
-      });
-    }
-
     let mutationAllowed = false;
     try {
       mutationAllowed = await mutationControl.assertAllowed({
@@ -788,6 +759,35 @@ export function createResponseOrchestrator({
         request,
         reason: "policy-authorization-context-mismatch",
         reasonCode: "POLICY_AUTHORIZATION_CONTEXT_MISMATCH",
+        now: safeNow(clock)
+      });
+    }
+
+    const authorizationIssuedAt = safeNow(clock);
+    if (!await persistState(
+      decision,
+      "AUTHORIZED",
+      "A1_CAPABILITY_ISSUED",
+      authorizationIssuedAt
+    ) || !await appendAudit({
+      ...baseAudit,
+      event: "authorization-issued",
+      action,
+      authorizationId: authorization.authorizationId,
+      reservationId: authorization.reservationId,
+      policyId: authorization.policyId,
+      policyRevision: authorization.revision,
+      policyHash: authorization.policyHash,
+      riskClass: authorization.riskClass,
+      at: authorizationIssuedAt
+    })) {
+      return await finishBeforeExecution({
+        decision,
+        actionId: claim.actionId,
+        authorization,
+        request,
+        reason: "authorization-state-or-audit-write-failed",
+        reasonCode: "AUTHORIZATION_AUDIT_FAILED",
         now: safeNow(clock)
       });
     }
