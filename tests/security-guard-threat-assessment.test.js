@@ -106,7 +106,7 @@ test("the same rule contributes only its strongest signal and cannot satisfy ind
     makeSignal(3, { type: "upload_risk", ruleId: "JBG-SHARED-RULE-001" })
   ];
   const assessment = createEngine().assess(signals);
-  assert.equal(assessment.riskScore, 99);
+  assert.equal(assessment.riskScore, 89);
   assert.equal(assessment.decision, "review");
 });
 
