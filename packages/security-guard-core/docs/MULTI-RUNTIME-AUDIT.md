@@ -1,15 +1,15 @@
 # JB Security Guard multi-runtime audit
 
 - Audit date: 2026-11-16
-- Audited baseline: `main` at `144e542988daf5741252010902f0cd86b5b4f33d`
-- Closeout branch: `feature/security-guard-closeout-lab` (PR #81)
+- Audited baseline: `main` at `6f8c7fa8ff8a9b7fbf09a9ca67e97a748b201f6c` (post-merge state; includes the subsequent Resilience Engine merge)
+- Security Guard closeout: PR [#81](https://github.com/JASBH121101/JB-Expert-QA/pull/81), merged 2026-11-16 at `4c86007ef61a786fdea94f48bcd154f7d8b1e527`
 - Scope: repository source, tests, contract schemas and module documentation. No production systems, Cloudflare resources, databases, DNS, WAF, customer projects, secrets or paid services were modified.
 
 ## Executive result
 
 Reuse the existing Security Guard implementation. Do not create parallel security engines or replace the public JavaScript API. The language-neutral Core remains contract-only: versioned JSON Schemas, semantics and shared fixtures. It is not a central server and contains no executable runtime logic.
 
-The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. The closeout lab additionally adds a language-neutral HMAC identity derivation helper, strict Core v1 normalizers, an explicit `check()` entry point on the distributed limiter, and an authenticated server-to-server universal rate-limit endpoint. It now also includes a deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. This completes the initial Node aggregation stage, but does not constitute statistical calibration, full-runtime certification or autonomous enforcement.
+The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. PR #81 merged the language-neutral HMAC identity derivation helper, strict Core v1 normalizers, the explicit `check()` entry point on the distributed limiter, and the authenticated server-to-server universal rate-limit endpoint. It also includes the deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. The initial Node aggregation stage is implemented; statistical calibration, broader runtime parity and autonomous enforcement remain out of scope.
 
 PHP 8.2+ and Python 3.11+ Core v1 clients now exist as independent packages, with optional Laravel middleware and FastAPI-compatible ASGI middleware. Both use the central Node universal rate-limit endpoint; neither duplicates the shared counter implementation. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
 
@@ -27,7 +27,7 @@ The existing Node package keeps its legacy exports and adds opt-in Core v1 outpu
 | Upload inspection | Emits events for promotion, rejection, quarantine and cleanup failure. | Promotion is reported only after the storage adapter confirms it; events exclude file names, hashes, content and scanner details. |
 | Request inspection | Emits normalized threat signals for existing request findings, plus local rate-limit decisions. | Signals are evidence only; they do not create a threat assessment or change existing enforcement. |
 
-The Node conformance suite runs all eight shared Core v1 fixtures through both JSON Schema validation and the native JavaScript runtime validators: rate-limit check/decision, authentication attempt/decision, security event, rate-limit policy, threat signal and threat assessment. The latest module integration work was exercised in Node 22/24 and on Ubuntu/Windows CI. These checks establish tested implementation behavior for the covered paths; they are not a security certification or a statistical precision/recall study.
+The Node conformance suite runs all eight shared Core v1 fixtures through both JSON Schema validation and the native JavaScript runtime validators: rate-limit check/decision, authentication attempt/decision, security event, rate-limit policy, threat signal and threat assessment. The PR #81 closeout head passed the Node 22/24, PHP 8.2, Python 3.11, PostgreSQL 16 and engine-certification gates. Follow-on checks on the current `main` commit also pass; the exact current-main matrix is recorded below. These checks establish tested implementation behavior for covered paths, not a security certification or statistical precision/recall study.
 
 ### Threat assessment: implemented aggregator, calibration remains open
 
@@ -95,7 +95,7 @@ The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and mal
 ## Implementation sequence and merge gates
 
 1. Freeze the remaining Core threat-assessment policy semantics; do not derive risk scores from legacy double-filter verdicts.
-2. Complete Node threat-assessment aggregation with explicit server-owned policy, bounded evidence, tenant isolation, benign/adversarial fixtures and calibrated evaluation. Keep enforcement opt-in and conservative.
+2. Maintain the Node threat-assessment aggregator and its bounded, tenant-isolated evidence rules. Statistical calibration against labeled benign/adversarial corpora, independent precision/recall measurements and any downstream enforcement require separate review; do not treat the deterministic policy index as a probability.
 3. Maintain and extend the existing PHP Core validators and Laravel middleware; complete Symfony integration only if needed, then prepare independent Composer publication.
 4. Maintain and extend the existing Python Core validators and FastAPI/Starlette ASGI middleware; add Django/Flask adapters only if needed, then prepare independent PyPI publication.
 5. Continue running identical contract vectors across Node, PHP and Python; add a managed key-rotation lifecycle and test tenant isolation, replay/idempotency, atomic concurrency, time boundaries, malformed payloads, timeouts, cancellation and outage behavior.
@@ -104,31 +104,39 @@ The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and mal
 No runtime is certified by the presence of a package directory alone. Compatibility labels must distinguish planned, implemented, tested and certified.
 
 
-## Closeout lab additions (2026-11-16)
+### Post-merge verification on current `main` (2026-11-16)
 
-The isolated branch `feature/security-guard-closeout-lab` is being validated against the current main baseline above. These changes are additive; the old PR branches are not merged as-is.
+- Current audited commit: `6f8c7fa8ff8a9b7fbf09a9ca67e97a748b201f6c`. PR #81 is an ancestor of this state; the later Resilience merge does not replace or supersede the Security Guard closeout.
+- The current-main Core validation, Security QA, Security Guard multi-runtime validation, Language QA validation, PostgreSQL integration and JB Engines Certification workflows all completed successfully.
+- The checks cover Node.js 22/24, PHP 8.2, Python 3.11, PostgreSQL 16, the Security Guard suite, the Linux/Windows engine matrix, Expert QA regression and the five-package distribution boundary.
+- The optional Neon development E2E job is read-only. These checks do not represent a production database migration, production deployment or live perimeter certification.
+- No failed or pending required job was reported for this current-main run set at audit time.
+
+## Security Guard Core v1 closeout (PR #81, merged 2026-11-16)
+
+The following additions were merged from `feature/security-guard-closeout-lab` through PR #81. PRs #65 and #69 were superseded and were not merged independently; their changes were consolidated and reviewed in the closeout.
 
 - `deriveCoreIdentityKey()` implements the documented domain-separated HMAC-SHA-256 Core v1 message via Web Crypto. It requires a trusted server-side canonical identity, a 32-byte minimum secret, safe tenant/application/type/key identifiers, and rejects empty, NUL-containing, ill-formed or oversized identities.
 - `normalizeCoreRateLimitCheckRequest()`, `normalizeCoreRateLimitDecision()`, `normalizeCoreRateLimitPolicy()` and `createCoreRateLimitCounterKey()` provide strict immutable boundary handling. Shared known-answer identity fixture and package-distribution smoke coverage are included.
 - The decision contract explicitly preserves fail-open semantics: `allowed=true, enforced=false, unavailable=true, exceeded=false` is valid when the store outage policy is fail-open. Fail-closed outages remain enforced HTTP 503. A permitted decision cannot be marked as enforced.
 - The distributed limiter now exposes `check(request)` and shares the same evaluation path with its middleware, preserving the existing Core decision/event callbacks and statistics.
 - `createUniversalRateLimitService()` is a Node.js server-to-server HTTP adapter. It requires authenticated app credentials, an exact path and method, bounded JSON, registered server-owned policies/scopes, and an injected atomic store. It rejects query strings and fails closed on store outage.
-- Unit tests use a deterministic test store. The Node package also includes a parameterized PostgreSQL UPSERT store and the pull request runs an isolated PostgreSQL 16 concurrency/rollover integration test. No Redis/Valkey driver is included, and no customer Neon/production database is touched or certified. A host using the PostgreSQL adapter must supply its own Pool/query connection, migration rollout, backups and cleanup operations.
+- Unit tests use a deterministic test store. The Node package also includes a parameterized PostgreSQL UPSERT store; PR #81 ran an isolated PostgreSQL 16 concurrency/rollover integration test. No Redis/Valkey driver is included, and no customer Neon/production database was changed or certified. A host using the PostgreSQL adapter must supply its own Pool/query connection, migration rollout, backups and cleanup operations.
 - The universal HTTP endpoint must be deployed behind HTTPS and protected from credential guessing by appropriate upstream network controls. Credentials must never be exposed to browser clients.
 
 ## Explicit open items — do not label as certified
 
 1. PHP 8.2+ and Python 3.11+ Core v1 packages and Laravel/ASGI adapters are present and CI-tested. Symfony, Django/Flask integration and separate Packagist/PyPI publication are not included in this closeout.
 2. The PostgreSQL shared-store adapter is validated against an ephemeral PostgreSQL 16 service in CI; Redis/Valkey adapters and live customer Neon/production verification remain out of scope.
-3. HMAC derivation is implemented and tested in Node; key rotation/dual-key overlap is specified but not yet implemented as a managed cross-runtime lifecycle.
+3. Core v1 HMAC derivation and shared known-answer conformance are implemented and tested across Node, PHP and Python; managed key rotation/dual-key overlap is not yet implemented as a cross-runtime lifecycle.
 4. There is no central durable telemetry sink or tenant-scoped policy control plane.
 5. The threat score remains a deterministic policy index, not a calibrated probability. Precision/recall and adversarial evasion measurements are not yet available.
 6. Cloudflare Workers/Pages parity remains rate-limit-specific, not full parity with Node middleware.
 
-A release/certification claim must wait for the applicable runtime parity, storage, rotation and threat-calibration gates. The PR #81 closeout CI can certify only the tested package interfaces and runtime matrix on its final head. Green CI does not certify production deployment, globally available infrastructure, threat-score accuracy or managed key rotation.
+The closeout is merged and its tested package interfaces passed CI, but that does not certify production deployment, globally available infrastructure, threat-score accuracy or managed key rotation. The still-open items above remain explicit release gates for any broader parity or production-readiness claim.
 
 
-## PHP and Python runtime packages (closeout lab)
+## PHP and Python runtime packages (source workspaces included in PR #81)
 
 - `packages/security-guard-php`: PHP 8.2+ HMAC-SHA-256 Core v1 helper, strict rate-limit request/decision/policy normalizers, length-prefixed counter-key helper, authenticated HTTPS client and optional Laravel service provider/middleware.
 - `packages/security-guard-python`: Python 3.11+ matching HMAC and Core v1 helpers, asynchronous authenticated HTTPS client and FastAPI/Starlette-compatible ASGI middleware.
