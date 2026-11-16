@@ -451,7 +451,7 @@ export const onRequest = async (context) => {
 
   // Resolve this identity from authenticated server-side state.
   // For anonymous endpoints, use a carefully reviewed client identity policy.
-  const identity = context.data.authenticatedUser?.id;
+  const identity = context.data?.authenticatedUser?.id;
   const decision = await limiter.check({ identity, scope: "catalog-api" });
   if (decision.response) return decision.response;
 
