@@ -135,3 +135,12 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
 **Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
+
+
+## NEXORA product integration
+
+NEXORA is registered as two independent targets and now has product-backed adapters:
+- Configurable Catalog: four real Node.js demo suites, Basic through Expert; this certifies the frontend prototype only, not backend security.
+- Site Engine: six real Laravel/PHP scenarios, Basic through Superextreme, including the full PHPUnit suite against an ephemeral SQLite database.
+
+The dedicated workflow checks out `feature/nexora-configurable-catalog` and `feature/nexora-site-engine-certification` independently. A report from one profile cannot mark the other ready. No NEXORA source branch is modified by the Threat Lab adapter workflow.
