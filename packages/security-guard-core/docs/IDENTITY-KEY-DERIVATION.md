@@ -11,7 +11,7 @@ The adapter must resolve identity in trusted server-side code. Never accept the 
 - Session identity: use a server-resolved opaque session identifier, never the session cookie value.
 - Account+IP identity: derive the two component identities first, then use a distinct account_ip scope; do not concatenate ambiguous raw values.
 
-Canonical identity values are UTF-8 strings supplied by the host application's identity resolver. The host must use the same canonicalization rules in every runtime that shares counters. Reject empty values, NUL bytes, invalid UTF-8, and values longer than the adapter's documented bound.
+Canonical identity values are UTF-8 strings supplied by the host application's identity resolver. The host must use the same canonicalization rules in every runtime that shares counters. Reject empty values, NUL bytes, invalid UTF-8, and values longer than 512 Unicode code points or 2048 UTF-8 bytes. For account+IP identities, derive or canonicalize the account and IP values separately, then encode their pair as a length-prefixed UTF-8 tuple (byte length + ':' + value for each field) before passing that tuple as canonicalIdentity; do not join the raw values with a delimiter.
 
 ## HMAC derivation
 
@@ -44,3 +44,8 @@ Policy and scope are separate counter dimensions and must be included in the int
 ## Required conformance vectors
 
 Every runtime must verify the exact same fixtures for valid/invalid identity values, digest length/case, tenant isolation, application isolation, identity-type separation, key ID selection, key rotation overlap, and cross-runtime equality. Use a fixed test-only secret for vectors; never place a production secret in the repository.
+
+
+## JavaScript conformance status
+
+The additive `@jb/security-guard/core-contract-v1` adapter implements this derivation with Web Crypto and a checked-in known-answer fixture. This covers the Node.js implementation only. PHP and Python must independently implement the same byte-level formula and pass this exact vector before cross-runtime compatibility is claimed.
