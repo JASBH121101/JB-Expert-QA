@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createResponseOrchestrator } from "../src/response-orchestrator.js";
+import { createIncidentCorrelationEngine } from "../src/incident-correlation-engine.js";
 
 const NOW = 1_800_000_000_000;
 
@@ -33,6 +34,44 @@ function incidentDecision(overrides = {}) {
     preserveEvidence: true,
     authorizationGranted: false,
     mayAuthorizeRecovery: false,
+    ...overrides
+  };
+}
+
+function realV05IncidentInput(overrides = {}) {
+  return {
+    schema: "jb.resilience.incident-input/v1",
+    assetId: "host-erp-01",
+    environment: "production",
+    serviceId: "catalog-api",
+    securityState: {
+      schema: "jb.resilience.signal-state/v1",
+      state: "clear",
+      reason: "all-sources-clear",
+      assetId: "host-erp-01",
+      environment: "production",
+      sources: [{
+        sourceId: "guard-01",
+        sourceEngine: "security-guard",
+        state: "clear",
+        issuedAtMs: NOW,
+        reasonCode: "GUARD_CLEAR"
+      }],
+      evidenceRefs: [],
+      preserveEvidence: true,
+      authorizationGranted: false
+    },
+    healthObservations: [{
+      schema: "jb.resilience.health-observation/v1",
+      observationId: "11111111-1111-4111-8111-111111111111",
+      assetId: "host-erp-01",
+      environment: "production",
+      serviceId: "catalog-api",
+      observedAtMs: NOW,
+      status: "unhealthy",
+      consecutiveFailures: 3,
+      reasonCode: "SERVICE_FAILURE"
+    }],
     ...overrides
   };
 }
@@ -141,7 +180,7 @@ function harness(overrides = {}) {
     }
   };
   const orchestrator = createResponseOrchestrator({
-    incidentEngine: {
+    incidentEngine: overrides.incidentEngine ?? {
       evaluateIncident() {
         calls.incidentEvaluations = (calls.incidentEvaluations ?? 0) + 1;
         return decision;
@@ -440,4 +479,21 @@ test("rejects v0.5 decisions that change the asset, environment or service scope
   assert.equal(h.calls.evaluated, 0);
   assert.equal(h.calls.authorized, 0);
   assert.equal(h.calls.restart, 0);
+});
+
+
+test("integrates the real v0.5 read-only correlation engine with the v0.6 response boundary", async () => {
+  const incidentEngine = createIncidentCorrelationEngine({ clock: () => NOW });
+  const h = harness({ incidentEngine });
+  const result = await h.orchestrator.executeIncident(realV05IncidentInput());
+
+  assert.equal(result.state, "RECOVERED");
+  assert.equal(result.decision, "review-recovery-policy");
+  assert.equal(result.decisionRule, "HEALTH_FAILURE_THRESHOLD");
+  assert.equal(result.action, "restart-service");
+  assert.equal(result.verified, true);
+  assert.equal(h.calls.restart, 1);
+  assert.equal(h.calls.request.assetId, "host-erp-01");
+  assert.equal(h.calls.request.environment, "production");
+  assert.equal(h.calls.request.incidentId, result.incidentId);
 });
