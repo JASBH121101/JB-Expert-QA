@@ -1,4 +1,6 @@
-const LAB_SCHEMA = "jb.threat-lab.report/v1";
+import { assessThreatLabDifficulty, normalizeDifficulty, THREAT_LAB_DIFFICULTY_LEVELS } from "./difficulty.js";
+
+const LAB_SCHEMA = "jb.threat-lab.report/v2";
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,79}$/i;
 
 const LIMITS = Object.freeze({
@@ -152,6 +154,7 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
         appliesTo.some((item) => typeof item !== "string" || !item.trim() || item.length > 80)) {
       throw new TypeError("scenario.appliesTo must contain at most " + LIMITS.appliesTo + " target ids or kinds of at most 80 characters");
     }
+    const difficulty = normalizeDifficulty(scenario.difficulty);
     const tags = scenario.tags ?? [];
     if (!Array.isArray(tags) || tags.length > LIMITS.scenarioTags ||
         tags.some((item) => typeof item !== "string" || !item.trim() || item.length > 80)) {
@@ -161,6 +164,7 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
       id: scenario.id,
       category: scenario.category,
       description: scenario.description.slice(0, 500),
+      difficulty,
       appliesTo: Object.freeze([...new Set(appliesTo)]),
       safety: Object.freeze({ safe: true, network: false, destructive: false, executesSample: false }),
       tags: Object.freeze([...new Set(tags)])
@@ -168,7 +172,11 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
     return scenario.id;
   }
 
-  async function run({ targetIds = [...targets.keys()], scenarioIds = [...scenarios.keys()], metadata = {} } = {}) {
+  async function run({ targetIds = [...targets.keys()], scenarioIds = [...scenarios.keys()], metadata = {}, difficulty = null } = {}) {
+    const selectedDifficulty = normalizeDifficulty(difficulty, null);
+    const maximumRank = selectedDifficulty === null
+      ? THREAT_LAB_DIFFICULTY_LEVELS.length
+      : THREAT_LAB_DIFFICULTY_LEVELS.find((level) => level.id === selectedDifficulty).rank;
     if (!Array.isArray(targetIds) || !Array.isArray(scenarioIds)) {
       throw new TypeError("targetIds and scenarioIds must be arrays");
     }
@@ -191,6 +199,9 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
       const scenario = scenarios.get(id);
       if (!scenario) throw new Error("Unknown scenario: " + id);
       return scenario;
+    }).filter((scenario) => {
+      const rank = THREAT_LAB_DIFFICULTY_LEVELS.find((level) => level.id === scenario.difficulty).rank;
+      return rank <= maximumRank;
     });
     const startedAt = clock().toISOString();
     const results = [];
@@ -202,8 +213,9 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
         if (reportBudgetExceeded) {
           results.push({
             target: { id: target.id, kind: target.kind, version: target.version },
-            scenario: { id: scenario.id, category: scenario.category },
+            scenario: { id: scenario.id, category: scenario.category, difficulty: scenario.difficulty },
             status: "skip",
+            skipReason: "report_budget",
             summary: "Total report output budget reached; adapter was not invoked",
             findings: [],
             metrics: {},
@@ -216,8 +228,9 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
             !scenario.appliesTo.includes(target.kind)) {
           results.push({
             target: { id: target.id, kind: target.kind, version: target.version },
-            scenario: { id: scenario.id, category: scenario.category },
+            scenario: { id: scenario.id, category: scenario.category, difficulty: scenario.difficulty },
             status: "skip",
+            skipReason: "target_scope",
             summary: "Scenario is not assigned to this target",
             findings: [],
             metrics: {},
@@ -237,7 +250,7 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
             reportBudgetExceeded = true;
             results.push({
               target: { id: target.id, kind: target.kind, version: target.version },
-              scenario: { id: scenario.id, category: scenario.category },
+              scenario: { id: scenario.id, category: scenario.category, difficulty: scenario.difficulty },
               status: "fail",
               summary: "Total report output budget exceeded",
               findings: [{
@@ -253,14 +266,15 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
           totalOutcomeBytes += outcomeBytes;
           results.push({
             target: { id: target.id, kind: target.kind, version: target.version },
-            scenario: { id: scenario.id, category: scenario.category },
+            scenario: { id: scenario.id, category: scenario.category, difficulty: scenario.difficulty },
             ...outcome,
+            skipReason: outcome.status === "skip" ? "adapter" : null,
             durationMs: Math.max(0, clock().getTime() - started)
           });
         } catch (error) {
           results.push({
             target: { id: target.id, kind: target.kind, version: target.version },
-            scenario: { id: scenario.id, category: scenario.category },
+            scenario: { id: scenario.id, category: scenario.category, difficulty: scenario.difficulty },
             status: "fail",
             summary: "Adapter execution failed",
             findings: [{ code: "LAB_ADAPTER_ERROR", message: String(error?.message ?? "Unknown adapter error").slice(0, 500) }],
@@ -281,7 +295,12 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
       startedAt,
       completedAt: clock().toISOString(),
       metadata: safeMetadata,
+      difficulty: {
+        requested: selectedDifficulty ?? "all",
+        includedLevels: THREAT_LAB_DIFFICULTY_LEVELS.filter((level) => level.rank <= maximumRank).map((level) => level.id)
+      },
       totals,
+      assessment: assessThreatLabDifficulty(results, selectedDifficulty ?? "superextreme"),
       results
     };
   }
@@ -296,3 +315,4 @@ export function createThreatLab({ name = "JB Threat Lab", version = "0.1.0", clo
 }
 
 export const THREAT_LAB_REPORT_SCHEMA = LAB_SCHEMA;
+export { assessThreatLabDifficulty, THREAT_LAB_DIFFICULTY_LEVELS };

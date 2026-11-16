@@ -144,6 +144,8 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
     mkdir(malwareFixtures),
     mkdir(guardTemp),
     mkdir(path.join(expertProject, "src"), { recursive: true }),
+    mkdir(path.join(expertProject, "lang", "es"), { recursive: true }),
+    mkdir(path.join(expertProject, "lang", "en"), { recursive: true }),
     mkdir(path.join(expertDatabaseProject, "src"), { recursive: true })
   ]);
 
@@ -413,6 +415,64 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
             passed ? [] : [{ code: "EXPERT_QA_VISUAL_DIFF_MISMATCH" }]);
         }
 
+        if (scenario.id === "expert-qa.language.translation-integrity") {
+          await mkdir(path.join(expertProject, "lang", "es"), { recursive: true });
+          await mkdir(path.join(expertProject, "lang", "en"), { recursive: true });
+          await writeFile(path.join(expertProject, "lang", "es", "messages.php"), `<?php
+return [
+  'greeting' => 'Hola :name',
+  'count' => 'Total :count',
+  'description' => 'Descripción del producto',
+];
+`);
+          await writeFile(path.join(expertProject, "lang", "en", "messages.php"), `<?php
+return [
+  'greeting' => 'Hello :name',
+  'count' => 'Total',
+  'legacy' => 'Old label',
+];
+`);
+          const report = await auditFixture(expertProject);
+          const languageAudit = report.languageAudit;
+          const missingKey = languageAudit?.findings?.some((item) =>
+            item.id === "missing-key" && item.key === "description"
+          ) ?? false;
+          const placeholderMismatch = languageAudit?.findings?.some((item) =>
+            item.id === "placeholder-mismatch" && item.key === "count"
+          ) ?? false;
+          const specialistFinding = report.diagnostics.some((item) =>
+            typeof item.id === "string" && item.id.startsWith("LANG-")
+          );
+          const passed = languageAudit?.status === "checked"
+            && languageAudit.sourceLocale === "es-419"
+            && languageAudit.targetLocale === "en"
+            && missingKey
+            && placeholderMismatch
+            && specialistFinding;
+          return outcome(
+            passed ? "pass" : "fail",
+            passed
+              ? "Expert QA detected a missing locale key and placeholder mismatch through its project auditor"
+              : "Language QA findings were not propagated through the Expert QA project audit",
+            {
+              status: languageAudit?.status ?? null,
+              sourceLocale: languageAudit?.sourceLocale ?? null,
+              targetLocale: languageAudit?.targetLocale ?? null,
+              missingKey,
+              placeholderMismatch,
+              specialistFinding,
+              glossaryFindings: languageAudit?.summary?.glossaryReview ?? 0
+            },
+            passed ? [] : [{
+              code: "EXPERT_QA_LANGUAGE_AUDIT_MISMATCH",
+              status: languageAudit?.status ?? null,
+              missingKey,
+              placeholderMismatch,
+              specialistFinding
+            }]
+          );
+        }
+
         if (scenario.id !== "expert-qa.static.unsafe-html-detected" &&
             scenario.id !== "expert-qa.static.repaired-html-regression") {
           return outcome("skip", "No Expert QA handler for this scenario");
@@ -440,28 +500,30 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
   });
 
   const scenarios = [
-    ["malware.eicar.harmless-test", "malware-static", "Detect the harmless EICAR test string.", "jb-malware-engine"],
-    ["malware.benign.no-false-positive", "malware-static", "Do not flag a benign inert text fixture.", "jb-malware-engine"],
-    ["malware.suspicious.inert-script", "malware-static", "Classify inert suspicious script text as suspicious, never confirmed malicious.", "jb-malware-engine"],
-    ["malware.hash-signature.exact-match", "malware-signatures", "Confirm an exact configured SHA-256 fixture signature.", "jb-malware-engine"],
-    ["malware.coverage.size-limit-unknown", "malware-coverage", "Return unknown when a file exceeds the configured scan budget.", "jb-malware-engine"],
-    ["malware.pdf.active-actions-suspicious", "document-triage", "Classify PDF active-action indicators as suspicious, never confirmed malicious.", "jb-malware-engine"],
-    ["guard.request.xss-block", "request-security", "Block a local synthetic XSS-pattern request.", "jb-security-guard"],
-    ["guard.request.sqli-block", "request-security", "Block a local synthetic SQL injection-pattern request.", "jb-security-guard"],
-    ["guard.request.path-traversal-block", "request-security", "Block a local encoded path-traversal request.", "jb-security-guard"],
-    ["guard.request.ambiguous-framing-block", "request-security", "Reject conflicting HTTP message framing before application handling.", "jb-security-guard"],
-    ["guard.upload.malicious-block", "upload-security", "Reject a synthetic signature match before file promotion.", "jb-security-guard"],
-    ["guard.upload.unknown-quarantine", "upload-security", "Keep no-match uploads quarantined rather than approving them.", "jb-security-guard"],
-    ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa"],
-    ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa"],
-    ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa"],
-    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa"]
+    ["malware.eicar.harmless-test", "malware-static", "Detect the harmless EICAR test string.", "jb-malware-engine", "basic"],
+    ["malware.benign.no-false-positive", "malware-static", "Do not flag a benign inert text fixture.", "jb-malware-engine", "basic"],
+    ["malware.suspicious.inert-script", "malware-static", "Classify inert suspicious script text as suspicious, never confirmed malicious.", "jb-malware-engine", "intermediate"],
+    ["malware.hash-signature.exact-match", "malware-signatures", "Confirm an exact configured SHA-256 fixture signature.", "jb-malware-engine", "intermediate"],
+    ["malware.coverage.size-limit-unknown", "malware-coverage", "Return unknown when a file exceeds the configured scan budget.", "jb-malware-engine", "advanced"],
+    ["malware.pdf.active-actions-suspicious", "document-triage", "Classify PDF active-action indicators as suspicious, never confirmed malicious.", "jb-malware-engine", "advanced"],
+    ["guard.request.xss-block", "request-security", "Block a local synthetic XSS-pattern request.", "jb-security-guard", "basic"],
+    ["guard.request.sqli-block", "request-security", "Block a local synthetic SQL injection-pattern request.", "jb-security-guard", "basic"],
+    ["guard.request.path-traversal-block", "request-security", "Block a local encoded path-traversal request.", "jb-security-guard", "intermediate"],
+    ["guard.request.ambiguous-framing-block", "request-security", "Reject conflicting HTTP message framing before application handling.", "jb-security-guard", "advanced"],
+    ["guard.upload.malicious-block", "upload-security", "Reject a synthetic signature match before file promotion.", "jb-security-guard", "expert"],
+    ["guard.upload.unknown-quarantine", "upload-security", "Keep no-match uploads quarantined rather than approving them.", "jb-security-guard", "expert"],
+    ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa", "basic"],
+    ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa", "intermediate"],
+    ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa", "advanced"],
+    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa", "expert"],
+    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa", "extreme"]
   ];
-  for (const [id, category, description, targetId] of scenarios) {
+  for (const [id, category, description, targetId, difficulty] of scenarios) {
     lab.registerScenario({
       id,
       category,
       description,
+      difficulty,
       appliesTo: [targetId],
       safety: { safe: true, network: false, destructive: false, executesSample: false },
       tags: ["safe-fixture", "offline"]
