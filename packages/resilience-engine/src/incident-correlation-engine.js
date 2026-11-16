@@ -279,10 +279,20 @@ function buildHealthSummary(observations, now, windowMs, maxClockSkewMs, setting
     const fingerprint = fingerprintObservation(item);
     const prior = byId.get(item.observationId);
     if (prior) {
-      if (prior !== fingerprint) duplicateIdConflict = true;
+      if (prior.fingerprint !== fingerprint) {
+        duplicateIdConflict = true;
+        if (fingerprint < prior.fingerprint) {
+          prior.fingerprint = fingerprint;
+          prior.item = item;
+          const priorIndex = normalized.findIndex((entry) =>
+            entry.observationId === item.observationId
+          );
+          if (priorIndex >= 0) normalized[priorIndex] = item;
+        }
+      }
       continue;
     }
-    byId.set(item.observationId, fingerprint);
+    byId.set(item.observationId, { fingerprint, item });
     normalized.push(item);
   }
 
@@ -517,6 +527,9 @@ export function createIncidentCorrelationEngine(options = {}) {
     const serviceId = assertIdentifier(input.serviceId, IDENTIFIER, "serviceId");
     const now = clock();
     assertTimestamp(now, "incident engine clock");
+    if (!Number.isSafeInteger(now + maxClockSkewMs)) {
+      throw new TypeError("incident engine clock plus allowed skew exceeds the safe integer range");
+    }
 
     const security = validateSecurityState(
       input.securityState, assetId, environment, now, windowMs, maxClockSkewMs

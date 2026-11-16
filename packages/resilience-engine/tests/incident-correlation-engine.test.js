@@ -261,6 +261,23 @@ test("duplicate observation IDs with different content are classified as conflic
   assert.equal(result.authorizationGranted, false);
 });
 
+test("conflicting duplicate IDs produce identical summaries regardless of input order", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const healthy = observation({ observationId: id, status: "healthy" });
+  const unhealthy = observation({
+    observationId: id,
+    status: "unhealthy",
+    consecutiveFailures: 2
+  });
+  const forward = engine().evaluateIncident(input({ health: [healthy, unhealthy] }));
+  const reverse = engine().evaluateIncident(input({ health: [unhealthy, healthy] }));
+
+  assert.deepEqual(forward.health, reverse.health);
+  assert.equal(forward.decisionRule, reverse.decisionRule);
+  assert.equal(forward.riskScore, reverse.riskScore);
+  assert.deepEqual(forward.trace, reverse.trace);
+});
+
 test("identical duplicate observations are idempotently de-duplicated", () => {
   const item = observation();
   const result = engine().evaluateIncident(input({ health: [item, { ...item }] }));
@@ -289,6 +306,15 @@ test("out-of-scope health or security snapshots are rejected", () => {
   assert.throws(() => engine().evaluateIncident(input({
     security: { ...securityState(), assetId: "other-host" }
   })), /scope does not match/);
+});
+
+test("trusted security snapshots with future source timestamps are rejected", () => {
+  assert.throws(() => engine().evaluateIncident(input({
+    security: securityState({
+      state: "clear",
+      sources: [source({ state: "clear", issuedAtMs: NOW + 60_000 })]
+    })
+  }), /too far in the future/);
 });
 
 test("future observations beyond the configured clock skew are rejected", () => {
