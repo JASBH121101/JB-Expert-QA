@@ -54,6 +54,13 @@ The host application provides health observations and a command runner with appr
 
 The health monitor's observation counters are still in-memory by default, but `restoreState()` lets the host hydrate the monitor before its first observation. Use `await recoveryStore.getServiceState(serviceId)` and pass its `attemptCount` and `lastAttemptAt` as `restartCount` and `lastRestartAt`. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore failure trends should persist those observations in their monitoring system.
 
+
+## Transactional PostgreSQL storage adapter (v1 laboratory)
+
+The optional `./adapters/postgres-storage` entry point provides a PostgreSQL-backed implementation of the v0.6 orchestration-store contract and a hash-chained audit store. The host injects a node-postgres-compatible Pool and explicitly calls `initialize()`; no database driver, credentials, network endpoint or service is bundled. Mutations use database transactions, per-asset/environment row locks, unique idempotency keys and a partial unique index for unresolved action claims.
+
+An expired unresolved claim remains held for reconciliation; it is never automatically recycled. The adapter's PostgreSQL primary can serialize operations across application processes, but this is not a complete distributed coordinator: monotonic execution fencing, quorum, leader election, split-brain handling and A3 failover remain out of scope. The adapter is a laboratory increment pending its real-PostgreSQL certification. See [PostgreSQL Storage Adapter v1](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
