@@ -133,12 +133,17 @@ export function createRestrictedHostCommandRunner({
         if (settled) return;
         settled = true;
         const numericExitCode = Number.isSafeInteger(error?.code) ? error.code : null;
-        const timedOut = error?.code === "ETIMEDOUT" || error?.killed === true;
+        const timedOut = error?.code === "ETIMEDOUT";
+        const reason = !error ? null
+          : timedOut ? "timeout"
+          : error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "output-limit"
+          : "command-failed";
         resolve(Object.freeze({
           exitCode: error ? numericExitCode ?? 1 : 0,
           stdout: boundedOutput(stdout),
           stderr: boundedOutput(stderr),
           timedOut,
+          reason,
           status: error ? timedOut ? "timed_out" : "failed" : "succeeded"
         }));
       };
