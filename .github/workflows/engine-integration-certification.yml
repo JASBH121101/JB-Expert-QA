@@ -1,0 +1,54 @@
+name: JB Engines Integration Certification
+
+on:
+  push:
+    branches: ["feature/jb-engines-integration-certification-v1"]
+    paths:
+      - "packages/engine-contracts/**"
+      - "packages/*/package.json"
+      - "scripts/verify-package-distributions.js"
+      - "package.json"
+      - ".github/workflows/engine-integration-certification.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/engine-contracts/**"
+      - "packages/*/package.json"
+      - "scripts/verify-package-distributions.js"
+      - "package.json"
+      - ".github/workflows/engine-integration-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-integration-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts-and-package-isolation:
+    name: Contracts and package isolation / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate manifests, envelopes, compatibility and registry
+        run: npm run test:engine-contracts
+      - name: Verify independently distributable engine packages
+        run: npm run test:package-distributions
