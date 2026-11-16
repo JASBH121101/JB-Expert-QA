@@ -23,6 +23,8 @@ on:
       - "src/index.js"
       - "tests/database-postgres-audit.test.js"
       - "tests/e2e/database-postgres-cli-smoke.js"
+      - "tests/e2e/security-guard-postgres-store.integration.js"
+      - "packages/security-guard/**"
       - "docs/DATABASE-QA.md"
       - ".github/workflows/database-postgres-integration.yml"
   workflow_dispatch:
