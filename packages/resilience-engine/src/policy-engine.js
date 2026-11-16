@@ -96,7 +96,15 @@ function canonicalJson(value) {
 function signingPayloadFor(policy) {
   const payload = Object.create(null);
   for (const key of Object.keys(policy)) {
-    if (key !== "signature" && key !== "policyHash") payload[key] = policy[key];
+    if (key === "policyHash") continue;
+    if (key === "signature") {
+      payload.signature = {
+        keyId: policy.signature.keyId,
+        algorithm: policy.signature.algorithm
+      };
+    } else {
+      payload[key] = policy[key];
+    }
   }
   return canonicalJson(payload);
 }
@@ -325,20 +333,26 @@ export function validateAdvancedResiliencePolicy(policy, {
 }
 
 function validateRequest(request) {
-  if (!isRecord(request) ||
-      Object.keys(request).length !== 5 ||
+  let safe;
+  try {
+    safe = cloneJsonSafe(request);
+  } catch {
+    return { valid: false, reason: "invalid-capability-request" };
+  }
+  if (!isRecord(safe) ||
+      Object.keys(safe).length !== 5 ||
       !["assetId", "environment", "incidentId", "action", "securityState"]
-        .every((key) => Object.hasOwn(request, key))) {
+        .every((key) => Object.hasOwn(safe, key))) {
     return { valid: false, reason: "invalid-capability-request" };
   }
-  if (typeof request.assetId !== "string" || !IDENTIFIER.test(request.assetId) ||
-      typeof request.environment !== "string" || !IDENTIFIER.test(request.environment) ||
-      typeof request.incidentId !== "string" || !IDENTIFIER.test(request.incidentId) ||
-      typeof request.action !== "string" || !Object.hasOwn(ACTION_RISK, request.action) ||
-      typeof request.securityState !== "string" || !SECURITY_STATES.has(request.securityState)) {
+  if (typeof safe.assetId !== "string" || !IDENTIFIER.test(safe.assetId) ||
+      typeof safe.environment !== "string" || !IDENTIFIER.test(safe.environment) ||
+      typeof safe.incidentId !== "string" || !IDENTIFIER.test(safe.incidentId) ||
+      typeof safe.action !== "string" || !Object.hasOwn(ACTION_RISK, safe.action) ||
+      typeof safe.securityState !== "string" || !SECURITY_STATES.has(safe.securityState)) {
     return { valid: false, reason: "invalid-capability-request" };
   }
-  return { valid: true, request };
+  return { valid: true, request: safe };
 }
 
 function evaluatePolicyCapability(policy, request, now) {
@@ -362,6 +376,16 @@ function evaluatePolicyCapability(policy, request, now) {
       assetId: service.id, action: input.action
     });
   }
+  if (riskClass === "A2") {
+    return Object.freeze({
+      permitted: false, reason: input.securityState === "confirmed"
+        ? "trusted-signal-gateway-not-certified"
+        : "confirmed-security-verdict-required"
+    });
+  }
+  if (riskClass === "A3") {
+    return Object.freeze({ permitted: false, reason: "failover-control-plane-not-certified" });
+  }
   if (input.securityState !== "clear") {
     return Object.freeze({ permitted: false, reason: "security-state-not-clear" });
   }
@@ -375,14 +399,6 @@ function evaluatePolicyCapability(policy, request, now) {
     if (input.action === "restart-service" && service.recovery?.requireApplicationHealth !== true) {
       return Object.freeze({ permitted: false, reason: "application-health-verification-required" });
     }
-  } else if (riskClass === "A2") {
-    return Object.freeze({
-      permitted: false, reason: input.securityState === "confirmed"
-        ? "trusted-signal-gateway-not-certified"
-        : "confirmed-security-verdict-required"
-    });
-  } else if (riskClass === "A3") {
-    return Object.freeze({ permitted: false, reason: "failover-control-plane-not-certified" });
   }
 
   return Object.freeze({
@@ -547,7 +563,12 @@ export function createResiliencePolicyEngine({
     } catch {
       return Object.freeze({ authorized: false, reason: "policy-invalid-or-expired" });
     }
-    const decision = evaluatePolicyCapability(validatedPolicy, request, now);
+    const normalizedRequest = validateRequest(request);
+    if (!normalizedRequest.valid) {
+      return Object.freeze({ authorized: false, reason: normalizedRequest.reason });
+    }
+    const safeRequest = normalizedRequest.request;
+    const decision = evaluatePolicyCapability(validatedPolicy, safeRequest, now);
     if (!decision.permitted || decision.riskClass === "A0") {
       return Object.freeze({
         authorized: false,
@@ -578,7 +599,7 @@ export function createResiliencePolicyEngine({
         policyId: validatedPolicy.policyId,
         revision: validatedPolicy.revision,
         policyHash: integrity.policyHash,
-        request,
+        request: safeRequest,
         budgets: validatedPolicy.budgets,
         riskClass: decision.riskClass,
         now,
@@ -600,10 +621,10 @@ export function createResiliencePolicyEngine({
       policyId: validatedPolicy.policyId,
       revision: validatedPolicy.revision,
       policyHash: integrity.policyHash,
-      assetId: request.assetId,
-      environment: request.environment,
-      incidentId: request.incidentId,
-      action: request.action,
+      assetId: safeRequest.assetId,
+      environment: safeRequest.environment,
+      incidentId: safeRequest.incidentId,
+      action: safeRequest.action,
       riskClass: decision.riskClass,
       reservationId: reservation.reservationId,
       issuedAt: now,
