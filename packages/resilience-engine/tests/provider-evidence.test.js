@@ -335,6 +335,21 @@ test("rejects unsigned extra fields, malformed evidence references and untrusted
   });
   assert.equal(result.verified, false);
   assert.equal(result.reason, "invalid-provider-evidence-bundle");
+
+  const accessorBundle = fixture.makeBundle();
+  const hostile = {};
+  Object.defineProperty(hostile, "role", {
+    enumerable: true,
+    get() { throw new Error("untrusted getter must not execute"); }
+  });
+  accessorBundle[0] = hostile;
+  const accessorResult = verifyA2ProviderEvidenceBundle({
+    attestations: accessorBundle,
+    expected: SCOPE,
+    verifier: fixture.verifier
+  });
+  assert.equal(accessorResult.verified, false);
+  assert.equal(accessorResult.reason, "provider-attestation-rejected");
 });
 
 test("fails closed when provider key resolution is asynchronous or unavailable", () => {
