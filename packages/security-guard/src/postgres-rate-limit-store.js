@@ -56,17 +56,19 @@ VALUES ($1, statement_timestamp(), 1, statement_timestamp())
 ON CONFLICT (counter_key) DO UPDATE SET
   window_started_at = CASE
     WHEN jb_security_guard_rate_limits.window_started_at
-      + ($2 * INTERVAL '1 millisecond') <= EXCLUDED.last_seen_at
-    THEN EXCLUDED.last_seen_at
+      + ($2 * INTERVAL '1 millisecond')
+      <= GREATEST(jb_security_guard_rate_limits.last_seen_at, EXCLUDED.last_seen_at)
+    THEN GREATEST(jb_security_guard_rate_limits.last_seen_at, EXCLUDED.last_seen_at)
     ELSE jb_security_guard_rate_limits.window_started_at
   END,
   request_count = CASE
     WHEN jb_security_guard_rate_limits.window_started_at
-      + ($2 * INTERVAL '1 millisecond') <= EXCLUDED.last_seen_at
+      + ($2 * INTERVAL '1 millisecond')
+      <= GREATEST(jb_security_guard_rate_limits.last_seen_at, EXCLUDED.last_seen_at)
     THEN 1
     ELSE jb_security_guard_rate_limits.request_count + 1
   END,
-  last_seen_at = EXCLUDED.last_seen_at
+  last_seen_at = GREATEST(jb_security_guard_rate_limits.last_seen_at, EXCLUDED.last_seen_at)
 RETURNING
   request_count AS count,
   GREATEST(
