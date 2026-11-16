@@ -673,7 +673,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
       );
     });
     initialized = true;
-    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 3 });
+    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 4 });
   }
 
   async function recordIncidentState(input) {
@@ -982,6 +982,12 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     applyState: applyFencedState,
     getState: getFencedState
   });
+  const trustedSignalStore = Object.freeze({
+    durable: true,
+    dialect: "postgresql",
+    recordSignal: recordTrustedSignal,
+    listSignals: listTrustedSignals
+  });
 
   return Object.freeze({
     durable: true,
@@ -990,7 +996,8 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     orchestrationStore,
     auditStore,
     coordinationStore,
-    fencedTargetStore
+    fencedTargetStore,
+    trustedSignalStore
   });
 }
 ), signal JSONB NOT NULL, received_at_ms BIGINT NOT NULL, retention_until_ms BIGINT NOT NULL, PRIMARY KEY (source_id, event_id), CHECK (expires_at_ms > issued_at_ms), CHECK (retention_until_ms >= expires_at_ms))",
