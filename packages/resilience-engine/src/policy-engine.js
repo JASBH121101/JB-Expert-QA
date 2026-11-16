@@ -455,7 +455,7 @@ function evaluatePolicyCapability(policy, request, now) {
 }
 
 function validateRevisionStore(store) {
-  return isRecord(store) && typeof store.acceptRevision === "function";
+  return isRecord(store) && typeof store.assertCurrent === "function";
 }
 
 function validateCapabilityLedger(ledger) {
@@ -469,12 +469,19 @@ export function createMemoryPolicyRevisionStore() {
   const revisions = new Map();
   return Object.freeze({
     durable: false,
-    async acceptRevision({ policyId, revision, policyHash }) {
+    setCurrentPolicy({ policyId, revision, policyHash }) {
+      if (typeof policyId !== "string" || !POLICY_ID.test(policyId) ||
+          !Number.isSafeInteger(revision) || revision < 1 ||
+          typeof policyHash !== "string" || !/^[a-f0-9]{64}$/.test(policyHash)) return false;
       const current = revisions.get(policyId);
       if (current && (revision < current.revision ||
           (revision === current.revision && policyHash !== current.policyHash))) return false;
       if (!current || revision > current.revision) revisions.set(policyId, { revision, policyHash });
       return true;
+    },
+    async assertCurrent({ policyId, revision, policyHash }) {
+      const current = revisions.get(policyId);
+      return Boolean(current && current.revision === revision && current.policyHash === policyHash);
     }
   });
 }
@@ -560,7 +567,7 @@ export function createResiliencePolicyEngine({
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
   if (typeof allowInMemoryStores !== "boolean") throw new TypeError("allowInMemoryStores must be boolean");
   if (!validateRevisionStore(policyRevisionStore)) {
-    throw new TypeError("policyRevisionStore must implement atomic acceptRevision");
+    throw new TypeError("policyRevisionStore must implement durable assertCurrent");
   }
   if (!validateCapabilityLedger(capabilityLedger)) {
     throw new TypeError("capabilityLedger must implement reserve, assert and complete operations");
@@ -621,7 +628,7 @@ export function createResiliencePolicyEngine({
 
     let acceptedRevision = false;
     try {
-      acceptedRevision = await policyRevisionStore.acceptRevision({
+      acceptedRevision = await policyRevisionStore.assertCurrent({
         policyId: validatedPolicy.policyId,
         revision: validatedPolicy.revision,
         policyHash: integrity.policyHash
@@ -724,7 +731,7 @@ export function createResiliencePolicyEngine({
     let acceptedRevision = false;
     let reserved = false;
     try {
-      acceptedRevision = await policyRevisionStore.acceptRevision({
+      acceptedRevision = await policyRevisionStore.assertCurrent({
         policyId: validatedPolicy.policyId,
         revision: validatedPolicy.revision,
         policyHash: integrity.policyHash
