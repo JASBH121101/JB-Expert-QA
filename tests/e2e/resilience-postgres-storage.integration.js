@@ -154,14 +154,14 @@ async function main() {
     });
     assert.equal(firstLease.acquired, true);
     const firstState = { status: "ready", revision: 1 };
-    const firstApplied = await storage.fencedTargetStore.applyState({
-      ...firstLease.lease, targetId, mutationId: "mutation-001", state: firstState
-    });
+    const firstApplied = await storage.fencedTargetStore.applyState(
+      fencedInput(firstLease.lease, { targetId, mutationId: "mutation-001", state: firstState })
+    );
     assert.equal(firstApplied.applied, true);
     assert.equal(firstApplied.fencingToken, firstLease.lease.fencingToken);
-    assert.deepEqual(await secondStorage.fencedTargetStore.applyState({
-      ...firstLease.lease, targetId, mutationId: "mutation-001", state: firstState
-    }), { applied: false, reason: "duplicate-mutation" });
+    assert.deepEqual(await secondStorage.fencedTargetStore.applyState(
+      fencedInput(firstLease.lease, { targetId, mutationId: "mutation-001", state: firstState })
+    ), { applied: false, reason: "duplicate-mutation" });
     assert.deepEqual(await storage.fencedTargetStore.applyState({
       ...fencedInput(firstLease.lease, { targetId, mutationId: "mutation-001",
       state: { status: "tampered", revision: 99 } })
