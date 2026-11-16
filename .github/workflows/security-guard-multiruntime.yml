@@ -1,0 +1,67 @@
+name: Security Guard multi-runtime validation
+
+on:
+  push:
+    branches: [main, "integration/**", "feature/security-guard-closeout-lab"]
+    paths:
+      - "packages/security-guard/**"
+      - "packages/security-guard-core/**"
+      - "packages/security-guard-php/**"
+      - "packages/security-guard-python/**"
+      - "tests/**"
+      - ".github/workflows/security-guard-multiruntime.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "packages/security-guard/**"
+      - "packages/security-guard-core/**"
+      - "packages/security-guard-php/**"
+      - "packages/security-guard-python/**"
+      - "tests/**"
+      - ".github/workflows/security-guard-multiruntime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-guard-multiruntime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-laravel-adapter:
+    name: PHP Core and Laravel client (PHP 8.2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Verify PHP runtime
+        run: |
+          php -v
+          php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2 or newer is required.\n"); exit(1); }'
+      - name: Check all PHP package files
+        run: find packages/security-guard-php -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Run shared HMAC and PHP adapter tests
+        run: php packages/security-guard-php/tests/run.php
+
+  python-fastapi-adapter:
+    name: Python Core and FastAPI ASGI client (3.11)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Verify Python runtime
+        run: |
+          python3 --version
+          python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11 or newer is required"'
+      - name: Compile Python package
+        run: python3 -m compileall -q packages/security-guard-python
+      - name: Run shared HMAC, API client and ASGI middleware tests
+        env:
+          PYTHONPATH: packages/security-guard-python/src
+        run: python3 -m unittest discover -s packages/security-guard-python/tests -v
