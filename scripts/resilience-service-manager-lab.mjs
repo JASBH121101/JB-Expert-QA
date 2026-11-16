@@ -159,6 +159,8 @@ async function certifyWindowsScm() {
   };
 
   const adapter = createWindowsScmAdapter({
+    run: async (executable, args, options) =>
+      command(executable, args, options.timeoutMs),
     allowedServices: [serviceName],
     timeoutMs,
     pollIntervalMs: 100
