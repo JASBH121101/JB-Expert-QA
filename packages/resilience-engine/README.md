@@ -48,7 +48,7 @@ The file ledger is not a cross-host consensus system. For multi-host orchestrati
 
 The host application provides health observations and a command runner with appropriate OS permissions. Adapters do not spawn processes themselves. The caller must authenticate and audit human approvals. A boolean supplied by an untrusted client is not an approval mechanism; use \`approvalVerifier\` to validate a signed, one-time, actor-bound record covering the exact proposal ID, nonce, service ID, action and expiry. The host verifier remains responsible for signature validation, actor authorization and replay protection across process restarts.
 
-The health monitor's observation counters are still in-memory. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore detailed observation trends should hydrate them from their own monitoring system or implement a persistence adapter for those observations.
+The health monitor's observation counters are still in-memory by default, but `restoreState()` lets the host hydrate the monitor before its first observation. Use `await recoveryStore.getServiceState(serviceId)` and pass its `attemptCount` and `lastAttemptAt` as `restartCount` and `lastRestartAt`. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore failure trends should persist those observations in their monitoring system.
 
 ## Not included
 
