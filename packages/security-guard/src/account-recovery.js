@@ -84,7 +84,7 @@ function createRecoveryCoreEvent(core, input) {
     scope: input.scopes?.length ? input.scopes.join("_") : "account_recovery",
     ...(RECOVERY_UUID.test(input.correlationId ?? "")
       ? { correlationId: input.correlationId }
-      : { correlationId: attempt.attemptId })
+      : { correlationId: randomUUID() })
   });
 }
 
