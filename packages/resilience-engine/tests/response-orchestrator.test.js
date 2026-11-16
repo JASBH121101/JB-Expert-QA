@@ -35,7 +35,11 @@ function incidentDecision(overrides = {}) {
     decision: "review-recovery-policy",
     recommendedNextStep: "evaluate-a1-policy-separately",
     decisionRule: "HEALTH_FAILURE_THRESHOLD",
-    trace: [],
+    trace: [{
+      ruleId: "HEALTH_FAILURE_THRESHOLD",
+      matched: true,
+      selected: true
+    }],
     evidenceRefs: [],
     preserveEvidence: true,
     authorizationGranted: false,
