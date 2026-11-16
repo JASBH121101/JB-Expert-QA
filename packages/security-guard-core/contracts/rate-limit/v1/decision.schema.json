@@ -152,6 +152,31 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": false
+          }
+        },
+        "required": [
+          "allowed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              429,
+              503
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
     }
   ]
 }
