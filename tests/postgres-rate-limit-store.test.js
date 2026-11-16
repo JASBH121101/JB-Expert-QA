@@ -1,8 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";
+import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";\nimport { createCoreRateLimitCounterKey } from "@jb/security-guard/core-contract-v1";
 
 const KEY = "jb-guard:api:" + "a".repeat(64);
+const CORE_KEY = createCoreRateLimitCounterKey({
+  tenantId: "tenant-demo", applicationId: "catalog-api", policyId: "public-api",
+  scope: "catalog:list", identityType: "account", keyId: "k2026-01",
+  identityKey: "b".repeat(64)
+});
 
 test("PostgreSQL rate-limit store initializes an indexed table without connecting on construction", async () => {
   const calls = [];
@@ -39,6 +44,22 @@ test("PostgreSQL consume uses a parameterized atomic UPSERT and database clock",
   assert.equal(result.count, 3);
   assert.equal(result.retryAfterMs, 42_000);
   assert.ok(Object.isFrozen(result));
+});
+
+test("PostgreSQL store accepts generated Core v1 length-prefixed counter keys", async () => {
+  let received;
+  const store = createPostgresRateLimitStore({
+    async query(sql, parameters) {
+      received = { sql, parameters };
+      return { rows: [{ count: "1", retry_after_ms: "1000" }] };
+    }
+  });
+  const result = await store.consumeLimit({
+    key: CORE_KEY, now: 1000, windowMs: 60_000, maxRequests: 10
+  });
+  assert.equal(result.allowed, true);
+  assert.equal(received.parameters[0], CORE_KEY);
+  assert.match(received.sql, /ON CONFLICT \(counter_key\) DO UPDATE/);
 });
 
 test("PostgreSQL store refuses raw identifiers and malformed counter requests", async () => {
