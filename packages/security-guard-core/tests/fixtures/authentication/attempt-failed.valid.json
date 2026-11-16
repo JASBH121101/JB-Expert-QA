@@ -1,0 +1,18 @@
+{
+  "schema": "jb.security.authentication.attempt/v1",
+  "attemptId": "f47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "tenantId": "tenant-demo",
+  "applicationId": "admin-api",
+  "operation": "login",
+  "outcome": "failure",
+  "occurredAtMs": 1794837600000,
+  "account": {
+    "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "keyId": "k2026-01",
+    "known": false
+  },
+  "client": {
+    "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "keyId": "k2026-01"
+  }
+}
