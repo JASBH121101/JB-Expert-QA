@@ -32,10 +32,14 @@ export function createWindowsScmAdapter({
     return result;
   }
 
-  async function queryState(serviceId, action = "query") {
+  async function queryState(serviceId, action = "query", commandTimeoutMs = timeoutMs) {
     const response = assertSuccess(await run(
       "sc.exe", ["query", serviceId],
-      { shell: false, timeoutMs, windowsHide: true }
+      {
+        shell: false,
+        timeoutMs: Math.max(1, Math.min(timeoutMs, commandTimeoutMs)),
+        windowsHide: true
+      }
     ), action);
     const output = [response.stdout, response.output, response.stderr]
       .filter((value) => typeof value === "string").join("\n");
@@ -54,8 +58,8 @@ export function createWindowsScmAdapter({
     const deadline = startedAt + timeoutMs;
     while (clock() <= deadline) {
       const remaining = deadline - clock();
-      if (remaining < 0) break;
-      const { response, state } = await queryState(serviceId);
+      if (remaining <= 0) break;
+      const { response, state } = await queryState(serviceId, "query", remaining);
       if (state === expectedState && clock() <= deadline) return response;
       const afterQuery = deadline - clock();
       if (afterQuery <= 0) break;
