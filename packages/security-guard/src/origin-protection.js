@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import {
+  createSecurityEventCoreV1,
+  normalizeSecurityEventCoreContract,
+  safelyEmitSecurityEventCore
+} from "./security-event-core-v1.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -92,7 +97,7 @@ function parseOrigin(value, allowRefererPath) {
 
 function normalizeOptions(options) {
   if (!isRecord(options)) throw new TypeError("origin protection options must be an object");
-  const allowed = new Set(["allowedOrigins", "allowRefererFallback", "allowMissingOrigin", "onEvent"]);
+  const allowed = new Set(["allowedOrigins", "allowRefererFallback", "allowMissingOrigin", "onEvent", "coreContract", "onCoreEvent"]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("Unknown origin protection option: " + key);
   }
@@ -112,11 +117,16 @@ function normalizeOptions(options) {
   }
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
+  const coreContract = normalizeSecurityEventCoreContract(options.coreContract);
+  const onCoreEvent = options.onCoreEvent ?? (() => {});
+  if (typeof onCoreEvent !== "function") throw new TypeError("onCoreEvent must be a function");
   return Object.freeze({
     allowedOrigins: new Set(origins),
     allowRefererFallback,
     allowMissingOrigin,
-    onEvent
+    onEvent,
+    coreContract,
+    onCoreEvent
   });
 }
 
@@ -127,6 +137,24 @@ function normalizeOptions(options) {
 export function createOriginProtection(options = {}) {
   const settings = normalizeOptions(options);
   const stats = { requests: 0, allowed: 0, blocked: 0 };
+
+  function emitCoreBlock(occurredAtMs) {
+    if (!settings.coreContract) return;
+    try {
+      const event = createSecurityEventCoreV1(settings.coreContract, {
+        occurredAtMs,
+        category: "origin",
+        ruleId: "JBG-CSRF-ORIGIN-001",
+        severity: "high",
+        action: "blocked",
+        outcome: "denied",
+        scope: "origin_check"
+      });
+      safelyEmitSecurityEventCore(settings.onCoreEvent, event);
+    } catch {
+      // Contract telemetry must never change origin enforcement.
+    }
+  }
 
   function middleware(request, response, next) {
     if (!request || !response || typeof next !== "function") {
@@ -166,9 +194,10 @@ export function createOriginProtection(options = {}) {
     }
 
     stats.blocked += 1;
+    const occurredAtMs = Date.now();
     const event = {
       id: randomUUID(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(occurredAtMs).toISOString(),
       component: "jb-security-guard",
       action: "origin-blocked",
       severity: "high",
@@ -176,6 +205,7 @@ export function createOriginProtection(options = {}) {
       method: method.slice(0, 32)
     };
     safeNotify(settings.onEvent, event);
+    emitCoreBlock(occurredAtMs);
 
     if (response.headersSent || response.writableEnded) {
       response.destroy?.();
