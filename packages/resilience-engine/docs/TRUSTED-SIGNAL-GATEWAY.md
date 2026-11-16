@@ -35,7 +35,7 @@ The gateway verifies signatures and digests again when reading persisted records
 
 ## Fail-closed aggregation
 
-All configured source identities scoped to an asset/environment are required to have a fresh signal. Missing sources resolve to `unknown`; expired required signals resolve to `stale`. A `clear` signal mixed with a non-clear finding resolves to `conflicting`. `tampered` dominates; explicit `unknown` blocks a clear result. A confirmed finding without conflicting clear evidence resolves to `confirmed`; suspected findings resolve to `suspected`.
+All configured source identities scoped to an asset/environment are required to have a fresh signal (including an explicit `clear` heartbeat when no finding exists). Missing sources resolve to `unknown`; expired required signals resolve to `stale`. A `clear` signal mixed with a non-clear finding resolves to `conflicting`. `tampered` dominates; explicit `unknown` blocks a clear result. A confirmed finding without conflicting clear evidence resolves to `confirmed`; suspected findings resolve to `suspected`.
 
 Every result sets `preserveEvidence: true` and `authorizationGranted: false`. Even a fully clear result is only an authenticated signal state; it is not a recovery permit, policy approval, containment order or failover authorization. Existing v1 recovery stays unchanged. A2 containment and A3 failover remain unavailable pending separate certifications.
 
