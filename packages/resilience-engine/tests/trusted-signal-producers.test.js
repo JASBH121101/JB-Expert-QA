@@ -109,10 +109,7 @@ test("Security Guard adapter rejects unsupported or malformed assessments/events
 });
 
 test("Malware exact detections become confirmed only with matching retained evidence", () => {
-  const producer = createMalwareEngineSignalProducer({
-    ...CONFIG,
-    idGenerator: () => UUID
-  });
+  const producer = createMalwareEngineSignalProducer(CONFIG);
   const signal = producer.fromScanReport(scanReport("malicious"), {
     evidenceRefs: [{ refId: "evidence:sample-01", sha256: SHA }]
   });
@@ -124,14 +121,14 @@ test("Malware exact detections become confirmed only with matching retained evid
     refId: "evidence:sample-01",
     sha256: SHA
   }]);
-  assert.equal(validateTrustedSignalEnvelope(signal).eventId, UUID);
+  assert.match(validateTrustedSignalEnvelope(signal).eventId, /^[0-9a-f-]{36}$/i);
+  assert.equal(signal.eventId, producer.fromScanReport(scanReport("malicious"), {
+    evidenceRefs: [{ refId: "evidence:sample-01", sha256: SHA }]
+  }).eventId);
 });
 
 test("Malware malicious reports without retained evidence are downgraded to suspected", () => {
-  const producer = createMalwareEngineSignalProducer({
-    ...CONFIG,
-    idGenerator: () => UUID
-  });
+  const producer = createMalwareEngineSignalProducer(CONFIG);
   const signal = producer.fromScanReport(scanReport("malicious"));
 
   assert.equal(signal.state, "suspected");
@@ -140,10 +137,7 @@ test("Malware malicious reports without retained evidence are downgraded to susp
 });
 
 test("Malware suspicious reports are suspected and no_match/unknown remain unknown", () => {
-  const producer = createMalwareEngineSignalProducer({
-    ...CONFIG,
-    idGenerator: () => UUID
-  });
+  const producer = createMalwareEngineSignalProducer(CONFIG);
   const suspicious = producer.fromScanReport(scanReport("suspicious"));
   const noMatch = producer.fromScanReport(scanReport("no_match"));
   const unknown = producer.fromScanReport({
@@ -160,7 +154,6 @@ test("Malware suspicious reports are suspected and no_match/unknown remain unkno
 test("Malware adapter rejects evidence with a mismatching digest and malformed reports", () => {
   const producer = createMalwareEngineSignalProducer({
     ...CONFIG,
-    idGenerator: () => UUID
   });
   assert.throws(() => producer.fromScanReport(scanReport("malicious"), {
     evidenceRefs: [{ refId: "evidence:bad", sha256: "b".repeat(64) }]
@@ -177,10 +170,7 @@ test("Malware adapter rejects evidence with a mismatching digest and malformed r
 
 test("producer adapters do not issue clear or tampered verdicts", () => {
   const guard = createSecurityGuardSignalProducer(CONFIG);
-  const malware = createMalwareEngineSignalProducer({
-    ...CONFIG,
-    idGenerator: () => UUID
-  });
+  const malware = createMalwareEngineSignalProducer(CONFIG);
   const states = [
     guard.fromThreatAssessment(assessment("observe")).state,
     guard.fromThreatAssessment(assessment("block")).state,
@@ -189,4 +179,55 @@ test("producer adapters do not issue clear or tampered verdicts", () => {
   ];
   assert.equal(states.includes("clear"), false);
   assert.equal(states.includes("tampered"), false);
+});
+
+test("producer envelopes flow through the gateway without granting recovery authorization", async () => {
+  const {
+    createMemoryTrustedSignalStore,
+    createTrustedSignalGateway
+  } = await import("../src/trusted-signal-gateway.js");
+  const gateway = createTrustedSignalGateway({
+    sources: [
+      {
+        sourceId: "guard-primary",
+        engine: "security-guard",
+        environment: "test",
+        assetIds: ["host-test-01"],
+        key: KEY
+      },
+      {
+        sourceId: "malware-primary",
+        engine: "malware-engine",
+        environment: "test",
+        assetIds: ["host-test-01"],
+        key: KEY
+      }
+    ],
+    replayStore: createMemoryTrustedSignalStore(),
+    requireDurableStore: false,
+    allowInMemoryStore: true,
+    clock: () => NOW
+  });
+  const guard = createSecurityGuardSignalProducer({
+    ...CONFIG,
+    sourceId: "guard-primary"
+  });
+  const malware = createMalwareEngineSignalProducer({
+    ...CONFIG,
+    sourceId: "malware-primary"
+  });
+  const guardResult = await gateway.ingest(guard.fromThreatAssessment(assessment("block")));
+  const malwareResult = await gateway.ingest(malware.fromScanReport(scanReport("malicious"), {
+    evidenceRefs: [{ refId: "evidence:sample-01", sha256: SHA }]
+  }));
+  const state = await gateway.getSecurityState({
+    assetId: "host-test-01",
+    environment: "test"
+  });
+
+  assert.equal(guardResult.accepted, true);
+  assert.equal(malwareResult.accepted, true);
+  assert.notEqual(state.state, "clear");
+  assert.equal(state.authorizationGranted, false);
+  assert.equal(state.preserveEvidence, true);
 });

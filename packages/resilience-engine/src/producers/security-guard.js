@@ -3,6 +3,9 @@ import { normalizeProducerOptions, signProducerSignal, isUuid } from "./shared.j
 const DECISIONS = new Set(["observe", "challenge", "review", "block"]);
 const SEVERITIES = new Set(["info", "low", "medium", "high", "critical"]);
 const EVENT_ACTIONS = new Set(["observed", "challenged", "blocked"]);
+const EVENT_OUTCOMES = new Set(["success", "denied", "unavailable", "error", "observed"]);
+const IDENTIFIER = /^[A-Za-z0-9:_-]{1,96}$/;
+const RULE_ID = /^[A-Z0-9][A-Z0-9_-]{2,95}$/;
 
 function severityForScore(score) {
   if (score >= 90) return "critical";
@@ -29,10 +32,13 @@ export function createSecurityGuardSignalProducer(options = {}) {
         !Number.isSafeInteger(assessment.riskScore) ||
         assessment.riskScore < 0 || assessment.riskScore > 100 ||
         !DECISIONS.has(assessment.decision) ||
-        typeof assessment.policyId !== "string" ||
+        typeof assessment.tenantId !== "string" || !IDENTIFIER.test(assessment.tenantId) ||
+        typeof assessment.applicationId !== "string" || !IDENTIFIER.test(assessment.applicationId) ||
+        typeof assessment.policyId !== "string" || !IDENTIFIER.test(assessment.policyId) ||
         !Array.isArray(assessment.signalIds) ||
         assessment.signalIds.length < 1 || assessment.signalIds.length > 128 ||
-        assessment.signalIds.some((id) => typeof id !== "string" || id.length < 1 || id.length > 128)) {
+        assessment.signalIds.some((id) => !isUuid(id)) ||
+        new Set(assessment.signalIds).size !== assessment.signalIds.length) {
       throw new TypeError("assessment is not a valid Security Guard threat-assessment/v1 result");
     }
 
@@ -53,8 +59,12 @@ export function createSecurityGuardSignalProducer(options = {}) {
         !Number.isSafeInteger(event.occurredAtMs) || event.occurredAtMs < 0 ||
         event.producer !== "security-guard-node" ||
         event.category !== "threat" ||
+        typeof event.tenantId !== "string" || !IDENTIFIER.test(event.tenantId) ||
+        typeof event.applicationId !== "string" || !IDENTIFIER.test(event.applicationId) ||
+        typeof event.ruleId !== "string" || !RULE_ID.test(event.ruleId) ||
         !SEVERITIES.has(event.severity) ||
-        !EVENT_ACTIONS.has(event.action)) {
+        !EVENT_ACTIONS.has(event.action) ||
+        !EVENT_OUTCOMES.has(event.outcome)) {
       throw new TypeError("event is not a supported Security Guard Core v1 threat event");
     }
 

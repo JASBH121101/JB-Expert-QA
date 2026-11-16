@@ -1,4 +1,5 @@
 import test from "node:test";
+import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
@@ -61,6 +62,44 @@ function storeInput(signal) {
   };
 }
 
+function recordInChildProcess(filePath, input) {
+  const storeModuleUrl = new URL("../src/trusted-signal-store.js", import.meta.url).href;
+  const script = [
+    "import { createFileTrustedSignalStore } from " + JSON.stringify(storeModuleUrl) + ";",
+    "const payload = JSON.parse(process.env.JB_TRUSTED_SIGNAL_INPUT);",
+    "const store = createFileTrustedSignalStore({ filePath: payload.filePath });",
+    "const result = await store.recordSignal(payload.input);",
+    "process.stdout.write(JSON.stringify(result));"
+  ].join("\n");
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
+      env: {
+        ...process.env,
+        JB_TRUSTED_SIGNAL_INPUT: JSON.stringify({ filePath, input })
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || "trusted-signal child process failed"));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error("trusted-signal child process returned invalid JSON: " + stdout));
+      }
+    });
+  });
+}
+
 test("requires a path and bounded options", () => {
   assert.throws(() => createFileTrustedSignalStore(), /filePath/);
   assert.throws(() => createFileTrustedSignalStore({
@@ -116,6 +155,26 @@ test("serializes concurrent claims from independent store instances", async (t) 
   ).length, 1);
 
   const records = await left.listSignals({
+    assetId: ASSET,
+    environment: ENVIRONMENT,
+    sinceMs: 0
+  });
+  assert.equal(records.length, 1);
+});
+
+test("serializes atomic replay claims across independent OS processes", async (t) => {
+  const { filePath } = await fixture(t);
+  const input = storeInput(createSignal());
+  const results = await Promise.all([
+    recordInChildProcess(filePath, input),
+    recordInChildProcess(filePath, input)
+  ]);
+
+  assert.equal(results.filter((result) => result.recorded === true).length, 1);
+  assert.equal(results.filter((result) =>
+    result.recorded === false && result.reason === "signal-replay"
+  ).length, 1);
+  const records = await createFileTrustedSignalStore({ filePath }).listSignals({
     assetId: ASSET,
     environment: ENVIRONMENT,
     sinceMs: 0

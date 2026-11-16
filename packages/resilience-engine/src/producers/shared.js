@@ -9,7 +9,7 @@ export function normalizeProducerOptions(options, expectedEngine) {
     throw new TypeError("producer options must be an object");
   }
   const allowed = new Set([
-    "sourceId", "environment", "assetId", "signingKey", "ttlMs", "idGenerator"
+    "sourceId", "environment", "assetId", "signingKey", "ttlMs"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowed.has(key)) throw new TypeError("unsupported producer option: " + key);
@@ -30,18 +30,13 @@ export function normalizeProducerOptions(options, expectedEngine) {
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1000 || ttlMs > 5 * 60_000) {
     throw new TypeError("ttlMs must be an integer from 1000 to 300000");
   }
-  const idGenerator = options.idGenerator;
-  if (idGenerator !== undefined && typeof idGenerator !== "function") {
-    throw new TypeError("idGenerator must be a function");
-  }
   return Object.freeze({
     sourceId: options.sourceId,
     sourceEngine: expectedEngine,
     environment: options.environment,
     assetId: options.assetId,
     signingKey: options.signingKey,
-    ttlMs,
-    idGenerator
+    ttlMs
   });
 }
 
