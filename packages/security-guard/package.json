@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.js",
     "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js",
-    "./cloudflare-pages-rate-limit": "./src/cloudflare-pages-rate-limit.js"
+    "./cloudflare-pages-rate-limit": "./src/cloudflare-pages-rate-limit.js",
+    "./rate-limit-contract": "./src/rate-limit-contract.js"
   },
   "files": [
     "src/**",

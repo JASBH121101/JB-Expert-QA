@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit";
 
+const TEST_SECRET = "jb-security-guard-test-secret-32-bytes-minimum";
+
 function createBinding(answers = [{ success: true }]) {
   const keys = [];
   let index = 0;
@@ -39,6 +41,7 @@ test("monitor mode records an exceeded limit without blocking", async () => {
 test("enforce mode returns 429 with no-store and Retry-After", async () => {
   const limiter = createCloudflareWorkerRateLimit({
     binding: createBinding([{ success: false }]),
+    identitySecret: TEST_SECRET,
     mode: "enforce",
     periodSeconds: 60
   });
@@ -56,6 +59,7 @@ test("policy map uses independent bindings and route scopes", async () => {
   const general = createBinding([{ success: false }]);
   const auth = createBinding([{ success: false }]);
   const limiter = createCloudflareWorkerRateLimit({
+    identitySecret: TEST_SECRET,
     policies: {
       general: { binding: general, mode: "monitor", periodSeconds: 60 },
       auth: { binding: auth, mode: "enforce", periodSeconds: 10 }
@@ -82,6 +86,7 @@ test("enforce mode fails closed with 503 when the binding is unavailable", async
   const events = [];
   const limiter = createCloudflareWorkerRateLimit({
     binding: createBinding([new Error("private account or infrastructure detail")]),
+    identitySecret: TEST_SECRET,
     mode: "enforce",
     onEvent(event) { events.push(event); }
   });
@@ -102,6 +107,7 @@ test("enforce mode fails closed with 503 when the binding is unavailable", async
 test("fail-open behavior must be explicitly selected for an enforce policy", async () => {
   const limiter = createCloudflareWorkerRateLimit({
     binding: createBinding([new Error("unavailable")]),
+    identitySecret: TEST_SECRET,
     mode: "enforce",
     failureMode: "open"
   });
@@ -126,6 +132,7 @@ test("monitor mode defaults to fail-open on binding outage", async () => {
 test("invalid binding results fail closed for enforce policies", async () => {
   const limiter = createCloudflareWorkerRateLimit({
     binding: createBinding([{ success: "yes" }]),
+    identitySecret: TEST_SECRET,
     mode: "enforce"
   });
   const result = await limiter.check({ identity: "opaque-user" });
@@ -172,6 +179,31 @@ test("telemetry callback failures cannot interrupt request handling", async () =
   const result = await limiter.check({ identity: "opaque-user" });
   assert.equal(result.allowed, true);
   assert.equal(result.exceeded, true);
+});
+
+test("enforce mode requires a stable keyed identity secret", () => {
+  assert.throws(() => createCloudflareWorkerRateLimit({
+    binding: createBinding(), mode: "enforce"
+  }), /identitySecret is required/);
+  assert.throws(() => createCloudflareWorkerRateLimit({
+    binding: createBinding(), mode: "enforce", identitySecret: "too-short"
+  }), /at least 32 bytes/);
+});
+
+test("HMAC identity keys are secret-dependent and never expose the supplied identity", async () => {
+  const first = createBinding();
+  const second = createBinding();
+  const one = createCloudflareWorkerRateLimit({
+    binding: first, identitySecret: TEST_SECRET
+  });
+  const two = createCloudflareWorkerRateLimit({
+    binding: second, identitySecret: "another-distinct-32-byte-test-secret"
+  });
+  await one.check({ identity: "low-entropy-user-7", scope: "catalog-read" });
+  await two.check({ identity: "low-entropy-user-7", scope: "catalog-read" });
+  assert.equal(first.keys[0].length, 64);
+  assert.notEqual(first.keys[0], second.keys[0]);
+  assert.equal(first.keys[0].includes("low-entropy-user-7"), false);
 });
 
 test("Worker adapter uses only Web APIs and generates route-scoped opaque keys", async () => {

@@ -6,6 +6,8 @@ import {
   createCloudflareWorkerRateLimitService
 } from "@jb/security-guard/cloudflare-worker-rate-limit";
 
+const TEST_SECRET = "jb-security-guard-test-secret-32-bytes-minimum";
+
 function createServiceBinding(service) {
   return { fetch(request) { return service.fetch(request); } };
 }
@@ -14,6 +16,7 @@ test("Pages adapter delegates to a private Worker and returns an enforced 429", 
   const keys = [];
   const limiter = createCloudflareWorkerRateLimit({
     binding: { async limit({ key }) { keys.push(key); return { success: false }; } },
+    identitySecret: TEST_SECRET,
     mode: "enforce",
     periodSeconds: 10
   });
@@ -150,9 +153,41 @@ test("Worker service exposes only the configured POST route and rejects oversize
   assert.equal(tooLarge.status, 413);
 });
 
+test("Worker service returns 503 for malformed internal adapter decisions", async () => {
+  const service = createCloudflareWorkerRateLimitService({
+    limiter: {
+      async check() {
+        return {
+          allowed: false,
+          exceeded: false,
+          enforced: false,
+          unavailable: false,
+          policy: null,
+          scope: "login",
+          response: null
+        };
+      }
+    }
+  });
+
+  const response = await service.fetch(new Request(
+    "https://internal.invalid/__jb/security-guard/rate-limit",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ identity: "trusted-account", scope: "login" })
+    }
+  ));
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "rate_limit_service_unavailable"
+  });
+});
+
 test("Worker service keeps rate-limit responses compact and never returns caller identity", async () => {
   const limiter = createCloudflareWorkerRateLimit({
     binding: { async limit() { return { success: false }; } },
+    identitySecret: TEST_SECRET,
     mode: "enforce"
   });
   const service = createCloudflareWorkerRateLimitService({ limiter });

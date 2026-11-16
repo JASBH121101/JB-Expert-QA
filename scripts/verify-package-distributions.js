@@ -161,6 +161,10 @@ try {
   ], { cwd: guardInstall });
   run(node, [
     "--input-type=module", "-e",
+    'import { normalizeRateLimitCheckInput } from "@jb/security-guard/rate-limit-contract"; const normalized = normalizeRateLimitCheckInput({ identity: " smoke-user ", scope: "distribution" }); if (normalized.identity !== "smoke-user") process.exit(1);'
+  ], { cwd: guardInstall });
+  run(node, [
+    "--input-type=module", "-e",
     'import { createCloudflareWorkerRateLimit } from "@jb/security-guard/cloudflare-worker-rate-limit"; if (typeof createCloudflareWorkerRateLimit !== "function") process.exit(1); const limiter = createCloudflareWorkerRateLimit({ binding: { async limit() { return { success: true }; } } }); const decision = await limiter.check({ identity: "package-smoke-test", scope: "distribution" }); if (!decision.allowed || decision.unavailable) process.exit(1);'
   ], { cwd: guardInstall });
 
