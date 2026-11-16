@@ -276,11 +276,17 @@ export { createFileRecoveryStore, createMemoryRecoveryStore } from "./recovery-s
 
 export {
   computeAdvancedPolicyHash,
+  createAdvancedPolicySigningPayload,
   validateAdvancedResiliencePolicy,
   createResiliencePolicyEngine,
   createMemoryPolicyRevisionStore,
   createMemoryCapabilityLedger
 } from "./policy-engine.js";
+
+export {
+  createEd25519PolicySignatureVerifier,
+  createResilienceIdentityPolicyBridge
+} from "./adapters/identity-policy-bridge.js";
 
 export {
   createTrustedSignalGateway,
