@@ -477,3 +477,94 @@ test("a quarantine read stream that resolves after timeout is destroyed", async 
   assert.equal(store.quarantine.has(uploadId), true);
   assert.equal(store.calls.some(([name]) => name === "promote"), false);
 });
+
+
+test("upload Core v1 reports promotion only after clean scanning and omits file metadata", async () => {
+  const store = createMemoryStore();
+  const events = [];
+  const fileName = "private-catalog-image.png";
+  const result = await inspector(store, cleanScanner(), {
+    coreContract: { tenantId: "tenant-upload", applicationId: "catalog-api" },
+    onCoreEvent: (event) => events.push(event)
+  }).inspect({
+    source: Readable.from([PNG]),
+    fileName,
+    declaredMimeType: "image/png"
+  });
+
+  assert.equal(result.status, "approved");
+  assert.equal(events.length, 1);
+  assert.equal(events[0].schema, "jb.security.event/v1");
+  assert.equal(events[0].category, "upload");
+  assert.equal(events[0].ruleId, "JBG-UPLOAD-SCAN-001");
+  assert.equal(events[0].action, "promoted");
+  assert.equal(events[0].outcome, "success");
+  assert.equal(events[0].scope, "clean_scan");
+  const serialized = JSON.stringify(events);
+  assert.equal(serialized.includes(fileName), false);
+  assert.equal(serialized.includes(result.sha256), false);
+  assert.equal(serialized.includes(result.uploadId), false);
+});
+
+test("upload Core v1 distinguishes malware rejection from a quarantined unknown verdict", async () => {
+  const maliciousStore = createMemoryStore();
+  const maliciousEvents = [];
+  const maliciousScanner = {
+    async scan({ stream }) {
+      for await (const chunk of stream) void chunk;
+      return { verdict: "malicious", engine: "MockAV", version: "1.0" };
+    }
+  };
+  await assert.rejects(
+    inspector(maliciousStore, maliciousScanner, {
+      coreContract: { tenantId: "tenant-upload", applicationId: "catalog-api" },
+      onCoreEvent: (event) => maliciousEvents.push(event)
+    }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "private-malware-sample.png"
+    }),
+    (error) => error.code === "MALWARE_DETECTED"
+  );
+  assert.equal(maliciousEvents.length, 1);
+  assert.equal(maliciousEvents[0].ruleId, "JBG-MALWARE-001");
+  assert.equal(maliciousEvents[0].severity, "critical");
+  assert.equal(maliciousEvents[0].action, "rejected");
+  assert.equal(maliciousEvents[0].outcome, "denied");
+
+  const unknownStore = createMemoryStore();
+  const unknownEvents = [];
+  const unknownScanner = {
+    async scan({ stream }) {
+      for await (const chunk of stream) void chunk;
+      return { verdict: "unknown", engine: "MockAV", version: "1.0" };
+    }
+  };
+  await assert.rejects(
+    inspector(unknownStore, unknownScanner, {
+      coreContract: { tenantId: "tenant-upload", applicationId: "catalog-api" },
+      onCoreEvent: (event) => unknownEvents.push(event)
+    }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "private-unknown-sample.png"
+    }),
+    (error) => error.code === "SCAN_NOT_CLEAN"
+  );
+  assert.equal(unknownEvents.length, 1);
+  assert.equal(unknownEvents[0].ruleId, "JBG-UPLOAD-QUARANTINE-001");
+  assert.equal(unknownEvents[0].action, "quarantined");
+  assert.equal(unknownEvents[0].outcome, "observed");
+  const serialized = JSON.stringify([...maliciousEvents, ...unknownEvents]);
+  assert.equal(serialized.includes("private-malware-sample.png"), false);
+  assert.equal(serialized.includes("private-unknown-sample.png"), false);
+  assert.equal(serialized.includes(createHash("sha256").update(PNG).digest("hex")), false);
+});
+
+test("upload Core v1 telemetry failures never alter the upload decision", async () => {
+  const store = createMemoryStore();
+  const result = await inspector(store, cleanScanner(), {
+    coreContract: { tenantId: "tenant-upload", applicationId: "catalog-api" },
+    onCoreEvent() { throw new Error("telemetry unavailable"); }
+  }).inspect({ source: Readable.from([PNG]), fileName: "product.png" });
+  assert.equal(result.status, "approved");
+  assert.equal(store.approved.size, 1);
+});
