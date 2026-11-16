@@ -78,8 +78,8 @@ The checkpoint is caller-owned state, not protected storage. The host applicatio
 The reusable core, target-scoped scenario registry, explicit offline/non-destructive/non-executing safety contract, inert fixtures, and versioned report schema are implemented in `@jb/threat-lab`. Its current four-engine integration matrix contains **20 scenarios**, all calling real engine APIs against temporary local fixtures and in-memory upload storage.
 
 - **JB Malware Engine — 6 scenarios:** exact harmless EICAR match; benign no-match/false-positive; inert PowerShell-like text classified as suspicious, not confirmed malicious; exact configured SHA-256 signature detection; over-limit file returned as `unknown`; PDF active-action indicators classified as suspicious without an exact malware detection.
-- **JB Security Guard — 6 scenarios:** synthetic XSS, SQL injection and encoded path-traversal requests blocked; ambiguous Content-Length/Transfer-Encoding framing rejected; malicious upload rejected through the real Malware Engine adapter; no-match upload retained in quarantine rather than promoted.
-- **JB Expert QA — 5 scenarios:** unsafe dynamic HTML sink detected; repaired `textContent` regression; static database audit detects dynamic raw SQL and disabled TLS without opening a database connection; deterministic PNG comparison identifies a synthetic pixel difference with zero AI calls; Language QA detects a missing locale key and placeholder mismatch through the real project auditor.
+- **JB Security Guard — 8 scenarios:** the six existing request/upload controls plus composed origin allowlisting and session-bound CSRF checks, and a bounded rate-limit capacity/identity-rotation/reset sequence.
+- **JB Expert QA — 6 scenarios:** the five existing HTML, database, visual, and Language QA checks plus compound local static-security analysis with safe controls and deterministic rescans.
 
 **Latest completed validation for PR #38, branch commit `698c605b75f28c929b294c4272e69bd6fcee3408`, targeting `integration/jb-threat-lab`:**
 - [Core validation #43622143702](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/43622143702): Node.js 22 ✅ and Node.js 24 ✅. Includes syntax checks, project regressions, Malware Engine regressions, all Threat Lab workspace tests, and clean npm package-distribution installs.
@@ -94,12 +94,12 @@ The suite uses temporary directories, inert fixtures, and in-memory upload stora
 
 NEXORA, Perfumaría JB, and client ERP profiles remain future integrations. Their code, data, deployment, and lifecycle remain separate from the current engine packages.
 
-- **JB Advisor Engine — 3 scenarios:** deterministic synthetic smartphone recommendation; mocked research candidate remains `unconfirmed` and `pending_review` with zero network requests; mixed smartphone/laptop comparisons are rejected by the technology domain adapter.
+- **JB Advisor Engine — 6 scenarios:** the three existing recommendation, research-review and product-type-isolation checks, plus insufficient-coverage no-winner gating, four-candidate order-independent weighted ranking, and atomic research-candidate capacity rejection.
 
 
 ## Four-engine certification update — 2026-11-14
 
-PR #41 adds JB Advisor Engine as a fourth independently versioned target to `integration/jb-threat-lab`. The current four-engine matrix contains **20 scenarios**: 6 Malware Engine, 6 Security Guard, 5 Expert QA (including Language QA), and 3 Advisor Engine.
+PR #41 adds JB Advisor Engine as a fourth independently versioned target to `integration/jb-threat-lab`. The current four-engine matrix contains **26 scenarios**: 6 Malware Engine, 8 Security Guard, 6 Expert QA (including Language QA), and 6 Advisor Engine.
 
 Advisor scenarios use synthetic smartphone fixtures and an in-memory research provider. Research candidates remain `unconfirmed` / `pending_review` until human review, mixed phone/laptop comparisons are rejected by domain isolation, and the integration records zero network requests.
 
@@ -137,11 +137,11 @@ A target is marked ready only when every required tier has at least one applicab
 
 The footprint above is an inventory across separate local test files, not yet one consolidated cross-suite report. CI runs these suites independently. Each Threat Lab report assesses only the scenarios selected and executed in that run; cross-suite aggregation remains a future lab capability.
 - **JB Malware Engine:** all six tiers are represented across the local core, Trojan-defense, persistence, and synthetic-PE test suites. Superextreme is currently represented by a synthetic PE credential-access/exfiltration correlation case; the file is never executed and no network request is made.
-- **JB Security Guard:** Basic through Expert are represented. Extreme and Superextreme are open coverage gaps.
-- **JB Expert QA:** Basic through Extreme are represented. Superextreme remains open.
-- **JB Advisor Engine:** Basic, Intermediate, and Expert are represented. Advanced, Extreme, and Superextreme remain open.
+- **JB Security Guard:** all six tiers are represented, including composed origin/CSRF enforcement and bounded rate-limit capacity/reset invariants.
+- **JB Expert QA:** all six tiers are represented, including compound local static-security analysis with safe controls and deterministic rescans.
+- **JB Advisor Engine:** all six tiers are represented, including coverage gating, order-independent four-candidate ranking, and atomic research-candidate capacity limits.
 
-These gaps must stay visible in reports. Do not fill them with mock-only engine outcomes or promote the product to full six-tier readiness until each missing tier has at least one real engine-backed scenario with explicit expected findings and safe local fixtures.
+The six-tier footprint is now represented across all four real engine-backed suites. This is tier presence, not comprehensive product coverage or proof that an engine is free of unknown defects. Preserve individual scenario results and keep expanding depth within each tier; never fill future gaps with mock-only engine outcomes.
 
 ### Required progression for new scenarios
 
