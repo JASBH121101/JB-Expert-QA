@@ -1,18 +1,18 @@
-# JB Resilience PostgreSQL Storage Adapter v2
+# JB Resilience PostgreSQL Storage Adapter v3
 
-**Status:** laboratory implementation pending certification; coordination primitives added in v2  
+**Status:** laboratory implementation pending certification; coordination, fencing and signal-replay primitives added in v3  
 **Package:** \`@jb/resilience-engine/adapters/postgres-storage\`  
 **Storage target:** PostgreSQL 16 or compatible  
 **Driver:** host-injected node-postgres-compatible Pool; no driver is bundled
 
 ## Scope
 
-This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns four stores:
+This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns five stores:
 
 - \`orchestrationStore\`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
 - \`auditStore\`: append-only, SHA-256 hash-chained audit events.
 - \`coordinationStore\`: per-scope leases with database-clock expiry and monotonic fencing-token issuance.
-- \`fencedTargetStore\`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.
+- \`fencedTargetStore\`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.\n- \`trustedSignalStore\`: a durable, database-unique replay registry shared by processes using the same authoritative PostgreSQL primary.
 
 The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The host owns the Pool and passes it in explicitly.
 
@@ -64,7 +64,7 @@ The target stores a durable high-water mark and mutation receipt. A lower token 
 
 **Guarantee boundary:** this closes the verify-then-write race for application state that is itself stored in this same PostgreSQL primary and modified only through this store. It does not fence `systemd`, Windows SCM, arbitrary files, remote APIs or other external side effects. Do not place network calls or OS commands behind this state API and label them fenced. A real OS fence still requires an enforcing host agent/resource that atomically consumes epochs at the destination.
 
-## Database objects
+## PostgreSQL trusted-signal replay store\n\nThe returned \`trustedSignalStore\` implements the existing Trusted Signal Gateway replay-store contract:\n\n- \`recordSignal({ signal, signalDigest, receivedAtMs, retentionUntilMs })\` validates the normalized envelope and digest, then claims \`(source_id,event_id)\` using a database unique key. Repeated identical IDs return \`signal-replay\`; the same source/event ID with a different digest returns \`signal-id-conflict\`.\n- \`listSignals({ assetId, environment, sinceMs })\` reads records in deterministic issue-time/event-ID order, revalidates the envelope and recomputes its digest before returning it.\n\nThis allows multiple gateway processes connected to the same PostgreSQL primary to share the replay registry. The store does not authenticate producer signatures or source scopes; the existing gateway does that before recording. The gateway still emits \`authorizationGranted: false\`; persisted signals are evidence for policy evaluation, not authority to mutate a host.\n\nReplay rows are not automatically evicted. Deleting an event ID would reopen its replay window; retention and safe archival/expiry require a separate, explicitly designed policy. This table is not a consensus log and inherits the availability/consistency boundary of one PostgreSQL primary.\n\n## Database objects
 
 Initialization creates only these namespaced tables and indexes:
 
@@ -77,7 +77,7 @@ Initialization creates only these namespaced tables and indexes:
 - \`jb_resilience_audit_records\`
 - \`jb_resilience_coordination_leases\`
 - \`jb_resilience_fenced_targets\`
-- \`jb_resilience_fenced_mutations\`
+- \`jb_resilience_fenced_mutations\`\n- \`jb_resilience_trusted_signals\`
 
 Use a dedicated database or a role/schema policy that confines the runtime role to these objects. The initializer requires DDL rights. A hardened deployment should separate one-time schema initialization privileges from the runtime role and grant only the minimum table/sequence permissions needed for reads, inserts, updates and audit appends.
 
@@ -91,7 +91,7 @@ Use a dedicated database or a role/schema policy that confines the runtime role 
 
 ## Explicit limitations
 
-This v2 remains laboratory-only and does not provide:
+This v3 remains laboratory-only and does not provide:
 
 - target-enforced consumption of fencing tokens by OS execution adapters, external services or resources outside this PostgreSQL primary;
 - leader election, quorum, split-brain resolution or multi-region consensus;
@@ -105,7 +105,7 @@ A single PostgreSQL primary provides transaction serialization for this adapter,
 
 ## Laboratory certification
 
-The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation, audit-chain tamper detection, competing lease acquisition, successor epochs, fenced target writes, stale-epoch rejection and mutation idempotency.
+The CI workflow starts a disposable PostgreSQL 16 service, installs \`pg\` without modifying the package manifests, and runs the integration suite on Node.js 22 and 24. Tests cover initialization, incident transitions, concurrent idempotency, active/expired claim handling, one-time finalization, circuit-breaker state, cancellation, audit-chain tamper detection, competing lease acquisition, successor epochs, fenced target writes, stale-epoch rejection, mutation idempotency, cross-adapter trusted-signal replay claims and stored-envelope integrity checks.
 
 No production database or Neon credentials are used by this test.
 
