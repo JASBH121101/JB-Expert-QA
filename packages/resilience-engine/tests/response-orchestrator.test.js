@@ -691,3 +691,15 @@ test("executes A1 through the real signed Policy Engine v2 and completes its one
     "final-preflight"
   ]);
 });
+
+
+test("rejects incident input exceeding the pre-normalization byte budget", async () => {
+  const h = harness();
+  const result = await h.orchestrator.executeIncident(
+    trustedIncidentInput({ oversized: "x".repeat(1_048_577) })
+  );
+  assert.equal(result.state, "FAILED_CLOSED");
+  assert.equal(result.reason, "incident-input-invalid");
+  assert.equal(h.calls.trustedInput, 0);
+  assert.equal(h.calls.restart, 0);
+});
