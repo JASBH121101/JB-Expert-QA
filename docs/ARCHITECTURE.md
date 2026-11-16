@@ -2,7 +2,7 @@
 
 ## Architectural principle
 
-This repository hosts three **distinct engines with separate responsibilities**. It is a shared code repository, not a single combined engine. Each engine retains its own API boundary, configuration, version, tests, release criteria, and failure semantics.
+This repository hosts independently versioned engines with separate responsibilities: JB Expert QA, JB Security Guard, JB Malware Engine, JB Advisor Engine, and JB Resilience Engine. It is a shared code repository, not a single combined engine. Each engine retains its own API boundary, configuration, version, tests, release criteria, and failure semantics.
 
 The engines may exchange normalized findings through explicit, versioned adapters. They must not share internal state or silently inherit one another's authority. The interoperability contracts in [SECURITY-INTEROPERABILITY.md](./SECURITY-INTEROPERABILITY.md) and [SECURITY-BRIDGE.md](./SECURITY-BRIDGE.md) define the permitted coordination.
 
@@ -59,6 +59,18 @@ The current package targets Node.js and its documented Express-compatible middle
 When used by Security Guard, Malware Engine is invoked through the documented scanner adapter. A Malware Engine `no_match` or `suspicious` result must never be converted into a clean/approved result. Security Guard remains responsible for the upload policy and storage promotion.
 
 The engine is local-first and is not a certified antivirus or a replacement for Microsoft Defender.
+
+### 4. JB Resilience Engine
+
+**Primary responsibility:** monitor service health and coordinate bounded, policy-controlled recovery.
+
+- Host-provided health observations and bounded failure/restart counters.
+- Allowlisted Linux systemd and Windows Service Control Manager adapters.
+- Automatic restart only for explicitly allowlisted non-critical services.
+- Human approval, verified by an injected approval verifier, for critical service recovery.
+- Expiring recovery proposals, restart caps, cooldowns, and replay prevention.
+
+**Decision boundary:** Resilience Engine does not own security policy, malware verdicts, or code-quality certification. It cannot disable Security Guard, restore databases, alter firewall/ACL settings, delete files, or execute arbitrary shell commands. The host supplies probes, scheduling, command execution, and durable audit records. A completely unavailable host requires an independent external monitor and a separate healthy failover target.
 
 ## Permitted coordination
 
