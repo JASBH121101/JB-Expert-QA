@@ -108,23 +108,23 @@ test("Linux command grammar rejects unapproved operations, services and argument
     allowedServices: ["catalog-api.service"],
     execFileImpl: stub.run
   });
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["restart", "other.service"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["restart", "catalog-api.service;id"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["status", "catalog-api.service"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("sh", ["-c", "id"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["restart", "catalog-api.service"], { shell: true }),
     /shell execution is prohibited/
   );
@@ -140,19 +140,19 @@ test("Windows command grammar rejects powershell, arbitrary sc verbs and unknown
     allowedServices: ["JBService"],
     execFileImpl: stub.run
   });
-  await assert.rejects(
+  assert.throws(
     runner.run("sc.exe", ["delete", "JBService"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("sc.exe", ["stop", "OtherService"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("powershell.exe", ["-Command", "Stop-Service JBService"], { shell: false }),
     /allowlist/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("sc.exe", ["stop", "JBService", "&&", "whoami"], { shell: false }),
     /allowlist/
   );
@@ -217,7 +217,7 @@ test("runner clamps command timeouts and rejects oversized or unsupported option
   });
   assert.equal(stub.calls[0].options.timeout, 15_000);
   assert.equal(stub.calls[0].options.windowsHide, true);
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["restart", "catalog.service"], {
       shell: false,
       timeoutMs: 50,
@@ -225,7 +225,7 @@ test("runner clamps command timeouts and rejects oversized or unsupported option
     }),
     /unsupported fields/
   );
-  await assert.rejects(
+  assert.throws(
     runner.run("systemctl", ["restart", "catalog.service"], { shell: false, timeoutMs: 20 }),
     /at least 100/
   );
