@@ -66,6 +66,11 @@ An expired unresolved claim remains held for reconciliation; it is never automat
 
 The optional `./adapters/health-monitor-probes` entry point converts host-configured, read-only HTTP(S), TCP and custom checks into observations for the existing Health Monitor. It uses exact origin and host/port allowlists, GET/HEAD only, manual redirects, loopback-only cleartext HTTP, bounded timeouts and a global concurrency limit across services. Required probe failures mark a service unhealthy; optional probe failures remain advisory. The adapter never executes recovery or operating-system actions. The host owns scheduling and security-state input. See [Health Monitor Probe Adapter v1](./docs/HEALTH-MONITOR-PROBES-V1.md).
 
+
+## Restricted Host Command Runner (v1 laboratory)
+
+The optional `./adapters/restricted-host-command-runner` entry point supplies a constrained `execFile` runner for the existing systemd and Windows SCM adapters. It uses fixed absolute executable paths, exact service allowlists, a fixed verb/argument grammar, `shell: false`, minimal child-process environment, timeouts and bounded output. It cannot execute arbitrary shell commands, elevate privileges, install services or expand the policy engine's authority. The runner must be injected into the existing typed adapter and executes with the host process identity. See [Restricted Host Command Runner v1](./docs/RESTRICTED-HOST-COMMAND-RUNNER-V1.md).
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
