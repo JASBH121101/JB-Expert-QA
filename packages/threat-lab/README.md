@@ -134,7 +134,7 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
-**Integration status:** both product-backed profiles are active through `packages/threat-lab/tests/nexora-profiles.integration.test.js` and the dedicated `.github/workflows/nexora-threat-lab.yml`. The older unpinned branch-following adapters have been retired. The registry-only test in `tests/lab.test.js` continues to protect target separation; it is not the product certifier.
+**Integration status:** both product-backed profiles are active through `packages/threat-lab/tests/nexora-profiles.integration.test.js` and the dedicated `.github/workflows/nexora-product-certification.yml`. The older unpinned branch-following adapters have been retired. The registry-only test in `tests/lab.test.js` continues to protect target separation; it is not the product certifier.
 
 
 ## NEXORA product integration
@@ -143,6 +143,6 @@ The official product adapter suite is `packages/threat-lab/tests/nexora-profiles
 - Configurable Catalog prototype: `JASBH121101/Nexora@88c4876c9678b93dadde55f79fe9d04890900741`, six scenarios from Basic through Superextreme. This is demo-only HTML/CSS/JS and browser localStorage, not real auth or server persistence.
 - Laravel Site Engine: `JASBH121101/Nexora@3f68126ecc58b088c071007c5116bc95426d159b`, six scenarios from Basic through Superextreme, including setup, published catalogue, permissions, exports, deterministic fake DNS/TLS checks, and the full PHPUnit suite.
 
-The dedicated `.github/workflows/nexora-threat-lab.yml` checks out both revisions read-only, installs locked PHP dependencies, runs the profile suite with mandatory checkouts, and runs the complete Site Engine suite on PostgreSQL 16. Generic Threat Lab CI skips this integration test when the product checkout environment is absent; the dedicated workflow sets `NEXORA_PROFILE_REQUIRED=true`, turning a missing checkout into a test failure rather than a skip.
+The dedicated `.github/workflows/nexora-product-certification.yml` checks out both revisions read-only, installs locked PHP dependencies, runs the profile suite with mandatory checkouts, and runs the complete Site Engine suite on PostgreSQL 16. Generic Threat Lab CI skips this integration test when the product checkout environment is absent; the dedicated workflow sets `NEXORA_PROFILE_REQUIRED=true`, turning a missing checkout into a test failure rather than a skip.
 
 No NEXORA product source branch is modified by the Threat Lab adapter workflow. Product reports remain separate and certify only the pinned scenarios that actually ran.
