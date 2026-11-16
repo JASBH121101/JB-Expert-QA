@@ -23,9 +23,27 @@ function safeNow(clock) {
   return now;
 }
 
-function clonePlainInput(value, depth = 0, seen = new WeakSet()) {
-  if (depth > 16) throw new TypeError("incident input nesting exceeds the supported depth");
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+function clonePlainInput(
+  value,
+  depth = 0,
+  seen = new WeakSet(),
+  budget = { nodes: 0, bytes: 0 }
+) {
+  budget.nodes += 1;
+  if (budget.nodes > 5_000 || depth > 16) {
+    throw new TypeError("incident input exceeds the node or nesting limit");
+  }
+  const addBytes = (text) => {
+    budget.bytes += Buffer.byteLength(text, "utf8");
+    if (budget.bytes > 1_048_576) {
+      throw new TypeError("incident input exceeds the 1 MiB data limit");
+    }
+  };
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    addBytes(value);
+    return value;
+  }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) throw new TypeError("incident input contains a non-finite number");
     return value;
@@ -44,7 +62,7 @@ function clonePlainInput(value, depth = 0, seen = new WeakSet()) {
       if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
         throw new TypeError("incident input arrays must not contain accessors");
       }
-      output.push(clonePlainInput(descriptor.value, depth + 1, seen));
+      output.push(clonePlainInput(descriptor.value, depth + 1, seen, budget));
     }
     seen.delete(value);
     return output;
@@ -61,11 +79,12 @@ function clonePlainInput(value, depth = 0, seen = new WeakSet()) {
   const entries = Object.entries(descriptors);
   if (entries.length > 1_000) throw new TypeError("incident input object is too large");
   for (const [key, descriptor] of entries) {
+    addBytes(key);
     if (["__proto__", "prototype", "constructor"].includes(key) ||
         !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
       throw new TypeError("incident input contains an unsafe or accessor property");
     }
-    output[key] = clonePlainInput(descriptor.value, depth + 1, seen);
+    output[key] = clonePlainInput(descriptor.value, depth + 1, seen, budget);
   }
   seen.delete(value);
   return output;
