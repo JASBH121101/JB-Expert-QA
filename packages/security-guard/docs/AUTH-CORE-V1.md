@@ -67,9 +67,35 @@ The distributed protector still requires a real store that atomically implements
 - Raw account identifiers, IP addresses, passwords, cookies, session tokens, recovery codes, and request bodies are not included. The Core bridge derives tenant/application-separated HMAC keys from the runtime's existing HMAC identity digests.
 - The Core attempt schema requires an account key. When an application resolver cannot provide an account, the bridge uses a tenant/application-separated anonymous-subject HMAC; configure a reliable server-side account resolver whenever possible.
 
-## Recovery protection
+## Recovery module integration
 
-`createAccountRecovery()` retains its separate IP/account/destination request limits, per-IP verification limit, one-time challenge store, generic public responses, and provider-failure cleanup. This integration does not change those public responses or replace those quotas. For a recovery endpoint protected by the authentication protector, set `operation: "account_recovery"`; the recovery module's own quota/event bridge is a separate future integration.
+The recovery module has an independent, opt-in Core v1 bridge. It is enabled with `coreContract` and uses the recovery module's existing stable `secret` to derive tenant/application-scoped HMAC identities:
+
+```js
+const recovery = guard.createAccountRecovery({
+  secret: process.env.JB_RECOVERY_HMAC_SECRET,
+  coreContract: {
+    tenantId: "tenant-01",
+    applicationId: "catalog-api",
+    accountKeyId: "recovery-account-hmac-2026-01",
+    clientKeyId: "recovery-client-hmac-2026-01"
+  },
+  onCoreAttempt(attempt) {},
+  onCoreDecision: ({ attempt, decision }) => {},
+  onCoreEvent(event) {}
+});
+```
+
+The operation is fixed to `account_recovery`; supplying another operation is rejected. Without `coreContract`, all Core callbacks remain inactive and the existing recovery behavior is preserved.
+
+- `requestRecovery()` deliberately does **not** emit a successful authentication attempt when it returns `{ accepted: true }`. That response is generic and also covers unknown/unverified accounts, rate-limited requests, missing providers, and challenge-store capacity suppression.
+- Core recovery events report rate limiting, generic suppression, challenge delivery success, provider delivery failure, challenge-store capacity, and dependency outages. Provider success is reported only after the provider promise resolves. Provider errors and raw delivery destinations are never included.
+- `verifyRecovery()` emits an authentication attempt with operation `account_recovery` only after the verification outcome is known. Invalid, expired, locked, and missing-or-consumed challenges have distinct sanitized event rules. A missing challenge is intentionally described as missing-or-consumed; the module cannot safely infer replay versus an unknown identifier.
+- The paired authentication decision describes the **per-IP verification throttle only**. `allow` means the attempt passed that throttle; it does not mean the OTP was valid. A throttled attempt yields enforced HTTP 429 in Core telemetry, while the module's public response remains `{ valid: false }`.
+- Storage outages emit a sanitized `recovery` event with outcome `unavailable`, while preserving the module's existing thrown-error behavior. Telemetry callback errors never change recovery outcomes.
+- Raw account IDs, destinations, IP addresses, OTPs, recovery tokens, provider errors, and request bodies are excluded. Subject correlation uses tenant/application-separated HMACs.
+
+The existing IP/account/destination request limits, per-IP verification limit, one-time challenge consumption, generic public responses, and provider-failure cleanup remain in force. As before, production multi-instance deployments must inject a store whose challenge and limit operations are atomic across instances; the in-memory store is process-local only.
 
 ## Safety boundaries
 
