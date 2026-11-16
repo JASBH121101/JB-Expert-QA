@@ -211,7 +211,7 @@ const SCHEMA_STATEMENTS = [
   "CREATE UNIQUE INDEX IF NOT EXISTS jb_resilience_one_claim_per_asset_idx ON jb_resilience_actions (environment, asset_id) WHERE status = 'claimed'",
   "CREATE TABLE IF NOT EXISTS jb_resilience_circuits (environment TEXT NOT NULL, asset_id TEXT NOT NULL, action TEXT NOT NULL, failure_count INTEGER NOT NULL CHECK (failure_count >= 0), failure_threshold INTEGER NOT NULL CHECK (failure_threshold BETWEEN 1 AND 10), cooldown_ms BIGINT NOT NULL CHECK (cooldown_ms BETWEEN 1000 AND 86400000), retry_at_ms BIGINT NULL, PRIMARY KEY (environment, asset_id, action))",
   "CREATE TABLE IF NOT EXISTS jb_resilience_audit_heads (head_id SMALLINT PRIMARY KEY CHECK (head_id = 1), sequence BIGINT NOT NULL, last_hash CHAR(64) NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)"
+  "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, record_schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)"
 ];
 
 function ensurePool(pool) {
