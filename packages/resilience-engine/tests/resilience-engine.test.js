@@ -26,6 +26,20 @@ test("Linux adapter uses a fixed executable, argument list and allowlist", async
   await assert.rejects(() => adapter.restartService("attacker; id"), /allowlisted/);
 });
 
+test("Linux adapter fails closed on permission errors and command timeouts", async () => {
+  const permissionDenied = createLinuxSystemdAdapter({
+    allowedServices: ["catalog-api.service"],
+    run: async () => ({ code: 5, stderr: "permission denied" })
+  });
+  await assert.rejects(() => permissionDenied.restartService("catalog-api.service"), /restart failed/);
+
+  const timedOut = createLinuxSystemdAdapter({
+    allowedServices: ["catalog-api.service"],
+    run: async () => { throw new Error("command timed out"); }
+  });
+  await assert.rejects(() => timedOut.restartService("catalog-api.service"), /timed out/);
+});
+
 test("Windows adapter waits for STOPPED and confirms RUNNING before completion", async () => {
   const calls = [];
   const states = ["STOP_PENDING", "STOPPED", "START_PENDING", "RUNNING"];
