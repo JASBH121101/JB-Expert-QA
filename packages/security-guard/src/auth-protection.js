@@ -1,4 +1,8 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import {
+  normalizeAuthCoreContract,
+  publishAuthCore
+} from "./auth-core-contract-v1.js";
 
 const SEVERITY = "high";
 const RULE_ID = "JBG-AUTH-BRUTE-001";
@@ -77,7 +81,7 @@ export function createAuthProtection(options = {}) {
   const allowedOptions = new Set([
     "identityKeyGenerator", "clientKeyGenerator", "mode", "blockSeverities",
     "onEvent", "windowMs", "resetAfterMs", "maxTrackedKeys", "policies",
-    "clock", "keySecret"
+    "clock", "keySecret", "coreContract", "onCoreAttempt", "onCoreDecision", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown authentication protection option: " + key);
@@ -116,6 +120,20 @@ export function createAuthProtection(options = {}) {
   if (!(typeof keySecret === "string" && keySecret.length >= 16) &&
       !(Buffer.isBuffer(keySecret) && keySecret.length >= 16)) {
     throw new TypeError("keySecret must be a string or Buffer containing at least 16 bytes");
+  }
+  if (options.coreContract !== undefined && options.keySecret === undefined) {
+    throw new TypeError("A stable explicit keySecret is required when Core v1 authentication is enabled");
+  }
+  const coreContract = normalizeAuthCoreContract(options.coreContract, keySecret);
+  const coreCallbacks = {
+    onCoreAttempt: options.onCoreAttempt,
+    onCoreDecision: options.onCoreDecision,
+    onCoreEvent: options.onCoreEvent
+  };
+  for (const [name, callback] of Object.entries(coreCallbacks)) {
+    if (callback !== undefined && typeof callback !== "function") {
+      throw new TypeError(name + " must be a function");
+    }
   }
 
   const buckets = {
@@ -301,6 +319,20 @@ export function createAuthProtection(options = {}) {
       });
     }
 
+    publishAuthCore(coreContract, coreCallbacks, {
+      attemptId: randomUUID(),
+      occurredAtMs: now,
+      outcome: "failure",
+      accountDigest: keys.account,
+      clientDigest: keys.ip,
+      decision: {
+        blocked: latest.blocked,
+        enforced: latest.blocked && enforced,
+        retryAfterSeconds: latest.blocked ? result.retryAfterSeconds : null
+      },
+      eventScopes: triggered
+    });
+
     return result;
   }
 
@@ -308,12 +340,22 @@ export function createAuthProtection(options = {}) {
     if (!request || typeof request !== "object") {
       throw new TypeError("recordSuccess requires the authentication request");
     }
+    const now = readNow();
     const keys = getKeys(request);
     for (const scope of ["accountIp", "account"]) {
       if (keys[scope]) buckets[scope].delete(keys[scope]);
     }
     // Do not clear an IP bucket: a successful account must not erase failures
     // accumulated by the same source against other accounts.
+    publishAuthCore(coreContract, coreCallbacks, {
+      attemptId: randomUUID(),
+      occurredAtMs: now,
+      outcome: "success",
+      accountDigest: keys.account,
+      clientDigest: keys.ip,
+      decision: { blocked: false, enforced: false },
+      eventScopes: []
+    });
   }
 
   function middleware(request, response, next) {
