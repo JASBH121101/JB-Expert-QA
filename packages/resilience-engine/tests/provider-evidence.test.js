@@ -240,6 +240,20 @@ test("rejects unknown, inactive, substituted and rolled-back provider keys", () 
     attestations: revokedBundle, expected: SCOPE, verifier: inactive.verifier
   }).verified, false);
 
+  const substitution = createFixture();
+  const originalForSubstitution = substitution.keys.get("key-policy-authority");
+  assert.equal(substitution.verifier.verify(
+    substitution.makeAttestation("policy-authority"), SCOPE
+  ).verified, true);
+  const replacementPair = generateKeyPairSync("ed25519");
+  substitution.keys.set("key-policy-authority", {
+    ...originalForSubstitution,
+    publicKeyPem: replacementPair.publicKey.export({ type: "spki", format: "pem" })
+  });
+  assert.equal(substitution.verifier.verify(
+    substitution.makeAttestation("policy-authority"), SCOPE
+  ).reason, "provider-key-rollback-or-substitution");
+
   const rollback = createFixture();
   const originalKey = rollback.keys.get("key-policy-authority");
   rollback.keys.set("key-policy-authority", {
@@ -310,9 +324,8 @@ test("rejects unsigned extra fields, malformed evidence references and untrusted
   extra[0].unreviewed = true;
   assert.equal(fixture.verifier.verify(extra[0], SCOPE).verified, false);
 
-  const badRef = fixture.makeAttestation("policy-authority", {
-    evidenceRefs: [{ refId: "artifact:bad", sha256: "not-a-hash" }]
-  });
+  const badRef = fixture.makeAttestation("policy-authority");
+  badRef.evidenceRefs[0].sha256 = "not-a-hash";
   assert.equal(fixture.verifier.verify(badRef, SCOPE).verified, false);
 
   const result = verifyA2ProviderEvidenceBundle({
