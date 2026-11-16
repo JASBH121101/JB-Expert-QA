@@ -51,8 +51,9 @@ class UniversalRateLimitClient:
             identity_bytes = identity.encode("utf-8", errors="strict")
         except UnicodeEncodeError as exc:
             raise ValueError("identity must be valid UTF-8") from exc
-        if len(identity) > 512 or len(identity_bytes) > 2048:
-            raise ValueError("identity exceeds the Core v1 length limit")
+        utf16_units = len(identity.encode("utf-16-le")) // 2
+        if utf16_units > 512 or len(identity_bytes) > 2048:
+            raise ValueError("identity exceeds the universal endpoint length limit")
         for value, label in ((scope, "scope"), (policy, "policy")):
             if not isinstance(value, str) or not value or len(value) > 96 or any(
                 ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-" for ch in value
