@@ -83,3 +83,7 @@ The optional `./trusted-signal-gateway` entry point authenticates signed, time-b
 A durable, atomic replay store is required by default. The in-memory store is available only for tests/development with explicit opt-in. Missing, stale, replayed, tampered, unknown or contradictory signals fail closed. Evidence references are preserved. The gateway never grants authorization and performs no operating-system or containment action.
 
 See [Trusted Signal Gateway v0.4](./docs/TRUSTED-SIGNAL-GATEWAY.md) for the envelope, store contract and aggregation rules.
+
+## Producer adapters and durable signal store (laboratory)
+
+The Security Guard and Malware Engine adapters are available through `./producers/security-guard` and `./producers/malware-engine`. They translate existing source outputs conservatively: Security Guard never emits a confirmed host-compromise verdict, and Malware Engine `no_match` remains `unknown`. `createFileTrustedSignalStore()` supplies a durable single-host replay ledger; it is not a cross-host database. These are integration prerequisites only and do not enable production recovery or OS actions. See [TRUSTED-SIGNAL-INTEGRATION.md](./docs/TRUSTED-SIGNAL-INTEGRATION.md).

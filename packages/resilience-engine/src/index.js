@@ -288,3 +288,7 @@ export {
   signTrustedSignalEnvelope,
   validateTrustedSignalEnvelope
 } from "./trusted-signal-gateway.js";
+
+export { createFileTrustedSignalStore } from "./trusted-signal-store.js";
+export { createSecurityGuardSignalProducer } from "./producers/security-guard.js";
+export { createMalwareEngineSignalProducer } from "./producers/malware-engine.js";
