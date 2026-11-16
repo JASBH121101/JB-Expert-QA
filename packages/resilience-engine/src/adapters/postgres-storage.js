@@ -243,14 +243,14 @@ async function verifyAuditWithClient(client, { lockHead = false } = {}) {
   if (headQuery.rowCount !== 1) throw new Error("audit head is missing; audit writes are blocked");
   const head = headQuery.rows[0];
   const rows = await client.query(
-    "SELECT sequence, schema, previous_hash, hash, entry FROM jb_resilience_audit_records ORDER BY sequence ASC"
+    "SELECT sequence, record_schema, previous_hash, hash, entry FROM jb_resilience_audit_records ORDER BY sequence ASC"
   );
   let sequence = 0;
   let previousHash = GENESIS_HASH;
   for (const row of rows.rows) {
     const currentSequence = toSafeInteger(row.sequence, "audit sequence");
     const record = {
-      schema: row.schema,
+      schema: row.record_schema,
       sequence: currentSequence,
       previousHash: row.previous_hash.trim(),
       entry: row.entry
@@ -428,6 +428,14 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
           [safe.environment, safe.assetId]
         );
 
+        const idempotencyAfterLock = await client.query(
+          "SELECT action_id FROM jb_resilience_actions WHERE idempotency_key=$1",
+          [safe.idempotencyKey]
+        );
+        if (idempotencyAfterLock.rowCount > 0) {
+          return Object.freeze({ claimed: false, reason: "idempotency-key-already-claimed" });
+        }
+
         const active = await client.query(
           "SELECT expires_at FROM jb_resilience_actions WHERE environment=$1 AND asset_id=$2 AND status='claimed' FOR UPDATE",
           [safe.environment, safe.assetId]
@@ -548,7 +556,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
       };
       const hash = auditRecordHash(record);
       await client.query(
-        "INSERT INTO jb_resilience_audit_records (sequence, schema, previous_hash, hash, entry) VALUES ($1,$2,$3,$4,$5::jsonb)",
+        "INSERT INTO jb_resilience_audit_records (sequence, record_schema, previous_hash, hash, entry) VALUES ($1,$2,$3,$4,$5::jsonb)",
         [sequence, AUDIT_SCHEMA, record.previousHash, hash, JSON.stringify(safeEntry)]
       );
       await client.query(
