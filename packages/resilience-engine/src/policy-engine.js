@@ -586,6 +586,8 @@ export function createResiliencePolicyEngine({
     now: initialNow
   });
   const issued = new WeakSet();
+  const asserted = new WeakSet();
+  const checking = new WeakSet();
   const completed = new WeakSet();
   const requestContext = new WeakMap();
 
@@ -697,6 +699,9 @@ export function createResiliencePolicyEngine({
         completed.has(authorization)) {
       return Object.freeze({ valid: false, reason: "unknown-or-consumed-authorization" });
     }
+    if (asserted.has(authorization) || checking.has(authorization)) {
+      return Object.freeze({ valid: false, reason: "authorization-already-asserted-or-checking" });
+    }
     const now = clock();
     let integrity;
     try {
@@ -728,6 +733,7 @@ export function createResiliencePolicyEngine({
         detail: refreshedDecision.reason
       });
     }
+    checking.add(authorization);
     let acceptedRevision = false;
     let reserved = false;
     try {
@@ -747,13 +753,78 @@ export function createResiliencePolicyEngine({
       }
     } catch {
       reserved = false;
+    } finally {
+      checking.delete(authorization);
     }
     if (!acceptedRevision) {
       return Object.freeze({ valid: false, reason: "policy-revision-not-current-or-store-failure" });
     }
-    return reserved
-      ? Object.freeze({ valid: true, reason: null })
-      : Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    if (!reserved) {
+      return Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    }
+
+    // Store checks are asynchronous. Recheck policy validity, signature, live
+    // conditions and authorization expiry after they complete, not only before.
+    const postCheckNow = clock();
+    try {
+      currentPolicy(postCheckNow);
+    } catch {
+      return Object.freeze({ valid: false, reason: "policy-invalid-or-expired" });
+    }
+    if (!Number.isSafeInteger(postCheckNow) || postCheckNow < 0 ||
+        postCheckNow >= authorization.expiresAt) {
+      return Object.freeze({ valid: false, reason: "authorization-expired-or-stale" });
+    }
+    const postCheckDecision = evaluatePolicyCapability(
+      validatedPolicy, freshRequest.request, postCheckNow
+    );
+    if (!postCheckDecision.permitted || postCheckDecision.riskClass !== authorization.riskClass) {
+      return Object.freeze({
+        valid: false,
+        reason: "capability-conditions-no-longer-met",
+        detail: postCheckDecision.reason
+      });
+    }
+
+    let revisionStillCurrent = false;
+    let reservationStillValid = false;
+    try {
+      revisionStillCurrent = await policyRevisionStore.assertCurrent({
+        policyId: authorization.policyId,
+        revision: authorization.revision,
+        policyHash: authorization.policyHash
+      }) === true;
+      if (revisionStillCurrent) {
+        reservationStillValid = await capabilityLedger.assertReservation({
+          reservationId: authorization.reservationId,
+          policyId: authorization.policyId,
+          revision: authorization.revision,
+          policyHash: authorization.policyHash,
+          now: postCheckNow
+        }) === true;
+      }
+    } catch {
+      reservationStillValid = false;
+    }
+    if (!revisionStillCurrent) {
+      return Object.freeze({ valid: false, reason: "policy-revision-not-current-or-store-failure" });
+    }
+    if (!reservationStillValid) {
+      return Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    }
+
+    const finalNow = clock();
+    try {
+      currentPolicy(finalNow);
+    } catch {
+      return Object.freeze({ valid: false, reason: "policy-invalid-or-expired" });
+    }
+    if (!Number.isSafeInteger(finalNow) || finalNow < 0 ||
+        finalNow >= authorization.expiresAt) {
+      return Object.freeze({ valid: false, reason: "authorization-expired-or-stale" });
+    }
+    asserted.add(authorization);
+    return Object.freeze({ valid: true, reason: null });
   }
 
   async function completeAuthorization({ authorization, outcome } = {}) {
@@ -764,6 +835,9 @@ export function createResiliencePolicyEngine({
     const now = clock();
     if (!["succeeded", "failed", "unverified", "cancelled-before-execution"].includes(outcome)) {
       return Object.freeze({ recorded: false, reason: "invalid-action-outcome" });
+    }
+    if (["succeeded", "unverified"].includes(outcome) && !asserted.has(authorization)) {
+      return Object.freeze({ recorded: false, reason: "execution-authorization-not-asserted" });
     }
     let recorded = false;
     try {
@@ -777,6 +851,7 @@ export function createResiliencePolicyEngine({
     }
     if (!recorded) return Object.freeze({ recorded: false, reason: "capability-ledger-finalization-failed" });
     completed.add(authorization);
+    asserted.delete(authorization);
     requestContext.delete(authorization);
     return Object.freeze({ recorded: true, reason: null });
   }

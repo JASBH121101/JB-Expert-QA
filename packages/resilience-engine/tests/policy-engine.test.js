@@ -251,7 +251,6 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   const oldEngine = makeEngine(makePolicy({ revision: 1 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const first = await oldEngine.authorize(REQUEST);
   assert.equal(first.authorized, true);
-  assert.equal((await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST })).valid, true);
 
   const newEngine = makeEngine(makePolicy({ revision: 2 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const second = await newEngine.authorize({
@@ -292,12 +291,18 @@ test("capability reservations enforce per-incident concurrency and action budget
   const accepted = first.authorized ? first : second;
   const denied = first.authorized ? second : first;
   assert.equal(denied.reason, "incident-concurrency-limit-reached");
+  assert.equal((await engine.assertAuthorization({
+    authorization: accepted.authorization, request: REQUEST
+  })).valid, true);
   assert.equal((await engine.completeAuthorization({
     authorization: accepted.authorization, outcome: "succeeded"
   })).recorded, true);
 
   const next = await engine.authorize(REQUEST);
   assert.equal(next.authorized, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: next.authorization, request: REQUEST
+  })).valid, true);
   assert.equal((await engine.completeAuthorization({
     authorization: next.authorization, outcome: "succeeded"
   })).recorded, true);
@@ -321,6 +326,9 @@ test("service maxRestartsPerHour narrows the global hourly asset budget", async 
   const engine = makeEngine(policy);
   const first = await engine.authorize(REQUEST);
   assert.equal(first.authorized, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: first.authorization, request: REQUEST
+  })).valid, true);
   await engine.completeAuthorization({ authorization: first.authorization, outcome: "succeeded" });
   const second = await engine.authorize(REQUEST);
   assert.equal(second.authorized, false);
@@ -353,7 +361,9 @@ test("authorization is short-lived, rechecks policy validity and is one-time com
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).valid, true);
   now += 1000;
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).reason,
-    "authorization-expired-or-stale");
+    "authorization-already-asserted-or-checking");
+  // A successful execution may be finalized after the TTL if the one-time pre-execution
+  // assertion was valid before expiry.
   assert.equal((await engine.completeAuthorization({
     authorization: result.authorization, outcome: "succeeded"
   })).recorded, true);
@@ -372,6 +382,66 @@ test("authorization rechecks live security and health conditions immediately bef
   });
   assert.equal(changed.valid, false);
   assert.equal(changed.reason, "capability-conditions-no-longer-met");
+});
+
+
+test("successful outcomes require a one-time pre-execution authorization assertion", async () => {
+  const engine = makeEngine();
+  const result = await engine.authorize(REQUEST);
+  assert.equal(result.authorized, true);
+  assert.deepEqual(
+    await engine.completeAuthorization({
+      authorization: result.authorization, outcome: "succeeded"
+    }),
+    { recorded: false, reason: "execution-authorization-not-asserted" }
+  );
+  assert.equal((await engine.assertAuthorization({
+    authorization: result.authorization, request: REQUEST
+  })).valid, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: result.authorization, request: REQUEST
+  })).reason, "authorization-already-asserted-or-checking");
+  assert.equal((await engine.completeAuthorization({
+    authorization: result.authorization, outcome: "succeeded"
+  })).recorded, true);
+});
+
+
+test("authorization expiry is rechecked after asynchronous policy-store verification", async () => {
+  let now = NOW;
+  let revisionChecks = 0;
+  const revisionStore = {
+    durable: true,
+    async assertCurrent() {
+      revisionChecks += 1;
+      if (revisionChecks === 2) now += 1000;
+      return true;
+    }
+  };
+  const ledger = {
+    durable: true,
+    async reserveAction() {
+      return { reserved: true, reservationId: "reservation-12345678" };
+    },
+    async assertReservation({ now: checkedAt }) {
+      return checkedAt < NOW + 1000;
+    },
+    async completeAction() { return true; }
+  };
+  const engine = createResiliencePolicyEngine({
+    policy: makePolicy(),
+    verifyPolicySignature: verifySignature,
+    policyRevisionStore: revisionStore,
+    capabilityLedger: ledger,
+    clock: () => now,
+    authorizationTtlMs: 1000
+  });
+  const result = await engine.authorize(REQUEST);
+  assert.equal(result.authorized, true);
+  assert.deepEqual(
+    await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST }),
+    { valid: false, reason: "authorization-expired-or-stale" }
+  );
 });
 
 test("signature is checked again before each authorization", async () => {
