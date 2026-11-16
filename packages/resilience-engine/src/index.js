@@ -16,6 +16,7 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
   if (typeof clock !== "function") throw new TypeError("clock must be a function");
   const issuedProposals = new WeakSet();
   const consumedProposals = new WeakSet();
+  const inFlightProposals = new WeakSet();
 
   function evaluateRecovery(state) {
     const now = clock();
@@ -35,12 +36,13 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
     if (!proposal || typeof proposal !== "object" || !issuedProposals.has(proposal)) {
       return Object.freeze({ executed: false, reason: "untrusted-or-unknown-proposal" });
     }
-    if (consumedProposals.has(proposal)) {
+    if (consumedProposals.has(proposal) || inFlightProposals.has(proposal)) {
       return Object.freeze({ executed: false, reason: "proposal-already-consumed" });
     }
-    if (clock() > proposal.expiresAt) {
+    if (clock() >= proposal.expiresAt) {
       return Object.freeze({ executed: false, reason: "proposal-expired" });
     }
+    inFlightProposals.add(proposal);
     if (proposal.approvalRequired) {
       let approved = false;
       try {
@@ -50,10 +52,12 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
         approved = false;
       }
       if (!approved) {
+        inFlightProposals.delete(proposal);
         return Object.freeze({ executed: false, reason: "human-approval-required-or-invalid" });
       }
     }
     consumedProposals.add(proposal);
+    inFlightProposals.delete(proposal);
     try {
       const result = await adapter.restartService(proposal.serviceId);
       return Object.freeze({
