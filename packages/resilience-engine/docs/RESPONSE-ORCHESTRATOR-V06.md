@@ -101,8 +101,8 @@ All production stores must declare `durable: true`. Memory implementations are t
 - `trustedInputVerifier(input)` — authenticates the host-owned provenance of the raw v0.5 input; it must not trust client-supplied verdicts.
 - `targetBindingVerifier({ assetId, environment, serviceId, platform })` — verifies the exact mapping from the v0.5 asset/environment/service tuple to the configured adapter target. Asset and service IDs are separate identifiers and must not be assumed equal.
 - `mutationControl.assertAllowed(context)` — host-owned global and scoped mutation stop control; only literal `true` permits progress.
-- `orchestrationStore` — durable, atomic incident/action/circuit state.
-- `auditStore.append(entry)` — durable append-only audit port.
+- `orchestrationStore` — durable, atomic incident/action/circuit state. The branch includes `createFileOrchestrationStore(...)`, a single-host file ledger with exclusive process locking, atomic replacement, monotonic lifecycle transitions, permanent idempotency claims and fail-closed capacity limits.
+- `auditStore.append(entry)` — durable append-only audit port. The branch includes `createFileAuditStore(...)`, a single-host append-only JSONL log with fsync and a SHA-256 hash chain. A corrupted chain blocks subsequent writes; independent signed checkpoints are still needed for stronger tamper resistance.
 - `clock()` — injected clock returning a non-negative safe integer in milliseconds.
 
 ### 5.2 Orchestration store operations
@@ -114,9 +114,9 @@ The store must atomically implement:
 - `getCircuitState({ assetId, action, now })` — return the current circuit state and retry deadline.
 - `claimAction({ idempotencyKey, incidentId, assetId, environment, serviceId, action, claimedAt, expiresAt })` — enforce a unique idempotency claim and one active mutation per asset/incident.
 - `completeAction({ actionId, outcome, completedAt, reasonCode })` — finalize a claimed action exactly once.
-- `recordActionOutcome({ assetId, action, outcome, at, failureThreshold, cooldownMs })` — atomically update the circuit breaker and last-action state.
+- `recordActionOutcome({ assetId, environment, action, outcome, at, failureThreshold, cooldownMs })` — atomically update the circuit breaker and last-action state for the exact asset/environment pair.
 
-A production implementation must not use a process-local Map as its authority. v0.6 may use a single-host transactional/file-backed implementation; cross-host consensus, fencing and cluster-wide failover remain later certification gates.
+The included file stores are suitable only for a single host with a protected local volume. They are not a cross-host database, consensus service or distributed fencing system. Multi-host deployments require a transactional backend. The hash chain detects local record alteration but does not prevent an attacker with write access from rewriting the complete file; ship independently signed audit checkpoints for stronger tamper resistance.
 
 ### 5.3 Audit entry rules
 
