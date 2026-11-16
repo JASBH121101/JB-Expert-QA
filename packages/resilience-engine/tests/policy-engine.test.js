@@ -291,12 +291,18 @@ test("capability reservations enforce per-incident concurrency and action budget
   const accepted = first.authorized ? first : second;
   const denied = first.authorized ? second : first;
   assert.equal(denied.reason, "incident-concurrency-limit-reached");
+  assert.equal((await engine.assertAuthorization({
+    authorization: accepted.authorization, request: REQUEST
+  })).valid, true);
   assert.equal((await engine.completeAuthorization({
     authorization: accepted.authorization, outcome: "succeeded"
   })).recorded, true);
 
   const next = await engine.authorize(REQUEST);
   assert.equal(next.authorized, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: next.authorization, request: REQUEST
+  })).valid, true);
   assert.equal((await engine.completeAuthorization({
     authorization: next.authorization, outcome: "succeeded"
   })).recorded, true);
@@ -320,6 +326,9 @@ test("service maxRestartsPerHour narrows the global hourly asset budget", async 
   const engine = makeEngine(policy);
   const first = await engine.authorize(REQUEST);
   assert.equal(first.authorized, true);
+  assert.equal((await engine.assertAuthorization({
+    authorization: first.authorization, request: REQUEST
+  })).valid, true);
   await engine.completeAuthorization({ authorization: first.authorization, outcome: "succeeded" });
   const second = await engine.authorize(REQUEST);
   assert.equal(second.authorized, false);
