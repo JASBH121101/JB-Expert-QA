@@ -519,15 +519,24 @@ test("rechecks the mutation stop switch after authorization and audit, immediate
   assert.equal(h.calls.states.some((entry) => entry.state === "HELD"), true);
 });
 
-test("reasserts the signed capability immediately before adapter invocation", async () => {
+test("consumes the single-use authorization once at the final pre-adapter preflight", async () => {
+  const h = harness();
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
+
+  assert.equal(result.state, "RECOVERED");
+  assert.equal(h.calls.asserted, 1);
+  assert.equal(h.calls.restart, 1);
+});
+
+test("fails closed when the one-time final authorization assertion fails", async () => {
   const h = harness({
-    assertResult: (_input, count) => ({ valid: count === 1 })
+    assertResult: () => ({ valid: false })
   });
   const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "policy-authorization-expired-before-adapter");
-  assert.equal(h.calls.asserted, 2);
+  assert.equal(h.calls.asserted, 1);
   assert.equal(h.calls.restart, 0);
   assert.deepEqual(h.calls.completed, ["cancelled-before-execution"]);
 });
