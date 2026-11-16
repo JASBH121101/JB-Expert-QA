@@ -56,7 +56,7 @@ The selected target profile is **autonomous-advanced**. See [ADVANCED-AUTONOMY-A
 The v2 policy authority is implemented in `src/policy-engine.js` and exported as `@jb/resilience-engine/policy-engine`. It is separate from the existing v1 runtime path to preserve backward compatibility.
 
 - Policy schema and allowed fields are strict; unknown fields, wildcard assets/actions and unknown capability names are rejected.
-- The canonical hash is SHA-256 over canonical JSON excluding only `policyHash` and `signature`. The host verifier receives the immutable normalized policy, canonical signing payload, hash and signature metadata. A successful signature result must be the literal boolean `true`; asynchronous or truthy non-boolean results are rejected.
+- The canonical hash is SHA-256 over canonical JSON excluding only `policyHash` and `signature.value`; the key ID and algorithm remain covered. The host verifier receives the immutable normalized policy, canonical signing payload, hash and signature metadata. A successful signature result must be the literal boolean `true`; asynchronous or truthy non-boolean results are rejected.
 - Validity windows are checked at controller creation, each evaluation/authorization and before use of a short-lived authorization.
 - The durable revision store atomically rejects revision rollback and same-revision hash substitution.
 - The durable capability ledger atomically reserves actions and enforces incident concurrency, per-incident budgets and per-asset hourly budgets.
