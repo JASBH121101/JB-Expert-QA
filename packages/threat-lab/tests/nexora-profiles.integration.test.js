@@ -18,6 +18,7 @@ const profileEnvironmentReady =
   && SITE_ROOT !== ""
   && existsSync(path.join(CATALOG_ROOT, "demo", "tests"))
   && existsSync(path.join(SITE_ROOT, "vendor", "bin", "phpunit"));
+const profileRequired = process.env.NEXORA_PROFILE_REQUIRED === "true";
 
 const safety = Object.freeze({
   safe: true,
@@ -171,8 +172,11 @@ function runSiteEngineScenario(scenario) {
 }
 
 test("Threat Lab certifies NEXORA Catalog prototype and Laravel Site Engine independently", {
-  skip: profileEnvironmentReady ? false : "Dedicated NEXORA profile CI environment is not configured"
+  skip: !profileEnvironmentReady && !profileRequired
+    ? "Dedicated NEXORA profile CI environment is not configured"
+    : false
 }, async () => {
+  assert.ok(profileEnvironmentReady, "Required NEXORA checkouts and installed Site Engine dependencies must exist");
   assert.equal(CATALOG_SHA, EXPECTED_CATALOG_SHA, "catalog source pin changed; update this test and its CI checkout together");
   assert.equal(SITE_SHA, EXPECTED_SITE_SHA, "Site Engine source pin changed; update this test and its CI checkout together");
 
