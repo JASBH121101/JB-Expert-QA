@@ -244,9 +244,9 @@ export function createDistributedRateLimit(options = {}) {
     let coreCheck = null;
     let identity = null;
     try {
-      now = readNow();
       identity = resolveIdentity(request);
       coreCheck = makeCoreCheck(identity);
+      now = readNow();
       result = await withTimeout(
         () => store.consumeLimit({ key: makeKey(identity), now, windowMs, maxRequests }),
         storeTimeoutMs
