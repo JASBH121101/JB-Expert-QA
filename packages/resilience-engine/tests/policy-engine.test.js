@@ -183,7 +183,7 @@ test("A1 restart requires an exact allowlist entry, production environment match
   assert.equal(engine.evaluate({
     ...REQUEST, health: { consecutiveFailures: 3, lastRestartAt: NOW + 1000 }
   }).reason, "health-clock-inconsistency");
-  assert.equal(engine.evaluate({ ...REQUEST, health: null }).reason, "invalid-capability-request");
+  assert.equal(engine.evaluate({ ...REQUEST, health: null }).reason, "health-evidence-required");
   assert.equal(engine.evaluate({ ...REQUEST, action: "failover" }).reason, "action-not-allowlisted");
 });
 
@@ -242,7 +242,9 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   assert.equal((await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST })).valid, true);
 
   const newEngine = makeEngine(makePolicy({ revision: 2 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
-  const second = await newEngine.authorize(REQUEST);
+  const second = await newEngine.authorize({
+    ...REQUEST, incidentId: "incident-2026-002"
+  });
   assert.equal(second.authorized, true);
   assert.deepEqual(
     await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST }),
