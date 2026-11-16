@@ -1,0 +1,33 @@
+{
+  "name": "jb/security-guard-php",
+  "description": "PHP Core v1 helpers and Laravel-compatible client for JB Security Guard",
+  "type": "library",
+  "license": "UNLICENSED",
+  "require": {
+    "php": ">=8.2"
+  },
+  "suggest": {
+    "illuminate/support": ">=10.0 <14.0",
+    "illuminate/http": ">=10.0 <14.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "JB\\SecurityGuard\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "JB\\SecurityGuard\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "php tests/run.php"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "JB\\SecurityGuard\\Laravel\\SecurityGuardServiceProvider"
+      ]
+    }
+  }
+}
