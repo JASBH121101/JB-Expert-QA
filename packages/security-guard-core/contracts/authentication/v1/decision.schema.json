@@ -65,10 +65,35 @@
       },
       "then": {
         "properties": {
+          "enforced": {
+            "const": false
+          },
           "status": {
             "type": "null"
           },
           "retryAfterSeconds": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "monitor"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": false
+          },
+          "status": {
             "type": "null"
           }
         }
@@ -109,11 +134,11 @@
       },
       "then": {
         "properties": {
+          "enforced": {
+            "const": true
+          },
           "status": {
-            "enum": [
-              null,
-              429
-            ]
+            "const": 429
           }
         }
       }
