@@ -11,7 +11,7 @@ The adapter must resolve identity in trusted server-side code. Never accept the 
 - Session identity: use a server-resolved opaque session identifier, never the session cookie value.
 - Account+IP identity: derive the two component identities first, then use a distinct account_ip scope; do not concatenate ambiguous raw values.
 
-Canonical identity values are UTF-8 strings supplied by the host application's identity resolver. The host must use the same canonicalization rules in every runtime that shares counters. Reject empty values, NUL bytes, invalid UTF-8, and values longer than the adapter's documented bound.
+Canonical identity values are UTF-8 strings supplied by the host application's identity resolver. For the Core v1 HMAC helper, reject empty values, NUL bytes, invalid UTF-8, values longer than 512 Unicode code points, or values longer than 2048 UTF-8 bytes. The HTTP universal-client identity envelope has a separate interoperable limit of 512 UTF-16 code units and 2048 UTF-8 bytes; clients must enforce that envelope before transmission.
 
 ## HMAC derivation
 
@@ -44,3 +44,10 @@ Policy and scope are separate counter dimensions and must be included in the int
 ## Required conformance vectors
 
 Every runtime must verify the exact same fixtures for valid/invalid identity values, digest length/case, tenant isolation, application isolation, identity-type separation, key ID selection, key rotation overlap, and cross-runtime equality. Use a fixed test-only secret for vectors; never place a production secret in the repository.
+
+
+## Runtime helper conformance status
+
+The Node package exposes `deriveCoreIdentityKey()` from `@jb/security-guard/core-contract-v1`. The PHP 8.2+ package and Python 3.11+ package expose equivalent helpers. All three implementations use the exact byte sequence above and pass the same checked-in known-answer vector in their runtime tests. The helpers accept trusted server-side canonical identity and secret material; they do not resolve identity from an HTTP request.
+
+The helpers do not implement a key vault, active/retiring key registry, dual-key overlap window or counter migration. Those remain host-owned until a versioned rotation contract is designed and independently tested. Do not rotate a live key without a reviewed migration plan, as key IDs are part of the counter-key tuple and an unplanned rotation can split active counters.

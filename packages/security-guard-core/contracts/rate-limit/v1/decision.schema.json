@@ -177,6 +177,28 @@
           "status"
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": true
+          }
+        },
+        "required": [
+          "allowed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": false
+          }
+        },
+        "required": [
+          "enforced"
+        ]
+      }
     }
   ]
 }

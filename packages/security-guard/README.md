@@ -473,3 +473,55 @@ For deployment configuration, the Worker must use the Worker-native rate-limit a
 The Worker and Pages adapters share a runtime-neutral request and service-decision contract. See [Rate-limit contract](docs/RATE-LIMIT-CONTRACT.md) for the normalized payload, validation rules, and the current boundary for future non-JavaScript integrations.
 
 This is request-rate protection for Pages Functions, not a substitute for Cloudflare DDoS protection, WAF rules, authentication, authorization, or application-level input validation.
+
+
+## Universal server-to-server rate limiting
+
+For independent applications hosted on different providers, the package provides an optional Node.js endpoint factory:
+
+~~~js
+import { createUniversalRateLimitService } from "@jb/security-guard/universal-rate-limit-service";
+
+const service = createUniversalRateLimitService({
+  store: sharedAtomicStore,
+  clients: {
+    "catalog-api": {
+      secret: process.env.CATALOG_GUARD_SECRET,
+      policies: {
+        public: { windowMs: 60_000, maxRequests: 120, scopes: ["catalog-read"] }
+      }
+    }
+  }
+});
+
+// Mount service.fetch with your Node HTTP adapter at the configured exact path.
+~~~
+
+The endpoint accepts server-to-server calls only. Keep the Bearer credential on application servers, expose the endpoint over HTTPS, register policies/scopes on the service, and provide a production atomic shared-store adapter. The included PostgreSQL adapter is covered by disposable PostgreSQL 16 CI, but this does not certify customer Neon/production databases or deployments. Redis/Valkey adapters are not included. See [UNIVERSAL-RATE-LIMIT.md](docs/UNIVERSAL-RATE-LIMIT.md).
+
+The Core v1 subpath also exports HMAC identity derivation and strict rate-limit request, decision, policy and counter-key helpers. See [Core identity derivation](../security-guard-core/docs/IDENTITY-KEY-DERIVATION.md).
+
+
+## PostgreSQL atomic counter store
+
+The optional `@jb/security-guard/postgres-rate-limit-store` adapter implements the injected atomic fixed-window store contract with a parameterized PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` statement. It uses the database statement clock rather than application-host clocks for window rollover. Initialize it with `await store.initialize()` before wiring it to `createDistributedRateLimit()`.
+
+~~~js
+import { Pool } from "pg";
+import { createDistributedRateLimit } from "@jb/security-guard";
+import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const store = createPostgresRateLimitStore({
+  query: (sql, values) => pool.query(sql, values)
+});
+await store.initialize();
+
+const limiter = createDistributedRateLimit({
+  store,
+  secret: process.env.JB_GUARD_COUNTER_SECRET,
+  namespace: "catalog-api"
+});
+~~~
+
+The store accepts either the existing namespaced HMAC key format or the Core v1 length-prefixed counter-key format; it rejects raw identities. It provides bounded `pruneExpired()` cleanup. Retention must be at least 24 hours, the maximum supported fixed window. Unit tests use a controlled query stub, and disposable PostgreSQL 16 CI covers concurrent quotas and database-clock rollover for both key formats. A production deployment must still validate its own PostgreSQL version, connection pool, migrations, backups and cleanup schedule. The adapter does not bundle the `pg` driver and does not create or connect to any database by itself.

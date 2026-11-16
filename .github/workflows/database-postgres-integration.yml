@@ -10,6 +10,8 @@ on:
       - "src/index.js"
       - "tests/database-postgres-audit.test.js"
       - "tests/e2e/database-postgres-cli-smoke.js"
+      - "tests/e2e/security-guard-postgres-store.integration.js"
+      - "packages/security-guard/**"
       - "docs/DATABASE-QA.md"
       - ".github/workflows/database-postgres-integration.yml"
   pull_request:
@@ -72,7 +74,9 @@ jobs:
       - name: Run real PostgreSQL CLI smoke test
         env:
           QA_DATABASE_URL: postgresql://jbqa_ci:jbqa_ci_password@127.0.0.1:5432/jbqa_ci?sslmode=disable
-        run: node tests/e2e/database-postgres-cli-smoke.js
+        run: |
+          node tests/e2e/database-postgres-cli-smoke.js
+          node tests/e2e/security-guard-postgres-store.integration.js
 
   neon-development:
     name: Optional Neon development read-only E2E

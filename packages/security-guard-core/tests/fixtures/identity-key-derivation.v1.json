@@ -1,0 +1,10 @@
+{
+  "schema": "jb.security.identity-key-vector/v1",
+  "keyId": "k2026-01",
+  "secretHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "tenantId": "tenant-demo",
+  "applicationId": "catalog-api",
+  "identityType": "account",
+  "canonicalIdentity": "user-123",
+  "expectedKey": "c1f6faa9f5d251b0447a6e47a0310ccd54706aa4a5e239e8bcf4e3f14e26863e"
+}

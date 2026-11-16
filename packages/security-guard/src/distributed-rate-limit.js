@@ -232,17 +232,17 @@ export function createDistributedRateLimit(options = {}) {
     }
   }
 
-  async function middleware(request, response, next) {
-    if (!request || typeof request !== "object" || !response ||
-        typeof response.setHeader !== "function" || typeof response.end !== "function" ||
-        typeof next !== "function") {
-      throw new TypeError("Distributed rate-limit middleware requires (request, response, next)");
+  async function evaluate(request = {}) {
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
+      throw new TypeError("Distributed rate-limit check requires a request-like object");
     }
+
     stats.requests += 1;
     let now;
     let result;
     let coreCheck = null;
     let identity = null;
+
     try {
       identity = resolveIdentity(request);
       coreCheck = makeCoreCheck(identity);
@@ -264,39 +264,30 @@ export function createDistributedRateLimit(options = {}) {
         component: "jb-security-guard", action: "distributed-rate-store-unavailable",
         severity: "critical", ruleIds: [RULE_ID]
       });
-      if (coreCheck) {
-        publishCore(coreCheck, {
-          allowed: !failClosed,
-          exceeded: false,
-          enforced: failClosed,
-          unavailable: true,
-          status: failClosed ? 503 : null,
-          retryAfterSeconds: failClosed ? 5 : null
-        }, eventTime, true);
-      }
-      if (failClosed) {
-        respond(response, 503, {
-          error: "security_rate_limit_unavailable",
-          message: "Request temporarily unavailable due to a security control."
-        }, { "Retry-After": 5 });
-      } else {
-        next();
-      }
-      return;
+      const decision = Object.freeze({
+        allowed: !failClosed,
+        exceeded: false,
+        enforced: failClosed,
+        unavailable: true,
+        status: failClosed ? 503 : null,
+        retryAfterSeconds: failClosed ? 5 : null
+      });
+      if (coreCheck) publishCore(coreCheck, decision, eventTime, true);
+      return decision;
     }
 
     if (result.allowed) {
       stats.allowed += 1;
-      publishCore(coreCheck, {
+      const decision = Object.freeze({
         allowed: true,
         exceeded: false,
         enforced: false,
         unavailable: false,
         status: null,
         retryAfterSeconds: null
-      }, now);
-      next();
-      return;
+      });
+      publishCore(coreCheck, decision, now);
+      return decision;
     }
 
     stats.blocked += 1;
@@ -308,22 +299,50 @@ export function createDistributedRateLimit(options = {}) {
       });
     }
     const retryAfterSeconds = Math.max(1, Math.ceil((result.retryAfterMs ?? windowMs) / 1000));
-    publishCore(coreCheck, {
+    const decision = Object.freeze({
       allowed: false,
       exceeded: true,
       enforced: true,
       unavailable: false,
       status: 429,
       retryAfterSeconds
-    }, now, result.count === maxRequests + 1);
-    respond(response, 429, {
-      error: "rate_limit_exceeded",
-      message: "Too many requests. Try again later."
-    }, { "Retry-After": retryAfterSeconds });
+    });
+    publishCore(coreCheck, decision, now, result.count === maxRequests + 1);
+    return decision;
+  }
+
+  async function check(request = {}) {
+    return evaluate(request);
+  }
+
+  async function middleware(request, response, next) {
+    if (!request || typeof request !== "object" || !response ||
+        typeof response.setHeader !== "function" || typeof response.end !== "function" ||
+        typeof next !== "function") {
+      throw new TypeError("Distributed rate-limit middleware requires (request, response, next)");
+    }
+
+    const decision = await evaluate(request);
+    if (decision.status === 503) {
+      respond(response, 503, {
+        error: "security_rate_limit_unavailable",
+        message: "Request temporarily unavailable due to a security control."
+      }, { "Retry-After": decision.retryAfterSeconds ?? 5 });
+      return;
+    }
+    if (decision.status === 429) {
+      respond(response, 429, {
+        error: "rate_limit_exceeded",
+        message: "Too many requests. Try again later."
+      }, { "Retry-After": decision.retryAfterSeconds });
+      return;
+    }
+    next();
   }
 
   return Object.freeze({
     middleware,
+    check,
     getStats: () => Object.freeze({ ...stats })
   });
 }

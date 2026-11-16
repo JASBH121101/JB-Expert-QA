@@ -113,6 +113,7 @@ const fixtureSchemas = [
   ["rate-limit/check-request.valid.json", "urn:jb:security-guard:rate-limit:check-request:v1"],
   ["rate-limit/decision-allowed.valid.json", "urn:jb:security-guard:rate-limit:decision:v1"],
   ["rate-limit/decision-blocked.valid.json", "urn:jb:security-guard:rate-limit:decision:v1"],
+  ["rate-limit/decision-fail-open.valid.json", "urn:jb:security-guard:rate-limit:decision:v1"],
   ["policies/rate-limit-policy.valid.json", "urn:jb:security-guard:policies:rate-limit:v1"],
   ["authentication/attempt-failed.valid.json", "urn:jb:security-guard:authentication:attempt:v1"],
   ["authentication/decision-unavailable.valid.json", "urn:jb:security-guard:authentication:decision:v1"],
