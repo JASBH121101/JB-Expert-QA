@@ -314,7 +314,7 @@ test("trusted security snapshots with future source timestamps are rejected", ()
       state: "clear",
       sources: [source({ state: "clear", issuedAtMs: NOW + 60_000 })]
     })
-  }), /too far in the future/);
+  })), /too far in the future/);
 });
 
 test("future observations beyond the configured clock skew are rejected", () => {
