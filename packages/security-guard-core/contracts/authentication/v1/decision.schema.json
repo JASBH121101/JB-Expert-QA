@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:authentication:decision:v1",
+  "title": "JB Security Guard authentication protection decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attemptId",
+    "outcome",
+    "enforced",
+    "status",
+    "retryAfterSeconds"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.authentication.decision/v1"
+    },
+    "attemptId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "outcome": {
+      "enum": [
+        "allow",
+        "deny",
+        "monitor",
+        "unavailable"
+      ]
+    },
+    "enforced": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        null,
+        429,
+        503
+      ]
+    },
+    "retryAfterSeconds": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 3600
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "allow"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": false
+          },
+          "status": {
+            "type": "null"
+          },
+          "retryAfterSeconds": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "monitor"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": false
+          },
+          "status": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "unavailable"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": true
+          },
+          "status": {
+            "const": 503
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "deny"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "enforced": {
+            "const": true
+          },
+          "status": {
+            "const": 429
+          }
+        }
+      }
+    }
+  ]
+}

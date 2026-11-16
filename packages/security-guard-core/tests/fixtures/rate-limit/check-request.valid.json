@@ -1,0 +1,13 @@
+{
+  "schema": "jb.security.rate-limit.check/v1",
+  "requestId": "b37a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "tenantId": "tenant-demo",
+  "applicationId": "catalog-api",
+  "policyId": "public-api",
+  "scope": "catalog:list",
+  "identity": {
+    "type": "anonymous",
+    "key": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "keyId": "k2026-01"
+  }
+}

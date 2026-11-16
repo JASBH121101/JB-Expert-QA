@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:authentication:attempt:v1",
+  "title": "JB Security Guard authentication attempt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attemptId",
+    "tenantId",
+    "applicationId",
+    "operation",
+    "outcome",
+    "occurredAtMs",
+    "account",
+    "client"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.authentication.attempt/v1"
+    },
+    "attemptId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "applicationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "operation": {
+      "enum": [
+        "login",
+        "password_reset",
+        "account_recovery",
+        "mfa_challenge",
+        "session_refresh"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "failure",
+        "success"
+      ]
+    },
+    "occurredAtMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "keyId"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9:_-]{1,64}$"
+        }
+      }
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "keyId"
+      ],
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "keyId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9:_-]{1,64}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "client": {
+            "properties": {
+              "key": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "client"
+        ]
+      },
+      "then": {
+        "properties": {
+          "client": {
+            "properties": {
+              "keyId": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "client": {
+            "properties": {
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key"
+            ]
+          }
+        },
+        "required": [
+          "client"
+        ]
+      },
+      "then": {
+        "properties": {
+          "client": {
+            "properties": {
+              "keyId": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

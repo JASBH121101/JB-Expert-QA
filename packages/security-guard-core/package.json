@@ -1,0 +1,12 @@
+{
+  "name": "@jb/security-guard-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Language-neutral, versioned contracts and conformance vectors for JB Security Guard.",
+  "files": [
+    "contracts/**/*.json",
+    "README.md",
+    "docs/**"
+  ],
+  "license": "UNLICENSED"
+}

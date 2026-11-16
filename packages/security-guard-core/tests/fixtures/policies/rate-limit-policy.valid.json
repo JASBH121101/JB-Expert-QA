@@ -1,0 +1,26 @@
+{
+  "schema": "jb.security.policy.rate-limit/v1",
+  "id": "catalog-public",
+  "tenantId": "tenant-demo",
+  "applicationId": "catalog-api",
+  "version": 1,
+  "enabled": true,
+  "mode": "enforce",
+  "failureMode": "closed",
+  "limits": [
+    {
+      "id": "catalog-list-ip",
+      "identityType": "ip",
+      "scope": "catalog:list",
+      "windowSeconds": 60,
+      "maxRequests": 60
+    },
+    {
+      "id": "catalog-read-anonymous",
+      "identityType": "anonymous",
+      "scope": "catalog:read",
+      "windowSeconds": 60,
+      "maxRequests": 100
+    }
+  ]
+}
