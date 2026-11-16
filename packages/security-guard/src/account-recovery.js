@@ -56,13 +56,15 @@ function safeNotify(onEvent, event) {
 
 function createRecoveryCoreEvent(core, input) {
   if (!core) return null;
-  const attempt = createAuthCoreAttempt(core, {
-    attemptId: randomUUID(),
-    occurredAtMs: input.occurredAtMs,
-    outcome: "failure",
-    accountDigest: input.subjectDigest ?? null,
-    clientDigest: null
-  });
+  const identity = input.subjectDigest
+    ? createAuthCoreAttempt(core, {
+      attemptId: randomUUID(),
+      occurredAtMs: input.occurredAtMs,
+      outcome: "failure",
+      accountDigest: input.subjectDigest,
+      clientDigest: null
+    })
+    : null;
   return validateSecurityEventV1({
     schema: "jb.security.event/v1",
     eventId: randomUUID(),
@@ -75,8 +77,10 @@ function createRecoveryCoreEvent(core, input) {
     severity: input.severity,
     action: input.action,
     outcome: input.outcome,
-    subjectKey: attempt.account.key,
-    subjectKeyId: attempt.account.keyId,
+    ...(identity ? {
+      subjectKey: identity.account.key,
+      subjectKeyId: identity.account.keyId
+    } : {}),
     scope: input.scopes?.length ? input.scopes.join("_") : "account_recovery",
     ...(RECOVERY_UUID.test(input.correlationId ?? "")
       ? { correlationId: input.correlationId }
@@ -438,14 +442,14 @@ export function createAccountRecovery(options = {}) {
     retryAfterMs = 0
   }) {
     if (!core) return null;
-    const subjectDigest = accountId !== null
+    const accountDigest = accountId !== null
       ? digest("account", String(accountId))
-      : digest("recovery-challenge", requestId || "anonymous");
+      : null;
     const attempt = createAuthCoreAttempt(core, {
       attemptId: randomUUID(),
       occurredAtMs,
       outcome,
-      accountDigest: subjectDigest,
+      accountDigest,
       clientDigest
     });
     const decision = createAuthCoreDecision(attempt.attemptId, {
@@ -638,7 +642,7 @@ export function createAccountRecovery(options = {}) {
 
     const now = readNow();
     const clientDigest = getClientDigest(input.request);
-    const subjectDigest = digest("recovery-challenge", requestId || "anonymous");
+    const subjectDigest = null;
     let limit;
     try {
       limit = await store.consumeLimit({
