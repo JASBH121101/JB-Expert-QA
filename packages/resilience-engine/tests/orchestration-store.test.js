@@ -312,3 +312,51 @@ test("file audit store rejects accessor and oversized entries", async () => {
     await assert.rejects(store.append({ event: "x".repeat(33 * 1024) }), /32 KiB/);
   });
 });
+
+
+test("encoded composite keys keep slash/colon asset IDs isolated and readable", async () => {
+  await withTempDirectory(async (directory) => {
+    const store = createFileOrchestrationStore({ filePath: join(directory, "orchestration.json") });
+    const assetId = "k8s/ns:prod/api";
+    const input = claimAction({ assetId });
+    const claim = await store.claimAction(input);
+    assert.equal(claim.claimed, true);
+
+    assert.equal(await store.recordActionOutcome({
+      assetId,
+      environment: input.environment,
+      action: input.action,
+      outcome: "failed",
+      at: input.claimedAt + 1,
+      failureThreshold: 1,
+      cooldownMs: 60_000
+    }), true);
+
+    const service = await store.getServiceState({
+      assetId,
+      environment: input.environment
+    });
+    assert.equal(service.lastActionAt, input.claimedAt + 1);
+    const circuit = await store.getCircuitState({
+      assetId,
+      environment: input.environment,
+      action: input.action,
+      now: input.claimedAt + 2
+    });
+    assert.equal(circuit.open, true);
+  });
+});
+
+test("execution can be held when final preflight cancels before adapter invocation", async () => {
+  await withTempDirectory(async (directory) => {
+    const store = createFileOrchestrationStore({ filePath: join(directory, "orchestration.json") });
+    assert.equal(await store.recordIncidentState(incidentState("OBSERVING")), true);
+    assert.equal(await store.recordIncidentState(incidentState("EXECUTING", {
+      at: 1_800_000_000_001
+    })), true);
+    assert.equal(await store.recordIncidentState(incidentState("HELD", {
+      at: 1_800_000_000_002
+    })), true);
+    assert.equal((await store.getIncident("incident-001")).state, "HELD");
+  });
+});
