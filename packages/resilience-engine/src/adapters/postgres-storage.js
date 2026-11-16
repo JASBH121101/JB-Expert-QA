@@ -626,9 +626,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
         "SELECT signal_digest FROM jb_resilience_trusted_signals WHERE source_id=$1 AND event_id=$2",
         [signal.sourceId, signal.eventId]
       );
-      if (existing.rowCount !== 1) {
-        throw new Error("trusted signal replay record disappeared during conflict resolution");
-      }
+      if (existing.rowCount !== 1) throw new Error("trusted signal replay record disappeared during conflict resolution");
       return Object.freeze({
         recorded: false,
         reason: existing.rows[0].signal_digest.trim() === signalDigest
@@ -1375,77 +1373,6 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
         state: cloneJsonData(row.state),
         updatedAt: toSafeInteger(row.updated_at, "target updated_at")
       });
-    });
-  }
-
-
-  function trustedSignalDigest(signal) {
-    return createHash("sha256")
-      .update(JSON.stringify({ ...signal, evidenceRefs: signal.evidenceRefs }), "utf8")
-      .digest("hex");
-  }
-
-  async function recordTrustedSignal({
-    signal: inputSignal, signalDigest, receivedAtMs, retentionUntilMs
-  } = {}) {
-    assertInitialized();
-    const signal = validateTrustedSignalEnvelope(inputSignal);
-    assertTimestamp(receivedAtMs, "receivedAtMs");
-    assertTimestamp(retentionUntilMs, "retentionUntilMs");
-    if (retentionUntilMs < signal.expiresAtMs) {
-      throw new TypeError("retentionUntilMs must be at least expiresAtMs");
-    }
-    if (typeof signalDigest !== "string" || !SHA256.test(signalDigest) ||
-        trustedSignalDigest(signal) !== signalDigest) {
-      throw new TypeError("signalDigest does not match the trusted signal");
-    }
-    return withTransaction(pool, async (client) => {
-      const inserted = await client.query(
-        "INSERT INTO jb_resilience_trusted_signals (source_id, event_id, asset_id, environment, issued_at_ms, expires_at_ms, signal_digest, signal, received_at_ms, retention_until_ms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10) ON CONFLICT (source_id, event_id) DO NOTHING RETURNING event_id",
-        [signal.sourceId, signal.eventId, signal.assetId, signal.environment,
-          signal.issuedAtMs, signal.expiresAtMs, signalDigest, JSON.stringify(signal),
-          receivedAtMs, retentionUntilMs]
-      );
-      if (inserted.rowCount === 1) return Object.freeze({ recorded: true });
-      const existing = await client.query(
-        "SELECT signal_digest FROM jb_resilience_trusted_signals WHERE source_id=$1 AND event_id=$2",
-        [signal.sourceId, signal.eventId]
-      );
-      if (existing.rowCount !== 1) {
-        throw new Error("trusted signal replay record disappeared during conflict resolution");
-      }
-      return Object.freeze({
-        recorded: false,
-        reason: existing.rows[0].signal_digest.trim() === signalDigest
-          ? "signal-replay" : "signal-id-conflict"
-      });
-    });
-  }
-
-  async function listTrustedSignals({ assetId, environment, sinceMs } = {}) {
-    assertInitialized();
-    assertAssetId(assetId, "assetId");
-    assertIdentifier(environment, "environment");
-    assertTimestamp(sinceMs, "sinceMs");
-    return withTransaction(pool, async (client) => {
-      const result = await client.query(
-        "SELECT signal, signal_digest, received_at_ms, retention_until_ms FROM jb_resilience_trusted_signals WHERE asset_id=$1 AND environment=$2 AND issued_at_ms >= $3 ORDER BY issued_at_ms ASC, event_id ASC",
-        [assetId, environment, sinceMs]
-      );
-      const records = result.rows.map((row) => {
-        const signal = validateTrustedSignalEnvelope(row.signal);
-        const signalDigest = row.signal_digest.trim();
-        if (!SHA256.test(signalDigest) || trustedSignalDigest(signal) !== signalDigest) {
-          throw new Error("trusted signal replay record integrity check failed");
-        }
-        const receivedAtMs = toSafeInteger(row.received_at_ms, "trusted signal received_at_ms");
-        const retentionUntilMs = toSafeInteger(row.retention_until_ms, "trusted signal retention_until_ms");
-        if (retentionUntilMs < signal.expiresAtMs) {
-          throw new Error("trusted signal replay record has invalid retention");
-        }
-        return Object.freeze({ signal, signalDigest, receivedAtMs, retentionUntilMs });
-      });
-      return Object.freeze(records);
     });
   }
 
