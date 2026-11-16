@@ -11,7 +11,7 @@ Reuse the existing Security Guard implementation. Do not create parallel securit
 
 The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. The closeout lab additionally adds a language-neutral HMAC identity derivation helper, strict Core v1 normalizers, an explicit `check()` entry point on the distributed limiter, and an authenticated server-to-server universal rate-limit endpoint. It now also includes a deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. This completes the initial Node aggregation stage, but does not constitute statistical calibration, full-runtime certification or autonomous enforcement.
 
-PHP/Laravel and Python/FastAPI adapters remain unimplemented. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
+PHP 8.2+ and Python 3.11+ Core v1 clients now exist as independent packages, with optional Laravel middleware and FastAPI-compatible ASGI middleware. Both use the central Node universal rate-limit endpoint; neither duplicates the shared counter implementation. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
 
 ## Current Node.js Core v1 coverage
 
@@ -74,7 +74,7 @@ The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and mal
 ## Gaps and risks
 
 1. **Threat assessment calibration:** validate weights and thresholds against labeled benign/adversarial corpora; measure false-positive/false-negative rates, evasion resistance and stability before treating policy scores as calibrated or enabling any downstream enforcement. Confidence weights from request signatures remain heuristics.
-2. **Cross-runtime adapters:** PHP and Python implementations do not exist. Native validators, stores, cryptography and framework middleware must be implemented and tested independently.
+2. **Cross-runtime boundaries:** PHP/Laravel and Python/FastAPI clients and Core v1 HMAC normalizers are implemented with shared known-answer tests. They use the central Node policy/API endpoint; independent PHP/Python quota stores are intentionally not implemented to avoid policy and counter divergence.
 3. **Storage consistency:** distributed Node adapters depend on host-supplied atomic stores. No shared production store implementation is included in Core.
 4. **Cloudflare scope:** Worker binding counters are approximate and location-scoped; Pages/Worker support is rate-limit-specific, not full Node feature parity.
 5. **Telemetry:** versioned callbacks exist, but durable delivery, retry policy, retention, access control and operational monitoring belong to a separately reviewed sink.
@@ -126,3 +126,13 @@ The isolated branch `feature/security-guard-closeout-lab` is being validated aga
 6. Cloudflare Workers/Pages parity remains rate-limit-specific, not full parity with Node middleware.
 
 A release/certification claim must wait for the applicable runtime parity, storage, rotation and threat-calibration gates. The branch closeout can certify only the tests and package interfaces actually covered by its green CI.
+
+
+## PHP and Python runtime packages (closeout lab)
+
+- `packages/security-guard-php`: PHP 8.2+ HMAC-SHA-256 Core v1 helper, strict rate-limit request/decision/policy normalizers, length-prefixed counter-key helper, authenticated HTTPS client and optional Laravel service provider/middleware.
+- `packages/security-guard-python`: Python 3.11+ matching HMAC and Core v1 helpers, asynchronous authenticated HTTPS client and FastAPI/Starlette-compatible ASGI middleware.
+- Both packages consume the shared Node universal endpoint, so a policy and quota are evaluated centrally. The PHP and Python packages do not maintain disconnected local counters.
+- Both language adapters use the exact same known-answer vector as Node. CI runs PHP lint + HMAC/client tests and Python compile + HMAC/client/ASGI tests.
+- PHP/Python packages are currently source workspaces inside this monorepo. Their own release tags/registries and independently pinned dependency/security-update workflows must be set up before publication to Composer Packagist or PyPI.
+- Framework middleware is an adapter only: identity resolution must use trusted server-side authenticated state; credentials remain secret; HTTPS verification is mandatory; 401/configuration errors never trigger fail-open.
