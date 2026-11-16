@@ -16,6 +16,7 @@ import { validateSecurityEventV1 } from "./core-contract-v1.js";
 const REQUEST_RULE = "JBG-RECOVERY-REQUEST-001";
 const VERIFY_RULE = "JBG-RECOVERY-VERIFY-001";
 const RATE_RULE = "JBG-RECOVERY-RATE-001";
+const RECOVERY_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEFAULT_MAX_CHALLENGES = 10_000;
 const DEFAULT_MAX_RATE_KEYS = 20_000;
 
@@ -77,7 +78,9 @@ function createRecoveryCoreEvent(core, input) {
     subjectKey: attempt.account.key,
     subjectKeyId: attempt.account.keyId,
     scope: input.scopes?.length ? input.scopes.join("_") : "account_recovery",
-    correlationId: input.correlationId ?? attempt.attemptId
+    ...(RECOVERY_UUID.test(input.correlationId ?? "")
+      ? { correlationId: input.correlationId }
+      : { correlationId: attempt.attemptId })
   });
 }
 
@@ -413,11 +416,11 @@ export function createAccountRecovery(options = {}) {
     const [coreAction, outcome] = mappings[action] ?? ["observed", "observed"];
     const event = createRecoveryCoreEvent(core, {
       occurredAtMs,
-      ruleId,
-      severity,
+      ruleId: context.coreRuleId ?? ruleId,
+      severity: context.coreSeverity ?? severity,
       action: coreAction,
       outcome,
-      scopes,
+      scopes: context.coreScopes ?? scopes,
       subjectDigest: context.subjectDigest ?? null,
       correlationId: context.correlationId
     });
@@ -697,8 +700,30 @@ export function createAccountRecovery(options = {}) {
 
     if (!result || result.status !== "valid") {
       stats.verificationFailed += 1;
+      const status = result?.status ?? "not_found";
+      const coreClassification = {
+        invalid: {
+          ruleId: VERIFY_RULE, severity: "medium", scope: "invalidCredential"
+        },
+        expired: {
+          ruleId: "JBG-RECOVERY-EXPIRED-001", severity: "medium", scope: "challengeExpired"
+        },
+        locked: {
+          ruleId: "JBG-RECOVERY-BRUTE-001", severity: "high", scope: "challengeLocked"
+        },
+        not_found: {
+          ruleId: "JBG-RECOVERY-CHALLENGE-001", severity: "medium", scope: "challengeMissingOrConsumed"
+        }
+      }[status] ?? {
+        ruleId: VERIFY_RULE, severity: "medium", scope: "challengeInvalid"
+      };
       emit("verification-failed", VERIFY_RULE, null, [], "medium", {
-        occurredAtMs: now, subjectDigest, correlationId: requestId
+        occurredAtMs: now,
+        subjectDigest,
+        correlationId: requestId,
+        coreRuleId: coreClassification.ruleId,
+        coreSeverity: coreClassification.severity,
+        coreScopes: [coreClassification.scope]
       });
       publishVerificationCore({
         occurredAtMs: now, outcome: "failure", requestId, clientDigest
