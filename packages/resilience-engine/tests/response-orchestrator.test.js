@@ -4,6 +4,18 @@ import { createResponseOrchestrator } from "../src/response-orchestrator.js";
 
 const NOW = 1_800_000_000_000;
 
+function trustedIncidentInput(overrides = {}) {
+  return {
+    schema: "jb.resilience.incident-input/v1",
+    assetId: "host-erp-01",
+    environment: "production",
+    serviceId: "catalog-api",
+    securityState: { state: "clear" },
+    healthObservations: [],
+    ...overrides
+  };
+}
+
 function incidentDecision(overrides = {}) {
   return {
     schema: "jb.resilience.incident-decision/v1",
@@ -170,7 +182,7 @@ function harness(overrides = {}) {
 
 test("executes only a policy-authorized A1 restart and verifies both service and application health", async () => {
   const h = harness();
-  const result = await h.orchestrator.executeIncident({ source: "trusted-host-adapter" });
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.schema, "jb.resilience.orchestration-result/v1");
   assert.equal(result.state, "RECOVERED");
@@ -191,7 +203,7 @@ test("executes only a policy-authorized A1 restart and verifies both service and
 
 test("rejects input whose provenance is not confirmed by the trusted host verifier", async () => {
   const h = harness({ trustedInput: false });
-  const result = await h.orchestrator.executeIncident({ source: "untrusted-client" });
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput({ source: "untrusted-client" }));
 
   assert.equal(result.state, "FAILED_CLOSED");
   assert.equal(result.reason, "trusted-input-rejected");
@@ -209,7 +221,7 @@ test("suspected, unknown, stale, confirmed, tampered and conflicting security st
         decisionRule: "SECURITY_" + securityState.toUpperCase()
       })
     });
-    const result = await h.orchestrator.executeIncident({});
+    const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
     assert.equal(result.state, "ESCALATED", securityState);
     assert.equal(h.calls.evaluated, 0, securityState);
