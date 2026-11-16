@@ -1,7 +1,7 @@
 # JB Security Guard multi-runtime audit
 
 - Audit date: 2026-11-16
-- Audited baseline: `main` at `9d5b37182b52a8e676c49be71023f0823a45e72e`
+- Audited baseline: `main` at `144e542988daf5741252010902f0cd86b5b4f33d`
 - Documentation branch: `docs/security-guard-core-current-coverage-audit`
 - Scope: repository source, tests, contract schemas and module documentation. No production systems, Cloudflare resources, databases, DNS, WAF, customer projects, secrets or paid services were modified.
 
@@ -9,7 +9,7 @@
 
 Reuse the existing Security Guard implementation. Do not create parallel security engines or replace the public JavaScript API. The language-neutral Core remains contract-only: versioned JSON Schemas, semantics and shared fixtures. It is not a central server and contains no executable runtime logic.
 
-The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. It now also includes a deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. This completes the initial Node aggregation stage, but does not constitute statistical calibration, full-runtime certification or autonomous enforcement.
+The JavaScript/Node adapter has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. The closeout lab additionally adds a language-neutral HMAC identity derivation helper, strict Core v1 normalizers, an explicit `check()` entry point on the distributed limiter, and an authenticated server-to-server universal rate-limit endpoint. It now also includes a deterministic, server-policy-owned threat-assessment aggregator that creates Core v1 assessments. This completes the initial Node aggregation stage, but does not constitute statistical calibration, full-runtime certification or autonomous enforcement.
 
 PHP/Laravel and Python/FastAPI adapters remain unimplemented. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
 
@@ -102,3 +102,27 @@ The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and mal
 6. Run bounded performance and memory tests; publish runtime packages independently only after release gates pass.
 
 No runtime is certified by the presence of a package directory alone. Compatibility labels must distinguish planned, implemented, tested and certified.
+
+
+## Closeout lab additions (2026-11-16)
+
+The isolated branch `feature/security-guard-closeout-lab` is being validated against the current main baseline above. These changes are additive; the old PR branches are not merged as-is.
+
+- `deriveCoreIdentityKey()` implements the documented domain-separated HMAC-SHA-256 Core v1 message via Web Crypto. It requires a trusted server-side canonical identity, a 32-byte minimum secret, safe tenant/application/type/key identifiers, and rejects empty, NUL-containing, ill-formed or oversized identities.
+- `normalizeCoreRateLimitCheckRequest()`, `normalizeCoreRateLimitDecision()`, `normalizeCoreRateLimitPolicy()` and `createCoreRateLimitCounterKey()` provide strict immutable boundary handling. Shared known-answer identity fixture and package-distribution smoke coverage are included.
+- The decision contract explicitly preserves fail-open semantics: `allowed=true, enforced=false, unavailable=true, exceeded=false` is valid when the store outage policy is fail-open. Fail-closed outages remain enforced HTTP 503. A permitted decision cannot be marked as enforced.
+- The distributed limiter now exposes `check(request)` and shares the same evaluation path with its middleware, preserving the existing Core decision/event callbacks and statistics.
+- `createUniversalRateLimitService()` is a Node.js server-to-server HTTP adapter. It requires authenticated app credentials, an exact path and method, bounded JSON, registered server-owned policies/scopes, and an injected atomic store. It rejects query strings and fails closed on store outage.
+- The universal API tests use a deterministic test-only atomic store. No Redis, Valkey, PostgreSQL or Neon production driver is included or certified. A real host adapter must supply an atomic `consumeLimit()` implementation shared by every replica.
+- The universal HTTP endpoint must be deployed behind HTTPS and protected from credential guessing by appropriate upstream network controls. Credentials must never be exposed to browser clients.
+
+## Explicit open items — do not label as certified
+
+1. PHP/Laravel and Python/FastAPI native adapters are not present in the repository yet.
+2. There is no production shared-store driver or distributed atomicity certification.
+3. HMAC key rotation/dual-key overlap is specified as a requirement but is not yet implemented as a managed cross-runtime lifecycle.
+4. There is no central durable telemetry sink or tenant-scoped policy control plane.
+5. The threat score remains a deterministic policy index, not a calibrated probability. Precision/recall and adversarial evasion measurements are not yet available.
+6. Cloudflare Workers/Pages parity remains rate-limit-specific, not full parity with Node middleware.
+
+A release/certification claim must wait for the applicable runtime parity, storage, rotation and threat-calibration gates. The branch closeout can certify only the tests and package interfaces actually covered by its green CI.
