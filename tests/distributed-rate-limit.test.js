@@ -92,6 +92,58 @@ test("fail-open is available only as an explicit configuration", async () => {
   assert.equal(result.response.writableEnded, false);
 });
 
+test("check() exposes the same shared decision path without requiring an HTTP response", async () => {
+  const store = createAtomicMemoryStore();
+  const limiter = createDistributedRateLimit({
+    store, secret: SECRET, maxRequests: 1,
+    keyGenerator: (request) => request.account
+  });
+  const first = await limiter.check({ account: "account-1" });
+  const second = await limiter.check({ account: "account-1" });
+  assert.equal(first.allowed, true);
+  assert.equal(first.status, null);
+  assert.equal(second.allowed, false);
+  assert.equal(second.status, 429);
+  assert.equal(limiter.getStats().requests, 2);
+});
+
+test("check() preserves fail-closed and fail-open outage semantics in Core v1", async () => {
+  const make = (failClosed) => {
+    const decisions = [];
+    const events = [];
+    const limiter = createDistributedRateLimit({
+      store: { async consumeLimit() { throw new Error("private store outage"); } },
+      secret: SECRET,
+      failClosed,
+      coreContract: {
+        tenantId: "tenant-demo", applicationId: "catalog-api",
+        policyId: "api-requests", identityType: "account",
+        identityKeyId: "identity-key-2026"
+      },
+      onCoreDecision(value) { decisions.push(value); },
+      onCoreEvent(value) { events.push(value); }
+    });
+    return { limiter, decisions, events };
+  };
+
+  const closed = make(true);
+  const denied = await closed.limiter.check({ account: "account-2" });
+  assert.equal(denied.allowed, false);
+  assert.equal(denied.status, 503);
+  assert.equal(closed.decisions[0].decision.unavailable, true);
+  assert.equal(closed.events[0].outcome, "unavailable");
+
+  const open = make(false);
+  const permitted = await open.limiter.check({ account: "account-3" });
+  assert.equal(permitted.allowed, true);
+  assert.equal(permitted.enforced, false);
+  assert.equal(permitted.unavailable, true);
+  assert.equal(permitted.status, null);
+  assert.equal(open.decisions[0].decision.allowed, true);
+  assert.equal(open.decisions[0].decision.unavailable, true);
+  assert.equal(open.events[0].outcome, "unavailable");
+});
+
 test("events and store keys never contain raw client identifiers", async () => {
   const store = createAtomicMemoryStore();
   const events = [];
