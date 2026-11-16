@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import pg from "pg";
+import { Pool } from "pg";
 import { createPostgresResilienceStorageAdapter } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
 
-const { Pool } = pg;
 const connectionString = process.env.QA_DATABASE_URL;
 if (!connectionString) throw new Error("QA_DATABASE_URL is required for the PostgreSQL resilience adapter integration test");
 
