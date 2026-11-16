@@ -42,7 +42,11 @@ function validId(value, name) {
 async function readBoundedBody(request, maxBytes) {
   const declared = request.headers.get("content-length");
   if (declared !== null) {
-    if (!/^\d+$/.test(declared) || Number(declared) > maxBytes) return { ok: false, status: 413 };
+    if (!/^\d+$/.test(declared)) return { ok: false, status: 400 };
+    if (Number(declared) > maxBytes) {
+      await request.body?.cancel().catch(() => {});
+      return { ok: false, status: 413 };
+    }
   }
   const reader = request.body?.getReader();
   if (!reader) return { ok: false, status: 400 };
