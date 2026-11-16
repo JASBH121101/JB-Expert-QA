@@ -48,11 +48,19 @@ function cloneJsonSafe(value, depth = 0, seen = new WeakSet()) {
 
   if (Array.isArray(value)) {
     const ownKeys = Object.keys(value);
-    if (ownKeys.length !== value.length ||
+    if (Object.getOwnPropertySymbols(value).length ||
+        ownKeys.length !== value.length ||
         ownKeys.some((key, index) => key !== String(index))) {
       throw new TypeError("policy arrays must be dense and contain no extra properties");
     }
-    const copy = value.map((entry) => cloneJsonSafe(entry, depth + 1, seen));
+    const copy = [];
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+        throw new TypeError("policy arrays must not contain accessors");
+      }
+      copy.push(cloneJsonSafe(descriptor.value, depth + 1, seen));
+    }
     seen.delete(value);
     return Object.freeze(copy);
   }
@@ -340,8 +348,8 @@ function validateRequest(request) {
     return { valid: false, reason: "invalid-capability-request" };
   }
   if (!isRecord(safe) ||
-      Object.keys(safe).length !== 5 ||
-      !["assetId", "environment", "incidentId", "action", "securityState"]
+      Object.keys(safe).length !== 6 ||
+      !["assetId", "environment", "incidentId", "action", "securityState", "health"]
         .every((key) => Object.hasOwn(safe, key))) {
     return { valid: false, reason: "invalid-capability-request" };
   }
@@ -351,6 +359,22 @@ function validateRequest(request) {
       typeof safe.action !== "string" || !Object.hasOwn(ACTION_RISK, safe.action) ||
       typeof safe.securityState !== "string" || !SECURITY_STATES.has(safe.securityState)) {
     return { valid: false, reason: "invalid-capability-request" };
+  }
+  if (safe.health !== null) {
+    try {
+      assertExactKeys(safe.health, ["consecutiveFailures", "lastRestartAt"], "health snapshot");
+      validateBoundedInteger(safe.health.consecutiveFailures, 0, 1_000_000,
+        "health.consecutiveFailures");
+      if (safe.health.lastRestartAt !== null &&
+          (!Number.isSafeInteger(safe.health.lastRestartAt) || safe.health.lastRestartAt < 0)) {
+        return { valid: false, reason: "invalid-capability-request" };
+      }
+    } catch {
+      return { valid: false, reason: "invalid-capability-request" };
+    }
+  }
+  if (safe.action === "restart-service" && safe.health === null) {
+    return { valid: false, reason: "health-evidence-required" };
   }
   return { valid: true, request: safe };
 }
@@ -396,8 +420,24 @@ function evaluatePolicyCapability(policy, request, now) {
     if (!EXECUTABLE_ACTIONS.has(input.action)) {
       return Object.freeze({ permitted: false, reason: "action-runtime-not-certified" });
     }
-    if (input.action === "restart-service" && service.recovery?.requireApplicationHealth !== true) {
-      return Object.freeze({ permitted: false, reason: "application-health-verification-required" });
+    if (input.action === "restart-service") {
+      if (service.recovery?.requireApplicationHealth !== true) {
+        return Object.freeze({ permitted: false, reason: "application-health-verification-required" });
+      }
+      if (input.health === null) {
+        return Object.freeze({ permitted: false, reason: "health-evidence-required" });
+      }
+      if (input.health.consecutiveFailures < service.recovery.failureThreshold) {
+        return Object.freeze({ permitted: false, reason: "failure-threshold-not-reached" });
+      }
+      if (input.health.lastRestartAt !== null) {
+        if (input.health.lastRestartAt > now) {
+          return Object.freeze({ permitted: false, reason: "health-clock-inconsistency" });
+        }
+        if (now - input.health.lastRestartAt < service.recovery.cooldownMs) {
+          return Object.freeze({ permitted: false, reason: "restart-cooldown-active" });
+        }
+      }
     }
   }
 
@@ -600,7 +640,16 @@ export function createResiliencePolicyEngine({
         revision: validatedPolicy.revision,
         policyHash: integrity.policyHash,
         request: safeRequest,
-        budgets: validatedPolicy.budgets,
+        budgets: Object.freeze({
+          ...validatedPolicy.budgets,
+          maxActionsPerAssetPerHour: safeRequest.action === "restart-service"
+            ? Math.min(
+              validatedPolicy.budgets.maxActionsPerAssetPerHour,
+              validatedPolicy.services.find((entry) => entry.id === safeRequest.assetId)
+                .recovery.maxRestartsPerHour
+            )
+            : validatedPolicy.budgets.maxActionsPerAssetPerHour
+        }),
         riskClass: decision.riskClass,
         now,
         expiresAt
