@@ -503,7 +503,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     validateOutcomes({ outcome, failureThreshold, cooldownMs });
     if (outcome === "cancelled-before-execution") return true;
     const retryAt = at + cooldownMs;
-    if (!Number.isSafeInteger(retryAt)) return false;
+    if (outcome !== "succeeded" && !Number.isSafeInteger(retryAt)) return false;
 
     return withTransaction(pool, async (client) => {
       const selected = await client.query(
