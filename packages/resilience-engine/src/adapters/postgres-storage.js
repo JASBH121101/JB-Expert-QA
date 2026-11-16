@@ -215,8 +215,8 @@ const SCHEMA_STATEMENTS = [
 ];
 
 function ensurePool(pool) {
-  if (!pool || typeof pool.connect !== "function") {
-    throw new TypeError("pool must provide connect() and clients with query()/release()");
+  if (!pool || typeof pool.connect !== "function" || typeof pool.query !== "function") {
+    throw new TypeError("pool must provide connect(), query(), and clients with query()/release()");
   }
 }
 
