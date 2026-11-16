@@ -239,7 +239,7 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   const oldEngine = makeEngine(makePolicy({ revision: 1 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const first = await oldEngine.authorize(REQUEST);
   assert.equal(first.authorized, true);
-  assert.equal((await oldEngine.assertAuthorization({ authorization: first.authorization })).valid, true);
+  assert.equal((await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST })).valid, true);
 
   const newEngine = makeEngine(makePolicy({ revision: 2 }), { policyRevisionStore: revisionStore, capabilityLedger: ledger });
   const second = await newEngine.authorize(REQUEST);
@@ -336,7 +336,7 @@ test("authorization is short-lived, rechecks policy validity and is one-time com
   const engine = makeEngine(makePolicy(), { clock: () => now, authorizationTtlMs: 1000 });
   const result = await engine.authorize(REQUEST);
   assert.equal(result.authorized, true);
-  assert.equal((await engine.assertAuthorization({ authorization: result.authorization })).valid, true);
+  assert.equal((await engine.assertAuthorization({ authorization: result.authorization, request: REQUEST })).valid, true);
   now += 1000;
   assert.equal((await engine.assertAuthorization({ authorization: result.authorization })).reason,
     "authorization-expired-or-stale");
@@ -346,6 +346,18 @@ test("authorization is short-lived, rechecks policy validity and is one-time com
   assert.equal((await engine.completeAuthorization({
     authorization: result.authorization, outcome: "succeeded"
   })).recorded, false);
+});
+
+test("authorization rechecks live security and health conditions immediately before use", async () => {
+  const engine = makeEngine();
+  const result = await engine.authorize(REQUEST);
+  assert.equal(result.authorized, true);
+  const changed = await engine.assertAuthorization({
+    authorization: result.authorization,
+    request: { ...REQUEST, securityState: "suspected" }
+  });
+  assert.equal(changed.valid, false);
+  assert.equal(changed.reason, "capability-conditions-no-longer-met");
 });
 
 test("signature is checked again before each authorization", async () => {
