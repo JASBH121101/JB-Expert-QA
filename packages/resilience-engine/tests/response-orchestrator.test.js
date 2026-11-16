@@ -412,3 +412,32 @@ test("a contradictory v0.5 recovery recommendation is persisted as held, not exe
   assert.equal(h.calls.evaluated, 0);
   assert.equal(h.calls.restart, 0);
 });
+
+
+test("rejects event input containing accessors before invoking trusted callbacks", async () => {
+  const h = harness();
+  const input = trustedIncidentInput();
+  Object.defineProperty(input, "source", {
+    enumerable: true,
+    get() { throw new Error("untrusted getter executed"); }
+  });
+
+  const result = await h.orchestrator.executeIncident(input);
+  assert.equal(result.state, "FAILED_CLOSED");
+  assert.equal(result.reason, "incident-input-invalid");
+  assert.equal(h.calls.trustedInput, 0);
+  assert.equal(h.calls.restart, 0);
+});
+
+test("rejects v0.5 decisions that change the asset, environment or service scope", async () => {
+  const h = harness();
+  const result = await h.orchestrator.executeIncident(
+    trustedIncidentInput({ assetId: "host-another-tenant" })
+  );
+
+  assert.equal(result.state, "FAILED_CLOSED");
+  assert.equal(result.reason, "incident-decision-scope-mismatch");
+  assert.equal(h.calls.evaluated, 0);
+  assert.equal(h.calls.authorized, 0);
+  assert.equal(h.calls.restart, 0);
+});
