@@ -184,12 +184,12 @@ async function main() {
     })).applied, true);
 
     const beforeStaleWrite = await storage.fencedTargetStore.getState({ scopeId, targetId });
-    assert.deepEqual(beforeStaleWrite.state, { status: "recovered", revision: 3 });
+    assert.deepEqual({ ...beforeStaleWrite.state }, { status: "recovered", revision: 3 });
     assert.deepEqual(await storage.fencedTargetStore.applyState({
       ...fencedInput(firstLease.lease, { targetId, mutationId: "mutation-stale",
       state: { status: "stale-overwrite", revision: 4 } })
     }), { applied: false, reason: "lease-not-current" });
-    assert.deepEqual((await storage.fencedTargetStore.getState({ scopeId, targetId })).state,
+    assert.deepEqual({ ...(await storage.fencedTargetStore.getState({ scopeId, targetId })).state },
       { status: "recovered", revision: 3 });
 
     const highWaterScope = "fenced-highwater-scope";
@@ -213,9 +213,9 @@ async function main() {
       reason: "stale-fencing-token",
       currentFencingToken: highWaterLease.lease.fencingToken + 1
     });
-    assert.deepEqual((await storage.fencedTargetStore.getState({
+    assert.deepEqual({ ...(await storage.fencedTargetStore.getState({
       scopeId: highWaterScope, targetId: "highwater-target"
-    })).state, { version: "initial" });
+    })).state }, { version: "initial" });
     await secondStorage.coordinationStore.releaseLease(successor.lease);
     await storage.coordinationStore.releaseLease(highWaterLease.lease);
   });
