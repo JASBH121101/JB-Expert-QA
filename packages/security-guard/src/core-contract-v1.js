@@ -12,6 +12,10 @@ function isRecord(value) {
 
 function assertExactKeys(value, required, optional = [], name = "value") {
   if (!isRecord(value)) throw new TypeError(name + " must be an object");
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(name + " must be a plain data object");
+  }
   const allowed = new Set([...required, ...optional]);
   for (const key of required) {
     if (!Object.hasOwn(value, key)) throw new TypeError(name + "." + key + " is required");
@@ -180,6 +184,12 @@ export function normalizeCoreRateLimitDecision(input) {
   }
   if (input.allowed && (input.status !== null || input.retryAfterSeconds !== null)) {
     throw new TypeError("an allowed decision cannot carry a blocking status or retry delay");
+  }
+  if (input.allowed && input.unavailable) {
+    throw new TypeError("an allowed decision cannot report an unavailable dependency");
+  }
+  if (input.allowed && input.enforced && input.exceeded) {
+    throw new TypeError("an enforced exceeded quota cannot be allowed");
   }
   if (!input.allowed && input.status === null) {
     throw new TypeError("a denied decision must identify an enforced 429 or 503 status");
