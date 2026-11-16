@@ -14,7 +14,8 @@ const REQUEST = Object.freeze({
   environment: "production",
   incidentId: "incident-2026-001",
   action: "restart-service",
-  securityState: "clear"
+  securityState: "clear",
+  health: { consecutiveFailures: 3, lastRestartAt: null }
 });
 
 function makePolicy(overrides = {}) {
@@ -173,6 +174,16 @@ test("A1 restart requires an exact allowlist entry, production environment match
   assert.equal(engine.evaluate({ ...REQUEST, environment: "staging" }).reason, "environment-mismatch");
   assert.equal(engine.evaluate({ ...REQUEST, securityState: "unknown" }).reason, "security-state-not-clear");
   assert.equal(engine.evaluate({ ...REQUEST, securityState: "suspected" }).reason, "security-state-not-clear");
+  assert.equal(engine.evaluate({
+    ...REQUEST, health: { consecutiveFailures: 2, lastRestartAt: null }
+  }).reason, "failure-threshold-not-reached");
+  assert.equal(engine.evaluate({
+    ...REQUEST, health: { consecutiveFailures: 3, lastRestartAt: NOW - 1000 }
+  }).reason, "restart-cooldown-active");
+  assert.equal(engine.evaluate({
+    ...REQUEST, health: { consecutiveFailures: 3, lastRestartAt: NOW + 1000 }
+  }).reason, "health-clock-inconsistency");
+  assert.equal(engine.evaluate({ ...REQUEST, health: null }).reason, "invalid-capability-request");
   assert.equal(engine.evaluate({ ...REQUEST, action: "failover" }).reason, "action-not-allowlisted");
 });
 
@@ -280,6 +291,26 @@ test("capability reservations enforce per-incident concurrency and action budget
   const exhausted = await engine.authorize(REQUEST);
   assert.equal(exhausted.authorized, false);
   assert.equal(exhausted.reason, "incident-action-budget-exhausted");
+});
+
+test("service maxRestartsPerHour narrows the global hourly asset budget", async () => {
+  const policy = makePolicy({
+    budgets: {
+      maxConcurrentActionsPerIncident: 1,
+      maxActionsPerIncident: 3,
+      maxActionsPerAssetPerHour: 3,
+      maxAutomaticContainmentsPerIncident: 1
+    }
+  });
+  policy.services[0].recovery.maxRestartsPerHour = 1;
+  policy.policyHash = computeAdvancedPolicyHash(policy);
+  const engine = makeEngine(policy);
+  const first = await engine.authorize(REQUEST);
+  assert.equal(first.authorized, true);
+  await engine.completeAuthorization({ authorization: first.authorization, outcome: "succeeded" });
+  const second = await engine.authorize(REQUEST);
+  assert.equal(second.authorized, false);
+  assert.equal(second.reason, "asset-hourly-budget-exhausted");
 });
 
 test("capability ledger and revision-store failures block authorization", async () => {
