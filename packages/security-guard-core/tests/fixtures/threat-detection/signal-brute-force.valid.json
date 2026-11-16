@@ -11,5 +11,6 @@
   "ruleId": "JBG-AUTH-BRUTE-001",
   "subjectKey": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "routeTemplate": "/api/login",
-  "evidenceCount": 8
+  "evidenceCount": 8,
+  "subjectKeyId": "k2026-01"
 }
