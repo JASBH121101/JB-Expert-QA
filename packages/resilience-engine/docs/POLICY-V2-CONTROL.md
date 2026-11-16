@@ -82,7 +82,8 @@ const request = {
   environment: "production",
   incidentId: "incident-2026-001",
   action: "restart-service",
-  securityState: "clear"
+  securityState: "clear",
+  health: { consecutiveFailures: 3, lastRestartAt: null }
 };
 
 const decision = controller.evaluate(request);
