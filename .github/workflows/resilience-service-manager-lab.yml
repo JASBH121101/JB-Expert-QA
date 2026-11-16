@@ -1,0 +1,48 @@
+name: JB Resilience Real Service Manager Lab
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/resilience-engine/src/adapters/**"
+      - "scripts/resilience-service-manager-lab.mjs"
+      - ".github/workflows/resilience-service-manager-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: resilience-service-manager-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-systemd:
+    name: Real systemd service restart / Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Exercise the real systemd manager through the typed adapter
+        run: node scripts/resilience-service-manager-lab.mjs
+
+  windows-scm:
+    name: Real Windows SCM service restart / Windows Server 2022
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Exercise the real Windows SCM through the typed adapter
+        run: node scripts/resilience-service-manager-lab.mjs
