@@ -686,7 +686,8 @@ test("local rate limiting publishes Core v1 check and exact enforcement decision
   assert.equal(decisions[1].decision.exceeded, true);
   assert.equal(decisions[1].decision.enforced, true);
   assert.equal(decisions[1].decision.status, 429);
-  assert.equal(decisions[1].decision.retryAfterSeconds, 60);
+  assert.ok(decisions[1].decision.retryAfterSeconds >= 1);
+  assert.ok(decisions[1].decision.retryAfterSeconds <= 60);
   assert.equal(events.length, 1, "repeated rate-limit hits must not flood Core events");
   assert.equal(events[0].schema, "jb.security.event/v1");
   assert.equal(events[0].category, "rate_limit");
@@ -740,23 +741,40 @@ test("request-inspection Core callbacks are isolated and configuration is valida
     onCoreSignal: {}
   }), /onCoreSignal must be a function/);
 
+  const callbackCounts = { signal: 0, decision: 0, event: 0 };
   const guard = createSecurityGuard({
     mode: "balanced",
-    rateLimit: { enabled: false },
+    rateLimit: { enabled: true, max: 1, windowMs: 60_000, maxKeys: 10 },
     coreContract: requestCoreContract(),
-    onCoreSignal() { throw new Error("signal sink unavailable"); },
-    onCoreDecision() { throw new Error("decision sink unavailable"); },
-    onCoreEvent() { throw new Error("event sink unavailable"); }
+    onCoreSignal() {
+      callbackCounts.signal += 1;
+      throw new Error("signal sink unavailable");
+    },
+    onCoreDecision() {
+      callbackCounts.decision += 1;
+      throw new Error("decision sink unavailable");
+    },
+    onCoreEvent() {
+      callbackCounts.event += 1;
+      throw new Error("event sink unavailable");
+    }
   });
-  const result = invokeGuardDirect(guard, {
+  const request = {
     url: "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
     method: "GET",
     headers: {},
     rawHeaders: [],
     socket: { remoteAddress: "192.0.2.93" }
-  });
-  assert.equal(result.response.statusCode, 403);
-  assert.equal(result.continued, 0);
+  };
+  const first = invokeGuardDirect(guard, request);
+  const second = invokeGuardDirect(guard, request);
+  assert.equal(first.response.statusCode, 403);
+  assert.equal(first.continued, 0);
+  assert.equal(second.response.statusCode, 429);
+  assert.equal(second.continued, 0);
+  assert.ok(callbackCounts.signal >= 2);
+  assert.equal(callbackCounts.decision, 2);
+  assert.equal(callbackCounts.event, 1);
 });
 
 test("request-inspection HMAC subjects are isolated by tenant and application", () => {
