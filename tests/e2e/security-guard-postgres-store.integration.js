@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { createPostgresRateLimitStore } from "@jb/security-guard/postgres-rate-limit-store";
+import { createCoreRateLimitCounterKey } from "@jb/security-guard/core-contract-v1";
 
 const connectionString = process.env.QA_DATABASE_URL;
 if (!connectionString) throw new Error("QA_DATABASE_URL is required for the isolated PostgreSQL integration test");
@@ -12,6 +13,15 @@ const store = createPostgresRateLimitStore({
 });
 const namespace = "guard-ci-" + randomBytes(8).toString("hex");
 const concurrentKey = namespace + ":" + randomBytes(32).toString("hex");
+const coreV1ConcurrentKey = createCoreRateLimitCounterKey({
+  tenantId: "tenant-integration",
+  applicationId: "security-guard-ci",
+  policyId: "concurrency",
+  scope: "login",
+  identityType: "account",
+  keyId: "ci-key-v1",
+  identityKey: randomBytes(32).toString("hex")
+});
 const expiryKey = namespace + ":" + randomBytes(32).toString("hex");
 
 try {
@@ -30,6 +40,18 @@ try {
   assert.equal(Math.max(...concurrent.map((item) => item.count)), 100);
   assert.ok(concurrent.every((item) => item.retryAfterMs >= 0 && item.retryAfterMs <= 60_000));
 
+  const coreV1Concurrent = await Promise.all(Array.from({ length: 100 }, (_, index) =>
+    store.consumeLimit({
+      key: coreV1ConcurrentKey,
+      now: 2_000_000 + index,
+      windowMs: 60_000,
+      maxRequests: 17
+    })
+  ));
+  assert.equal(coreV1Concurrent.filter((item) => item.allowed).length, 17);
+  assert.equal(coreV1Concurrent.filter((item) => !item.allowed).length, 83);
+  assert.equal(Math.max(...coreV1Concurrent.map((item) => item.count)), 100);
+
   const firstWindow = await store.consumeLimit({
     key: expiryKey, now: 10, windowMs: 1000, maxRequests: 1
   });
@@ -45,11 +67,11 @@ try {
   assert.equal(afterRollover.allowed, true);
   assert.equal(afterRollover.count, 1);
 
-  console.log("PASS: PostgreSQL atomic upsert enforced concurrent quota and database-clock window rollover.");
+  console.log("PASS: PostgreSQL atomic upsert enforced legacy and Core v1 concurrent quotas plus database-clock rollover.");
 } finally {
   await pool.query(
     "DELETE FROM jb_security_guard_rate_limits WHERE counter_key = ANY($1::text[])",
-    [[concurrentKey, expiryKey]]
+    [[concurrentKey, coreV1ConcurrentKey, expiryKey]]
   ).catch(() => {});
   await pool.end();
 }
