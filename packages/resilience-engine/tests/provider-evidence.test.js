@@ -39,7 +39,7 @@ function createFixture({ providerOverrides = {} } = {}) {
     keys.set(keyId, {
       schema: "jb.resilience.provider-trust-key/v1",
       keyId,
-      keyVersion: overrides.keyVersion ?? 1,
+      keyVersion: 1,
       algorithm: "Ed25519",
       publicKeyPem: publicKey.export({ type: "spki", format: "pem" }),
       providerId,
@@ -75,7 +75,7 @@ function createFixture({ providerOverrides = {} } = {}) {
       issuedAtMs: NOW - 1_000,
       expiresAtMs: NOW + 10_000,
       keyId,
-      keyVersion: 1,
+      keyVersion: overrides.keyVersion ?? 1,
       algorithm: "Ed25519",
       facts: { ...ROLE_FACTS[role] },
       evidenceRefs: [{
