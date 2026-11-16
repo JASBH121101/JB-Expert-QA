@@ -1,0 +1,15 @@
+{
+  "schema": "jb.security.event/v1",
+  "eventId": "c47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "occurredAtMs": 1794837600000,
+  "tenantId": "tenant-demo",
+  "applicationId": "catalog-api",
+  "producer": "security-guard-js",
+  "category": "rate_limit",
+  "ruleId": "JBG-RATE-001",
+  "severity": "high",
+  "action": "blocked",
+  "outcome": "denied",
+  "subjectKey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "scope": "catalog:list"
+}
