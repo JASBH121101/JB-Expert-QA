@@ -82,7 +82,7 @@ test("Core v1 HMAC refuses short secrets and noncanonical identity values", asyn
     cryptoApi: webcrypto
   };
   await assert.rejects(() => deriveCoreIdentityKey(base), /at least 32 bytes/);
-  await assert.rejects(() => deriveCoreIdentityKey({ ...base, secret: new Uint8Array(32), canonicalIdentity: "user\0123" }), /without NUL/);
+  await assert.rejects(() => deriveCoreIdentityKey({ ...base, secret: new Uint8Array(32), canonicalIdentity: "user" + String.fromCharCode(0) + "123" }), /without NUL/);
   await assert.rejects(() => deriveCoreIdentityKey({ ...base, secret: new Uint8Array(32), canonicalIdentity: "\ud800" }), /valid, stable Unicode/);
 });
 
