@@ -96,7 +96,7 @@ test("filters progressively through the selected difficulty and reports weighted
 
 test("does not count target-scope skips as missing executions or falsely certify incomplete engines", async () => {
   const lab = createThreatLab();
-  for (const id of ["engine-a", "engine-b"]) {
+  for (const id of ["engine-a", "engine-b", "engine-c"]) {
     lab.registerTarget({
       id,
       kind: "test-engine",
@@ -107,9 +107,9 @@ test("does not count target-scope skips as missing executions or falsely certify
   registerScenario(lab, "beta-advanced", "advanced", ["engine-b"]);
 
   const report = await lab.run();
-  assert.equal(report.results.length, 4);
-  assert.equal(report.results.filter((result) => result.skipReason === "target_scope").length, 2);
-  assert.equal(report.assessment.targets.length, 2);
+  assert.equal(report.results.length, 6);
+  assert.equal(report.results.filter((result) => result.skipReason === "target_scope").length, 4);
+  assert.equal(report.assessment.targets.length, 3);
   assert.equal(report.assessment.ready, false);
 
   const alpha = report.assessment.targets.find((item) => item.target.id === "engine-a");
@@ -119,6 +119,10 @@ test("does not count target-scope skips as missing executions or falsely certify
   assert.deepEqual(beta.coveredLevels, ["advanced"]);
   assert.equal(alpha.ready, false);
   assert.equal(beta.ready, false);
+  const gamma = report.assessment.targets.find((item) => item.target.id === "engine-c");
+  assert.equal(gamma.total, 0);
+  assert.deepEqual(gamma.missingLevels, ["basic", "intermediate", "advanced", "expert", "extreme", "superextreme"]);
+  assert.equal(gamma.ready, false);
 });
 
 test("adapter skips remain visible and prevent a tier from being certified", async () => {
