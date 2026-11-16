@@ -503,7 +503,7 @@ test("upload Core v1 reports promotion only after clean scanning and omits file 
   const serialized = JSON.stringify(events);
   assert.equal(serialized.includes(fileName), false);
   assert.equal(serialized.includes(result.sha256), false);
-  assert.equal(serialized.includes(result.uploadId), false);
+  assert.equal(events[0].correlationId, result.uploadId, "the generated upload UUID is the event correlation ID");
 });
 
 test("upload Core v1 distinguishes malware rejection from a quarantined unknown verdict", async () => {
