@@ -111,6 +111,8 @@ Weights increase exponentially so a missed high-difficulty case cannot be hidden
 
 ### Initial coverage map
 
+
+These tier footprints are an inventory across separate local test files. The current test runner executes those files independently; it does not yet merge their results into one cross-suite certification report. Each report certifies only the scenarios selected and executed in that individual run.
 The first classification of existing scenarios currently gives these per-engine tier footprints:
 
 | Engine | Covered tiers | Current gaps |
