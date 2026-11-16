@@ -74,10 +74,18 @@ function makePolicy(overrides = {}) {
 const verifySignature = ({ signature }) => signature.value === "signed-policy-fixture-value";
 
 function makeEngine(policy = makePolicy(), options = {}) {
+  const policyRevisionStore = options.policyRevisionStore ?? createMemoryPolicyRevisionStore();
+  if (typeof policyRevisionStore.setCurrentPolicy === "function") {
+    policyRevisionStore.setCurrentPolicy({
+      policyId: policy.policyId,
+      revision: policy.revision,
+      policyHash: policy.policyHash
+    });
+  }
   return createResiliencePolicyEngine({
     policy,
     verifyPolicySignature: verifySignature,
-    policyRevisionStore: options.policyRevisionStore ?? createMemoryPolicyRevisionStore(),
+    policyRevisionStore,
     capabilityLedger: options.capabilityLedger ?? createMemoryCapabilityLedger(),
     allowInMemoryStores: true,
     clock: options.clock ?? (() => NOW),
@@ -223,14 +231,18 @@ test("A2 and A3 are denied until their independent signal and failover control p
   }).reason, "failover-control-plane-not-certified");
 });
 
-test("policy revision store rejects rollback and equal-revision hash substitution", async () => {
+test("policy revision registry requires owner activation and rejects rollback/hash substitution", async () => {
   const store = createMemoryPolicyRevisionStore();
   const first = { policyId: "jb-prod-continuity", revision: 4, policyHash: "a".repeat(64) };
-  assert.equal(await store.acceptRevision(first), true);
-  assert.equal(await store.acceptRevision(first), true);
-  assert.equal(await store.acceptRevision({ ...first, policyHash: "b".repeat(64) }), false);
-  assert.equal(await store.acceptRevision({ ...first, revision: 3 }), false);
-  assert.equal(await store.acceptRevision({ ...first, revision: 5 }), true);
+  assert.equal(await store.assertCurrent(first), false);
+  assert.equal(store.setCurrentPolicy(first), true);
+  assert.equal(await store.assertCurrent(first), true);
+  assert.equal(store.setCurrentPolicy({ ...first, policyHash: "b".repeat(64) }), false);
+  assert.equal(store.setCurrentPolicy({ ...first, revision: 3 }), false);
+  const next = { ...first, revision: 5 };
+  assert.equal(store.setCurrentPolicy(next), true);
+  assert.equal(await store.assertCurrent(first), false);
+  assert.equal(await store.assertCurrent(next), true);
 });
 
 test("old authorization becomes invalid as soon as a newer policy revision is accepted", async () => {
@@ -248,7 +260,7 @@ test("old authorization becomes invalid as soon as a newer policy revision is ac
   assert.equal(second.authorized, true);
   assert.deepEqual(
     await oldEngine.assertAuthorization({ authorization: first.authorization, request: REQUEST }),
-    { valid: false, reason: "policy-revision-rollback-or-store-failure" }
+    { valid: false, reason: "policy-revision-not-current-or-store-failure" }
   );
 });
 
@@ -318,10 +330,10 @@ test("service maxRestartsPerHour narrows the global hourly asset budget", async 
 test("capability ledger and revision-store failures block authorization", async () => {
   const failingRevisionStore = {
     durable: true,
-    async acceptRevision() { throw new Error("database unavailable"); }
+    async assertCurrent() { throw new Error("database unavailable"); }
   };
   const engine = makeEngine(makePolicy(), { policyRevisionStore: failingRevisionStore });
-  assert.equal((await engine.authorize(REQUEST)).reason, "policy-revision-rollback-or-store-failure");
+  assert.equal((await engine.authorize(REQUEST)).reason, "policy-revision-not-current-or-store-failure");
 
   const failingLedger = {
     durable: true,
