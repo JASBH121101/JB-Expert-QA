@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import {
+  createSecurityEventCoreV1,
+  normalizeSecurityEventCoreContract,
+  safelyEmitSecurityEventCore
+} from "./security-event-core-v1.js";
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
@@ -98,6 +103,63 @@ function safeNotify(onEvent, action, reason) {
     }
   } catch {
     // Telemetry must never change the upload decision.
+  }
+}
+
+function emitUploadCoreEvent(core, callback, action, reason, uploadId) {
+  if (!core) return;
+  const normalizedReason = typeof reason === "string" ? reason.toLowerCase() : "";
+  let descriptor;
+  if (action === "approved") {
+    descriptor = {
+      ruleId: "JBG-UPLOAD-SCAN-001",
+      severity: "info",
+      action: "promoted",
+      outcome: "success",
+      scope: "clean_scan"
+    };
+  } else if (action === "quarantined") {
+    descriptor = {
+      ruleId: normalizedReason === "malware_detected"
+        ? "JBG-MALWARE-001"
+        : "JBG-UPLOAD-QUARANTINE-001",
+      severity: normalizedReason === "malware_detected" ? "critical" : "high",
+      action: "quarantined",
+      outcome: "observed",
+      scope: "upload_quarantine"
+    };
+  } else if (action === "cleanup_failed") {
+    descriptor = {
+      ruleId: "JBG-UPLOAD-CLEANUP-001",
+      severity: "high",
+      action: "rejected",
+      outcome: "error",
+      scope: "quarantine_cleanup"
+    };
+  } else if (action === "rejected") {
+    descriptor = {
+      ruleId: normalizedReason === "malware_detected"
+        ? "JBG-MALWARE-001"
+        : "JBG-UPLOAD-INSPECT-001",
+      severity: normalizedReason === "malware_detected" ? "critical" : "high",
+      action: "rejected",
+      outcome: "denied",
+      scope: "upload_inspection"
+    };
+  } else {
+    return;
+  }
+
+  try {
+    const event = createSecurityEventCoreV1(core, {
+      category: "upload",
+      ...descriptor,
+      correlationId: uploadId,
+      occurredAtMs: Date.now()
+    });
+    safelyEmitSecurityEventCore(callback, event);
+  } catch {
+    // Core telemetry is observational and must never change upload disposition.
   }
 }
 
@@ -229,7 +291,7 @@ function validateScanner(scanner) {
   }
 }
 
-async function deleteQuarantine(store, uploadId, onEvent) {
+async function deleteQuarantine(store, uploadId, notify) {
   let timeoutHandle;
   const deletePromise = Promise.resolve().then(() => store.delete({ uploadId }));
   deletePromise.catch(() => {});
@@ -239,7 +301,7 @@ async function deleteQuarantine(store, uploadId, onEvent) {
   try {
     await Promise.race([deletePromise, timeoutPromise]);
   } catch {
-    safeNotify(onEvent, "cleanup_failed", "quarantine_delete_failed");
+    notify("cleanup_failed", "quarantine_delete_failed");
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -348,7 +410,7 @@ export function createUploadInspector(options = {}) {
 
   const allowedOptions = new Set([
     "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "allowedMimeTypes", "onEvent",
-    "securityBridge"
+    "securityBridge", "coreContract", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
     if (!allowedOptions.has(key)) throw new TypeError("Unknown upload inspector option: " + key);
@@ -385,6 +447,9 @@ export function createUploadInspector(options = {}) {
 
   const onEvent = options.onEvent ?? (() => {});
   if (typeof onEvent !== "function") throw new TypeError("onEvent must be a function");
+  const coreContract = normalizeSecurityEventCoreContract(options.coreContract);
+  const onCoreEvent = options.onCoreEvent ?? (() => {});
+  if (typeof onCoreEvent !== "function") throw new TypeError("onCoreEvent must be a function");
   const securityBridge = options.securityBridge ?? null;
   if (securityBridge !== null && (!isRecord(securityBridge) ||
       typeof securityBridge.submitAssessment !== "function")) {
@@ -405,6 +470,10 @@ export function createUploadInspector(options = {}) {
       throw new UploadInspectionError("INVALID_INPUT");
     }
     const uploadId = randomUUID();
+    const notify = (action, reason) => {
+      safeNotify(onEvent, action, reason);
+      emitUploadCoreEvent(coreContract, onCoreEvent, action, reason, uploadId);
+    };
     let quarantineAttempted = false;
     let retainQuarantine = false;
 
@@ -417,7 +486,7 @@ export function createUploadInspector(options = {}) {
           ingestTimeoutMs,
           (lateWriter) => {
             lateWriter?.destroy?.();
-            return deleteQuarantine(store, uploadId, onEvent);
+            return deleteQuarantine(store, uploadId, notify);
           }
         );
       } catch (error) {
@@ -594,7 +663,7 @@ export function createUploadInspector(options = {}) {
         throw new UploadInspectionError("APPROVAL_FAILED");
       }
 
-      safeNotify(onEvent, "approved", "clean_scan");
+      notify("approved", "clean_scan");
       return Object.freeze({
         status: "approved",
         uploadId,
@@ -602,10 +671,10 @@ export function createUploadInspector(options = {}) {
       });
     } catch (error) {
       if (quarantineAttempted && !retainQuarantine) {
-        await deleteQuarantine(store, uploadId, onEvent);
+        await deleteQuarantine(store, uploadId, notify);
       }
       const code = error instanceof UploadInspectionError ? error.code : "PROCESSING_FAILED";
-      safeNotify(onEvent, retainQuarantine ? "quarantined" : "rejected", code.toLowerCase());
+      notify(retainQuarantine ? "quarantined" : "rejected", code.toLowerCase());
       throw new UploadInspectionError(code);
     }
   }
