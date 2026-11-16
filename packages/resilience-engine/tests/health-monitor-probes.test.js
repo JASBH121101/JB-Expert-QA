@@ -237,12 +237,12 @@ test("custom probe timeout aborts the host callback signal", async () => {
   assert.equal(signal.aborted, true);
 });
 
-test("probe concurrency never exceeds its configured bound", async () => {
+test("probe concurrency is bounded globally across simultaneous service checks", async () => {
   const { monitor } = makeMonitor();
   let active = 0;
   let peak = 0;
   const probes = Array.from({ length: 6 }, (_, index) =>
-    customProbe("probe-" + index, "catalog", async () => {
+    customProbe("probe-" + index, index < 3 ? "catalog-a" : "catalog-b", async () => {
       active += 1;
       peak = Math.max(peak, active);
       await new Promise((resolve) => setTimeout(resolve, 15));
@@ -255,8 +255,11 @@ test("probe concurrency never exceeds its configured bound", async () => {
     probes,
     maxConcurrentProbes: 2
   });
-  const result = await adapter.probeService({ serviceId: "catalog" });
-  assert.equal(result.healthy, true);
+  const results = await Promise.all([
+    adapter.probeService({ serviceId: "catalog-a" }),
+    adapter.probeService({ serviceId: "catalog-b" })
+  ]);
+  assert.equal(results.every((result) => result.healthy), true);
   assert.equal(peak, 2);
 });
 
