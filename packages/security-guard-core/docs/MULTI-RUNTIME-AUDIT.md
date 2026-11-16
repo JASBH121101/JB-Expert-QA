@@ -1,76 +1,104 @@
 # JB Security Guard multi-runtime audit
 
 - Audit date: 2026-11-16
-- Audited baseline: main at 821a2e88000b403b1fa24a446a5335587efd0d3c
-- Laboratory branch: feature/security-guard-multiruntime-core-lab
-- Scope: repository source and documentation review; no production systems, Cloudflare resources, databases, DNS, WAF, or customer projects were modified.
+- Audited baseline: `main` at `9d5b37182b52a8e676c49be71023f0823a45e72e`
+- Documentation branch: `docs/security-guard-core-current-coverage-audit`
+- Scope: repository source, tests, contract schemas and module documentation. No production systems, Cloudflare resources, databases, DNS, WAF, customer projects, secrets or paid services were modified.
 
 ## Executive result
 
-Reuse the existing Security Guard implementation. Do not create parallel security engines or replace the public JavaScript API. The repository already contains a substantial Node.js/Cloudflare security surface, but it does not yet provide a complete language-neutral runtime contract, PHP or Python SDKs, a shared production store implementation, or a public cross-runtime service API.
+Reuse the existing Security Guard implementation. Do not create parallel security engines or replace the public JavaScript API. The language-neutral Core remains contract-only: versioned JSON Schemas, semantics and shared fixtures. It is not a central server and contains no executable runtime logic.
 
-The Core introduced in this branch is contract-only: JSON Schemas and fixtures. It is not a central server and contains no executable runtime logic.
+The JavaScript/Node adapter now has opt-in Core v1 integrations across request rate limiting, authentication, account recovery, CSRF, origin checks, uploads and request-inspection threat signals. The adapter is still **partially integrated**, not fully certified: the threat-assessment schema has a validator, but there is no calibrated multi-signal assessment engine or server-owned threat policy that creates assessments.
+
+PHP/Laravel and Python/FastAPI adapters remain unimplemented. Cloudflare Workers and Pages have rate-limit-specific adapters, not complete parity with the Node middleware surface.
+
+## Current Node.js Core v1 coverage
+
+The existing Node package keeps its legacy exports and adds opt-in Core v1 outputs:
+
+| Area | Core v1 integration | Important boundary |
+| --- | --- | --- |
+| Local request rate limiting | Emits validated rate-limit checks and decisions, plus a sanitized rate-limit event on a new exceeded incident. | Process-local memory only; not a globally consistent counter. |
+| Distributed rate limiting | Emits Core v1 checks, decisions and sanitized events. | Requires the host to inject an atomic shared store. |
+| Authentication | Local and distributed protectors emit authentication attempts, decisions and sanitized events. | An `allow` decision means the throttle did not block the request; it does not establish that credentials are valid. |
+| Account recovery | Emits sanitized recovery events and verification attempts/decisions after outcomes are known. | The generic `requestRecovery()` acceptance response is not represented as successful authentication. |
+| CSRF and origin | Emits sanitized Core security events for rejected unsafe requests. | CSRF may correlate a session using HMAC; raw session/token and Origin/Referer values are excluded. |
+| Upload inspection | Emits events for promotion, rejection, quarantine and cleanup failure. | Promotion is reported only after the storage adapter confirms it; events exclude file names, hashes, content and scanner details. |
+| Request inspection | Emits normalized threat signals for existing request findings, plus local rate-limit decisions. | Signals are evidence only; they do not create a threat assessment or change existing enforcement. |
+
+The Node conformance suite runs all eight shared Core v1 fixtures through both JSON Schema validation and the native JavaScript runtime validators: rate-limit check/decision, authentication attempt/decision, security event, rate-limit policy, threat signal and threat assessment. The latest module integration work was exercised in Node 22/24 and on Ubuntu/Windows CI. These checks establish tested implementation behavior for the covered paths; they are not a security certification or a statistical precision/recall study.
+
+### Threat assessment is still a separate stage
+
+- `validateThreatSignalV1()` and `validateThreatAssessmentV1()` validate the wire contracts.
+- The request inspector emits threat signals. Its confidence values are explicitly heuristic weights, not statistically calibrated probabilities.
+- There is no Core v1 multi-signal aggregation engine or server-owned threat-assessment policy that produces risk scores and `observe/challenge/block/review` decisions.
+- Do not automatically block an actor from one weak heuristic signal. A future assessment layer needs explicit policy, bounded evidence aggregation, false-positive/evasion tests and a documented calibration process.
+- The older double-filter protocol `jb.security.assessment/v1` is separate. It combines Expert QA and Security Guard verdicts for the same resource; it does not provide Core threat-assessment risk scores or Core signal IDs. It must not be translated into `threat-assessment/v1` by inventing scores or signal references.
 
 ## Existing module inventory
 
 | Area | Existing implementation | Current status / boundary |
 | --- | --- | --- |
-| General request controls | createSecurityGuard() in packages/security-guard/src/index.js | Node.js / Express-compatible; includes request-target checks and process-local rate limiting. |
-| Request threat signatures | detectRequestThreats() inside the Node entry module | Pattern-based request-target/header checks; not a full WAF, parser-aware SQLi detector, bot classifier, or risk-scoring engine. |
-| General distributed rate limiting | createDistributedRateLimit() | Node middleware; store is injected and must provide atomic consumeLimit(). |
-| Authentication throttling | createAuthProtection() | Process-local account, account+client, and client scopes with bounded state and progressive lockout. Account-only blocking needs DoS-aware policy review. |
-| Distributed authentication | createDistributedAuthProtection() | Async adapter over injected shared atomic store. Backend consistency, transactions, TTL and outage semantics remain the host adapter's responsibility. |
-| Account recovery | createAccountRecovery(), createMemoryRecoveryStore() | Recovery challenges and scoped throttles exist; default memory storage is process-local. External delivery providers and production persistence are injected. |
-| Security headers | createSecurityHeaders() | Existing Node middleware. |
-| Origin validation | createOriginProtection() | Existing Node middleware for browser routes using ambient credentials. |
-| CSRF | createCsrfProtection() | HMAC/session-bound synchronizer-token helper; session storage and lifecycle remain host-owned. |
-| HTTP server hardening | configureNodeHttpServer() | Node HTTP/HTTPS server controls; does not apply to Workers or HTTP/2, and framework multipart/parser limits remain necessary. |
-| Upload inspection | createUploadInspector() | Streaming hash/size verification, quarantine-store and scanner contracts, timeout and atomic-promotion requirements. Requires a real scanner and production storage adapter. Signature/type identification is not antivirus or full format validation. |
-| Cloudflare Worker rate limit | createCloudflareWorkerRateLimit() | Runtime-native Cloudflare binding adapter; counters are approximate and location-scoped, not globally exact. |
-| Worker-to-Pages bridge | createCloudflareWorkerRateLimitService(), createCloudflarePagesRateLimit() | Private Service Binding pattern; current endpoint is not a public authenticated API. |
-| Security events | Module-specific onEvent callbacks | Sanitization exists in multiple modules, but there is no unified versioned event registry or central telemetry pipeline. |
-| Policy management | Per-module options and mode settings | No central tenant/application policy manager or policy precedence engine was found. |
-| Threat scoring | No complete cross-module scorer identified | Signals and rule findings exist; normalized signal aggregation, calibrated risk scoring, and policy-driven challenge/block decisions remain future work. |
+| General request controls | `createSecurityGuard()` in `packages/security-guard/src/index.js` | Node.js / Express-compatible request inspection and process-local rate limiting; Core signals/decisions are opt-in. |
+| Request threat signatures | `detectRequestThreats()` | Pattern-based request-target/header checks; not a full WAF, parser-aware SQLi detector, bot classifier or calibrated risk-scoring engine. |
+| General distributed rate limiting | `createDistributedRateLimit()` | Node middleware; store is injected and must provide atomic `consumeLimit()`. |
+| Authentication throttling | `createAuthProtection()` | Process-local account, account+client and client scopes with bounded state and progressive lockout; Core attempt/decision/event bridge is opt-in. |
+| Distributed authentication | `createDistributedAuthProtection()` | Async adapter over injected shared atomic store; Core attempt/decision/event bridge is opt-in. Backend consistency, transactions, TTL and outage semantics remain the host adapter's responsibility. |
+| Account recovery | `createAccountRecovery()`, `createMemoryRecoveryStore()` | Recovery challenges and scoped throttles; Core events/verification bridge is opt-in. Default memory storage is process-local. |
+| Security headers | `createSecurityHeaders()` | Existing Node middleware; static header configuration, not a separate threat-assessment producer. |
+| Origin validation | `createOriginProtection()` | Existing Node middleware with opt-in sanitized Core event on rejection. |
+| CSRF | `createCsrfProtection()` | HMAC/session-bound synchronizer-token helper with opt-in sanitized Core event on rejection; session storage/lifecycle remain host-owned. |
+| HTTP server hardening | `configureNodeHttpServer()` | Node HTTP/HTTPS server controls; does not apply to Workers or HTTP/2. Framework multipart/parser limits remain necessary. |
+| Upload inspection | `createUploadInspector()` | Streaming hash/size verification, quarantine-store and scanner contracts, timeout and atomic-promotion requirements; Core terminal-outcome events are opt-in. A file signature/type check is not antivirus or full format validation. |
+| Cloudflare Worker rate limit | `createCloudflareWorkerRateLimit()` | Runtime-native binding adapter with Core rate-limit contract support; counters are approximate/location-scoped, not globally exact. |
+| Worker-to-Pages bridge | `createCloudflareWorkerRateLimitService()`, `createCloudflarePagesRateLimit()` | Private Service Binding pattern with Core rate-limit support; not a public authenticated API or a full Node middleware port. |
+| Security Bridge | `src/security-bridge/`, `packages/security-guard/src/security-bridge.js` | Separate local loopback double-filter protocol. Its verdicts and decisions are not Core threat signals or risk assessments. |
+| Security events | Module callbacks plus Core v1 schemas | Producers can emit versioned sanitized objects, but there is no central durable telemetry/event sink. |
+| Policy management | Per-module options and mode settings | No central tenant/application policy manager or policy-precedence engine was found. |
+| Threat scoring | Core signal/assessment validators only | No calibrated cross-module signal aggregator or policy-driven challenge/block assessment engine exists yet. |
 
 ## Multi-runtime implementation status
 
 | Runtime | Repository evidence | Status |
 | --- | --- | --- |
-| JavaScript / Node.js | packages/security-guard, exported middleware and tests | Existing implementation; primary compatibility baseline. |
-| JavaScript / Cloudflare Workers | Worker-native rate-limit adapter and tests | Partial runtime adapter; not the full Node middleware surface. |
-| JavaScript / Cloudflare Pages | Pages Service Binding client and tests | Partial request-rate adapter; Pages requires the private Worker service. |
-| PHP / Laravel / Symfony | No Security Guard Composer package or PHP runtime adapter found in the audited tree/search | Not implemented. |
-| Python / FastAPI / Django / Flask | No Security Guard PyPI package or Python runtime adapter found in the audited tree/search | Not implemented. |
+| JavaScript / Node.js | `packages/security-guard`, native validators, Core bridge tests and package CI | Existing implementation with partial Core v1 integration; primary compatibility baseline. |
+| JavaScript / Cloudflare Workers | Worker-native rate-limit adapter and tests | Partial runtime adapter for rate limiting; not the full Node middleware/auth/upload surface. |
+| JavaScript / Cloudflare Pages | Pages Service Binding client and tests | Partial rate-limit adapter; requires the private Worker service. |
+| PHP / Laravel / Symfony | No Security Guard Composer package or PHP runtime adapter | Not implemented. |
+| Python / FastAPI / Django / Flask | No Security Guard PyPI package or Python runtime adapter | Not implemented. |
 
-The existing SECURITY-INTEROPERABILITY.md defines cross-engine finding and malware-scanner boundaries. It is not a PHP/Python runtime contract or a universal middleware implementation.
+The existing `SECURITY-INTEROPERABILITY.md` defines cross-engine finding and malware-scanner boundaries. It is not a PHP/Python runtime contract or a universal middleware implementation.
 
 ## Gaps and risks
 
-1. The current rate-limit helper is a JavaScript API; the new schemas must be consumed by native PHP/Python validators rather than imported as executable JS.
-2. Existing Node distributed limiters depend on host-supplied atomic stores. The current Node HMAC namespace and Worker HMAC key composition differ; the new JS bridge must normalize tenant/application/identity-type context without changing the legacy API. Test fixtures do not establish production-grade distributed consistency.
-3. Worker rate-limit bindings are suitable as a low-latency approximate option, not as a strict globally exact counter.
-4. Authentication/account-recovery semantics must remain distinct from anonymous API quotas. Progressive account lockout can be abused to deny a victim access unless IP/account risk, generic responses, recovery paths, and thresholds are considered together.
-5. Threat patterns are heuristic signals. Blocking must be confidence- and policy-driven, with false-positive and evasion tests.
-6. Upload signature checks identify file types; they do not replace a maintained malware scanner, sandbox, CDR, safe image re-encoding, or atomic private-storage promotion.
-7. Module event payloads differ. Cross-runtime telemetry needs a strict allow-list, event schema version, stable IDs, clock semantics, and redaction tests.
-8. Tenant/application isolation, signing-key rotation, clock skew, request replay, bounded parsing, cancellation and failure modes require cross-runtime conformance tests.
-9. The current package targets Node.js 22+. Workers/Pages have separate entry points; importing Node entry points into edge runtimes is unsupported.
+1. **Threat assessment:** define a versioned, server-owned assessment policy and aggregation model before emitting risk scores or challenge/block decisions. Confidence weights from request signatures are uncalibrated heuristics.
+2. **Cross-runtime adapters:** PHP and Python implementations do not exist. Native validators, stores, cryptography and framework middleware must be implemented and tested independently.
+3. **Storage consistency:** distributed Node adapters depend on host-supplied atomic stores. No shared production store implementation is included in Core.
+4. **Cloudflare scope:** Worker binding counters are approximate and location-scoped; Pages/Worker support is rate-limit-specific, not full Node feature parity.
+5. **Telemetry:** versioned callbacks exist, but durable delivery, retry policy, retention, access control and operational monitoring belong to a separately reviewed sink.
+6. **Identity and key rotation:** tenant/application scoping and key IDs exist in the contracts; cross-runtime canonical HMAC derivation, rotation, dual-key migration and privacy-safe correlation still require identical conformance tests.
+7. **Authentication semantics:** authentication/recovery attempts and quota decisions must remain distinct. Progressive account lockout can be abused for denial of service unless identity scopes, recovery paths and thresholds are jointly reviewed.
+8. **Upload safety:** signature identification does not replace a maintained malware scanner, sandbox, CDR, safe re-encoding or atomic private-storage promotion.
+9. **Threat accuracy:** pattern matches can produce false positives and be evaded. Maintain benign corpora, adversarial cases and independent precision/recall measurements before treating scores as calibrated.
+10. **Runtime boundaries:** the package targets Node.js 22+. Workers/Pages have separate entry points; importing Node entry points into edge runtimes is unsupported.
 
 ## Target architecture
 
-- Core: language-neutral JSON Schemas, versioned policy semantics, event vocabulary, and conformance vectors. No Node-only imports and no central singleton service.
-- JavaScript adapter: keep @jb/security-guard and preserve existing exports; bridge the current helpers and Worker/Pages modules to the versioned contracts.
-- PHP adapter: native Composer package; Laravel first, then Symfony and generic middleware after independent tests.
-- Python adapter: native PyPI package; FastAPI first, then Django and Flask after independent tests.
-- Infrastructure adapters: per-runtime atomic store, framework identity resolver, scanner, quarantine storage, telemetry sink, clock and key provider are injected interfaces. Never assume one provider or database is available.
+- **Core:** language-neutral JSON Schemas, immutable contract semantics, policy schemas and conformance vectors. No Node-only imports and no central singleton service.
+- **JavaScript adapter:** keep `@jb/security-guard` and preserve existing exports; finish the remaining assessment/policy semantics and verify all runtime paths before calling the JS adapter complete.
+- **PHP adapter:** native Composer package; Laravel first, then Symfony and generic middleware after independent tests.
+- **Python adapter:** native PyPI package; FastAPI first, then Django and Flask after independent tests.
+- **Infrastructure adapters:** per-runtime atomic store, framework identity resolver, scanner, quarantine storage, telemetry sink, clock and key provider are injected interfaces. Never assume one provider or database is available.
 
 ## Implementation sequence and merge gates
 
-1. Complete the source audit and freeze v1 contract semantics.
-2. Build the JavaScript conformance bridge without breaking existing exports; run current Security Guard and package-distribution suites.
-3. Add PHP core contracts/adapter natively and test with disposable local stores and framework harnesses.
-4. Add Python core contracts/adapter natively and test with disposable local stores and framework harnesses.
-5. Run identical JSON contract vectors across Node, PHP and Python; test tenant isolation, HMAC key rotation, replay/idempotency, atomic concurrency, time boundaries, malformed payloads, timeouts, cancellation, and outage behavior.
+1. Freeze the remaining Core threat-assessment policy semantics; do not derive risk scores from legacy double-filter verdicts.
+2. Complete Node threat-assessment aggregation with explicit server-owned policy, bounded evidence, tenant isolation, benign/adversarial fixtures and calibrated evaluation. Keep enforcement opt-in and conservative.
+3. Implement PHP Core validators and Laravel adapter natively; run the shared JSON fixtures and runtime-specific security tests.
+4. Implement Python Core validators and FastAPI adapter natively; run the same shared JSON fixtures and runtime-specific security tests.
+5. Run identical contract vectors across Node, PHP and Python; test tenant isolation, HMAC key rotation, replay/idempotency, atomic concurrency, time boundaries, malformed payloads, timeouts, cancellation and outage behavior.
 6. Run bounded performance and memory tests; publish runtime packages independently only after release gates pass.
 
-No runtime is certified by the presence of a package directory alone. Compatibility labels must distinguish planned, implemented, tested, and certified.
+No runtime is certified by the presence of a package directory alone. Compatibility labels must distinguish planned, implemented, tested and certified.
