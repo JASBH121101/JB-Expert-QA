@@ -10,7 +10,7 @@ v2 is accepted only by the separate policy engine. It is not silently interprete
 
 The package does not include a production signing key, trust root or default verifier. The host must inject `verifyPolicySignature({ policy, signature, policyHash, signingPayload })`. The callback must verify the signature against an owner-controlled trust store and return the literal boolean `true`. Promise results, truthy objects and exceptions fail closed.
 
-The canonical signing payload is JSON with recursively sorted object keys and original array order, excluding `signature` and `policyHash`. `policyHash` is SHA-256 of that payload. The signature covers that same payload; the hash is provided to the verifier as a convenient independently checked digest. The signature metadata contains `keyId`, `algorithm` and `value`; the host is responsible for enforcing approved algorithms, key status, rotation and revocation.
+The canonical signing payload is JSON with recursively sorted object keys and original array order, excluding only `signature.value` and `policyHash`; the signing key ID and algorithm remain covered. `policyHash` is SHA-256 of that payload. The signature covers that same payload; the hash is provided to the verifier as a convenient independently checked digest. The signature metadata contains `keyId`, `algorithm` and `value`; the host is responsible for enforcing approved algorithms, key status, rotation and revocation.
 
 Validity timestamps must be canonical UTC ISO-8601 values. The policy is invalid before `notBefore`, at or after `expiresAt`, or when the clock is invalid.
 
