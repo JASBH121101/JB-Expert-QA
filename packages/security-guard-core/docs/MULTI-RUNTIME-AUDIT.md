@@ -20,7 +20,7 @@ The existing Node package keeps its legacy exports and adds opt-in Core v1 outpu
 | Area | Core v1 integration | Important boundary |
 | --- | --- | --- |
 | Local request rate limiting | Emits validated rate-limit checks and decisions, plus a sanitized rate-limit event on a new exceeded incident. | Process-local memory only; not a globally consistent counter. |
-| Distributed rate limiting | Emits Core v1 checks, decisions and sanitized events. | Requires the host to inject an atomic shared store. |
+| Distributed rate limiting | Emits Core v1 checks, decisions and sanitized events. | Requires an injected atomic shared store; an optional PostgreSQL adapter is available in the Node package. |
 | Authentication | Local and distributed protectors emit authentication attempts, decisions and sanitized events. | An `allow` decision means the throttle did not block the request; it does not establish that credentials are valid. |
 | Account recovery | Emits sanitized recovery events and verification attempts/decisions after outcomes are known. | The generic `requestRecovery()` acceptance response is not represented as successful authentication. |
 | CSRF and origin | Emits sanitized Core security events for rejected unsafe requests. | CSRF may correlate a session using HMAC; raw session/token and Origin/Referer values are excluded. |
@@ -43,7 +43,7 @@ The Node conformance suite runs all eight shared Core v1 fixtures through both J
 | --- | --- | --- |
 | General request controls | `createSecurityGuard()` in `packages/security-guard/src/index.js` | Node.js / Express-compatible request inspection and process-local rate limiting; Core signals/decisions are opt-in. |
 | Request threat signatures | `detectRequestThreats()` | Pattern-based request-target/header checks; not a full WAF, parser-aware SQLi detector, bot classifier or calibrated risk-scoring engine. |
-| General distributed rate limiting | `createDistributedRateLimit()` | Node middleware; store is injected and must provide atomic `consumeLimit()`. |
+| General distributed rate limiting | `createDistributedRateLimit()`, `createPostgresRateLimitStore()` | Node middleware with an injected atomic `consumeLimit()` store; PostgreSQL UPSERT adapter is covered by an isolated PostgreSQL 16 concurrency/rollover CI test. |
 | Authentication throttling | `createAuthProtection()` | Process-local account, account+client and client scopes with bounded state and progressive lockout; Core attempt/decision/event bridge is opt-in. |
 | Distributed authentication | `createDistributedAuthProtection()` | Async adapter over injected shared atomic store; Core attempt/decision/event bridge is opt-in. Backend consistency, transactions, TTL and outage semantics remain the host adapter's responsibility. |
 | Account recovery | `createAccountRecovery()`, `createMemoryRecoveryStore()` | Recovery challenges and scoped throttles; Core events/verification bridge is opt-in. Default memory storage is process-local. |
@@ -113,14 +113,14 @@ The isolated branch `feature/security-guard-closeout-lab` is being validated aga
 - The decision contract explicitly preserves fail-open semantics: `allowed=true, enforced=false, unavailable=true, exceeded=false` is valid when the store outage policy is fail-open. Fail-closed outages remain enforced HTTP 503. A permitted decision cannot be marked as enforced.
 - The distributed limiter now exposes `check(request)` and shares the same evaluation path with its middleware, preserving the existing Core decision/event callbacks and statistics.
 - `createUniversalRateLimitService()` is a Node.js server-to-server HTTP adapter. It requires authenticated app credentials, an exact path and method, bounded JSON, registered server-owned policies/scopes, and an injected atomic store. It rejects query strings and fails closed on store outage.
-- The universal API tests use a deterministic test-only atomic store. No Redis, Valkey, PostgreSQL or Neon production driver is included or certified. A real host adapter must supply an atomic `consumeLimit()` implementation shared by every replica.
+- Unit tests use a deterministic test store. The Node package also includes a parameterized PostgreSQL UPSERT store and the pull request runs an isolated PostgreSQL 16 concurrency/rollover integration test. No Redis/Valkey driver is included, and no customer Neon/production database is touched or certified. A host using the PostgreSQL adapter must supply its own Pool/query connection, migration rollout, backups and cleanup operations.
 - The universal HTTP endpoint must be deployed behind HTTPS and protected from credential guessing by appropriate upstream network controls. Credentials must never be exposed to browser clients.
 
 ## Explicit open items — do not label as certified
 
 1. PHP/Laravel and Python/FastAPI native adapters are not present in the repository yet.
-2. There is no production shared-store driver or distributed atomicity certification.
-3. HMAC key rotation/dual-key overlap is specified as a requirement but is not yet implemented as a managed cross-runtime lifecycle.
+2. The PostgreSQL shared-store adapter is validated against an ephemeral PostgreSQL 16 service in CI; Redis/Valkey adapters and live customer Neon/production verification remain out of scope.
+3. HMAC derivation is implemented and tested in Node; key rotation/dual-key overlap is specified but not yet implemented as a managed cross-runtime lifecycle.
 4. There is no central durable telemetry sink or tenant-scoped policy control plane.
 5. The threat score remains a deterministic policy index, not a calibrated probability. Precision/recall and adversarial evasion measurements are not yet available.
 6. Cloudflare Workers/Pages parity remains rate-limit-specific, not full parity with Node middleware.
