@@ -1,0 +1,109 @@
+name: NEXORA Threat Lab Profiles
+
+on:
+  pull_request:
+    branches: [integration/jb-threat-lab]
+    paths:
+      - "packages/threat-lab/tests/nexora-profiles.integration.test.js"
+      - "docs/NEXORA-THREAT-LAB-PROFILES.md"
+      - "packages/threat-lab/README.md"
+      - "docs/JB-THREAT-LAB.md"
+      - ".github/workflows/nexora-product-certification.yml"
+  push:
+    branches: [integration/jb-threat-lab]
+    paths:
+      - "packages/threat-lab/tests/nexora-profiles.integration.test.js"
+      - "docs/NEXORA-THREAT-LAB-PROFILES.md"
+      - ".github/workflows/nexora-product-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-threat-lab-profiles
+  cancel-in-progress: true
+
+jobs:
+  nexora-profiles:
+    name: NEXORA pinned product profiles · Node 22 / PHP 8.3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nexora
+          POSTGRES_USER: nexora
+          POSTGRES_PASSWORD: nexora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexora -d nexora"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout JB Expert QA and Threat Lab
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Checkout pinned NEXORA Configurable Catalog prototype
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: 88c4876c9678b93dadde55f79fe9d04890900741
+          path: nexora-catalog
+
+      - name: Checkout pinned NEXORA Laravel Site Engine
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: 3f68126ecc58b088c071007c5116bc95426d159b
+          path: nexora-site-engine
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Set up PHP 8.3 and Composer
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        with:
+          php-version: "8.3"
+          extensions: bcmath, curl, dom, fileinfo, intl, mbstring, openssl, pdo_pgsql, pdo_sqlite, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked Site Engine dependencies
+        working-directory: nexora-site-engine
+        run: |
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist --no-progress
+          php artisan key:generate --force
+
+      - name: Verify Laravel coding style
+        working-directory: nexora-site-engine
+        env:
+          COLUMNS: 200
+        run: composer lint
+
+      - name: Run NEXORA profile scenarios in JB Threat Lab
+        env:
+          NEXORA_CATALOG_ROOT: ${{ github.workspace }}/nexora-catalog
+          NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/nexora-site-engine
+          NEXORA_CATALOG_SHA: 88c4876c9678b93dadde55f79fe9d04890900741
+          NEXORA_SITE_ENGINE_SHA: 3f68126ecc58b088c071007c5116bc95426d159b
+        run: node --test packages/threat-lab/tests/nexora-profiles.integration.test.js
+
+      - name: Run full Laravel suite on PostgreSQL 16
+        working-directory: nexora-site-engine
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: nexora
+          DB_USERNAME: nexora
+          DB_PASSWORD: nexora
+          DB_URL: ""
+        run: composer test
