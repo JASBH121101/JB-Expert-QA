@@ -9,7 +9,7 @@ import {
   createResiliencePolicyEngine
 } from "../src/policy-engine.js";
 
-const NOW = 1_800_000_000_000;
+const NOW = Date.parse("2026-11-16T20:00:00Z");
 
 function trustedIncidentInput(overrides = {}) {
   return {
