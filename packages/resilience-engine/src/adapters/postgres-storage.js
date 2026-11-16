@@ -560,8 +560,8 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
         [sequence, AUDIT_SCHEMA, record.previousHash, hash, JSON.stringify(safeEntry)]
       );
       await client.query(
-        "UPDATE jb_resilience_audit_heads SET sequence=$2, last_hash=$3 WHERE head_id=1",
-        [1, sequence, hash]
+        "UPDATE jb_resilience_audit_heads SET sequence=$1, last_hash=$2 WHERE head_id=1",
+        [sequence, hash]
       );
       return true;
     });
