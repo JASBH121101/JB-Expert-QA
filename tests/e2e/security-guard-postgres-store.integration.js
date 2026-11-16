@@ -51,6 +51,7 @@ try {
   assert.equal(coreV1Concurrent.filter((item) => item.allowed).length, 17);
   assert.equal(coreV1Concurrent.filter((item) => !item.allowed).length, 83);
   assert.equal(Math.max(...coreV1Concurrent.map((item) => item.count)), 100);
+  assert.ok(coreV1Concurrent.every((item) => item.retryAfterMs >= 0 && item.retryAfterMs <= 60_000));
 
   const firstWindow = await store.consumeLimit({
     key: expiryKey, now: 10, windowMs: 1000, maxRequests: 1
