@@ -497,7 +497,7 @@ const service = createUniversalRateLimitService({
 // Mount service.fetch with your Node HTTP adapter at the configured exact path.
 ~~~
 
-The endpoint accepts server-to-server calls only. Keep the Bearer credential on application servers, expose the endpoint over HTTPS, register policies/scopes on the service, and provide a production atomic shared-store adapter. The included tests use an in-memory fixture; they do not certify Redis, Valkey, PostgreSQL or Neon. See [UNIVERSAL-RATE-LIMIT.md](docs/UNIVERSAL-RATE-LIMIT.md).
+The endpoint accepts server-to-server calls only. Keep the Bearer credential on application servers, expose the endpoint over HTTPS, register policies/scopes on the service, and provide a production atomic shared-store adapter. The included PostgreSQL adapter is covered by disposable PostgreSQL 16 CI, but this does not certify customer Neon/production databases or deployments. Redis/Valkey adapters are not included. See [UNIVERSAL-RATE-LIMIT.md](docs/UNIVERSAL-RATE-LIMIT.md).
 
 The Core v1 subpath also exports HMAC identity derivation and strict rate-limit request, decision, policy and counter-key helpers. See [Core identity derivation](../security-guard-core/docs/IDENTITY-KEY-DERIVATION.md).
 
@@ -524,4 +524,4 @@ const limiter = createDistributedRateLimit({
 });
 ~~~
 
-The store rejects keys that do not have the expected namespaced HMAC format, and provides bounded `pruneExpired()` cleanup. Retention must be at least 24 hours, the maximum supported fixed window. Tests for this adapter use a controlled query stub; a production deployment must still validate the SQL against its own PostgreSQL version, connection pool, migration process, backups and cleanup schedule. The adapter does not create or connect to any database by itself.
+The store accepts either the existing namespaced HMAC key format or the Core v1 length-prefixed counter-key format; it rejects raw identities. It provides bounded `pruneExpired()` cleanup. Retention must be at least 24 hours, the maximum supported fixed window. Unit tests use a controlled query stub, and disposable PostgreSQL 16 CI covers concurrent quotas and database-clock rollover for both key formats. A production deployment must still validate its own PostgreSQL version, connection pool, migrations, backups and cleanup schedule. The adapter does not bundle the `pg` driver and does not create or connect to any database by itself.
