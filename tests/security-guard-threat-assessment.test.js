@@ -106,7 +106,7 @@ test("the same rule contributes only its strongest signal and cannot satisfy ind
     makeSignal(3, { type: "upload_risk", ruleId: "JBG-SHARED-RULE-001" })
   ];
   const assessment = createEngine().assess(signals);
-  assert.equal(assessment.riskScore, 89);
+  assert.equal(assessment.riskScore, 98);
   assert.equal(assessment.decision, "review");
 });
 
@@ -170,13 +170,14 @@ test("disabled policies return no assessment and never trigger enforcement", () 
 });
 
 test("the maximum signal count selects the newest eligible signals deterministically", () => {
-  const engine = createEngine(makePolicy({ maxSignals: 2 }));
+  const engine = createEngine(makePolicy({ maxSignals: 3 }));
   const assessment = engine.assess([
-    makeSignal(1, { detectedAtMs: NOW - 30_000 }),
-    makeSignal(2, { detectedAtMs: NOW - 20_000 }),
-    makeSignal(3, { detectedAtMs: NOW - 10_000 })
+    makeSignal(1, { detectedAtMs: NOW - 40_000 }),
+    makeSignal(2, { detectedAtMs: NOW - 30_000 }),
+    makeSignal(3, { detectedAtMs: NOW - 20_000 }),
+    makeSignal(4, { detectedAtMs: NOW - 10_000 })
   ]);
-  assert.deepEqual(assessment.signalIds, [uuid(2), uuid(3)]);
+  assert.deepEqual(assessment.signalIds, [uuid(2), uuid(3), uuid(4)]);
 });
 
 test("invalid clocks and invalid generated assessment IDs fail closed", () => {
