@@ -212,7 +212,9 @@ const SCHEMA_STATEMENTS = [
   "CREATE TABLE IF NOT EXISTS jb_resilience_circuits (environment TEXT NOT NULL, asset_id TEXT NOT NULL, action TEXT NOT NULL, failure_count INTEGER NOT NULL CHECK (failure_count >= 0), failure_threshold INTEGER NOT NULL CHECK (failure_threshold BETWEEN 1 AND 10), cooldown_ms BIGINT NOT NULL CHECK (cooldown_ms BETWEEN 1000 AND 86400000), retry_at_ms BIGINT NULL, PRIMARY KEY (environment, asset_id, action))",
   "CREATE TABLE IF NOT EXISTS jb_resilience_audit_heads (head_id SMALLINT PRIMARY KEY CHECK (head_id = 1), sequence BIGINT NOT NULL, last_hash CHAR(64) NOT NULL)",
   "CREATE TABLE IF NOT EXISTS jb_resilience_audit_records (sequence BIGINT PRIMARY KEY, record_schema TEXT NOT NULL, previous_hash CHAR(64) NOT NULL, hash CHAR(64) NOT NULL, entry JSONB NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS jb_resilience_coordination_leases (scope_id TEXT PRIMARY KEY, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, acquired_at BIGINT NULL, renewed_at BIGINT NULL, expires_at BIGINT NULL, CHECK ((holder_id IS NULL AND lease_id IS NULL AND acquired_at IS NULL AND renewed_at IS NULL AND expires_at IS NULL) OR (holder_id IS NOT NULL AND lease_id IS NOT NULL AND acquired_at IS NOT NULL AND renewed_at IS NOT NULL AND expires_at IS NOT NULL)))"
+  "CREATE TABLE IF NOT EXISTS jb_resilience_coordination_leases (scope_id TEXT PRIMARY KEY, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, acquired_at BIGINT NULL, renewed_at BIGINT NULL, expires_at BIGINT NULL, CHECK ((holder_id IS NULL AND lease_id IS NULL AND acquired_at IS NULL AND renewed_at IS NULL AND expires_at IS NULL) OR (holder_id IS NOT NULL AND lease_id IS NOT NULL AND acquired_at IS NOT NULL AND renewed_at IS NOT NULL AND expires_at IS NOT NULL)))",
+  "CREATE TABLE IF NOT EXISTS jb_resilience_fenced_targets (scope_id TEXT NOT NULL, target_id TEXT NOT NULL, fencing_token BIGINT NOT NULL DEFAULT 0 CHECK (fencing_token >= 0), holder_id TEXT NULL, lease_id UUID NULL, state JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (scope_id, target_id))",
+  "CREATE TABLE IF NOT EXISTS jb_resilience_fenced_mutations (scope_id TEXT NOT NULL, target_id TEXT NOT NULL, mutation_id TEXT NOT NULL, payload_hash CHAR(64) NOT NULL, fencing_token BIGINT NOT NULL, applied_at BIGINT NOT NULL, PRIMARY KEY (scope_id, target_id, mutation_id))"
 ];
 
 function ensurePool(pool) {
@@ -473,6 +475,122 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     });
   }
 
+
+  function validateFencedStateInput(input) {
+    const safe = cloneJsonData(input);
+    const required = [
+      "scopeId", "targetId", "holderId", "leaseId",
+      "fencingToken", "mutationId", "state"
+    ];
+    if (safe === null || typeof safe !== "object" || Array.isArray(safe) ||
+        Object.keys(safe).length !== required.length ||
+        !required.every((key) => Object.hasOwn(safe, key))) {
+      throw new TypeError("fenced state mutation has an invalid shape");
+    }
+    const identity = validateLeaseIdentity(safe);
+    assertAssetId(safe.targetId, "targetId");
+    assertIdentifier(safe.mutationId, "mutationId");
+    if (safe.state === null || typeof safe.state !== "object" || Array.isArray(safe.state)) {
+      throw new TypeError("fenced state must be a plain JSON object");
+    }
+    if (Buffer.byteLength(JSON.stringify(safe.state), "utf8") > 64 * 1024) {
+      throw new TypeError("fenced state exceeds the 64 KiB limit");
+    }
+    return { ...identity, targetId: safe.targetId, mutationId: safe.mutationId, state: safe.state };
+  }
+
+  async function applyFencedState(input) {
+    assertInitialized();
+    const safe = validateFencedStateInput(input);
+    const payloadHash = createHash("sha256")
+      .update(canonicalJson(safe.state), "utf8")
+      .digest("hex");
+
+    return withTransaction(pool, async (client) => {
+      // Lock the authoritative lease row for the full target mutation. Lease
+      // acquisition/replacement uses the same row lock, closing the
+      // check-then-write race for this PostgreSQL-managed target.
+      const leaseResult = await client.query(
+        "SELECT scope_id, fencing_token, holder_id, lease_id, expires_at FROM jb_resilience_coordination_leases WHERE scope_id=$1 FOR UPDATE",
+        [safe.scopeId]
+      );
+      if (leaseResult.rowCount !== 1 || !leaseIdentityMatches(leaseResult.rows[0], safe)) {
+        return Object.freeze({ applied: false, reason: "lease-not-current" });
+      }
+      const now = await databaseNow(client);
+      if (leaseResult.rows[0].expires_at === null ||
+          toSafeInteger(leaseResult.rows[0].expires_at, "lease expires_at") <= now) {
+        return Object.freeze({ applied: false, reason: "lease-expired" });
+      }
+
+      await client.query(
+        "INSERT INTO jb_resilience_fenced_targets (scope_id, target_id) VALUES ($1,$2) ON CONFLICT (scope_id, target_id) DO NOTHING",
+        [safe.scopeId, safe.targetId]
+      );
+      const targetResult = await client.query(
+        "SELECT fencing_token, holder_id, lease_id, state FROM jb_resilience_fenced_targets WHERE scope_id=$1 AND target_id=$2 FOR UPDATE",
+        [safe.scopeId, safe.targetId]
+      );
+      if (targetResult.rowCount !== 1) throw new Error("fenced target row is unavailable");
+
+      const priorMutation = await client.query(
+        "SELECT payload_hash FROM jb_resilience_fenced_mutations WHERE scope_id=$1 AND target_id=$2 AND mutation_id=$3",
+        [safe.scopeId, safe.targetId, safe.mutationId]
+      );
+      if (priorMutation.rowCount === 1) {
+        const samePayload = priorMutation.rows[0].payload_hash.trim() === payloadHash;
+        return Object.freeze({
+          applied: false,
+          reason: samePayload ? "duplicate-mutation" : "mutation-id-conflict"
+        });
+      }
+
+      const current = targetResult.rows[0];
+      const currentToken = toSafeInteger(current.fencing_token, "target fencing_token");
+      if (currentToken > safe.fencingToken) {
+        return Object.freeze({ applied: false, reason: "stale-fencing-token", currentFencingToken: currentToken });
+      }
+      if (currentToken === safe.fencingToken &&
+          (current.lease_id !== safe.leaseId || current.holder_id !== safe.holderId)) {
+        return Object.freeze({ applied: false, reason: "fencing-token-owner-mismatch" });
+      }
+
+      await client.query(
+        "UPDATE jb_resilience_fenced_targets SET fencing_token=$3, holder_id=$4, lease_id=$5, state=$6::jsonb, updated_at=$7 WHERE scope_id=$1 AND target_id=$2",
+        [
+          safe.scopeId, safe.targetId, safe.fencingToken, safe.holderId,
+          safe.leaseId, JSON.stringify(safe.state), now
+        ]
+      );
+      await client.query(
+        "INSERT INTO jb_resilience_fenced_mutations (scope_id, target_id, mutation_id, payload_hash, fencing_token, applied_at) VALUES ($1,$2,$3,$4,$5,$6)",
+        [safe.scopeId, safe.targetId, safe.mutationId, payloadHash, safe.fencingToken, now]
+      );
+      return Object.freeze({ applied: true, fencingToken: safe.fencingToken, updatedAt: now });
+    });
+  }
+
+  async function getFencedState({ scopeId, targetId } = {}) {
+    assertInitialized();
+    assertIdentifier(scopeId, "scopeId");
+    assertAssetId(targetId, "targetId");
+    return withTransaction(pool, async (client) => {
+      const result = await client.query(
+        "SELECT fencing_token, holder_id, lease_id, state, updated_at FROM jb_resilience_fenced_targets WHERE scope_id=$1 AND target_id=$2",
+        [scopeId, targetId]
+      );
+      if (result.rowCount !== 1) return null;
+      const row = result.rows[0];
+      return Object.freeze({
+        fencingToken: toSafeInteger(row.fencing_token, "target fencing_token"),
+        holderId: row.holder_id,
+        leaseId: row.lease_id,
+        state: cloneJsonData(row.state),
+        updatedAt: toSafeInteger(row.updated_at, "target updated_at")
+      });
+    });
+  }
+
   async function initialize() {
     await withTransaction(pool, async (client) => {
       for (const statement of SCHEMA_STATEMENTS) await client.query(statement);
@@ -482,7 +600,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
       );
     });
     initialized = true;
-    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 2 });
+    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 3 });
   }
 
   async function recordIncidentState(input) {
@@ -784,6 +902,13 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     releaseLease,
     verifyLease
   });
+  const fencedTargetStore = Object.freeze({
+    durable: true,
+    dialect: "postgresql",
+    guaranteesAtomicTargetWrites: true,
+    applyState: applyFencedState,
+    getState: getFencedState
+  });
 
   return Object.freeze({
     durable: true,
@@ -791,6 +916,7 @@ export function createPostgresResilienceStorageAdapter({ pool } = {}) {
     initialize,
     orchestrationStore,
     auditStore,
-    coordinationStore
+    coordinationStore,
+    fencedTargetStore
   });
 }
