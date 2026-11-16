@@ -121,7 +121,7 @@ export function assessThreatLabDifficulty(results, requestedDifficulty = "supere
   );
   const applicable = results.filter((result) => result?.skipReason !== "target_scope");
   const overall = summarizeResults(applicable, requiredLevels);
-  const targetIds = [...new Set(applicable.map((result) => result?.target?.id).filter(Boolean))];
+  const targetIds = [...new Set(results.map((result) => result?.target?.id).filter(Boolean))];
 
   const targets = targetIds.map((id) => {
     const targetResults = applicable.filter((result) => result.target?.id === id);
