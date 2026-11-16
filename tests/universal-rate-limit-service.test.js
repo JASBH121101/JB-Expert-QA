@@ -51,11 +51,10 @@ function request(service, body, options = {}) {
   if (options.authorization !== null) {
     headers.set("authorization", options.authorization ?? "Bearer " + CLIENT_SECRET);
   }
-  return service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", {
-    method: options.method ?? "POST",
-    headers,
-    body: options.rawBody ?? JSON.stringify(body)
-  }));
+  const method = options.method ?? "POST";
+  const init = { method, headers };
+  if (method !== "GET" && method !== "HEAD") init.body = options.rawBody ?? JSON.stringify(body);
+  return service.fetch(new Request("https://guard.example/__jb/security-guard/v1/check", init));
 }
 
 test("valid server-to-server request is allowed and the raw identity is not used as a counter key", async () => {
