@@ -500,29 +500,30 @@ return [
   });
 
   const scenarios = [
-    ["malware.eicar.harmless-test", "malware-static", "Detect the harmless EICAR test string.", "jb-malware-engine"],
-    ["malware.benign.no-false-positive", "malware-static", "Do not flag a benign inert text fixture.", "jb-malware-engine"],
-    ["malware.suspicious.inert-script", "malware-static", "Classify inert suspicious script text as suspicious, never confirmed malicious.", "jb-malware-engine"],
-    ["malware.hash-signature.exact-match", "malware-signatures", "Confirm an exact configured SHA-256 fixture signature.", "jb-malware-engine"],
-    ["malware.coverage.size-limit-unknown", "malware-coverage", "Return unknown when a file exceeds the configured scan budget.", "jb-malware-engine"],
-    ["malware.pdf.active-actions-suspicious", "document-triage", "Classify PDF active-action indicators as suspicious, never confirmed malicious.", "jb-malware-engine"],
-    ["guard.request.xss-block", "request-security", "Block a local synthetic XSS-pattern request.", "jb-security-guard"],
-    ["guard.request.sqli-block", "request-security", "Block a local synthetic SQL injection-pattern request.", "jb-security-guard"],
-    ["guard.request.path-traversal-block", "request-security", "Block a local encoded path-traversal request.", "jb-security-guard"],
-    ["guard.request.ambiguous-framing-block", "request-security", "Reject conflicting HTTP message framing before application handling.", "jb-security-guard"],
-    ["guard.upload.malicious-block", "upload-security", "Reject a synthetic signature match before file promotion.", "jb-security-guard"],
-    ["guard.upload.unknown-quarantine", "upload-security", "Keep no-match uploads quarantined rather than approving them.", "jb-security-guard"],
-    ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa"],
-    ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa"],
-    ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa"],
-    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa"],
-    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa"]
+    ["malware.eicar.harmless-test", "malware-static", "Detect the harmless EICAR test string.", "jb-malware-engine", "basic"],
+    ["malware.benign.no-false-positive", "malware-static", "Do not flag a benign inert text fixture.", "jb-malware-engine", "basic"],
+    ["malware.suspicious.inert-script", "malware-static", "Classify inert suspicious script text as suspicious, never confirmed malicious.", "jb-malware-engine", "intermediate"],
+    ["malware.hash-signature.exact-match", "malware-signatures", "Confirm an exact configured SHA-256 fixture signature.", "jb-malware-engine", "intermediate"],
+    ["malware.coverage.size-limit-unknown", "malware-coverage", "Return unknown when a file exceeds the configured scan budget.", "jb-malware-engine", "advanced"],
+    ["malware.pdf.active-actions-suspicious", "document-triage", "Classify PDF active-action indicators as suspicious, never confirmed malicious.", "jb-malware-engine", "advanced"],
+    ["guard.request.xss-block", "request-security", "Block a local synthetic XSS-pattern request.", "jb-security-guard", "basic"],
+    ["guard.request.sqli-block", "request-security", "Block a local synthetic SQL injection-pattern request.", "jb-security-guard", "basic"],
+    ["guard.request.path-traversal-block", "request-security", "Block a local encoded path-traversal request.", "jb-security-guard", "intermediate"],
+    ["guard.request.ambiguous-framing-block", "request-security", "Reject conflicting HTTP message framing before application handling.", "jb-security-guard", "advanced"],
+    ["guard.upload.malicious-block", "upload-security", "Reject a synthetic signature match before file promotion.", "jb-security-guard", "expert"],
+    ["guard.upload.unknown-quarantine", "upload-security", "Keep no-match uploads quarantined rather than approving them.", "jb-security-guard", "expert"],
+    ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa", "basic"],
+    ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa", "intermediate"],
+    ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa", "advanced"],
+    ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa", "expert"],
+    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa", "extreme"]
   ];
-  for (const [id, category, description, targetId] of scenarios) {
+  for (const [id, category, description, targetId, difficulty] of scenarios) {
     lab.registerScenario({
       id,
       category,
       description,
+      difficulty,
       appliesTo: [targetId],
       safety: { safe: true, network: false, destructive: false, executesSample: false },
       tags: ["safe-fixture", "offline"]
