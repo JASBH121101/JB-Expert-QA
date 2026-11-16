@@ -112,6 +112,9 @@ final class CoreV1
         if ($input['allowed'] && $input['unavailable'] && $input['exceeded']) {
             throw new InvalidArgumentException('fail-open unavailable decisions cannot be quota-exceeded');
         }
+        if ($status === null && $retry !== null) {
+            throw new InvalidArgumentException('Retry-After requires a response status');
+        }
         if (!$input['allowed'] && !in_array($status, [429, 503], true)) {
             throw new InvalidArgumentException('denied decisions require 429 or 503');
         }
