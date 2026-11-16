@@ -94,7 +94,11 @@ function validateDecision(value) {
       value.health.consecutiveFailures < 0 ||
       !INCIDENT_DECISIONS.has(value.decision) ||
       typeof value.decisionRule !== "string" ||
-      !Array.isArray(value.trace) ||
+      typeof value.recommendedNextStep !== "string" ||
+      value.recommendedNextStep.length > 128 ||
+      !Array.isArray(value.trace) || value.trace.length < 1 || value.trace.length > 32 ||
+      !Number.isSafeInteger(value.health.consecutiveFailures) ||
+      value.health.consecutiveFailures > 1_000_000 ||
       value.preserveEvidence !== true ||
       value.authorizationGranted !== false ||
       value.mayAuthorizeRecovery !== false) {
@@ -364,7 +368,8 @@ export function createResponseOrchestrator({
 
     let decision;
     try {
-      decision = validateDecision(await incidentEngine.evaluateIncident(safeIncidentInput));
+      const rawDecision = await incidentEngine.evaluateIncident(safeIncidentInput);
+      decision = validateDecision(deepFreeze(clonePlainInput(rawDecision)));
     } catch {
       return result({ state: "FAILED_CLOSED", reason: "incident-decision-invalid" });
     }
