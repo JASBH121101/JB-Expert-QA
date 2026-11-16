@@ -8,8 +8,7 @@
   "occurredAtMs": 1794837600000,
   "account": {
     "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "keyId": "k2026-01",
-    "known": false
+    "keyId": "k2026-01"
   },
   "client": {
     "key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
