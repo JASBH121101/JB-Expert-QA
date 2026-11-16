@@ -77,7 +77,7 @@ async function createCoreRateLimitCheck(core, normalizedInput) {
     core.applicationId,
     core.identityType,
     normalizedInput.identity
-  ].join("\\0"));
+  ].join("\0"));
   const digest = new Uint8Array(await cryptoApi.subtle.sign("HMAC", key, material));
   let hex = "";
   for (const byte of digest) hex += byte.toString(16).padStart(2, "0");
@@ -311,6 +311,23 @@ export function createCloudflarePagesRateLimit(options = {}) {
         const coreEvent = coreEventValue === null
           ? null
           : validateSecurityEventV1(coreEventValue);
+        const expectedStatus = payload.response?.status ?? null;
+        const expectedRetryAfter = expectedStatus === null
+          ? null
+          : Number(payload.response.headers.get("retry-after"));
+        if (coreDecision.allowed !== payload.allowed ||
+            coreDecision.exceeded !== payload.exceeded ||
+            coreDecision.enforced !== payload.enforced ||
+            coreDecision.unavailable !== payload.unavailable ||
+            coreDecision.status !== expectedStatus ||
+            coreDecision.retryAfterSeconds !== expectedRetryAfter ||
+            payload.policy !== coreCheck.policyId ||
+            payload.scope !== coreCheck.scope) {
+          throw new TypeError("Worker Core decision does not match the service result");
+        }
+        if ((coreDecision.exceeded || coreDecision.unavailable) !== Boolean(coreEvent)) {
+          throw new TypeError("Worker Core event presence does not match the decision");
+        }
         if (coreEvent && (
           coreEvent.tenantId !== coreCheck.tenantId ||
           coreEvent.applicationId !== coreCheck.applicationId ||
