@@ -62,3 +62,16 @@ Keep JB Security Guard as the sole owner of runtime security policy. Evolve the 
 ## Scope boundary
 
 This branch is an audit/laboratory branch. Do not merge it into `main` until implementation, regression, security, package-distribution, and load-test gates pass. Do not claim a universal global limit until the selected shared backend provides atomic coordination across all participating deployments.
+
+
+## Implementation status — laboratory branch
+
+Implemented on `feature/security-guard-universal-rate-limit`:
+
+- Extracted duplicate Worker/Pages request validation and service-decision validation into `rate-limit-contract.js`.
+- Added a canonical, validated wire decision and conversion helper for the private Worker-to-Pages Service Binding.
+- Required a stable 32-byte `identitySecret` for Cloudflare Worker `enforce` policies and changed identity key derivation to HMAC-SHA-256 when configured.
+- Preserved monitor-mode compatibility and existing adapter return fields; no Node distributed-store semantics or auth/recovery buckets were replaced.
+- Added contract tests, keyed identity tests, package export smoke coverage, and integration documentation.
+
+Not yet certified: full repository CI, cross-instance atomic-store testing against a real shared backend, multi-runtime PHP/Python integration, load/latency testing, Cloudflare runtime Preview verification, and production deployment. The private Worker endpoint is not made public by this work. The Cloudflare native binding remains approximate and location-scoped.
