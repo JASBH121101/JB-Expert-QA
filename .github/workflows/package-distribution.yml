@@ -2,7 +2,7 @@ name: NPM package distribution validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "feature/jb-threat-lab"]
     paths:
       - "package.json"
       - "packages/**"

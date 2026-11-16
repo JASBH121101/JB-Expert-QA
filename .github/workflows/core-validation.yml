@@ -3,7 +3,7 @@ name: Core validation
 
 on:
   push:
-    branches: [main, "integration/**"]
+    branches: [main, "integration/**", "feature/jb-threat-lab"]
     paths:
       - "package.json"
       - "src/**"
