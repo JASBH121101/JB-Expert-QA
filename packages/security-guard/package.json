@@ -7,7 +7,8 @@
     ".": "./src/index.js",
     "./cloudflare-worker-rate-limit": "./src/cloudflare-worker-rate-limit.js",
     "./cloudflare-pages-rate-limit": "./src/cloudflare-pages-rate-limit.js",
-    "./rate-limit-contract": "./src/rate-limit-contract.js"
+    "./rate-limit-contract": "./src/rate-limit-contract.js",
+    "./core-contract-v1": "./src/core-contract-v1.js"
   },
   "files": [
     "src/**",
