@@ -126,3 +126,41 @@ test("file recovery store validates its configuration and service identifiers", 
   const store = createMemoryRecoveryStore();
   await assert.rejects(() => store.getServiceState("../unsafe"), /serviceId is invalid/);
 });
+
+test("file recovery store enforces ledger size and service-capacity bounds", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "jb-resilience-bounds-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const filePath = join(directory, "ledger.json");
+  await writeFile(filePath, "x".repeat(2048), "utf8");
+  const bounded = createFileRecoveryStore({ filePath, maxLedgerBytes: 1024 });
+  await assert.rejects(
+    () => bounded.getServiceState("catalog-api.service"),
+    /exceeds the configured size limit/
+  );
+
+  const capacityPath = join(directory, "capacity.json");
+  const capacityStore = createFileRecoveryStore({ filePath: capacityPath, maxServices: 1 });
+  const first = proposal({ serviceId: "catalog-api.service" });
+  assert.equal((await capacityStore.claimRecovery({
+    proposal: first, claimedAt: 1100, maxRestarts: 2
+  })).claimed, true);
+  const second = proposal({ serviceId: "worker.service" });
+  assert.equal((await capacityStore.claimRecovery({
+    proposal: second, claimedAt: 1100, maxRestarts: 2
+  })).reason, "recovery-store-capacity-reached");
+});
+
+test("memory recovery store rejects nonce reuse across different proposal IDs", async () => {
+  const store = createMemoryRecoveryStore();
+  const first = proposal();
+  assert.equal((await store.claimRecovery({
+    proposal: first, claimedAt: 1100, maxRestarts: 2
+  })).claimed, true);
+  const replay = proposal({
+    proposalId: randomUUID(),
+    nonce: first.nonce
+  });
+  assert.equal((await store.claimRecovery({
+    proposal: replay, claimedAt: 1101, maxRestarts: 2
+  })).reason, "proposal-already-claimed");
+});
