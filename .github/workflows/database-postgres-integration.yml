@@ -12,6 +12,8 @@ on:
       - "tests/e2e/database-postgres-cli-smoke.js"
       - "tests/e2e/security-guard-postgres-store.integration.js"
       - "packages/security-guard/**"
+      - "packages/resilience-engine/**"
+      - "tests/e2e/resilience-postgres-storage.integration.js"
       - "docs/DATABASE-QA.md"
       - ".github/workflows/database-postgres-integration.yml"
   pull_request:
@@ -25,6 +27,8 @@ on:
       - "tests/e2e/database-postgres-cli-smoke.js"
       - "tests/e2e/security-guard-postgres-store.integration.js"
       - "packages/security-guard/**"
+      - "packages/resilience-engine/**"
+      - "tests/e2e/resilience-postgres-storage.integration.js"
       - "docs/DATABASE-QA.md"
       - ".github/workflows/database-postgres-integration.yml"
   workflow_dispatch:
@@ -79,6 +83,7 @@ jobs:
         run: |
           node tests/e2e/database-postgres-cli-smoke.js
           node tests/e2e/security-guard-postgres-store.integration.js
+          node tests/e2e/resilience-postgres-storage.integration.js
 
   neon-development:
     name: Optional Neon development read-only E2E
