@@ -131,3 +131,59 @@ test("CSRF configuration requires a strong secret and stable session resolver", 
   });
   assert.equal(csrf.verifyToken({}, "A".repeat(43)), false);
 });
+
+
+test("CSRF Core v1 emits a pseudonymous session event without exposing the session or token", () => {
+  const events = [];
+  const csrf = createCsrfProtection({
+    secret: SECRET,
+    sessionKeyGenerator: (request) => request.sessionId,
+    coreContract: {
+      tenantId: "tenant-csrf",
+      applicationId: "browser-api",
+      subjectKeyId: "csrf-session-key-v1"
+    },
+    onCoreEvent: (event) => events.push(event)
+  });
+  const sessionId = "private-csrf-session-991";
+  const token = csrf.createToken({ sessionId });
+  const result = invoke(csrf.middleware, {
+    sessionId, method: "POST", headers: {}
+  });
+
+  assert.equal(result.response.statusCode, 403);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].schema, "jb.security.event/v1");
+  assert.equal(events[0].category, "csrf");
+  assert.equal(events[0].ruleId, "JBG-CSRF-TOKEN-001");
+  assert.equal(events[0].action, "blocked");
+  assert.equal(events[0].outcome, "denied");
+  assert.equal(events[0].subjectKey.length, 64);
+  assert.equal(events[0].subjectKeyId, "csrf-session-key-v1");
+  const serialized = JSON.stringify(events);
+  assert.equal(serialized.includes(sessionId), false);
+  assert.equal(serialized.includes(token), false);
+  assert.equal(serialized.includes(SECRET), false);
+});
+
+test("CSRF Core v1 requires a subject key ID and telemetry cannot change enforcement", () => {
+  assert.throws(() => createCsrfProtection({
+    secret: SECRET,
+    sessionKeyGenerator: () => "session",
+    coreContract: { tenantId: "tenant-csrf", applicationId: "browser-api" }
+  }), /subjectKeyId is required/);
+
+  const csrf = createCsrfProtection({
+    secret: SECRET,
+    sessionKeyGenerator: () => "session",
+    coreContract: {
+      tenantId: "tenant-csrf",
+      applicationId: "browser-api",
+      subjectKeyId: "csrf-session-key-v1"
+    },
+    onCoreEvent() { throw new Error("telemetry unavailable"); }
+  });
+  const result = invoke(csrf.middleware, { method: "PATCH", headers: {} });
+  assert.equal(result.response.statusCode, 403);
+  assert.equal(result.continued, 0);
+});
