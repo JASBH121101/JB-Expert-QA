@@ -66,7 +66,7 @@ test("universal service rejects malformed Unicode identities and enforces the sh
   const tooManyUtf16Units = request(service, { identity: "😀".repeat(257), scope: "catalog-read", policy: "general" });
   assert.equal((await tooManyUtf16Units).status, 400);
 
-  const malformedSurrogate = request(service, { identity: "\\ud800", scope: "catalog-read", policy: "general" });
+  const malformedSurrogate = request(service, { identity: "\ud800", scope: "catalog-read", policy: "general" });
   assert.equal((await malformedSurrogate).status, 400);
 });
 
