@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import {
   validateAuthenticationAttemptV1,
   toAuthenticationDecisionV1,
@@ -156,7 +156,7 @@ export function createAuthCoreEvent(core, attempt, {
   const blocked = !unavailable && enforced;
   return validateSecurityEventV1({
     schema: "jb.security.event/v1",
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     occurredAtMs,
     tenantId: core.tenantId,
     applicationId: core.applicationId,
