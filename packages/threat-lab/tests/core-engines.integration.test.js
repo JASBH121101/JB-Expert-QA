@@ -607,7 +607,7 @@ return [
             'res.redirect(req.query.next);',
             'fetch(req.query.url);',
             'const output = eval(userInput);',
-            'element.innerHTML = userInput;'
+            "document.querySelector('#result').innerHTML = location.search;"
           ].join("\n");
           const safeSource = [
             'const api = "https://api.example.com/v1";',
