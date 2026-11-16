@@ -58,7 +58,7 @@ function toSecretBytes(secret) {
 }
 
 function assertCanonicalIdentity(value) {
-  if (typeof value !== "string" || value.length === 0 || value.length > 512 || value.includes("\0")) {
+  if (typeof value !== "string" || value.length === 0 || Array.from(value).length > 512 || value.includes("\0")) {
     throw new TypeError("canonicalIdentity must be a non-empty string of at most 512 characters without NUL");
   }
   const bytes = encoder.encode(value);
