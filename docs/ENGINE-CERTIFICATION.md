@@ -2,11 +2,12 @@
 
 ## Scope
 
-This certification validates the three engines as separate products and then validates their explicit integration contracts:
+This certification validates four core engines as separate products and then validates their explicit integration contracts:
 
 1. **JB Expert QA** — source/project, dependency, browser, accessibility, visual and database QA. It diagnoses and reports defects in software projects.
 2. **JB Security Guard QA** — runtime HTTP/request and upload-boundary protection. It enforces policy in the application server.
 3. **JB Malware Engine** — bounded local file triage using hashes, byte signatures, static heuristics and supported file-format analyzers.
+4. **JB Resilience Engine** — Linux/Windows service-health tracking and policy-bounded recovery with human approval for critical actions.
 
 The packages remain independently versioned and independently installable. This certification does not collapse their source trees into one monolithic runtime.
 
@@ -19,11 +20,12 @@ The `JB Engines Certification` GitHub Actions workflow runs:
 - Security Guard's controlled request/security regression suite on Ubuntu and Windows, Node.js 22 and 24.
 - Malware Engine's complete package test suite, including calibration and the Security Guard streaming adapter, on Ubuntu and Windows, Node.js 22 and 24.
 - A bounded Malware Engine performance benchmark using generated benign fixtures.
-- Clean package-distribution checks for all three independently installable packages on Node.js 22 and 24.
+- Resilience Engine policy, health-monitor and Linux/Windows adapter tests on Ubuntu and Windows, Node.js 22 and 24.
+- Clean package-distribution checks for all five independently installable packages on Node.js 22 and 24 (including the separately versioned Advisor package).
 
 All test payloads are synthetic or inert. Malware plumbing uses the harmless EICAR test string and generated fixtures; no suspicious executable is run. Security tests target local test handlers and in-memory fixtures, not public websites or production systems.
 
-## Three-engine operating model
+## Four-core-engine operating model
 
 The intended integration is a pipeline with explicit ownership:
 
@@ -69,6 +71,8 @@ Expert QA's first job is to produce reproducible findings with file/line evidenc
 The supervised autopilot has explicit opt-in controls. Low-risk auto-repair requires the AI deep-analysis, source-upload, apply-low-risk and run-tests flags together. It is not enabled by this certification workflow. No code is silently rewritten, and visual QA remains deterministic/local unless a separately authorized emergency AI fallback is explicitly requested.
 
 ## Certification decision
+
+Resilience Engine is tested separately on Ubuntu and Windows, Node.js 22 and 24. Critical-service recovery must be rejected without valid human approval; platform adapters use injected test runners and never restart CI host services. Tests also verify that proposals expiring during asynchronous approval cannot execute, Windows reaches `STOPPED` before `start` and `RUNNING` afterward, and active threat/tamper signals suspend recovery.
 
 A green workflow is necessary but not sufficient. Final certification requires:
 
