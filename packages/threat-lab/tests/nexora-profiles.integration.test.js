@@ -10,7 +10,7 @@ const SITE_ROOT = process.env.NEXORA_SITE_ENGINE_ROOT ?? "";
 const CATALOG_SHA = process.env.NEXORA_CATALOG_SHA ?? "";
 const SITE_SHA = process.env.NEXORA_SITE_ENGINE_SHA ?? "";
 
-const EXPECTED_CATALOG_SHA = "88c4876c9678b93dadde55f79fe9d04890900741";
+const EXPECTED_CATALOG_SHA = "63f0608d0b00d633b1ad147ab2318fc099b8a99e";
 const EXPECTED_SITE_SHA = "3f68126ecc58b088c071007c5116bc95426d159b";
 
 const profileEnvironmentReady =
