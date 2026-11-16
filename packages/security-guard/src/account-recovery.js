@@ -620,6 +620,7 @@ export function createAccountRecovery(options = {}) {
           await store.deleteChallenge(requestId);
         } catch {
           // Keep the public recovery response generic even if cleanup fails.
+          emitCoreUnavailable(channel, now, accountDigest, ["challengeCleanup"]);
         }
         stats.deliveryFailures += 1;
         emit("delivery-failed", REQUEST_RULE, channel, [], "high", {
