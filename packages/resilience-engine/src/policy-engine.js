@@ -586,6 +586,8 @@ export function createResiliencePolicyEngine({
     now: initialNow
   });
   const issued = new WeakSet();
+  const asserted = new WeakSet();
+  const checking = new WeakSet();
   const completed = new WeakSet();
   const requestContext = new WeakMap();
 
@@ -697,6 +699,9 @@ export function createResiliencePolicyEngine({
         completed.has(authorization)) {
       return Object.freeze({ valid: false, reason: "unknown-or-consumed-authorization" });
     }
+    if (asserted.has(authorization) || checking.has(authorization)) {
+      return Object.freeze({ valid: false, reason: "authorization-already-asserted-or-checking" });
+    }
     const now = clock();
     let integrity;
     try {
@@ -728,6 +733,7 @@ export function createResiliencePolicyEngine({
         detail: refreshedDecision.reason
       });
     }
+    checking.add(authorization);
     let acceptedRevision = false;
     let reserved = false;
     try {
@@ -747,13 +753,17 @@ export function createResiliencePolicyEngine({
       }
     } catch {
       reserved = false;
+    } finally {
+      checking.delete(authorization);
     }
     if (!acceptedRevision) {
       return Object.freeze({ valid: false, reason: "policy-revision-not-current-or-store-failure" });
     }
-    return reserved
-      ? Object.freeze({ valid: true, reason: null })
-      : Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    if (!reserved) {
+      return Object.freeze({ valid: false, reason: "capability-reservation-invalid-or-expired" });
+    }
+    asserted.add(authorization);
+    return Object.freeze({ valid: true, reason: null });
   }
 
   async function completeAuthorization({ authorization, outcome } = {}) {
@@ -764,6 +774,9 @@ export function createResiliencePolicyEngine({
     const now = clock();
     if (!["succeeded", "failed", "unverified", "cancelled-before-execution"].includes(outcome)) {
       return Object.freeze({ recorded: false, reason: "invalid-action-outcome" });
+    }
+    if (["succeeded", "unverified"].includes(outcome) && !asserted.has(authorization)) {
+      return Object.freeze({ recorded: false, reason: "execution-authorization-not-asserted" });
     }
     let recorded = false;
     try {
@@ -777,6 +790,7 @@ export function createResiliencePolicyEngine({
     }
     if (!recorded) return Object.freeze({ recorded: false, reason: "capability-ledger-finalization-failed" });
     completed.add(authorization);
+    asserted.delete(authorization);
     requestContext.delete(authorization);
     return Object.freeze({ recorded: true, reason: null });
   }
