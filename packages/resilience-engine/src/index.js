@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { evaluateRecoveryEligibility, validateResiliencePolicy } from "./policy.js";
 
 function isRecord(value) {
@@ -20,10 +21,15 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
 
   function evaluateRecovery(state) {
     const now = clock();
+    if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(now + 60_000)) {
+      return Object.freeze({ eligible: false, reason: "invalid-clock" });
+    }
     const eligibility = evaluateRecoveryEligibility(validatedPolicy, { ...state, now });
     if (!eligibility.eligible) return eligibility;
     const proposal = Object.freeze({
       schema: "jb.resilience.recovery-proposal/v1",
+      proposalId: randomUUID(),
+      nonce: randomUUID(),
       action: eligibility.action, serviceId: eligibility.serviceId,
       approvalRequired: eligibility.approvalRequired, reason: eligibility.reason,
       issuedAt: now, expiresAt: now + 60_000
@@ -39,15 +45,20 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
     if (consumedProposals.has(proposal) || inFlightProposals.has(proposal)) {
       return Object.freeze({ executed: false, reason: "proposal-already-consumed" });
     }
-    if (clock() >= proposal.expiresAt) {
+    const initialNow = clock();
+    if (!Number.isSafeInteger(initialNow) || initialNow < 0) {
+      return Object.freeze({ executed: false, reason: "invalid-clock" });
+    }
+    if (initialNow >= proposal.expiresAt) {
+      consumedProposals.add(proposal);
       return Object.freeze({ executed: false, reason: "proposal-expired" });
     }
     inFlightProposals.add(proposal);
     if (proposal.approvalRequired) {
       let approved = false;
       try {
-        approved = Boolean(approvalVerifier && approval &&
-          await approvalVerifier({ proposal, approval }) === true);
+        approved = approvalVerifier && approval &&
+          await approvalVerifier({ proposal, approval }) === true;
       } catch {
         approved = false;
       }
@@ -55,6 +66,18 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
         inFlightProposals.delete(proposal);
         return Object.freeze({ executed: false, reason: "human-approval-required-or-invalid" });
       }
+    }
+    // Approval verification may be asynchronous; a proposal must still be live immediately before adapter invocation.
+    const beforeAdapter = clock();
+    if (!Number.isSafeInteger(beforeAdapter) || beforeAdapter < 0) {
+      consumedProposals.add(proposal);
+      inFlightProposals.delete(proposal);
+      return Object.freeze({ executed: false, reason: "invalid-clock" });
+    }
+    if (beforeAdapter >= proposal.expiresAt) {
+      consumedProposals.add(proposal);
+      inFlightProposals.delete(proposal);
+      return Object.freeze({ executed: false, reason: "proposal-expired" });
     }
     consumedProposals.add(proposal);
     inFlightProposals.delete(proposal);
