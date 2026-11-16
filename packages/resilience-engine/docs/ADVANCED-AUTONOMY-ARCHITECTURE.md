@@ -1,239 +1,417 @@
-# JB Resilience Engine — Advanced Autonomous Architecture
+# JB Resilience Engine — Advanced Autonomous Architecture & Policy
 
-**Status:** design baseline for implementation and review  
-**Repository:** `JASBH121101/JB-Expert-QA`  
-**Package:** `packages/resilience-engine`  
-**Autonomy profile:** `advanced-autonomous`  
-**Scope:** bounded host/service continuity and incident response. This design does not authorize production deployment, infrastructure changes, or destructive operations.
+**Document type:** target architecture and policy specification  
+**Target package:** `packages/resilience-engine` inside `JB-Expert-QA`  
+**Target policy schema:** `jb.resilience.policy/v2`  
+**Target autonomy mode:** `autonomous-advanced`  
+**Status:** design only — not yet implemented or enabled by the current runtime
 
-## 1. Operating contract
+## 1. Executive decision
 
-JB Resilience Engine is the deterministic continuity decision and orchestration engine. It is not a threat detector, EDR, malware remover, or unrestricted agent.
+JB Resilience Engine will operate as an **advanced autonomous continuity orchestrator**. It may execute pre-authorized, bounded and verifiable recovery or containment actions without waiting for an operator. Human approval is an exception path for actions whose impact exceeds the policy's autonomous envelope.
 
-Advanced autonomy authorizes automatic execution of explicitly pre-approved, bounded, reversible actions, including selected containment and recovery actions. It does **not** grant unrestricted administrative authority.
+Advanced autonomy does **not** mean unrestricted root/administrator access, arbitrary command execution, self-modifying policy, or permission to perform irreversible data operations. The engine is autonomous only inside an explicit capability envelope signed by the system owner.
 
-The engine must:
-- deny by default when identity, evidence, policy, state, or authorization is missing or ambiguous;
-- execute only typed actions from a versioned allowlist, never generated shell commands;
-- enforce blast-radius, time, retry, concurrency, and resource budgets;
-- preserve forensic evidence and immutable audit history;
-- verify outcomes independently; command success is not service recovery;
-- stop and escalate before irreversible, destructive, data-affecting, or infrastructure-wide actions;
-- support an emergency autonomy kill switch that disables automatic execution without disabling monitoring or audit.
+The governing rules are:
 
-## 2. Trust boundaries and logical architecture
+1. **Deny by default.** An action must be explicitly allowed for the exact asset, action type, scope and policy revision.
+2. **Evidence before action.** Inputs must be authenticated, fresh, replay-protected and attributable to a trusted producer.
+3. **Bounded blast radius.** Every action has per-asset, per-incident and cluster-wide budgets.
+4. **Verify outcomes.** A successful command is not proof of service recovery or successful containment.
+5. **Fail closed on uncertainty.** Invalid signals, policy, clock, ledger, quorum, fencing or health verification block mutation.
+6. **Preserve forensic evidence.** Resilience does not clean, overwrite or erase potentially compromised evidence.
+7. **Human escalation remains available.** Irreversible, broad-scope or out-of-envelope operations are held for an authorized operator.
+8. **No hidden authority transfer.** Security Guard and Malware Engine own their detection verdicts; Resilience owns only continuity decisions within its policy.
+
+## 2. Responsibility boundaries
+
+| Engine / subsystem | Owns | Does not own |
+|---|---|---|
+| JB Security Guard | Security telemetry, policy evaluation and security verdicts | Service recovery authority |
+| JB Malware Engine | Malware/integrity findings and evidence references | Arbitrary service or infrastructure changes |
+| JB Resilience Engine | Health correlation, continuity decisions, action budgets, recovery/containment orchestration and verification | Threat scanning, malware removal, policy weakening, evidence deletion |
+| JB Expert QA | Source quality, test, contract and release validation | Runtime incident response |
+
+Resilience consumes validated signals; it must never upgrade an untrusted alert into a confirmed attack, downgrade a confirmed verdict, or instruct another engine to disable its controls.
+
+## 3. Target architecture
 
 ```text
-Security Guard ──────┐
-Malware Engine ──────┤
-Host / App Probes ───┼─> Authenticated Signal Gateway
-OS Service Manager ──┘              |
-                                    v
-                         Validation / Replay Defense
-                                    |
-                                    v
-                           Incident Correlator
-                                    |
-                    +---------------+---------------+
-                    |                               |
-             Health Intelligence              Asset Registry
-                    |                         + Criticality Map
-                    +---------------+---------------+
-                                    |
-                           Deterministic Decision
-                                    |
-                         Mandatory Policy Gate
-                           /        |        \
-                        DENY    AUTO PLAN   ESCALATE
-                         |         |           |
-                       Audit   Response    Approval /
-                              Orchestrator  Operator Queue
-                                   |
-                          Typed Adapter Layer
-                         systemd / Windows SCM
-                                   |
-                          Recovery Verification
-                                   |
-                       Durable Ledger + Audit Trail
-                                   |
-                         Incident Report / Learning
+ Security Guard ─────┐
+ Malware Engine ─────┼──> Trusted Signal Gateway
+ External Monitor ──┤          |
+ OS / App Probes ────┘          v
+                         Provenance & Replay Guard
+                                  |
+                         Event Normalizer / Evidence Index
+                                  |
+                   ┌──────────────┴──────────────┐
+                   v                             v
+           Health Intelligence             Threat Correlator
+                   └──────────────┬──────────────┘
+                                  v
+                      Incident State Machine
+                                  |
+                    Deterministic Decision Engine
+                                  |
+                      Capability / Risk Policy Gate
+                         /          |           \
+                      DENY       ESCALATE       AUTHORIZE
+                        |           |               |
+                     Audit     Approval Broker   Action Planner
+                                                     |
+                                             Budget / Lease / Lock
+                                                     |
+                                           Response Orchestrator
+                                                     |
+                                    Typed, capability-limited adapters
+                                    /          |             \
+                              Service ops   Traffic ops   Containment
+                                    \          |             /
+                                             v
+                                      Outcome Verifier
+                                             |
+                                Durable State + Audit Ledger
+                                             |
+                               Operator / Incident Notifications
 ```
 
-### Component responsibilities
+### Component contracts
 
-1. **Authenticated Signal Gateway** — accepts signals only from configured producers; validates producer identity, schema, signature or authenticated transport, timestamp, expiry, sequence/replay marker, asset identity and correlation ID.
-2. **Health Intelligence** — evaluates liveness, readiness, dependencies, latency/error thresholds, consecutive failures and recovery history. Distinguishes host failure, process failure and application degradation.
-3. **Asset Registry** — authoritative mapping of service IDs, owners, criticality, dependencies, allowed actions, recovery objectives, data sensitivity and approved recovery targets. Unknown assets are never auto-operated.
-4. **Incident Correlator** — correlates independent evidence over bounded windows, retains source provenance and contradictions, and classifies uncertainty. Scores are not represented as calibrated probabilities.
-5. **Decision Engine** — deterministic, versioned decision rules. It selects a typed plan based on incident class, evidence freshness, asset criticality, dependency graph, current state, action budget and autonomy profile.
-6. **Policy Gate** — final mandatory enforcement point. Checks allowlist, blast radius, action parameters, cooldowns, attempt limits, maintenance windows, policy version, kill switch and authorization class.
-7. **Response Orchestrator** — executes typed plans with deadlines, cancellation, idempotency keys, concurrency control, bounded retries and per-incident action budgets.
-8. **Adapter Layer** — fixed, reviewed OS/service operations only. No arbitrary executable path, shell interpolation, dynamic command strings or AI-authored commands.
-9. **Recovery Verification** — verifies OS service state and application readiness using independent probes and stability windows.
-10. **Durable State and Audit Ledger** — persists incident transitions, evidence references, decisions, policy versions, action claims, approvals, execution results and verification outcomes.
-11. **Operator Escalation** — queues actions requiring approval, exposes rationale and rollback/recovery implications, and supports authenticated cancellation or override.
-12. **Incident Intelligence** — generates timelines and recommendations from evidence. It cannot change policy or grant itself permissions.
+1. **Trusted Signal Gateway**
+   - Accept only registered engine/monitor identities over authenticated channels.
+   - Validate schema, producer identity, signature or authenticated message integrity, event ID, nonce/sequence, event time, expiry and asset binding.
+   - Reject or quarantine invalid, stale, duplicated, unknown-version or replayed events.
+   - Keep the original evidence reference and a normalized representation; do not silently rewrite source verdicts.
 
-## 3. Incident classes
+2. **Health Intelligence**
+   - Track liveness, readiness, dependency state, error rate, latency, resource saturation and consecutive failures.
+   - Distinguish host unreachable, process stopped, service-manager failure, application not-ready and dependency failure.
+   - Use independent probes for critical decisions; do not treat a process being RUNNING as proof of application health.
 
-- **HEALTH_DEGRADED** — service is available but outside configured health objectives.
-- **SERVICE_UNAVAILABLE** — trusted probes confirm service/process unavailable.
-- **DEPENDENCY_FAILURE** — required dependency unhealthy; restarting dependents is not the default.
-- **SUSPECTED_SECURITY_EVENT** — valid but unconfirmed or conflicting security signal; suspend recovery on affected scope.
-- **CONFIRMED_SECURITY_INCIDENT** — authenticated trusted producer provides a confirmed verdict and evidence reference.
-- **TAMPER_OR_INTEGRITY_FAILURE** — binary, configuration, boot or policy integrity failure; preserve evidence and block restart/repair of affected component.
-- **HOST_UNREACHABLE** — independent external monitor cannot reach host; local self-recovery is impossible.
-- **RECOVERY_UNVERIFIED** — action executed but service/application health cannot be proven.
-- **RECOVERY_EXHAUSTED** — retry or action budget consumed.
-- **SIGNAL_PIPELINE_DEGRADED** — trust, freshness or availability of detection/monitoring inputs is compromised.
+3. **Threat Correlator**
+   - Correlate Security Guard and Malware Engine events with asset identity, integrity findings, timestamps and health changes.
+   - Preserve source verdicts and uncertainty. A numeric score is not a calibrated probability unless separately validated.
+   - Treat unknown, conflicting or expired security state as unsafe for automatic recovery.
 
-Each incident retains severity, assets, source signals, provenance, evidence freshness, timestamps, policy version, uncertainty, decisions and outcome.
+4. **Incident State Machine**
+   - Own incident lifecycle and prevent competing recovery plans.
+   - Deduplicate repeated events and associate related events with one incident.
+   - Enforce transitions and prevent loops such as repeated restart → crash → restart.
 
-## 4. Autonomy classes and policy
+5. **Deterministic Decision Engine**
+   - Evaluate versioned, testable rules. It must not depend on a language model to authorize or construct an action.
+   - Return a structured decision: evidence, rule IDs, policy revision, risk class, scope, action, limits, expiry and verification plan.
+   - AI or heuristic analysis may suggest an investigation, but it cannot grant capabilities or bypass the Policy Gate.
 
-### A0 — Observe only
-Always available. Collect signals, correlate, classify, preserve evidence and notify. No remediation.
+6. **Capability / Risk Policy Gate**
+   - Enforce exact asset/action allowlists, criticality, security state, maintenance window, freshness, budgets, concurrency, dependency and data-safety constraints.
+   - Authorize only the minimum action required. A denied action cannot be retried through a different adapter.
+   - Validate policy authenticity and validity before each mutation; an expired or invalid policy disables mutations.
 
-### A1 — Automatic reversible actions
-May execute without per-action human approval only when all policy predicates pass:
-- target is explicitly registered and allowlisted;
-- action is typed, tested, reversible and within approved scope;
-- evidence is fresh and sufficiently corroborated for that action;
-- no active tamper/integrity block or unresolved security conflict exists;
-- action budget, retry cap, cooldown and dependency checks pass;
-- durable ledger and audit sink are healthy;
-- kill switch is off and the current policy is valid.
+7. **Action Planner and Response Orchestrator**
+   - Convert an authorized decision into a typed action plan; no shell text, script strings or arbitrary executable path is accepted.
+   - Use idempotency keys, bounded deadlines, cancellation, leases and per-action concurrency limits.
+   - Before retrying an action with an unknown result, reconcile real system state. Never blindly retry a timed-out mutation.
 
-Examples: bounded restart of a non-critical allowlisted service after confirmed non-security outage; drain a single unhealthy instance from a preconfigured local pool; pause a non-critical job queue; switch a feature flag to a pre-approved safe mode; apply a pre-approved rate-limiting profile through a typed adapter.
+8. **Typed adapter layer**
+   - Expose narrow functions such as restart allowlisted service, drain registered instance, switch a preconfigured route, enter configured degraded mode, or apply an approved containment profile.
+   - Each adapter declares capabilities, supported platform, required permissions, preconditions, timeout, expected postcondition and compensating action.
+   - Adapter permissions must be narrower than host administrator privileges wherever the platform permits.
 
-### A2 — Autonomous containment under explicit playbook
-Can execute pre-authorized containment when the signal is authenticated and the playbook precisely limits target and impact. Examples: isolate a specific non-critical workload from a local service mesh; disable a compromised service account token through a pre-integrated identity adapter; quarantine a process using a supported endpoint adapter while preserving forensic artifacts.
+9. **Outcome Verifier**
+   - Verify both control-plane state and application-level readiness.
+   - For containment, verify that the affected asset is isolated while preserving approved management, logging and forensic collection paths.
+   - For failover, verify the new leader/target, fencing epoch, traffic path and data consistency before reporting success.
 
-A2 must never disable the security sensor, logging, audit, backup, identity control plane, or the Resilience kill switch. Containment actions require a tested compensating action and expiry/lease where technically possible. If the adapter cannot prove the target identity or scope, deny.
+10. **Durable State and Audit Ledger**
+    - Store incident transitions, signal digests, decisions, policy revisions, action claims, budgets, approval references, verification and operator overrides.
+    - Use transactional uniqueness/idempotency and concurrency control. Cluster-wide actions require a shared transactional or consensus-backed store, not the current local JSON ledger.
+    - Store evidence references and hashes rather than secrets or unrestricted command output.
+    - If the ledger is unavailable or corrupt, block new mutations.
 
-### A3 — Human approval required
-Always escalate:
-- actions on critical services or shared control planes;
-- changes with broad blast radius or cross-host impact;
-- network/firewall/security-group changes outside an exact pre-approved rule;
-- failover, traffic/DNS changes or promotion of a secondary host;
-- database restore, rollback, schema/data mutation or backup replacement;
-- credential rotation/revocation beyond an exact pre-authorized emergency playbook;
-- deleting, overwriting, rebuilding or replacing files/binaries;
-- actions with uncertain rollback, possible data loss, or legal/compliance implications;
-- policy, trust root, allowlist, autonomy profile or kill-switch changes.
+11. **Approval Broker and Operator Interface**
+    - Request human approval only for actions outside the autonomous envelope.
+    - Bind approvals to the exact incident, asset, action, parameters, policy revision, approver identity, issue time and expiry.
+    - Require durable one-time replay protection; high-impact overrides require two distinct authorized approvers.
+    - A generic boolean or client-side confirmation is never sufficient.
 
-Approval must be signed, one-time, actor-bound and bound to the exact proposal ID, nonce, asset, action, parameters, reason, policy version, issue/expiry times and approver role. Approval is revalidated immediately before execution. Expired, replayed, mismatched or unverifiable approvals are rejected.
+## 4. Autonomy classes and action policy
 
-### A4 — Prohibited
-Never permitted, even in advanced autonomous mode:
-- arbitrary shell or code execution;
-- AI-generated commands or dynamic executable arguments;
-- disabling or tampering with Security Guard, Malware Engine, audit, backups or monitoring to restore availability;
-- deleting forensic evidence, logs or suspicious artifacts;
-- restoring a known-suspect binary or snapshot;
-- self-modifying policies, permissions, trust roots or its own code;
-- uncontrolled lateral movement, credential harvesting or destructive retaliation;
-- destructive data operations without a separate explicitly authorized operator workflow.
+Autonomy is assigned to an **action on an asset**, not just to a service's critical/non-critical label.
 
-## 5. Decision algorithm
-
-For every candidate response:
-
-1. Authenticate source and validate schema, asset, timestamp, expiry and replay protection.
-2. Correlate evidence; preserve conflicting signals and uncertainty.
-3. Resolve asset criticality and dependency graph from the trusted registry.
-4. Classify incident using deterministic rules.
-5. Generate candidate typed actions from the approved playbook registry.
-6. Evaluate each action against policy predicates, blast-radius budget, retry/cooldown, reversibility, evidence requirements and kill switch.
-7. Choose the least-impact action that meets the recovery objective. If no safe action qualifies, take no action and escalate.
-8. Atomically claim the action in durable storage before execution; enforce idempotency and per-asset locks.
-9. Execute through the fixed adapter with a strict timeout and cancellation path.
-10. Verify OS state and application readiness; observe a stability window before marking recovered.
-11. Record result and evidence; stop further automatic actions if verification fails, state is ambiguous, or a budget is exhausted.
-12. Notify the operator with the decision rationale and next safe action.
-
-The decision record must include: incident ID, signal references, asset, classification, policy version, selected action, rejected alternatives and reasons, autonomy class, budget before/after, approval reference if any, execution result, verification result and timestamps.
-
-## 6. Default response matrix
-
-| Condition | Autonomous response | Guardrail |
+| Class | Risk | Default execution |
 |---|---|---|
-| Non-critical service unavailable; no security signal | One bounded restart, then verify | Allowlist, cooldown, attempt cap |
-| Repeated failures after restart | Stop and escalate | No restart loop |
-| Dependency unavailable | Wait/notify or use exact dependency playbook | Do not restart all dependents |
-| Suspected attack or conflicting signals | Preserve evidence, suspend recovery on affected scope, alert | No blind restart |
-| Confirmed compromise of non-critical workload | Execute exact pre-approved containment playbook | Target identity and scope must verify |
-| Integrity/tamper failure | Freeze recovery, preserve artifacts, alert | Never replace/restart suspect binary |
-| Critical service outage | Diagnose and prepare proposal | Approval before action |
-| Host unreachable | External monitor may prepare failover proposal | No self-recovery claim; external target required |
-| Recovery verification fails | Stop, mark unverified, escalate | No repeated action cascade |
-| Ledger/audit unavailable | Observe and alert only | Fail closed for remediation |
+| A0 — Observe | Read-only probes, correlation, reporting | Automatic |
+| A1 — Routine recovery | Reversible single-service action on allowlisted stateless/non-critical workload | Automatic within budgets and health gates |
+| A2 — Bounded containment | Reversible isolation or traffic removal for a specifically identified asset | Automatic only for trusted confirmed security verdicts and a pre-authorized containment profile |
+| A3 — Controlled continuity | Switch traffic or fail over to a pre-provisioned target | Automatic only when every external monitor, fencing, quorum, replication and consistency gate passes |
+| A4 — High-impact operations | Data restore, destructive cleanup, host rebuild, global credential rotation, broad network or identity changes | Human approval required; some actions remain prohibited to Resilience |
 
-## 7. Safety invariants
+A4 approval does not grant permission to perform actions outside the adapter catalogue or violate hard prohibitions.
 
-- **Fail closed:** missing policy, unavailable durable ledger, invalid signal, stale evidence or adapter ambiguity blocks automatic action.
-- **Least privilege:** separate read, containment and recovery permissions; short-lived credentials; no broad administrator token in the decision process.
-- **Blast-radius limits:** per-action, per-incident, per-host and global concurrency ceilings.
-- **Circuit breaker:** repeated failure or verification mismatch disables the affected playbook until explicit reset.
-- **Evidence preservation:** append-only audit, evidence references, trusted timestamps and restricted access.
-- **No split brain:** cross-host promotion requires external fencing/lease and authoritative ownership confirmation.
-- **Kill switch:** authenticated operator can disable automatic actions; monitoring and audit remain on.
-- **Policy integrity:** signed/versioned policy, monotonic version checks and dual control for policy/trust-root changes.
-- **No false recovery:** only independent health checks plus a stability window can close a recovery incident.
-- **Bounded autonomy:** no action outside the exact registered target, parameters, time window and budget.
+### 4.1 A1 — Routine recovery
 
-## 8. State model
+Automatic restart/recovery is permitted only when all conditions hold:
 
-Incident lifecycle:
+- Service ID and exact action are in the signed allowlist.
+- Asset is marked eligible for A1 and is not a security control-plane or protected data service.
+- Health observations meet the configured failure threshold from independent or sufficiently diverse probes.
+- No active, suspected, conflicting, stale or unknown security/tamper state affects the asset or its dependencies.
+- Dependencies are healthy; otherwise recover the dependency or degrade safely rather than restart a dependent chain.
+- Per-service, per-incident and cluster budgets have remaining capacity.
+- Cooldown, maintenance and concurrency rules pass.
+- Durable action claim succeeds before adapter invocation.
+- Post-action service and application health can be verified.
 
-`NEW -> VALIDATING -> CORRELATED -> CLASSIFIED -> DECIDING -> (DENIED | AWAITING_APPROVAL | EXECUTING) -> VERIFYING -> (RECOVERED | UNVERIFIED | FAILED | ESCALATED)`
+An automatic action that exhausts its budget opens a circuit breaker and escalates. No infinite retry loop is permitted.
 
-Action lifecycle:
+### 4.2 A2 — Bounded security containment
 
-`PROPOSED -> POLICY_CHECKED -> CLAIMED -> (AWAITING_APPROVAL -> APPROVED) -> EXECUTING -> VERIFYING -> (SUCCEEDED | FAILED | UNVERIFIED | EXPIRED | CANCELLED)`
+Autonomous containment is allowed only when:
 
-All transitions are persisted atomically. Illegal transitions are rejected. Restarting the engine must not reset attempt limits, replay protection, incident ownership or active circuit breakers.
+- A trusted Security Guard or Malware Engine producer emits a valid, fresh, confirmed verdict for the exact asset, with an evidence reference and provenance.
+- The signed policy explicitly allows the named containment profile for that asset class.
+- The action is reversible, narrowly scoped and has a tested release procedure.
+- Essential management, logging and forensic collection channels remain available where technically possible.
+- The action does not disable endpoint protection, weaken firewall/ACL policy globally, delete files, alter evidence or restore binaries.
+- A second independent signal or integrity finding is required when the policy marks the asset as high impact.
 
-## 9. Required policy configuration
+For **suspected**, conflicting, stale or unknown security signals: suspend recovery on the affected scope, preserve evidence, alert operators and do not automatically restart or isolate the entire host.
 
-A host deployment must explicitly configure:
-- autonomy profile and enabled classes (A0-A2 only for automatic execution);
-- asset registry, criticality and dependency graph;
-- exact typed playbooks, parameter schemas and allowed targets;
-- evidence sources, trust identities, freshness and corroboration requirements;
-- per-service and global retry/concurrency/action budgets;
-- cooldowns, timeouts, health probes and stability windows;
-- durable transactional ledger and append-only audit destination;
-- approval verifier and authorized operator roles for A3;
-- external monitor/fencing integration for any failover capability;
-- emergency kill-switch owner and operational procedure.
+A confirmed tamper/integrity failure blocks restart, self-repair and binary restoration of the affected component. The approved action is containment and escalation, not cleanup.
 
-No permissive defaults. Unconfigured policy means observe-only.
+### 4.3 A3 — Controlled failover
 
-## 10. Rollout and certification gates
+Failover can be autonomously executed only for a pre-provisioned target and only when all of the following are true:
 
-1. **Design and policy tests:** decision table, deny-by-default, stale/replayed/forged signals, conflicting verdicts, policy version rollback and kill-switch tests.
-2. **Simulation:** outage, cascading dependency failure, suspected attack, confirmed compromise, tamper, ledger outage, adapter timeout, crash during action, repeated restart and verification failure.
-3. **Isolated host labs:** real systemd and Windows SCM on disposable VMs; no production credentials or data.
-4. **Shadow mode:** decisions logged but no actions; compare decisions with operator judgment and tune deterministic thresholds.
-5. **Canary autonomy:** A1 first on explicitly non-critical services; A2 only after playbook-specific safety certification.
-6. **Operational certification:** recovery objectives, evidence retention, audit review, rollback drills, kill-switch drill, failure injection and security review.
-7. **Production authorization:** separate explicit approval; never implied by merging code or passing CI.
+- An independent monitor outside the failed host confirms unavailability.
+- The control plane has a durable, transactional coordination store.
+- A valid exclusive lease and monotonically increasing fencing epoch prevent the former primary from writing.
+- Quorum/authority is unambiguous; split-brain is ruled out.
+- Replication is healthy and measured lag is within the service's explicit RPO.
+- Target capacity, dependencies, secrets access and health checks are ready.
+- The source is fenced before a new writer is promoted.
+- Traffic cutover and rollback are preconfigured and bounded.
+- Post-failover integrity and application-level checks pass.
 
-## 11. Non-goals and unresolved dependencies
+If any gate is unknown or cannot be independently verified, do not promote a new writer. Keep the service in safe degraded/read-only mode where configured and escalate. A host cannot recover itself after it is fully unreachable; external orchestration is mandatory.
 
-This architecture does not itself provide cross-host failover, external monitoring, database restore, cloud infrastructure provisioning, identity-provider integration, network enforcement or a resident daemon. Those require separately reviewed adapters and independent control planes. A host that is completely down cannot recover itself.
+The existing JSON file recovery ledger is single-host only and is **not sufficient** for A3. A transactional database/coordination backend with uniqueness, lease expiry and fencing semantics is a prerequisite.
 
-The existing package currently provides bounded service recovery, a durable single-host file ledger, fixed Linux/Windows service adapters and post-action verification hooks. The advanced-autonomy design above is a target architecture, **not a claim that these capabilities are already implemented**. Multi-host operation requires a transactional shared store and fencing; security containment requires authenticated integrations and playbook-specific adapters.
+## 5. Incident response decision matrix
 
-## 12. Implementation sequence
+| Incident / evidence | Automatic response | Prohibited automatic response | Escalation |
+|---|---|---|---|
+| Transient outage, no security signal, stateless allowlisted service | Bounded restart, verify, then circuit-break on failure | Unbounded retries or restarting dependencies blindly | After budget exhaustion or failed verification |
+| Dependency unavailable | Mark dependent service degraded; recover dependency only if separately eligible | Restarting an entire dependency tree | If dependency is stateful/critical |
+| Suspected or conflicting attack signal | Suspend recovery, preserve logs/evidence, notify | Restarting affected asset; broad network isolation | Immediate |
+| Confirmed malware on allowlisted workload | Apply exact pre-approved containment profile; preserve evidence | Cleaning malware, deleting files, restoring executable, disabling protection | Immediate notification; human investigation |
+| Configuration/binary tamper | Freeze recovery and contain if explicitly authorized | Auto-repair, overwrite, rollback binary | Immediate |
+| Resource saturation | Apply bounded load shed, drain unhealthy stateless instance, configured degraded mode | Killing databases, dropping persistent queues, changing global quotas | If no safe degradation path |
+| Host unreachable | External monitor may propose/execute A3 only when all failover gates pass | Local self-recovery claim; promote without fencing | If any prerequisite is unknown |
+| Recovery command timed out / unknown result | Reconcile actual state; hold further mutation until resolved | Blind retry | If state cannot be reconciled |
+| Recovery executed but health check fails | Open circuit breaker; stop retrying; preserve diagnostics | Marking incident recovered | Immediate for critical service |
+| Ledger, clock, policy signature or adapter integrity failure | Block all mutations; continue read-only monitoring if safe | Fallback to memory ledger or unsigned policy | Immediate |
 
-- **Phase 1 — Policy foundation:** policy schema/versioning, asset criticality registry, typed playbook registry, autonomy classes, kill switch, deterministic decision records.
-- **Phase 2 — Signal trust:** authenticated producer contracts, signature/transport validation, replay defense, freshness and correlation.
-- **Phase 3 — Orchestration safety:** action budgets, idempotency, per-asset locks, circuit breakers, cancellation, durable state transitions.
-- **Phase 4 — Verified containment:** exact Security Guard/Malware Engine signal contracts and isolated, reversible containment adapters.
-- **Phase 5 — External resilience:** independent monitoring, fencing/lease, transactional shared ledger and controlled failover proposals.
-- **Phase 6 — Certification:** simulation suite, Windows/Linux VM labs, shadow mode, canary, audit and recovery drills.
+## 6. Proposed policy schema v2
 
-Each phase is developed on its own feature branch, tested in isolation, repaired and rerun before PR review and merge. No production deployment or paid infrastructure is part of this design approval.
+The current runtime accepts `jb.resilience.policy/v1` with `mode: "semi-autonomous"`. The following is a **target contract**, not a currently accepted configuration.
+
+```json
+{
+  "schema": "jb.resilience.policy/v2",
+  "policyId": "jb-prod-continuity",
+  "revision": 1,
+  "mode": "autonomous-advanced",
+  "validity": {
+    "notBefore": "2026-11-16T00:00:00Z",
+    "expiresAt": "2026-12-16T00:00:00Z"
+  },
+  "signature": {
+    "keyId": "continuity-policy-owner-01",
+    "algorithm": "approved-by-host-key-policy"
+  },
+  "defaults": {
+    "decision": "deny",
+    "unknownSignal": "hold-and-escalate",
+    "staleSignal": "hold-and-escalate",
+    "ledgerUnavailable": "block-mutations",
+    "policyInvalid": "block-mutations",
+    "preserveEvidence": true,
+    "requireDurableAudit": true
+  },
+  "budgets": {
+    "maxConcurrentActionsPerIncident": 1,
+    "maxActionsPerIncident": 3,
+    "maxActionsPerAssetPerHour": 2,
+    "maxAutomaticContainmentsPerIncident": 1
+  },
+  "services": [
+    {
+      "id": "web-api-01",
+      "tier": "stateless",
+      "criticality": "standard",
+      "allowedActions": [
+        "restart-service",
+        "drain-instance",
+        "enter-degraded-mode"
+      ],
+      "recovery": {
+        "failureThreshold": 3,
+        "maxRestartsPerHour": 2,
+        "cooldownMs": 300000,
+        "requireApplicationHealth": true
+      },
+      "containmentProfile": null,
+      "failoverProfile": null
+    }
+  ]
+}
+```
+
+The host must validate the complete schema, issuer/key identity, signature, validity period, monotonic revision and policy hash. The example signature block is descriptive metadata only; the implementation must use the cryptographic verification mechanism selected by the host key-management design. No unsigned example policy is valid for production.
+
+### Required policy dimensions
+
+- **Asset identity:** immutable service/instance identifier, environment and ownership.
+- **Tier and criticality:** stateless, stateful, critical, data-bearing, security-control-plane.
+- **Capabilities:** exact actions permitted per asset; no wildcard mutation grant.
+- **Preconditions:** evidence sources, freshness, dependency health, maintenance window and confidence/verdict requirements.
+- **Budgets:** per action, asset, incident, time window and cluster.
+- **Verification:** expected postconditions and independent check sources.
+- **Containment:** named profile, exact scope, management/forensic exceptions and release criteria.
+- **Failover:** target identity, RPO/RTO, lease/fencing, quorum, replication and cutover constraints.
+- **Approval:** authorized roles, dual-control thresholds, expiry and replay protection.
+- **Audit:** immutable policy revision/hash and mandatory decision/action records.
+
+## 7. Signal contract between engines
+
+Every inter-engine event must use a versioned envelope such as:
+
+```json
+{
+  "schema": "jb.security-event/v1",
+  "eventId": "unique-event-id",
+  "producer": {
+    "engine": "JB Malware Engine",
+    "version": "x.y.z",
+    "identity": "registered-producer-id"
+  },
+  "asset": {
+    "id": "web-api-01",
+    "hostId": "host-17"
+  },
+  "event": {
+    "type": "integrity-tamper",
+    "verdict": "confirmed",
+    "severity": "high",
+    "occurredAt": "2026-11-16T19:00:00Z",
+    "expiresAt": "2026-11-16T19:05:00Z"
+  },
+  "evidence": {
+    "references": ["evidence://opaque-reference"],
+    "digest": "sha256:..."
+  },
+  "replay": {
+    "nonce": "unique-nonce",
+    "sequence": 481
+  },
+  "signature": {
+    "keyId": "registered-engine-key",
+    "value": "detached-signature"
+  }
+}
+```
+
+This is a contract illustration, not a production credential. Resilience must verify producer authorization, event signature/integrity, asset binding, freshness, replay status and supported schema version before the event can influence a mutation. An event from an unknown or untrusted producer is informational only.
+
+## 8. State machine and action lifecycle
+
+Incident states:
+
+`OBSERVING → DEGRADED → SUSPECTED_SECURITY | CONFIRMED_SECURITY | SERVICE_FAILURE → PLANNED → AUTHORIZED → EXECUTING → VERIFYING → RECOVERED | CONTAINED | DEGRADED_SAFE | ESCALATED | FAILED_CLOSED`
+
+Rules:
+
+- A security/tamper state blocks A1 recovery for the affected asset until an explicit clearance event from the owning security engine is validated.
+- A confirmed event can enter A2 only through an approved containment profile.
+- A failed or uncertain verification never transitions to `RECOVERED`.
+- A crash after an action claim consumes that action budget and requires reconciliation; it does not silently reopen the budget.
+- Duplicate event IDs, proposal IDs and action idempotency keys cannot trigger duplicate mutations.
+- One incident may have only one active mutating plan per asset unless a policy explicitly permits safe parallelism.
+
+## 9. Hard prohibitions
+
+Resilience must never autonomously:
+
+- Execute arbitrary shell commands, scripts, dynamic code or model-generated commands.
+- Disable or weaken Security Guard, Malware Engine, endpoint protection, logging, audit or access controls.
+- Delete, overwrite, sanitize or rotate forensic evidence.
+- Restore a binary, package, driver or configuration that may be compromised.
+- Delete databases, queues, disks, backups or user data.
+- Restore database backups or roll data backward.
+- Promote a stateful writer without fencing, quorum and consistency verification.
+- Rebuild/reimage hosts, provision new infrastructure or change global identity/credential/network policy.
+- Change its own policy, trust roots, signing keys, capability allowlists or approval requirements.
+- Bypass its own ledger, retry limits, kill switch or verification gates.
+
+Some of these operations may be available through a separately designed operator workflow; approval does not make them permissible through the Resilience autonomous adapter catalogue.
+
+## 10. Emergency controls and human authority
+
+- **Mutation stop switch:** immediately blocks new mutating plans while allowing safe read-only monitoring and audit to continue.
+- **Scoped recovery disable:** suspend a named service, asset group or action class without disabling the full engine.
+- **Policy rollback:** only to a previously signed, unexpired, monotonic-approved policy version; never to an unsigned or revoked policy.
+- **Emergency override:** signed, time-bounded and scoped. For high-impact operations it requires two distinct authorized approvers. It cannot override hard prohibitions.
+- **Operator escalation:** include incident ID, evidence references, current state, proposed action, denied gates, remaining budgets and exact reason approval is required.
+
+## 11. Security, reliability and abuse controls
+
+- Separate the read-only monitoring identity from mutation-capable adapter identities.
+- Use least-privilege service accounts and OS permissions restricted to configured service units.
+- Require signed policy deployment, authenticated producer registration and key rotation with overlap/revocation.
+- Protect the ledger with OS permissions, encryption at rest where supported, integrity checks and bounded retention.
+- Apply per-incident locks, idempotency, monotonic epochs and cluster-wide action budgets.
+- Use jittered backoff and circuit breakers; do not retry an unknown outcome until state reconciliation completes.
+- Keep a tamper-evident audit chain or ship signed audit checkpoints to an independent sink.
+- Monitor the Resilience process itself from an independent host. A dead Resilience host cannot execute recovery.
+- Do not make automatic decisions from uncalibrated risk scores or model-generated explanations.
+
+## 12. Required validation before enabling advanced autonomy
+
+1. **Contract/unit tests:** schema, signatures, freshness, replay, policy expiry, capability allowlists, decision matrix and deterministic output.
+2. **Concurrency tests:** duplicate event, duplicate approval, same-asset parallel actions, ledger lock contention, crash after claim and multi-process budget races.
+3. **Fault injection:** timeout, partial command result, corrupt ledger, clock skew, missing monitor, stale event, lost management path and failed health probe.
+4. **Security simulation:** suspected vs confirmed malware, tamper event, conflicting producer verdicts, invalid signature and replayed event. Verify no restart or evidence destruction.
+5. **Continuity lab:** dependency outage, service flapping, degraded mode, drain, preconfigured failover, split-brain attempt, expired lease and replication lag above RPO.
+6. **Platform validation:** isolated Windows VM with SCM and Linux VM with systemd. Existing injected command-runner tests are not equivalent to real OS validation.
+7. **Shadow mode:** compute and audit decisions without executing mutations; compare decisions with operator judgments.
+8. **Canary:** enable only A1 first on one non-critical service; then A2 containment on a deliberately isolated lab asset; A3 only after fencing and multi-host ledger certification.
+9. **Release gate:** no production activation while any safety-critical scenario is failing, unverified or skipped.
+
+## 13. Implementation sequence
+
+| Stage | Deliverable | Acceptance gate |
+|---|---|---|
+| v0.3 | Policy schema v2, policy signature/expiry validation, explicit autonomy mode and capability catalogue | Invalid/unsigned/expired policy blocks mutation; existing v1 tests remain covered during migration |
+| v0.4 | Trusted signal gateway and signed event contracts for Security Guard / Malware Engine | Replay, spoofing, stale and malformed events cannot authorize actions |
+| v0.5 | Deterministic Decision Engine, incident state machine and audit decision records | Scenario matrix passes with explainable rule IDs and no unauthorized action |
+| v0.6 | Typed A1/A2 action adapters, budgets, circuit breakers and mutation stop switch | Lab recovery/containment remains inside exact allowlists and verifies outcomes |
+| v0.7 | External monitor contract and A3 failover planner | Fencing, quorum, consistency and independent observer tests pass; no split-brain |
+| v0.8 | Durable cluster ledger, operator approval broker and tamper-evident audit | Crash/race/replay/approval tests pass across processes and hosts |
+| v1.0 | Integrated autonomous-advanced certification | Full lab, shadow and canary gates pass; production enablement remains an explicit operator decision |
+
+## 14. Current implementation gap
+
+The current package is still the v0.2 recovery foundation:
+
+- Current policy schema is `jb.resilience.policy/v1` and accepts `mode: "semi-autonomous"`.
+- Current automatic action is a bounded service restart for an allowlisted non-critical service.
+- Critical services still rely on an injected signed, one-time human approval verifier.
+- Current adapters cover Linux systemd and Windows SCM restart/verification.
+- The built-in JSON recovery ledger is single-host; it is not a cluster coordination store.
+- Security/tamper signals are host-provided booleans in the current API, not yet the signed event contract above.
+- No A2 containment adapter, A3 external failover controller, policy-signature registry, incident correlator or autonomous decision engine exists yet.
+
+Therefore this document does not authorize activating `autonomous-advanced` in the present runtime. Implementation must follow the stages above, remain in a lab branch, pass tests, then be reviewed and merged through the normal repository process.
