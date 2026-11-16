@@ -163,3 +163,30 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
 **Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
+
+
+## NEXORA real-product adapters — 2026-11-16
+
+The placeholder target-separation regression is retained, but product-level execution is now defined through a dedicated, offline integration workflow. The workflow checks out two immutable NEXORA revisions into separate directories; it does not treat a pass in one profile as evidence for the other.
+
+**Pinned inputs**
+- Configurable Catalog: `JASBH121101/Nexora@88c4876c9678b93dadde55f79fe9d04890900741` from `feature/nexora-configurable-catalog`.
+- Site Engine: `JASBH121101/Nexora@3f68126ecc58b088c071007c5116bc95426d159b` from the canonical `docs/nexora-approved-upgrades-2026-11` integration line.
+
+**Configurable Catalog tiers**
+- Basic: public/admin demo contract tests.
+- Intermediate: dynamic schema, dimensional units, responsive layout and demo privacy tests.
+- Advanced: Laravel setup/template persistence feature tests using in-memory SQLite.
+- Expert, Extreme and Superextreme remain unrepresented and must stay visible as gaps.
+
+**Site Engine tiers**
+- Basic: public publication and private-field exposure boundaries.
+- Intermediate: custom-domain hostname validation.
+- Advanced: role/action/field-level authorization.
+- Expert: export and informational inventory least-privilege checks.
+- Extreme: ownership TXT and fake DNS/TLS readiness plus published-domain middleware.
+- Superextreme: complete Laravel feature regression suite.
+
+The workflow uses only local checkouts, SQLite memory databases, temporary test fixtures and injected fake DNS/TLS adapters. It does not query real DNS, open external TLS connections, deploy, alter production data, or enable paid services. Passing the Site Engine suite indicates readiness for these registered tests only; it is not proof of absence of defects. The Configurable Catalog deliberately remains not-ready above Advanced until real scenarios are added.
+
+The demo's `localStorage` behavior remains prototype-only. It is never counted as real server authentication, durable persistence or secure file upload. The Laravel tests are run separately against the pinned application branch.
