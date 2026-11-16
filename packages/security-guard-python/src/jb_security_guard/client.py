@@ -26,17 +26,21 @@ class UniversalRateLimitClient:
         timeout_seconds: float = 2.5,
         transport: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
     ) -> None:
+        if not isinstance(endpoint, str):
+            raise ValueError("endpoint must be an absolute HTTPS URL")
         parsed = urlsplit(endpoint)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("endpoint must be an absolute HTTPS URL without embedded credentials")
         if not client_id or len(client_id) > 96 or any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-" for ch in client_id):
             raise ValueError("client_id has an invalid format")
-        if not 32 <= len(client_secret.encode("utf-8")) <= 512:
+        if not isinstance(client_secret, str) or not 32 <= len(client_secret.encode("utf-8")) <= 512:
             raise ValueError("client_secret must contain 32-512 bytes")
         if failure_mode not in ("open", "closed"):
             raise ValueError("failure_mode must be open or closed")
         if not 0.1 <= timeout_seconds <= 15:
             raise ValueError("timeout_seconds must be from 0.1 to 15")
+        if transport is not None and not callable(transport):
+            raise ValueError("transport must be callable")
         self._endpoint = endpoint
         self._client_id = client_id
         self._client_secret = client_secret
