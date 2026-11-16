@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:rate-limit:decision:v1",
+  "title": "JB Security Guard rate-limit decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "requestId",
+    "tenantId",
+    "applicationId",
+    "policyId",
+    "scope",
+    "allowed",
+    "exceeded",
+    "enforced",
+    "unavailable",
+    "status",
+    "retryAfterSeconds"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.rate-limit.decision/v1"
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "applicationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "policyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:_-]{1,96}$"
+    },
+    "allowed": {
+      "type": "boolean"
+    },
+    "exceeded": {
+      "type": "boolean"
+    },
+    "enforced": {
+      "type": "boolean"
+    },
+    "unavailable": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        null,
+        429,
+        503
+      ]
+    },
+    "retryAfterSeconds": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 60
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": true
+          }
+        },
+        "required": [
+          "allowed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "type": "null"
+          },
+          "retryAfterSeconds": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": 429
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "allowed": {
+            "const": false
+          },
+          "exceeded": {
+            "const": true
+          },
+          "enforced": {
+            "const": true
+          },
+          "unavailable": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": 503
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "allowed": {
+            "const": false
+          },
+          "exceeded": {
+            "const": false
+          },
+          "enforced": {
+            "const": true
+          },
+          "unavailable": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}
