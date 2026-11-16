@@ -37,7 +37,7 @@ const ATTESTATION_UNSIGNED_FIELDS = [
   "facts", "evidenceRefs"
 ];
 const ATTESTATION_FIELDS = [...ATTESTATION_UNSIGNED_FIELDS, "signature"];
-const PROVIDER_VERIFIER_BRAND = Symbol("JB Resilience provider evidence verifier");
+const PROVIDER_VERIFIERS = new WeakSet();
 const EXPECTED_FIELDS = [
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ];
@@ -388,8 +388,7 @@ export function createProviderEvidenceVerifier({
     }
   }
 
-  return Object.freeze({
-    [PROVIDER_VERIFIER_BRAND]: true,
+  const verifier = Object.freeze({
     algorithm: "Ed25519",
     capability: CAPABILITY,
     verify,
@@ -398,6 +397,8 @@ export function createProviderEvidenceVerifier({
       return observedKeys.get(keyId)?.keyVersion ?? null;
     }
   });
+  PROVIDER_VERIFIERS.add(verifier);
+  return verifier;
 }
 
 /**
@@ -409,8 +410,7 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
   if (!Array.isArray(attestations) || attestations.length !== ROLES.length ||
       Object.getOwnPropertySymbols(attestations).length !== 0 ||
       Object.keys(attestations).length !== attestations.length ||
-      verifier?.[PROVIDER_VERIFIER_BRAND] !== true ||
-      typeof verifier.verify !== "function") {
+      !PROVIDER_VERIFIERS.has(verifier)) {
     return Object.freeze({
       schema: BUNDLE_SCHEMA,
       verified: false,
