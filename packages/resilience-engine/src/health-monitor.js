@@ -103,6 +103,40 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
     return Object.freeze({ ...next });
   }
 
+  function restoreState({
+    serviceId,
+    consecutiveFailures = 0,
+    restartCount = 0,
+    lastRestartAt = null,
+    lastObservedAt = null,
+    status = "unknown",
+    securityThreatActive = false
+  } = {}) {
+    if (typeof serviceId !== "string" || !SERVICE_ID.test(serviceId) ||
+        !Number.isSafeInteger(consecutiveFailures) || consecutiveFailures < 0 ||
+        !Number.isSafeInteger(restartCount) || restartCount < 0 ||
+        (lastRestartAt !== null && (!Number.isSafeInteger(lastRestartAt) || lastRestartAt < 0)) ||
+        (lastObservedAt !== null && (!Number.isSafeInteger(lastObservedAt) || lastObservedAt < 0)) ||
+        !["unknown", "healthy", "unhealthy", "recovery-requested", "recovery-failed"].includes(status) ||
+        typeof securityThreatActive !== "boolean") {
+      throw new TypeError("restored health state is invalid");
+    }
+    if (states.has(serviceId)) {
+      throw new Error("health state can only be restored before the first observation");
+    }
+    assertCanTrack(serviceId);
+    const restored = {
+      consecutiveFailures,
+      restartCount,
+      lastRestartAt,
+      lastObservedAt,
+      status,
+      securityThreatActive
+    };
+    states.set(serviceId, restored);
+    return Object.freeze({ ...restored });
+  }
+
   function getSnapshot(serviceId) {
     if (typeof serviceId !== "string" || !SERVICE_ID.test(serviceId)) {
       throw new TypeError("serviceId is required and must be valid");
@@ -110,5 +144,5 @@ export function createHealthMonitor({ engine, clock = Date.now, maxServices = 10
     return Object.freeze({ ...getState(serviceId) });
   }
 
-  return Object.freeze({ observe, recordRecoveryAttempt, getSnapshot });
+  return Object.freeze({ observe, recordRecoveryAttempt, restoreState, getSnapshot });
 }
