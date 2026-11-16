@@ -629,6 +629,8 @@ export async function deriveCoreIdentityKey(options = {}) {
 
 /** Strict, deeply frozen Core v1 request normalization for external adapters. */
 export function normalizeCoreRateLimitCheckRequest(input) {
+  assertCoreV1PlainObject(input, "request");
+  assertCoreV1PlainObject(input.identity, "request.identity");
   const normalized = validateRateLimitCheckV1(input);
   return coreV1DeepFreeze(normalized);
 }
@@ -639,6 +641,7 @@ export function normalizeCoreRateLimitCheckRequest(input) {
  * outages remain denied 503 decisions.
  */
 export function normalizeCoreRateLimitDecision(input) {
+  assertCoreV1PlainObject(input, "decision");
   const decision = validateRateLimitDecisionV1(input);
   if (decision.allowed && decision.enforced) {
     throw new TypeError("an allowed decision cannot be enforced");
@@ -651,6 +654,10 @@ export function normalizeCoreRateLimitDecision(input) {
 
 /** Strict policy normalization with unique limit identifiers. */
 export function normalizeCoreRateLimitPolicy(input) {
+  assertCoreV1PlainObject(input, "policy");
+  if (Array.isArray(input.limits)) {
+    input.limits.forEach((limit, index) => assertCoreV1PlainObject(limit, "policy.limits[" + index + "]"));
+  }
   const policy = validateRateLimitPolicyV1(input);
   const seen = new Set();
   for (const [index, limit] of policy.limits.entries()) {
