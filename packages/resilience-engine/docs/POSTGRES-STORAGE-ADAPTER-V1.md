@@ -75,6 +75,9 @@ Initialization creates only these namespaced tables and indexes:
 - \`jb_resilience_circuits\`
 - \`jb_resilience_audit_heads\`
 - \`jb_resilience_audit_records\`
+- \`jb_resilience_coordination_leases\`
+- \`jb_resilience_fenced_targets\`
+- \`jb_resilience_fenced_mutations\`
 
 Use a dedicated database or a role/schema policy that confines the runtime role to these objects. The initializer requires DDL rights. A hardened deployment should separate one-time schema initialization privileges from the runtime role and grant only the minimum table/sequence permissions needed for reads, inserts, updates and audit appends.
 
