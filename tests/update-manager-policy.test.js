@@ -103,7 +103,8 @@ test("policy covers each independently versioned engine", () => {
   assert.deepEqual(ENGINE_PACKAGES, [
     "@jb/expert-qa",
     "@jb/security-guard",
-    "@jb/malware-engine"
+    "@jb/malware-engine",
+    "@jb/resilience-engine"
   ]);
   assert.deepEqual(HYBRID_UPDATE_POLICY.automaticReleaseTypes, ["patch"]);
   assert.equal(HYBRID_UPDATE_POLICY.rollbackOnFailure, true);

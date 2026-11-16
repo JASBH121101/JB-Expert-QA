@@ -1,0 +1,21 @@
+{
+  "name": "@jb/resilience-engine",
+  "version": "0.1.0",
+  "description": "Independent, policy-bounded service health and recovery engine for Linux and Windows.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": {
+    ".": "./src/index.js",
+    "./policy": "./src/policy.js",
+    "./adapters/linux-systemd": "./src/adapters/linux-systemd.js",
+    "./adapters/windows-scm": "./src/adapters/windows-scm.js"
+  },
+  "files": ["src/**", "docs/**", "README.md"],
+  "scripts": { "test": "node --test" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JASBH121101/JB-Expert-QA.git",
+    "directory": "packages/resilience-engine"
+  },
+  "license": "UNLICENSED"
+}

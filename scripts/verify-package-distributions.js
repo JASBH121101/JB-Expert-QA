@@ -317,8 +317,18 @@ try {
   );
   assert.ok((await stat(advisorSnapshot)).size > 0, "Advisor Engine offline dataset builder must produce a knowledge snapshot");
 
-  progress("All four standalone package checks completed");
-  console.log("PASS: all four npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
+  // JB Resilience Engine.
+  progress("Packing standalone Resilience Engine tarball");
+  const resilienceTarball = await pack("packages/resilience-engine");
+  const resilienceInstall = await install(resilienceTarball, "install-resilience-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createResilienceEngine, createHealthMonitor } from "@jb/resilience-engine"; import { createLinuxSystemdAdapter } from "@jb/resilience-engine/adapters/linux-systemd"; import { createWindowsScmAdapter } from "@jb/resilience-engine/adapters/windows-scm"; if ([createResilienceEngine, createHealthMonitor, createLinuxSystemdAdapter, createWindowsScmAdapter].some((value) => typeof value !== "function")) process.exit(1);'
+  ], { cwd: resilienceInstall });
+  progress("Resilience Engine package checks passed");
+
+  progress("All five standalone package checks completed");
+  console.log("PASS: all five npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
