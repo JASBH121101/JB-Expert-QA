@@ -177,6 +177,56 @@
           "status"
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": true
+          },
+          "unavailable": {
+            "const": true
+          }
+        },
+        "required": [
+          "allowed",
+          "unavailable"
+        ]
+      },
+      "then": {
+        "properties": {
+          "allowed": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": true
+          },
+          "enforced": {
+            "const": true
+          },
+          "exceeded": {
+            "const": true
+          }
+        },
+        "required": [
+          "allowed",
+          "enforced",
+          "exceeded"
+        ]
+      },
+      "then": {
+        "properties": {
+          "allowed": {
+            "const": false
+          }
+        }
+      }
     }
   ]
 }
