@@ -98,6 +98,8 @@ All production stores must declare `durable: true`. Memory implementations are t
 - `policyEngine.evaluate(request)`, `authorize(request)`, `assertAuthorization({ authorization, request })`, and `completeAuthorization({ authorization, outcome })` — existing v2 policy engine.
 - `adapter.platform`, `adapter.restartService(serviceId)`, and `adapter.verifyService(serviceId)` — existing typed platform adapter.
 - `applicationHealthCheck(context)` — host-owned application readiness verifier.
+- `trustedInputVerifier(input)` — authenticates the host-owned provenance of the raw v0.5 input; it must not trust client-supplied verdicts.
+- `targetBindingVerifier({ assetId, environment, serviceId, platform })` — verifies the exact mapping from the v0.5 asset/environment/service tuple to the configured adapter target. Asset and service IDs are separate identifiers and must not be assumed equal.
 - `mutationControl.assertAllowed(context)` — host-owned global and scoped mutation stop control; only literal `true` permits progress.
 - `orchestrationStore` — durable, atomic incident/action/circuit state.
 - `auditStore.append(entry)` — durable append-only audit port.
