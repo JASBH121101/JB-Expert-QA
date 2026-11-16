@@ -155,7 +155,7 @@ function validateLedger(value, limits) {
     }
   }
   for (const [serviceKey, service] of Object.entries(value.services)) {
-    if (typeof serviceKey !== "string" || !serviceKey.includes(":") ||
+    if (typeof serviceKey !== "string" || serviceKey.split(":").length !== 2 ||
         !isRecord(service) ||
         !ASSET_ID.test(service.assetId ?? "") ||
         !IDENTIFIER.test(service.environment ?? "") ||
@@ -419,17 +419,18 @@ export function createFileOrchestrationStore({
   }
 
   async function getServiceState({ assetId, environment } = {}) {
-    assertIdentifier(assetId, "assetId");
+    assertAssetId(assetId, "assetId");
     assertIdentifier(environment, "environment");
+    const key = scopeKey(environment, assetId);
     return read((ledger) => Object.freeze({
-      lastActionAt: ledger.services[environment + ":" + assetId]?.lastActionAt ?? null,
-      lastOutcome: ledger.services[environment + ":" + assetId]?.lastOutcome ?? "unknown",
-      consecutiveFailures: ledger.services[environment + ":" + assetId]?.consecutiveFailures ?? 0
+      lastActionAt: ledger.services[key]?.lastActionAt ?? null,
+      lastOutcome: ledger.services[key]?.lastOutcome ?? "unknown",
+      consecutiveFailures: ledger.services[key]?.consecutiveFailures ?? 0
     }));
   }
 
   async function getCircuitState({ assetId, environment, action, now } = {}) {
-    assertIdentifier(assetId, "assetId");
+    assertAssetId(assetId, "assetId");
     assertIdentifier(environment, "environment");
     assertIdentifier(action, "action");
     assertTimestamp(now, "circuit clock");
@@ -537,7 +538,7 @@ export function createFileOrchestrationStore({
   async function recordActionOutcome({
     assetId, environment, action, outcome, at, failureThreshold, cooldownMs
   } = {}) {
-    assertIdentifier(assetId, "assetId");
+    assertAssetId(assetId, "assetId");
     assertIdentifier(environment, "environment");
     assertIdentifier(action, "action");
     assertTimestamp(at, "action outcome timestamp");
