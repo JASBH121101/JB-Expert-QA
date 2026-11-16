@@ -15,6 +15,7 @@ export { configureNodeHttpServer } from "./node-server-hardening.js";
 export { createOriginProtection } from "./origin-protection.js";
 export { createCsrfProtection } from "./csrf-protection.js";
 export { createDistributedRateLimit } from "./distributed-rate-limit.js";
+export { createUniversalRateLimitService } from "./universal-rate-limit-service.js";
 export { createDistributedAuthProtection } from "./distributed-auth-protection.js";
 export { createUploadInspector, UploadInspectionError } from "./upload-inspector.js";
 
