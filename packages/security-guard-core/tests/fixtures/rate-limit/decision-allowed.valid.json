@@ -1,0 +1,14 @@
+{
+  "schema": "jb.security.rate-limit.decision/v1",
+  "requestId": "b37a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "tenantId": "tenant-demo",
+  "applicationId": "catalog-api",
+  "policyId": "public-api",
+  "scope": "catalog:list",
+  "allowed": true,
+  "exceeded": false,
+  "enforced": false,
+  "unavailable": false,
+  "status": null,
+  "retryAfterSeconds": null
+}
