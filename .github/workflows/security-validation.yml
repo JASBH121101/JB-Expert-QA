@@ -12,7 +12,7 @@ on:
       - "config/security-url.config.json"
       - ".github/workflows/security-validation.yml"
   pull_request:
-    branches: [main, "integration/**"]
+    branches: [main, "integration/**", "feature/jb-threat-lab"]
     paths:
       - "package.json"
       - "packages/**"

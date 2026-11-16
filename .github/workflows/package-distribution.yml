@@ -1,6 +1,14 @@
 name: NPM package distribution validation
 
 on:
+  push:
+    branches: [main, "feature/jb-threat-lab"]
+    paths:
+      - "package.json"
+      - "packages/**"
+      - "scripts/build-expert-qa-package.js"
+      - "scripts/verify-package-distributions.js"
+      - ".github/workflows/package-distribution.yml"
   pull_request:
     branches: [main, "feature/jb-threat-lab"]
     paths:
