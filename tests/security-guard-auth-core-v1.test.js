@@ -181,7 +181,7 @@ test("local Core v1 mode requires a stable secret and valid key identifiers", ()
     ...base, coreContract: CORE
   }), /stable explicit keySecret/);
   assert.throws(() => guard.createAuthProtection({
-    ...base, keySecret: "short", coreContract: CORE
+    ...base, keySecret: "abcdefghijklmnopqrst", coreContract: CORE
   }), /at least 32 bytes/);
   assert.throws(() => guard.createAuthProtection({
     ...base, keySecret: SECRET,
