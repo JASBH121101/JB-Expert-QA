@@ -86,6 +86,35 @@ expect($decision['allowed'] && !$decision['unavailable'], 'PHP universal client 
 expect(str_starts_with($captured['headers']['Authorization'], 'Bearer '), 'PHP client must use server-side Bearer authentication');
 expect(!str_contains($captured['body'], 'php-client-secret'), 'PHP client must not put credentials in JSON body');
 
+$unicodeDecision = $client->check(str_repeat('€', 512), 'catalog-read', 'public');
+expect($unicodeDecision['allowed'], 'PHP client must accept the shared 512 UTF-16-unit / 2048-byte identity boundary');
+$oversizedIdentityRejected = false;
+try {
+    $client->check(str_repeat('€', 513), 'catalog-read', 'public');
+} catch (RuntimeException) {
+    $oversizedIdentityRejected = true;
+}
+expect($oversizedIdentityRejected, 'PHP client must reject identities beyond 512 UTF-16 code units');
+
+$oversizedResponseClient = new UniversalRateLimitClient(
+    'https://guard.example/check', 'catalog-api',
+    'php-client-secret-at-least-32-bytes', 'open', 1000,
+    static fn() => ['status' => 200, 'headers' => [], 'body' => str_repeat('x', 16385)]
+);
+expect(!$oversizedResponseClient->check('user-123', 'catalog-read', 'public')['allowed'],
+    'PHP client must reject oversized upstream response bodies');
+
+$embeddedCredentialsRejected = false;
+try {
+    new UniversalRateLimitClient(
+        'https://user:password@guard.example/check', 'catalog-api',
+        'php-client-secret-at-least-32-bytes'
+    );
+} catch (RuntimeException) {
+    $embeddedCredentialsRejected = true;
+}
+expect($embeddedCredentialsRejected, 'PHP client must reject endpoint userinfo');
+
 $failClosedClient = new UniversalRateLimitClient(
     'https://guard.example/check', 'catalog-api',
     'php-client-secret-at-least-32-bytes', 'closed', 1000,
