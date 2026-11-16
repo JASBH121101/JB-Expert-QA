@@ -305,7 +305,7 @@ test("file audit store rejects accessor and oversized entries", async () => {
       enumerable: true,
       get() { throw new Error("must not execute"); }
     });
-    assert.throws(() => store.append(hostile), /accessor property/);
-    assert.throws(() => store.append({ event: "x".repeat(33 * 1024) }), /32 KiB/);
+    await assert.rejects(store.append(hostile), /accessor property/);
+    await assert.rejects(store.append({ event: "x".repeat(33 * 1024) }), /32 KiB/);
   });
 });
