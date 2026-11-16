@@ -20,6 +20,7 @@ export function createResilienceEngine({ policy, adapter, approvalVerifier = nul
   const inFlightProposals = new WeakSet();
 
   function evaluateRecovery(state) {
+    if (!isRecord(state)) return Object.freeze({ eligible: false, reason: "invalid-recovery-state" });
     const now = clock();
     if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(now + 60_000)) {
       return Object.freeze({ eligible: false, reason: "invalid-clock" });
