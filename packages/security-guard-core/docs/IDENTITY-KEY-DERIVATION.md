@@ -44,3 +44,10 @@ Policy and scope are separate counter dimensions and must be included in the int
 ## Required conformance vectors
 
 Every runtime must verify the exact same fixtures for valid/invalid identity values, digest length/case, tenant isolation, application isolation, identity-type separation, key ID selection, key rotation overlap, and cross-runtime equality. Use a fixed test-only secret for vectors; never place a production secret in the repository.
+
+
+## JavaScript reference helper status
+
+The Node package now exposes `deriveCoreIdentityKey()` from `@jb/security-guard/core-contract-v1`. It follows the exact byte sequence above using Web Crypto HMAC-SHA-256 and a fixed known-answer fixture shared with future language adapters. The helper accepts secret bytes and uses a trusted server-side canonical identity; it does not resolve identity from an HTTP request.
+
+The helper does not implement a key vault, active/retiring key registry, dual-key overlap window or counter migration. Those remain host-owned until a versioned rotation contract and independent PHP/Python conformance tests are complete. Do not rotate a live key without a reviewed migration plan, as key IDs are part of the counter-key tuple and an unplanned rotation can split active counters.
