@@ -26,7 +26,8 @@
     "test:threat-lab": "npm --workspace @jb/threat-lab run check",
     "audit:database:postgres": "node src/postgres-database-cli.js",
     "audit:language": "node src/language-cli.js",
-    "test:resilience-engine": "node --test packages/resilience-engine/tests/*.test.js"
+    "test:resilience-engine": "node --test packages/resilience-engine/tests/*.test.js",
+    "test:engine-contracts": "npm --workspace @jb/engine-contracts run test"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -43,6 +44,7 @@
     "packages/malware-engine",
     "packages/threat-lab",
     "packages/advisor-engine",
-    "packages/resilience-engine"
+    "packages/resilience-engine",
+    "packages/engine-contracts"
   ]
 }
