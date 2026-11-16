@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nexora-threat-lab-validation-\${{ github.ref }}
+  group: nexora-threat-lab-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      NEXORA_CATALOG_ROOT: \${{ github.workspace }}/.test-targets/nexora-catalog
+      NEXORA_CATALOG_ROOT: ${{ github.workspace }}/.test-targets/nexora-catalog
       NEXORA_CATALOG_REVISION: 88c4876c9678b93dadde55f79fe9d04890900741
     steps:
       - name: Checkout JB Threat Lab
@@ -74,7 +74,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      NEXORA_SITE_ENGINE_ROOT: \${{ github.workspace }}/.test-targets/nexora-site-engine
+      NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/.test-targets/nexora-site-engine
       NEXORA_SITE_ENGINE_REVISION: 3f68126ecc58b088c071007c5116bc95426d159b
     steps:
       - name: Checkout JB Threat Lab
