@@ -52,16 +52,52 @@ test("healthy observations continue after recovery-attempt capacity is exhausted
   );
 });
 
-test("security threat observations are passed to the recovery eligibility gate", () => {
-  const inputs = [];
+test("unhealthy observations do not propose recovery after the attempt cap", () => {
+  let evaluations = 0;
   const monitor = createHealthMonitor({
-    engine: { evaluateRecovery(input) { inputs.push(input); return { eligible: false, reason: "security-threat-active" }; } }
+    maxRecoveryAttempts: 1,
+    engine: {
+      evaluateRecovery() {
+        evaluations += 1;
+        return { eligible: true, proposal: { serviceId: "api" } };
+      }
+    }
+  });
+  monitor.recordRecoveryAttempt({ serviceId: "api", executed: false });
+
+  const capped = monitor.observe({ serviceId: "api", healthy: false });
+  assert.equal(capped.status, "unhealthy");
+  assert.equal(capped.recovery.eligible, false);
+  assert.equal(capped.recovery.reason, "recovery-attempt-limit-reached");
+  assert.equal(evaluations, 0);
+
+  const threat = monitor.observe({
+    serviceId: "api", healthy: false, securityThreatActive: true
+  });
+  assert.equal(threat.recovery.reason, "security-threat-active");
+  assert.equal(evaluations, 0);
+
+  const healthy = monitor.observe({ serviceId: "api", healthy: true });
+  assert.equal(healthy.status, "healthy");
+  assert.equal(healthy.restartCount, 1);
+});
+
+test("security threat observations suspend recovery before policy evaluation", () => {
+  let evaluations = 0;
+  const monitor = createHealthMonitor({
+    engine: {
+      evaluateRecovery() {
+        evaluations += 1;
+        return { eligible: true, proposal: { serviceId: "api" } };
+      }
+    }
   });
   const result = monitor.observe({
     serviceId: "api", healthy: false, securityThreatActive: true
   });
+  assert.equal(result.recovery.eligible, false);
   assert.equal(result.recovery.reason, "security-threat-active");
-  assert.equal(inputs[0].securityThreatActive, true);
+  assert.equal(evaluations, 0);
 });
 
 test("health monitor rejects malformed observations and recovery outcomes", () => {
