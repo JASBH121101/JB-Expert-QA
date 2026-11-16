@@ -147,6 +147,7 @@ test("JB Threat Lab validates Advisor Engine against deterministic offline fixtu
     id: "advisor.technology.deterministic",
     category: "recommendation",
     description: "Compare two synthetic smartphones using deterministic local data.",
+    difficulty: "basic",
     appliesTo: ["jb-advisor-engine"],
     safety
   });
@@ -154,6 +155,7 @@ test("JB Threat Lab validates Advisor Engine against deterministic offline fixtu
     id: "advisor.research.pending-review",
     category: "evidence-governance",
     description: "Ensure mocked research candidates remain unconfirmed pending human review.",
+    difficulty: "expert",
     appliesTo: ["jb-advisor-engine"],
     safety
   });
@@ -161,6 +163,7 @@ test("JB Threat Lab validates Advisor Engine against deterministic offline fixtu
     id: "advisor.domain.type-isolation",
     category: "domain-isolation",
     description: "Reject a comparison that mixes smartphone and laptop product types.",
+    difficulty: "intermediate",
     appliesTo: ["jb-advisor-engine"],
     safety
   });

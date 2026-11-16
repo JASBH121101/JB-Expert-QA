@@ -126,16 +126,17 @@ test("JB Threat Lab validates Trojan-oriented static triage and conservative han
   });
 
   const scenarios = [
-    ["malware.trojan.delivery-execution-persistence", "trojan-detection", "Correlate inert download, dynamic execution and persistence indicators."],
-    ["malware.trojan.single-indicator-false-positive", "trojan-false-positive", "Do not infer a Trojan family from one generic low-specificity indicator."],
-    ["malware.trojan.suspicious-never-quarantine", "trojan-containment", "Do not quarantine a suspicious candidate without a confirmed malicious signature."]
+    ["malware.trojan.delivery-execution-persistence", "trojan-detection", "Correlate inert download, dynamic execution and persistence indicators.", "expert"],
+    ["malware.trojan.single-indicator-false-positive", "trojan-false-positive", "Do not infer a Trojan family from one generic low-specificity indicator.", "intermediate"],
+    ["malware.trojan.suspicious-never-quarantine", "trojan-containment", "Do not quarantine a suspicious candidate without a confirmed malicious signature.", "advanced"]
   ];
 
-  for (const [id, category, description] of scenarios) {
+  for (const [id, category, description, difficulty] of scenarios) {
     lab.registerScenario({
       id,
       category,
       description,
+      difficulty,
       appliesTo: ["jb-malware-engine"],
       safety: { safe: true, network: false, destructive: false, executesSample: false },
       tags: ["trojan-defense", "inert-fixture", "offline"]

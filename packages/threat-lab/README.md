@@ -85,3 +85,53 @@ Verified CI for PR #41:
 PR #23 is closed as superseded. Its Advisor implementation is represented by PR #41; do not merge the obsolete `integration/jb-advisor-engine` branch.
 
 The original PR #38 run records the historical three-engine baseline (17 scenarios). PR #41 adds the three Advisor scenarios and is the current four-engine integration.
+
+
+## Six-tier difficulty and engine readiness
+
+Every registered scenario now has a difficulty tier. Existing scenarios that do not declare one remain compatible and default to `basic`.
+
+| Tier | Weight | Validation focus |
+| --- | ---: | --- |
+| Basic | 1 | Known behavior, deterministic checks, essential controls |
+| Intermediate | 2 | Input variations, normalization, malformed data, common boundaries |
+| Advanced | 4 | Combined signals, state transitions, cross-feature behavior |
+| Expert | 8 | Chained failures, false-positive resistance, recovery and invariants |
+| Extreme | 16 | Adversarial combinations, concurrency, resource ceilings, degraded dependencies |
+| Superextreme | 32 | Compound failure paths, long sequences, recovery invariants, strict disposable boundaries |
+
+Use `lab.run({ difficulty: "advanced" })` to execute all registered scenarios from Basic through Advanced. Omitting the option runs every registered tier. Scenario selection by ID still works and is intersected with the chosen maximum tier.
+
+The report adds:
+- `difficulty`: selected ceiling and included levels.
+- `assessment`: weighted score, execution coverage, covered/missing tiers, and a separate assessment for each target.
+- `skipReason`: distinguishes a structural target-scope skip from an adapter that declined a test or a report-budget stop.
+
+Weights increase exponentially so a missed high-difficulty case cannot be hidden by many easy passes. Structural target-scope skips are excluded from scoring. Adapter skips and report-budget skips remain visible, lower execution coverage, and prevent readiness. A target is ready only when every required tier has at least one applicable scenario and all such scenarios pass without skips. This is readiness for the registered scenario set only, not proof that an engine is free of defects.
+
+### Initial coverage map
+
+
+These tier footprints are an inventory across separate local test files. The current test runner executes those files independently; it does not yet merge their results into one cross-suite certification report. Each report certifies only the scenarios selected and executed in that individual run.
+The first classification of existing scenarios currently gives these per-engine tier footprints:
+
+| Engine | Covered tiers | Current gaps |
+| --- | --- | --- |
+| JB Malware Engine | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | None in tier presence; expand scenario depth within each tier |
+| JB Security Guard | Basic, Intermediate, Advanced, Expert | Extreme, Superextreme |
+| JB Expert QA | Basic, Intermediate, Advanced, Expert, Extreme | Superextreme |
+| JB Advisor Engine | Basic, Intermediate, Expert | Advanced, Extreme, Superextreme |
+
+A missing tier is an explicit testing gap, not a pass. The next lab iterations should add real engine-backed, offline scenarios for those gaps before claiming full six-tier readiness. Keep all fixtures inert, bounded, local, and non-destructive; do not execute samples or send traffic to production services.
+
+
+## NEXORA profiles — separate certification targets
+
+The NEXORA repository contains two distinct deliverables and they must not be collapsed into one Threat Lab target:
+
+- **NEXORA Configurable Catalog (frontend/catalog studio):** the independently scoped configurable-catalog prototype, including editable business templates, catalog fields, product presentation, responsive behavior, and browser-side demo persistence. Its tests must treat localStorage/demo behavior as prototype-only and must not mistake it for real authentication, server persistence, or secure file upload.
+- **NEXORA Site Engine (Laravel/PHP distributable):** the separate Laravel application and server-side engine. Its profile must validate installation and database setup, owner authentication, role/permission boundaries, product/category CRUD, public-site exposure, export generation, upload validation/storage, and package/deployment safety using disposable local databases and filesystem fixtures.
+
+They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
+
+**Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
