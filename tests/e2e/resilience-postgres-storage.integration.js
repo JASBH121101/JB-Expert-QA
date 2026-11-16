@@ -300,7 +300,7 @@ async function main() {
     assert.deepEqual(conflict, { accepted: false, reason: "signal-id-conflict" });
 
     await pool.query(
-      "UPDATE jb_resilience_trusted_signals SET signal=jsonb_set(signal, '{reasonCode}', '\\"TAMPERED\\"'::jsonb) WHERE source_id=$1 AND event_id=$2",
+      "UPDATE jb_resilience_trusted_signals SET signal=jsonb_set(signal, '{reasonCode}', to_jsonb('TAMPERED'::text)) WHERE source_id=$1 AND event_id=$2",
       ["malware-ci", signal.eventId]
     );
     await assert.rejects(secondStorage.trustedSignalStore.listSignals({
