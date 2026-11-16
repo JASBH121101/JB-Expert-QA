@@ -124,6 +124,7 @@ export function createResponseOrchestrator({
   adapter,
   applicationHealthCheck,
   trustedInputVerifier,
+  targetBindingVerifier,
   mutationControl,
   orchestrationStore,
   auditStore,
@@ -154,6 +155,9 @@ export function createResponseOrchestrator({
   }
   if (typeof trustedInputVerifier !== "function") {
     throw new TypeError("trustedInputVerifier is required to verify host-owned input provenance");
+  }
+  if (typeof targetBindingVerifier !== "function") {
+    throw new TypeError("targetBindingVerifier is required to validate the exact asset/environment/service binding");
   }
   if (!isRecord(mutationControl) || typeof mutationControl.assertAllowed !== "function") {
     throw new TypeError("mutationControl.assertAllowed is required");
@@ -304,6 +308,27 @@ export function createResponseOrchestrator({
       at: now
     };
 
+    let targetBindingValid = false;
+    try {
+      targetBindingValid = await targetBindingVerifier(Object.freeze({
+        assetId: decision.assetId,
+        environment: decision.environment,
+        serviceId: decision.serviceId,
+        platform: adapter.platform
+      })) === true;
+    } catch {
+      targetBindingValid = false;
+    }
+    if (!targetBindingValid) {
+      return result({
+        incidentId: decision.incidentId,
+        state: "FAILED_CLOSED",
+        decision: decision.decision,
+        decisionRule: decision.decisionRule,
+        reason: "asset-service-binding-rejected"
+      });
+    }
+
     if (!await persistState(decision, "OBSERVING", "INCIDENT_EVALUATED", now) ||
         !await appendAudit({ ...baseAudit, event: "incident-evaluated" })) {
       return result({
@@ -343,12 +368,24 @@ export function createResponseOrchestrator({
     }
 
     if (decision.security.state !== "clear" || decision.health.state !== "unhealthy") {
+      const reasonCode = "A1_REQUIRES_CLEAR_SECURITY_AND_UNHEALTHY_SERVICE";
+      const at = safeNow(clock);
+      if (!await persistState(decision, "HELD", reasonCode, at) ||
+          !await appendAudit({ ...baseAudit, event: "a1-precondition-rejected", reasonCode, at })) {
+        return result({
+          incidentId: decision.incidentId,
+          state: "FAILED_CLOSED",
+          decision: decision.decision,
+          decisionRule: decision.decisionRule,
+          reason: "a1-precondition-audit-failed"
+        });
+      }
       return result({
         incidentId: decision.incidentId,
         state: "HELD",
         decision: decision.decision,
         decisionRule: decision.decisionRule,
-        reason: "a1-requires-clear-security-and-unhealthy-service"
+        reason: reasonCode
       });
     }
 
@@ -386,6 +423,7 @@ export function createResponseOrchestrator({
     }
 
     if (!isRecord(serviceState) ||
+        !Object.hasOwn(serviceState, "lastActionAt") ||
         (serviceState.lastActionAt !== null &&
           (!Number.isSafeInteger(serviceState.lastActionAt) || serviceState.lastActionAt < 0)) ||
         !isRecord(circuitState) || typeof circuitState.open !== "boolean") {
@@ -427,8 +465,15 @@ export function createResponseOrchestrator({
     } catch {
       policyDecision = null;
     }
-    if (!policyDecision || policyDecision.permitted !== true) {
-      const reasonCode = policyDecision?.reason ?? "POLICY_EVALUATION_FAILED";
+    if (!policyDecision || policyDecision.permitted !== true ||
+        policyDecision.riskClass !== "A1" ||
+        policyDecision.action !== ACTION ||
+        policyDecision.assetId !== decision.assetId) {
+      const reasonCode = policyDecision?.reason ??
+        (policyDecision?.riskClass !== "A1" ? "POLICY_RISK_CLASS_NOT_A1" :
+          policyDecision?.action !== ACTION ? "POLICY_ACTION_MISMATCH" :
+            policyDecision?.assetId !== decision.assetId ? "POLICY_ASSET_MISMATCH" :
+              "POLICY_EVALUATION_FAILED");
       await persistState(decision, "HELD", reasonCode, safeNow(clock));
       await appendAudit({ ...baseAudit, event: "policy-denied", action, reasonCode });
       return result({
@@ -503,7 +548,18 @@ export function createResponseOrchestrator({
     try {
       const issued = await policyEngine.authorize(request);
       if (issued?.authorized === true && isRecord(issued.authorization)) {
-        authorization = issued.authorization;
+        const candidate = issued.authorization;
+        const authorizationMatchesRequest =
+          candidate.riskClass === "A1" &&
+          candidate.assetId === decision.assetId &&
+          candidate.environment === decision.environment &&
+          candidate.incidentId === decision.incidentId &&
+          candidate.action === ACTION &&
+          typeof candidate.reservationId === "string" &&
+          candidate.reservationId.length >= 8 &&
+          Number.isSafeInteger(candidate.expiresAt) &&
+          candidate.expiresAt > safeNow(clock);
+        if (authorizationMatchesRequest) authorization = candidate;
       } else {
         return await finishBeforeExecution({
           decision,
@@ -521,6 +577,17 @@ export function createResponseOrchestrator({
         request,
         reason: "policy-authorization-failed",
         reasonCode: "POLICY_AUTHORIZATION_FAILED",
+        now: safeNow(clock)
+      });
+    }
+
+    if (!authorization) {
+      return await finishBeforeExecution({
+        decision,
+        actionId: claim.actionId,
+        request,
+        reason: "policy-authorization-context-mismatch",
+        reasonCode: "POLICY_AUTHORIZATION_CONTEXT_MISMATCH",
         now: safeNow(clock)
       });
     }
@@ -677,7 +744,18 @@ export function createResponseOrchestrator({
       finalState,
       finalReason,
       safeNow(clock)
-    );
+    });
+
+    if (!fullyVerified || !finalStatePersisted) {
+      await appendAudit({
+        ...baseAudit,
+        event: "action-reconciliation-required",
+        action,
+        outcome: "unverified",
+        reasonCode: finalStatePersisted ? finalReason : "INCIDENT_STATE_FINALIZATION_FAILED",
+        at: safeNow(clock)
+      });
+    }
 
     return result({
       incidentId: decision.incidentId,
