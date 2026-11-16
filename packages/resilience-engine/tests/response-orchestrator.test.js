@@ -291,7 +291,7 @@ test("suspected, unknown, stale, confirmed, tampered and conflicting security st
 
 test("does not execute when the policy gate denies the exact A1 capability", async () => {
   const h = harness({ policyDecision: { permitted: false, reason: "action-not-allowlisted" } });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "action-not-allowlisted");
@@ -303,7 +303,7 @@ test("duplicate action claim is a no-op and cannot trigger a second mutation", a
   const h = harness({
     claimAction: async () => ({ claimed: false, reason: "idempotency-key-already-claimed" })
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "idempotency-key-already-claimed");
@@ -315,7 +315,7 @@ test("rechecks the mutation stop switch immediately before adapter invocation", 
   const h = harness({
     mutationAllowed: (_context, count) => count === 1
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "mutation-stopped");
@@ -326,9 +326,9 @@ test("rechecks the mutation stop switch immediately before adapter invocation", 
 
 test("an unavailable audit sink blocks action execution", async () => {
   const h = harness({
-    appendAudit: async (entry) => entry.event !== "action-authorized"
+    appendAudit: async (entry) => entry.event !== "authorization-issued"
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "pre-execution-audit-or-state-write-failed");
@@ -342,7 +342,7 @@ test("a failed service or application health check is never reported as recovere
     { applicationVerification: { healthy: false } }
   ]) {
     const h = harness(overrides);
-    const result = await h.orchestrator.executeIncident({});
+    const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
     assert.equal(result.state, "RECONCILIATION_REQUIRED");
     assert.equal(result.executed, true);
@@ -354,7 +354,7 @@ test("a failed service or application health check is never reported as recovere
 
 test("an open circuit breaker holds the incident without authorizing or executing", async () => {
   const h = harness({ circuitState: { open: true, retryAtMs: NOW + 60_000 } });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "circuit-breaker-open");
@@ -376,7 +376,7 @@ test("unknown or non-recovery v0.5 decisions remain read-only", async () => {
       decisionRule: "ALL_CLEAR"
     })
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "OBSERVING");
   assert.equal(result.executed, false);
@@ -387,7 +387,7 @@ test("unknown or non-recovery v0.5 decisions remain read-only", async () => {
 
 test("rejects an asset-to-service mapping not approved by the host registry", async () => {
   const h = harness({ targetBindingValid: false });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "FAILED_CLOSED");
   assert.equal(result.reason, "asset-service-binding-rejected");
@@ -411,7 +411,7 @@ test("rejects a policy result that claims permission outside A1 restart-service"
       assetId: "host-erp-01"
     }
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "POLICY_RISK_CLASS_NOT_A1");
@@ -438,7 +438,7 @@ test("rejects authorization not bound to the exact incident, asset and policy re
       })
     }
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "policy-authorization-context-mismatch");
@@ -448,7 +448,7 @@ test("rejects authorization not bound to the exact incident, asset and policy re
 
 test("fails closed when the durable service-state response omits lastActionAt", async () => {
   const h = harness({ serviceState: {} });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "FAILED_CLOSED");
   assert.equal(result.reason, "orchestration-state-invalid");
@@ -462,7 +462,7 @@ test("a contradictory v0.5 recovery recommendation is persisted as held, not exe
       health: { state: "healthy", consecutiveFailures: 0 }
     })
   });
-  const result = await h.orchestrator.executeIncident({});
+  const result = await h.orchestrator.executeIncident(trustedIncidentInput());
 
   assert.equal(result.state, "HELD");
   assert.equal(result.reason, "A1_REQUIRES_CLEAR_SECURITY_AND_UNHEALTHY_SERVICE");
