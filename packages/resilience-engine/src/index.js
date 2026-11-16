@@ -306,3 +306,11 @@ export {
   evaluateA3FailoverReadiness,
   CONTINUITY_GATE_REQUIREMENTS
 } from "./continuity-gates.js";
+
+
+export {
+  A2_PROVIDER_EVIDENCE_ROLES,
+  createProviderEvidenceSigningPayload,
+  createProviderEvidenceVerifier,
+  verifyA2ProviderEvidenceBundle
+} from "./provider-evidence.js";
