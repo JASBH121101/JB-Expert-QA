@@ -524,3 +524,173 @@ export const SECURITY_GUARD_CORE_V1_SCHEMAS = Object.freeze({
   threatAssessment: "jb.security.threat-assessment/v1",
   threatAssessmentPolicy: "jb.security.policy.threat-assessment/v1"
 });
+
+
+// Core v1 cross-runtime identity derivation and strict boundary normalizers.
+// These helpers are additive and do not alter the legacy Node/Worker key formats.
+const CORE_V1_TEXT_ENCODER = new TextEncoder();
+const CORE_V1_TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
+const CORE_V1_SHA256_HEX = /^[a-f0-9]{64}$/;
+
+function assertCoreV1PlainObject(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(label + " must be a plain object");
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(label + " must be a plain object");
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string") throw new TypeError(label + " contains an unsupported key");
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError(label + " must not contain accessor properties");
+    }
+  }
+}
+
+function coreV1SecretBytes(secret) {
+  if (secret instanceof ArrayBuffer) return new Uint8Array(secret.slice(0));
+  if (ArrayBuffer.isView(secret)) {
+    return new Uint8Array(secret.buffer.slice(secret.byteOffset, secret.byteOffset + secret.byteLength));
+  }
+  throw new TypeError("secret must be an ArrayBuffer or an ArrayBuffer view");
+}
+
+function coreV1CanonicalIdentity(value) {
+  if (typeof value !== "string" || value.length === 0 ||
+      Array.from(value).length > 512 || value.includes("\0")) {
+    throw new TypeError("canonicalIdentity must be a non-empty string of at most 512 characters without NUL");
+  }
+  const bytes = CORE_V1_TEXT_ENCODER.encode(value);
+  if (bytes.byteLength > 2048 || CORE_V1_TEXT_DECODER.decode(bytes) !== value) {
+    throw new TypeError("canonicalIdentity must be valid UTF-8 and at most 2048 bytes");
+  }
+  return value;
+}
+
+function coreV1DeepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) coreV1DeepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * Derive an opaque cross-runtime identity key from trusted server-side input.
+ * The canonical identity must never originate from an untrusted request field.
+ */
+export async function deriveCoreIdentityKey(options = {}) {
+  assertCoreV1PlainObject(options, "options");
+  const allowed = new Set([
+    "secret", "keyId", "tenantId", "applicationId", "identityType",
+    "canonicalIdentity", "cryptoApi"
+  ]);
+  for (const key of Reflect.ownKeys(options)) {
+    if (!allowed.has(key)) throw new TypeError("options contains an unsupported field");
+  }
+  for (const key of [
+    "secret", "keyId", "tenantId", "applicationId", "identityType", "canonicalIdentity"
+  ]) {
+    if (!Object.hasOwn(options, key)) throw new TypeError("options." + key + " is required");
+  }
+
+  const secret = coreV1SecretBytes(options.secret);
+  if (secret.byteLength < 32 || secret.byteLength > 4096) {
+    throw new TypeError("secret must contain 32-4096 bytes");
+  }
+  if (typeof options.keyId !== "string" || !KEY_ID.test(options.keyId)) {
+    throw new TypeError("keyId must be a safe 1-64 character identifier");
+  }
+  identifier(options.tenantId, "tenantId");
+  identifier(options.applicationId, "applicationId");
+  if (!IDENTITY_TYPES.has(options.identityType)) throw new TypeError("identityType is unsupported");
+  const canonicalIdentity = coreV1CanonicalIdentity(options.canonicalIdentity);
+
+  const cryptoApi = options.cryptoApi ?? globalThis.crypto;
+  if (!cryptoApi?.subtle || typeof cryptoApi.subtle.importKey !== "function" ||
+      typeof cryptoApi.subtle.sign !== "function") {
+    throw new TypeError("A Web Crypto implementation with subtle.importKey/sign is required");
+  }
+  const key = await cryptoApi.subtle.importKey(
+    "raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const message = CORE_V1_TEXT_ENCODER.encode(
+    "jb.security-guard.identity.v1\0" +
+    options.tenantId + "\0" +
+    options.applicationId + "\0" +
+    options.identityType + "\0" +
+    canonicalIdentity
+  );
+  const signature = new Uint8Array(await cryptoApi.subtle.sign("HMAC", key, message));
+  return Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Strict, deeply frozen Core v1 request normalization for external adapters. */
+export function normalizeCoreRateLimitCheckRequest(input) {
+  const normalized = validateRateLimitCheckV1(input);
+  return coreV1DeepFreeze(normalized);
+}
+
+/**
+ * Strict decision normalization. An allowed unavailable decision is valid only
+ * for fail-open (enforced=false, status=null, exceeded=false); fail-closed
+ * outages remain denied 503 decisions.
+ */
+export function normalizeCoreRateLimitDecision(input) {
+  const decision = validateRateLimitDecisionV1(input);
+  if (decision.allowed && decision.enforced) {
+    throw new TypeError("an allowed decision cannot be enforced");
+  }
+  if (decision.allowed && decision.unavailable && decision.exceeded) {
+    throw new TypeError("an unavailable fail-open decision cannot be quota-exceeded");
+  }
+  return coreV1DeepFreeze(decision);
+}
+
+/** Strict policy normalization with unique limit identifiers. */
+export function normalizeCoreRateLimitPolicy(input) {
+  const policy = validateRateLimitPolicyV1(input);
+  const seen = new Set();
+  for (const [index, limit] of policy.limits.entries()) {
+    if (seen.has(limit.id)) {
+      throw new TypeError("policy.limits[" + index + "].id must be unique");
+    }
+    seen.add(limit.id);
+  }
+  return coreV1DeepFreeze(policy);
+}
+
+/** Build a collision-resistant length-prefixed key for an atomic shared store. */
+export function createCoreRateLimitCounterKey(input) {
+  assertCoreV1PlainObject(input, "counterKey");
+  const fields = [
+    "tenantId", "applicationId", "policyId", "scope",
+    "identityType", "keyId", "identityKey"
+  ];
+  for (const key of Reflect.ownKeys(input)) {
+    if (!fields.includes(key)) throw new TypeError("counterKey contains an unsupported field");
+  }
+  for (const key of fields) {
+    if (!Object.hasOwn(input, key)) throw new TypeError("counterKey." + key + " is required");
+  }
+  const values = [
+    "jbsg-counter-v1",
+    identifier(input.tenantId, "counterKey.tenantId"),
+    identifier(input.applicationId, "counterKey.applicationId"),
+    identifier(input.policyId, "counterKey.policyId"),
+    identifier(input.scope, "counterKey.scope")
+  ];
+  if (!IDENTITY_TYPES.has(input.identityType)) throw new TypeError("counterKey.identityType is unsupported");
+  values.push(input.identityType);
+  if (typeof input.keyId !== "string" || !KEY_ID.test(input.keyId)) {
+    throw new TypeError("counterKey.keyId is unsupported");
+  }
+  values.push(input.keyId);
+  if (typeof input.identityKey !== "string" || !CORE_V1_SHA256_HEX.test(input.identityKey)) {
+    throw new TypeError("counterKey.identityKey must be a lowercase HMAC-SHA-256 digest");
+  }
+  values.push(input.identityKey);
+  return values.map((value) => CORE_V1_TEXT_ENCODER.encode(value).byteLength + ":" + value).join("");
+}
