@@ -36,6 +36,12 @@ const SITE_ENGINE_SCENARIOS = Object.freeze({
   "nexora.site.public-data-boundaries": "tests/Feature/PublicSiteEngineTest.php",
   "nexora.site.inventory-assistant-field-isolation": "tests/Feature/InventoryAssistantTest.php",
   "nexora.site.export-permission-and-formula-safety": "tests/Feature/ExportEngineTest.php",
+  "nexora.site.export-and-inventory-authorization": {
+    testFiles: [
+      "tests/Feature/ExportEngineTest.php",
+      "tests/Feature/InventoryAssistantTest.php"
+    ]
+  },
   "nexora.site.role-and-field-authorization": "tests/Feature/PermissionEngineTest.php",
   "nexora.site.extreme.domain-and-tls-boundaries": {
     testFiles: [
