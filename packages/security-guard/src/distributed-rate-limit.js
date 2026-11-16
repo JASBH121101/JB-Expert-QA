@@ -48,7 +48,7 @@ function normalizeCoreContract(value) {
 }
 
 function safelyCall(callback, value) {
-  if (typeof callback !== "function") return;
+  if (typeof callback !== "function" || value === null || value === undefined) return;
   try {
     const result = callback(value);
     if (result && typeof result.then === "function") Promise.resolve(result).catch(() => {});
@@ -222,12 +222,14 @@ export function createDistributedRateLimit(options = {}) {
     });
   }
 
-  function publishCore(check, decisionInput, now) {
+  function publishCore(check, decisionInput, now, emitEvent = false) {
     if (!check) return;
     const decision = toRateLimitDecisionV1(check, decisionInput);
     safelyCall(onCoreDecision, Object.freeze({ check, decision }));
-    const event = createCoreRateLimitEvent(check, decision, now);
-    safelyCall(onCoreEvent, event);
+    if (emitEvent) {
+      const event = createCoreRateLimitEvent(check, decision, now);
+      safelyCall(onCoreEvent, event);
+    }
   }
 
   async function middleware(request, response, next) {
@@ -270,7 +272,7 @@ export function createDistributedRateLimit(options = {}) {
           unavailable: true,
           status: failClosed ? 503 : null,
           retryAfterSeconds: failClosed ? 5 : null
-        }, eventTime);
+        }, eventTime, true);
       }
       if (failClosed) {
         respond(response, 503, {
@@ -313,7 +315,7 @@ export function createDistributedRateLimit(options = {}) {
       unavailable: false,
       status: 429,
       retryAfterSeconds
-    }, now);
+    }, now, result.count === maxRequests + 1);
     respond(response, 429, {
       error: "rate_limit_exceeded",
       message: "Too many requests. Try again later."
