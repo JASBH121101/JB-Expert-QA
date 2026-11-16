@@ -81,7 +81,7 @@ test("Core v1 HMAC refuses short secrets and noncanonical identity values", asyn
     canonicalIdentity: "user-123",
     cryptoApi: webcrypto
   };
-  await assert.rejects(() => deriveCoreIdentityKey(base), /at least 32 bytes/);
+  await assert.rejects(() => deriveCoreIdentityKey(base), /32-4096 bytes/);
   await assert.rejects(() => deriveCoreIdentityKey({ ...base, secret: new Uint8Array(32), canonicalIdentity: "user" + String.fromCharCode(0) + "123" }), /without NUL/);
   await assert.rejects(() => deriveCoreIdentityKey({ ...base, secret: new Uint8Array(32), canonicalIdentity: "\ud800" }), /valid UTF-8/);
 });
@@ -128,7 +128,7 @@ test("Core v1 rate-limit decisions accept enforced 429 and 503 states", () => {
 });
 
 test("Core v1 rate-limit decisions reject contradictory enforcement states", () => {
-  assert.throws(() => normalizeCoreRateLimitDecision(decision({ unavailable: true })), /429 decision/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ unavailable: true })), /429 requires exceeded=true/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ status: 503, unavailable: false })), /503 decision/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: false, status: null })), /denied decision/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, status: 429 })), /allowed decision/);
