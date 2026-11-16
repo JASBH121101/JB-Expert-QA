@@ -37,6 +37,7 @@ const ATTESTATION_UNSIGNED_FIELDS = [
   "facts", "evidenceRefs"
 ];
 const ATTESTATION_FIELDS = [...ATTESTATION_UNSIGNED_FIELDS, "signature"];
+const PROVIDER_VERIFIER_BRAND = Symbol("JB Resilience provider evidence verifier");
 const EXPECTED_FIELDS = [
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ];
@@ -388,6 +389,7 @@ export function createProviderEvidenceVerifier({
   }
 
   return Object.freeze({
+    [PROVIDER_VERIFIER_BRAND]: true,
     algorithm: "Ed25519",
     capability: CAPABILITY,
     verify,
@@ -405,7 +407,10 @@ export function createProviderEvidenceVerifier({
  */
 export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifier } = {}) {
   if (!Array.isArray(attestations) || attestations.length !== ROLES.length ||
-      typeof verifier?.verify !== "function") {
+      Object.getOwnPropertySymbols(attestations).length !== 0 ||
+      Object.keys(attestations).length !== attestations.length ||
+      verifier?.[PROVIDER_VERIFIER_BRAND] !== true ||
+      typeof verifier.verify !== "function") {
     return Object.freeze({
       schema: BUNDLE_SCHEMA,
       verified: false,
@@ -428,7 +433,17 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
 
   const byRole = new Map();
   const verified = [];
-  for (const attestation of attestations) {
+  for (let index = 0; index < attestations.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(attestations, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      return Object.freeze({
+        schema: BUNDLE_SCHEMA,
+        verified: false,
+        executable: false,
+        reason: "invalid-provider-evidence-bundle"
+      });
+    }
+    const attestation = descriptor.value;
     const role = attestation?.role;
     if (!ROLES.includes(role) || byRole.has(role)) {
       return Object.freeze({
@@ -438,8 +453,13 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
         reason: "missing-or-duplicate-provider-role"
       });
     }
-    const result = verifier.verify(attestation, scope);
-    if (!result.verified) {
+    let result;
+    try {
+      result = verifier.verify(attestation, scope);
+    } catch {
+      result = null;
+    }
+    if (!isRecord(result) || result.verified !== true) {
       return Object.freeze({
         schema: BUNDLE_SCHEMA,
         verified: false,
