@@ -6,6 +6,8 @@ on:
     paths:
       - "packages/threat-lab/tests/nexora-profiles.integration.test.js"
       - "docs/NEXORA-THREAT-LAB-PROFILES.md"
+      - "packages/threat-lab/README.md"
+      - "docs/JB-THREAT-LAB.md"
       - ".github/workflows/nexora-threat-lab.yml"
   push:
     branches: [integration/jb-threat-lab]
