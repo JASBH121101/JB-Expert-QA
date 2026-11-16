@@ -38,7 +38,7 @@ test("Windows adapter waits for STOPPED and confirms RUNNING before completion",
       if (args[1][0] === "query") {
         const state = states.shift();
         const code = state === "STOPPED" ? 1 : state === "RUNNING" ? 4 : 3;
-        return { code: 0, stdout: "SERVICE_NAME: JBService\\n        STATE              : " + code + "  " + state };
+        return { code: 0, stdout: "SERVICE_NAME: JBService\n        STATE              : " + code + "  " + state };
       }
       return { code: 0 };
     }
