@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/;
+const ASSET_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/;
 const SECURITY_STATES = new Set([
   "clear", "suspected", "confirmed", "conflicting", "stale", "unknown", "tampered"
 ]);
@@ -83,7 +84,7 @@ function validateDecision(value) {
   if (!isRecord(value) ||
       value.schema !== "jb.resilience.incident-decision/v1" ||
       typeof value.incidentId !== "string" || !IDENTIFIER.test(value.incidentId) ||
-      typeof value.assetId !== "string" || !IDENTIFIER.test(value.assetId) ||
+      typeof value.assetId !== "string" || !ASSET_ID.test(value.assetId) ||
       typeof value.environment !== "string" || !IDENTIFIER.test(value.environment) ||
       typeof value.serviceId !== "string" || !IDENTIFIER.test(value.serviceId) ||
       !isRecord(value.security) || !SECURITY_STATES.has(value.security.state) ||
