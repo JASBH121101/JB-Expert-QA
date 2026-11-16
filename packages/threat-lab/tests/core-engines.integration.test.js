@@ -607,7 +607,7 @@ return [
             'res.redirect(req.query.next);',
             'fetch(req.query.url);',
             'const output = eval(userInput);',
-            "document.querySelector('#result').innerHTML = location.search;"
+
           ].join("\n");
           const safeSource = [
             'const api = "https://api.example.com/v1";',
@@ -619,8 +619,10 @@ return [
             'fetch(TRUSTED_SERVICE_URL);',
             'element.textContent = userInput;'
           ].join("\n");
+          const htmlSinkSource = "document.querySelector('#result').innerHTML = location.search;\\n";
           await writeFile(path.join(expertCompositeProject, "src", "unsafe.js"), unsafeSource);
           await writeFile(path.join(expertCompositeProject, "src", "safe.js"), safeSource);
+          await writeFile(path.join(expertCompositeProject, "src", "html-sink.js"), htmlSinkSource);
           const first = await auditFixture(expertCompositeProject);
           const second = await auditFixture(expertCompositeProject);
           const expectedPrefixes = [
@@ -632,21 +634,23 @@ return [
           );
           const evalDetected = first.diagnostics.some((item) => item.title === "Dynamic eval execution");
           const htmlSinkDetected = first.diagnostics.some((item) =>
-            item.title === "Dynamic HTML sink requires manual review"
+            item.metadata?.detector === "html-sink-context"
+            && item.metadata?.classification === "unescaped-untrusted-source"
+            && item.location === "src/html-sink.js:1"
           );
           const safeControlFindings = first.diagnostics.filter((item) =>
             typeof item.location === "string"
             && item.location.startsWith("src/safe.js:")
             && (expectedPrefixes.some((prefix) => item.id.startsWith(prefix))
               || item.title === "Dynamic eval execution"
-              || item.title === "Dynamic HTML sink requires manual review")
+              || item.metadata?.detector === "html-sink-context")
           );
           const normalizeFindings = (report) => report.diagnostics
             .map(({ id, title, location, severity }) => ({ id, title, location, severity }))
             .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
           const deterministic = JSON.stringify(normalizeFindings(first)) === JSON.stringify(normalizeFindings(second));
           const passed = first.analysisScope.complete && second.analysisScope.complete
-            && first.analysisScope.filesAnalyzed === 2
+            && first.analysisScope.filesAnalyzed === 3
             && expectedPrefixes.every((_, index) => detected[index])
             && evalDetected && htmlSinkDetected
             && safeControlFindings.length === 0
