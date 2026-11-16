@@ -163,3 +163,18 @@ The NEXORA repository contains two distinct deliverables and they must not be co
 They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
 
 **Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
+
+## NEXORA product adapter validation
+
+The earlier registry-only test remains a structural boundary regression: it confirms that the two NEXORA targets cannot cross-certify one another. Separate product-level integration tests now execute real, pinned test suites through the Threat Lab adapters:
+
+| Target | Pinned product revision | Executed product suites | Current tier coverage |
+| --- | --- | --- | --- |
+| NEXORA Configurable Catalog prototype | `88c4876c9678b93dadde55f79fe9d04890900741` | `demo/tests/catalog-data.test.js`, `store.test.js`, `admin-responsive.test.js`, `setup-contract.test.js` | Basic, Intermediate, Advanced |
+| NEXORA Site Engine | `ebdf403d105add03b5aaa4b9018e45e42b6cd8ee` | `SetupHealthTest.php`, `PublicSiteEngineTest.php`, `InventoryAssistantTest.php`, `ExportEngineTest.php`, `PermissionEngineTest.php` | Basic, Intermediate, Advanced, Expert |
+
+The adapter uses fixed test-file allowlists, no shell, bounded runtime/output, and a separate checkout per target. The Site Engine runner uses PHPUnit with SQLite in-memory; it does not connect to a persistent database or deployment. The workflow resolves Composer dependencies before the isolated feature tests execute.
+
+The Catalog prototype is validated as a browser-side demo only. Its localStorage behavior is not real server persistence, and these tests do not certify authentication or secure image uploads. The Site Engine tests cover only implemented and documented features; they do not imply ERP/POS/payment or centralized multi-tenant behavior.
+
+The catalog's Expert, Extreme, and Superextreme tiers and the Site Engine's Extreme and Superextreme tiers remain missing. A clean run of the selected suites is not a six-tier certification or a production approval. Any NEXORA product defect discovered by these tests must be fixed and validated in that product's own branch; this Threat Lab change must remain adapter/test orchestration only.

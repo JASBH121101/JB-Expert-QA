@@ -1,0 +1,102 @@
+name: NEXORA Threat Lab product validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/threat-lab/**"
+      - "docs/JB-THREAT-LAB.md"
+      - ".github/workflows/nexora-threat-lab-validation.yml"
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "packages/threat-lab/**"
+      - "docs/JB-THREAT-LAB.md"
+      - ".github/workflows/nexora-threat-lab-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-threat-lab-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  configurable-catalog:
+    name: NEXORA Configurable Catalog · Node 22
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      NEXORA_CATALOG_ROOT: ${{ github.workspace }}/.test-targets/nexora-catalog
+      NEXORA_CATALOG_REVISION: 88c4876c9678b93dadde55f79fe9d04890900741
+    steps:
+      - name: Checkout JB Threat Lab
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Checkout the pinned NEXORA catalog prototype
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: 88c4876c9678b93dadde55f79fe9d04890900741
+          path: .test-targets/nexora-catalog
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Validate the isolated catalog product profile
+        run: node --test packages/threat-lab/tests/nexora-configurable-catalog.integration.test.js
+
+  site-engine:
+    name: NEXORA Site Engine · PHP 8.3 · SQLite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/.test-targets/nexora-site-engine
+      NEXORA_SITE_ENGINE_REVISION: ebdf403d105add03b5aaa4b9018e45e42b6cd8ee
+    steps:
+      - name: Checkout JB Threat Lab
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Checkout the pinned NEXORA Site Engine branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: JASBH121101/Nexora
+          ref: ebdf403d105add03b5aaa4b9018e45e42b6cd8ee
+          path: .test-targets/nexora-site-engine
+          persist-credentials: false
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        with:
+          php-version: "8.3"
+          extensions: bcmath, curl, dom, fileinfo, intl, mbstring, openssl, pdo_sqlite, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked Site Engine dependencies
+        working-directory: .test-targets/nexora-site-engine
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare disposable Laravel test environment
+        working-directory: .test-targets/nexora-site-engine
+        run: |
+          if [ ! -f .env ]; then cp .env.example .env; fi
+          php artisan key:generate --force
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Validate the isolated Laravel product profile
+        run: node --test packages/threat-lab/tests/nexora-site-engine.integration.test.js
