@@ -117,12 +117,12 @@ The first classification of existing scenarios currently gives these per-engine 
 
 | Engine | Covered tiers | Current gaps |
 | --- | --- | --- |
-| JB Malware Engine | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | None in tier presence; expand scenario depth within each tier |
-| JB Security Guard | Basic, Intermediate, Advanced, Expert | Extreme, Superextreme |
-| JB Expert QA | Basic, Intermediate, Advanced, Expert, Extreme | Superextreme |
-| JB Advisor Engine | Basic, Intermediate, Expert | Advanced, Extreme, Superextreme |
+| JB Malware Engine | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | Expand scenario depth within each tier |
+| JB Security Guard | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | Expand protocol-chain and bounded-state depth |
+| JB Expert QA | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | Expand compound-analysis and recovery depth |
+| JB Advisor Engine | Basic, Intermediate, Advanced, Expert, Extreme, Superextreme | Expand evidence and candidate-capacity depth |
 
-A missing tier is an explicit testing gap, not a pass. The next lab iterations should add real engine-backed, offline scenarios for those gaps before claiming full six-tier readiness. Keep all fixtures inert, bounded, local, and non-destructive; do not execute samples or send traffic to production services.
+A missing tier is an explicit testing gap, not a pass. Each four-engine footprint now has at least one real engine-backed scenario in its independent local test suite; this indicates tier presence only, not comprehensive product coverage or absence of defects. Keep all fixtures inert, bounded, local, and non-destructive; do not execute samples or send traffic to production services.
 
 
 ## NEXORA profiles — separate certification targets

@@ -11,6 +11,8 @@ import { createMalwareEngine } from "../../malware-engine/src/index.js";
 import { createSecurityGuardScanner } from "../../malware-engine/src/security-guard-adapter.js";
 import { createSecurityGuard } from "../../security-guard/src/index.js";
 import { createUploadInspector } from "../../security-guard/src/upload-inspector.js";
+import { createOriginProtection } from "../../security-guard/src/origin-protection.js";
+import { createCsrfProtection } from "../../security-guard/src/csrf-protection.js";
 import { auditProject } from "../../../src/adapters/filesystem/audit-project.js";
 import { auditDatabaseProject } from "../../../src/adapters/filesystem/audit-database.js";
 import { comparePngBuffers } from "../../../src/adapters/visual/png-diff.js";
@@ -95,7 +97,8 @@ function createMemoryStore() {
 function simulateGuardRequest(guard, url, {
   method = "GET",
   headers = {},
-  rawHeaders = []
+  rawHeaders = [],
+  remoteAddress = "127.0.0.1"
 } = {}) {
   const response = {
     statusCode: 200,
@@ -112,7 +115,7 @@ function simulateGuardRequest(guard, url, {
     method,
     headers,
     rawHeaders,
-    socket: { remoteAddress: "127.0.0.1" }
+    socket: { remoteAddress }
   }, response, () => { reachedApplication = true; });
   return { statusCode: response.statusCode, headers: response.headers, body: response.body, reachedApplication };
 }
@@ -140,13 +143,15 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
   const guardTemp = path.join(root, "guard-temp");
   const expertProject = path.join(root, "expert-project");
   const expertDatabaseProject = path.join(root, "expert-database-project");
+  const expertCompositeProject = path.join(root, "expert-composite-project");
   await Promise.all([
     mkdir(malwareFixtures),
     mkdir(guardTemp),
     mkdir(path.join(expertProject, "src"), { recursive: true }),
     mkdir(path.join(expertProject, "lang", "es"), { recursive: true }),
     mkdir(path.join(expertProject, "lang", "en"), { recursive: true }),
-    mkdir(path.join(expertDatabaseProject, "src"), { recursive: true })
+    mkdir(path.join(expertDatabaseProject, "src"), { recursive: true }),
+    mkdir(path.join(expertCompositeProject, "src"), { recursive: true })
   ]);
 
   assert.deepEqual(Buffer.from(EICAR_TEST_STRING), EXPECTED_EICAR,
@@ -336,6 +341,121 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
             { actualCode, expectedCode, approved: store.approved.size, quarantined: store.quarantine.size },
             passed ? [] : [{ code: "GUARD_UPLOAD_POLICY_MISMATCH" }]);
         }
+
+        if (scenario.id === "guard.origin-csrf.composed-policy") {
+          const allowedOrigin = "https://catalog.example";
+          const originProtection = createOriginProtection({ allowedOrigins: [allowedOrigin] });
+          const csrfProtection = createCsrfProtection({
+            secret: Buffer.alloc(32, 0x5a),
+            sessionKeyGenerator: (request) => request.sessionId
+          });
+          function runChain({ method = "POST", origin, sessionId, token }) {
+            const request = {
+              url: "/account/profile",
+              method,
+              headers: {},
+              sessionId,
+              socket: { remoteAddress: "127.0.0.1" }
+            };
+            if (origin !== null) request.headers.origin = origin;
+            if (token !== null) request.headers[csrfProtection.headerName] = token;
+            const response = {
+              statusCode: 200,
+              headersSent: false,
+              writableEnded: false,
+              headers: {},
+              body: "",
+              setHeader(name, value) { this.headers[String(name).toLowerCase()] = value; },
+              end(body = "") { this.body = String(body); this.writableEnded = true; }
+            };
+            let reachedApplication = false;
+            originProtection.middleware(request, response, () => {
+              csrfProtection.middleware(request, response, () => { reachedApplication = true; });
+            });
+            return { statusCode: response.statusCode, reachedApplication };
+          }
+          const sessionId = "threat-lab-session-001";
+          const validToken = csrfProtection.createToken({ sessionId });
+          const validWrite = runChain({ origin: allowedOrigin, sessionId, token: validToken });
+          const rejectedOrigin = runChain({ origin: "https://attacker.example", sessionId, token: validToken });
+          const rejectedToken = runChain({ origin: allowedOrigin, sessionId, token: "A".repeat(43) });
+          const safeRead = runChain({ method: "GET", origin: "https://attacker.example", sessionId, token: null });
+          const originStats = originProtection.getStats();
+          const csrfStats = csrfProtection.getStats();
+          const passed = validWrite.statusCode === 200 && validWrite.reachedApplication
+            && rejectedOrigin.statusCode === 403 && !rejectedOrigin.reachedApplication
+            && rejectedToken.statusCode === 403 && !rejectedToken.reachedApplication
+            && safeRead.statusCode === 200 && safeRead.reachedApplication
+            && originStats.requests === 4 && originStats.allowed === 3 && originStats.blocked === 1
+            && csrfStats.requests === 3 && csrfStats.allowed === 2 && csrfStats.blocked === 1;
+          return outcome(
+            passed ? "pass" : "fail",
+            passed
+              ? "Origin allowlisting and session-bound CSRF validation compose correctly with safe-method false-positive controls"
+              : "Composed origin/CSRF enforcement or its control path violated the expected policy",
+            {
+              requestStatuses: [validWrite.statusCode, rejectedOrigin.statusCode, rejectedToken.statusCode, safeRead.statusCode],
+              applicationReachCount: [validWrite, rejectedOrigin, rejectedToken, safeRead].filter((item) => item.reachedApplication).length,
+              originStats, csrfStats, networkRequests: 0
+            },
+            passed ? [] : [{ code: "GUARD_ORIGIN_CSRF_CHAIN_MISMATCH" }]
+          );
+        }
+
+        if (scenario.id === "guard.rate-limit.capacity-reset-invariants") {
+          const events = [];
+          const boundedGuard = createSecurityGuard({
+            mode: "strict",
+            rateLimit: { enabled: true, max: 2, windowMs: 60_000, maxKeys: 1 },
+            keyGenerator: (request) => request.socket?.remoteAddress ?? "unknown",
+            onEvent: (event) => events.push(event)
+          });
+          const requests = [
+            simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.10" }),
+            simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.10" }),
+            simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.10" }),
+            simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.11" }),
+            simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.12" })
+          ];
+          const saturatedStats = boundedGuard.getStats();
+          const saturatedEventCount = events.length;
+          boundedGuard.reset();
+          const resetStats = boundedGuard.getStats();
+          const releasedClient = simulateGuardRequest(boundedGuard, "/health", { remoteAddress: "192.0.2.11" });
+          const afterReleaseStats = boundedGuard.getStats();
+          const passed = requests.map((item) => item.statusCode).join(",") === "200,200,429,429,429"
+            && requests.slice(0, 2).every((item) => item.reachedApplication)
+            && requests.slice(2).every((item) => !item.reachedApplication)
+            && saturatedStats.requests === 5
+            && saturatedStats.blocked === 3
+            && saturatedStats.rateLimitKeys === 1
+            && saturatedStats.byRule["JBG-RATE-001"] === 1
+            && saturatedStats.byRule["JBG-RATE-002"] === 2
+            && saturatedEventCount === 2
+            && resetStats.requests === 0 && resetStats.blocked === 0 && resetStats.rateLimitKeys === 0
+            && releasedClient.statusCode === 200 && releasedClient.reachedApplication
+            && afterReleaseStats.rateLimitKeys === 1;
+          return outcome(
+            passed ? "pass" : "fail",
+            passed
+              ? "Rate-limit state stayed bounded, identity rotation failed closed, duplicate alerts were suppressed, and reset released capacity"
+              : "Rate-limit capacity, alert suppression, or reset invariants did not match expectations",
+            {
+              requestStatuses: requests.map((item) => item.statusCode),
+              blocked: saturatedStats.blocked,
+              rateLimitKeys: saturatedStats.rateLimitKeys,
+              rateLimitExceeded: saturatedStats.byRule["JBG-RATE-001"] ?? 0,
+              capacityExceeded: saturatedStats.byRule["JBG-RATE-002"] ?? 0,
+              uniqueEvents: saturatedEventCount,
+              resetKeys: resetStats.rateLimitKeys,
+              releasedClientStatus: releasedClient.statusCode,
+              postResetKeys: afterReleaseStats.rateLimitKeys,
+              networkRequests: 0
+            },
+            passed ? [] : [{ code: "GUARD_RATE_LIMIT_STATE_MISMATCH" }]
+          );
+        }
+
         return outcome("skip", "No Security Guard handler for this scenario");
       }
     }
@@ -473,6 +593,90 @@ return [
           );
         }
 
+
+        if (scenario.id === "expert-qa.static.compound-security-regression") {
+          const unsafeSource = [
+            'const api = "http://api.example.com/v1";',
+            'res.setHeader("Access-Control-Allow-Origin", "*");',
+            'res.setHeader("Access-Control-Allow-Credentials", "true");',
+            'res.setHeader("Set-Cookie", "session=abc; Path=/");',
+            'const passwordHash = crypto.createHash("md5").update(password).digest("hex");',
+            'const resetToken = Math.random().toString(36);',
+            'const claims = jwt.decode(token);',
+            'if (claims.role === "admin") grantAccess();',
+            'res.redirect(req.query.next);',
+            'fetch(req.query.url);',
+            'const output = eval(userInput);',
+            'element.innerHTML = userInput;'
+          ].join("\n");
+          const safeSource = [
+            'const api = "https://api.example.com/v1";',
+            'res.cookie("session", sessionValue, { httpOnly: true, secure: true, sameSite: "lax" });',
+            'const passwordHash = await argon2.hash(password);',
+            'const resetToken = crypto.randomBytes(32).toString("hex");',
+            'const claims = jwt.verify(token, publicKey, { algorithms: ["RS256"] });',
+            'const next = allowedRedirects.has(req.query.next) ? req.query.next : "/";',
+            'fetch(TRUSTED_SERVICE_URL);',
+            'element.textContent = userInput;'
+          ].join("\n");
+          await writeFile(path.join(expertCompositeProject, "src", "unsafe.js"), unsafeSource);
+          await writeFile(path.join(expertCompositeProject, "src", "safe.js"), safeSource);
+          const first = await auditFixture(expertCompositeProject);
+          const second = await auditFixture(expertCompositeProject);
+          const expectedPrefixes = [
+            "SEC-HTTP-", "SEC-CORS-", "SEC-COOKIE-", "SEC-PASSWORD-HASH-",
+            "SEC-RANDOM-", "SEC-JWT-", "SEC-REDIRECT-", "SEC-SSRF-"
+          ];
+          const detected = expectedPrefixes.map((prefix) =>
+            first.diagnostics.some((item) => item.id.startsWith(prefix))
+          );
+          const evalDetected = first.diagnostics.some((item) => item.title === "Dynamic eval execution");
+          const htmlSinkDetected = first.diagnostics.some((item) =>
+            item.title === "Dynamic HTML sink requires manual review"
+          );
+          const safeControlFindings = first.diagnostics.filter((item) =>
+            typeof item.location === "string"
+            && item.location.startsWith("src/safe.js:")
+            && (expectedPrefixes.some((prefix) => item.id.startsWith(prefix))
+              || item.title === "Dynamic eval execution"
+              || item.title === "Dynamic HTML sink requires manual review")
+          );
+          const normalizeFindings = (report) => report.diagnostics
+            .map(({ id, title, location, severity }) => ({ id, title, location, severity }))
+            .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+          const deterministic = JSON.stringify(normalizeFindings(first)) === JSON.stringify(normalizeFindings(second));
+          const passed = first.analysisScope.complete && second.analysisScope.complete
+            && first.analysisScope.filesAnalyzed === 2
+            && expectedPrefixes.every((_, index) => detected[index])
+            && evalDetected && htmlSinkDetected
+            && safeControlFindings.length === 0
+            && deterministic
+            && first.analysisScope.networkRequests === 0
+            && second.analysisScope.networkRequests === 0
+            && first.analysisScope.dependencyAdvisoryLookup === false;
+          return outcome(
+            passed ? "pass" : "fail",
+            passed
+              ? "Expert QA detected the compound static-security fixture, preserved safe controls, and produced repeatable offline findings"
+              : "Compound static audit, safe-control suppression, coverage, or deterministic report invariants failed",
+            {
+              filesAnalyzed: first.analysisScope.filesAnalyzed,
+              expectedSecurityFamilies: expectedPrefixes.length,
+              detectedSecurityFamilies: detected.filter(Boolean).length,
+              evalDetected, htmlSinkDetected,
+              safeControlFindings: safeControlFindings.length,
+              deterministic, scanComplete: first.analysisScope.complete,
+              networkRequests: first.analysisScope.networkRequests
+            },
+            passed ? [] : [{
+              code: "EXPERT_QA_COMPOUND_AUDIT_MISMATCH",
+              detected, evalDetected, htmlSinkDetected,
+              safeControlFindings: safeControlFindings.length,
+              deterministic, scanComplete: first.analysisScope.complete
+            }]
+          );
+        }
+
         if (scenario.id !== "expert-qa.static.unsafe-html-detected" &&
             scenario.id !== "expert-qa.static.repaired-html-regression") {
           return outcome("skip", "No Expert QA handler for this scenario");
@@ -512,11 +716,14 @@ return [
     ["guard.request.ambiguous-framing-block", "request-security", "Reject conflicting HTTP message framing before application handling.", "jb-security-guard", "advanced"],
     ["guard.upload.malicious-block", "upload-security", "Reject a synthetic signature match before file promotion.", "jb-security-guard", "expert"],
     ["guard.upload.unknown-quarantine", "upload-security", "Keep no-match uploads quarantined rather than approving them.", "jb-security-guard", "expert"],
+    ["guard.origin-csrf.composed-policy", "request-security", "Verify the interaction of origin allowlisting, session-bound CSRF tokens, safe methods, and application reachability.", "jb-security-guard", "extreme"],
+    ["guard.rate-limit.capacity-reset-invariants", "request-security", "Exercise bounded rate-limit state, client-identity rotation, alert suppression, and reset recovery under a deterministic local request sequence.", "jb-security-guard", "superextreme"],
     ["expert-qa.static.unsafe-html-detected", "static-code-security", "Detect an intentionally vulnerable HTML sink in source code.", "jb-expert-qa", "basic"],
     ["expert-qa.static.repaired-html-regression", "static-code-security", "Verify a repaired textContent implementation has no HTML-sink finding.", "jb-expert-qa", "intermediate"],
     ["expert-qa.database.dynamic-query-and-tls", "database-security", "Detect dynamic raw SQL and disabled TLS through local static database audit.", "jb-expert-qa", "advanced"],
     ["expert-qa.visual.deterministic-diff", "visual-regression", "Detect a synthetic PNG pixel difference deterministically without AI.", "jb-expert-qa", "expert"],
-    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa", "extreme"]
+    ["expert-qa.language.translation-integrity", "language-quality", "Detect missing locale keys and placeholder mismatches without a translation provider.", "jb-expert-qa", "extreme"],
+    ["expert-qa.static.compound-security-regression", "static-code-security", "Correlate multiple insecure configurations with safe control examples and deterministic offline rescans.", "jb-expert-qa", "superextreme"]
   ];
   for (const [id, category, description, targetId, difficulty] of scenarios) {
     lab.registerScenario({
