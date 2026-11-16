@@ -132,6 +132,8 @@ test("Core v1 rate-limit decisions reject contradictory enforcement states", () 
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ status: 503, unavailable: false })), /503 decision/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: false, status: null })), /denied decision/);
   assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, status: 429 })), /allowed decision/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, unavailable: true })), /unavailable dependency/);
+  assert.throws(() => normalizeCoreRateLimitDecision(decision({ allowed: true, enforced: true, exceeded: true, status: null, retryAfterSeconds: null })), /exceeded quota/);
 });
 
 test("Core v1 rate-limit policies enforce strict shapes, bounds, and unique IDs", () => {
