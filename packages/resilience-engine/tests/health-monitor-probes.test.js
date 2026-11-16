@@ -282,7 +282,7 @@ test("configuration rejects unsafe origins, methods, redirects and unallowlisted
       id: "bad-method", serviceId: "catalog", type: "http",
       url: "https://health.example.test/ready", method: "POST"
     }]
-  }), /GET\/HEAD/);
+  }), /GET or HEAD/);
   assert.throws(() => createHealthMonitorProbeAdapter({
     ...base,
     probes: [{
