@@ -364,6 +364,26 @@ export function createAuthProtection(options = {}) {
     }
     const status = statusFor(request);
     const enforced = status.blocked && mode !== "monitor" && blockSeverities.includes(SEVERITY);
+    if (status.blocked && coreContract) {
+      try {
+        const keys = getKeys(request);
+        publishAuthCore(coreContract, coreCallbacks, {
+          attemptId: randomUUID(),
+          occurredAtMs: Date.now(),
+          outcome: "failure",
+          accountDigest: keys.account,
+          clientDigest: keys.ip,
+          decision: {
+            blocked: true,
+            enforced,
+            retryAfterSeconds: Math.max(1, Math.ceil(status.retryAfterMs / 1000))
+          },
+          eventScopes: []
+        });
+      } catch {
+        // Core telemetry must not change the established middleware decision.
+      }
+    }
 
     if (!status.blocked) {
       next();
