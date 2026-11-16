@@ -22,10 +22,31 @@ export function createWindowsScmAdapter({
   }
   const allowed = new Set(allowedServices);
 
+  function assertAllowed(serviceId) {
+    if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
+  }
+
   function assertSuccess(result, action) {
     const exitCode = result?.exitCode ?? result?.code;
     if (!result || exitCode !== 0) throw new Error("Windows service " + action + " command failed");
     return result;
+  }
+
+  async function queryState(serviceId, action = "query", commandTimeoutMs = timeoutMs) {
+    const response = assertSuccess(await run(
+      "sc.exe", ["query", serviceId],
+      {
+        shell: false,
+        timeoutMs: Math.max(1, Math.min(timeoutMs, commandTimeoutMs)),
+        windowsHide: true
+      }
+    ), action);
+    const output = [response.stdout, response.output, response.stderr]
+      .filter((value) => typeof value === "string").join("\n");
+    const match = output.match(/\bSTATE\s*:\s*\d+\s+([A-Z_]+)\b/i);
+    const state = match?.[1]?.toUpperCase() ?? null;
+    if (!state) throw new Error("Windows service state response could not be parsed");
+    return { response, state };
   }
 
   async function waitForState(serviceId, expectedState) {
@@ -37,15 +58,8 @@ export function createWindowsScmAdapter({
     const deadline = startedAt + timeoutMs;
     while (clock() <= deadline) {
       const remaining = deadline - clock();
-      if (remaining < 0) break;
-      const response = assertSuccess(await run(
-        "sc.exe", ["query", serviceId],
-        { shell: false, timeoutMs: Math.max(1, Math.min(timeoutMs, remaining || 1)), windowsHide: true }
-      ), "query");
-      const output = [response.stdout, response.output, response.stderr]
-        .filter((value) => typeof value === "string").join("\n");
-      const match = output.match(/\bSTATE\s*:\s*\d+\s+([A-Z_]+)\b/i);
-      const state = match?.[1]?.toUpperCase() ?? null;
+      if (remaining <= 0) break;
+      const { response, state } = await queryState(serviceId, "query", remaining);
       if (state === expectedState && clock() <= deadline) return response;
       const afterQuery = deadline - clock();
       if (afterQuery <= 0) break;
@@ -57,7 +71,7 @@ export function createWindowsScmAdapter({
   return Object.freeze({
     platform: "windows-scm",
     async restartService(serviceId) {
-      if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
+      assertAllowed(serviceId);
       assertSuccess(await run(
         "sc.exe", ["stop", serviceId], { shell: false, timeoutMs, windowsHide: true }
       ), "stop");
@@ -67,12 +81,14 @@ export function createWindowsScmAdapter({
       ), "start");
       const running = await waitForState(serviceId, "RUNNING");
       return Object.freeze({
-        serviceId,
-        stopped: true,
-        running: true,
-        platform: "windows-scm",
-        commandResult: running
+        serviceId, stopped: true, running: true,
+        platform: "windows-scm", commandResult: running
       });
+    },
+    async verifyService(serviceId) {
+      assertAllowed(serviceId);
+      const { state } = await queryState(serviceId);
+      return Object.freeze({ healthy: state === "RUNNING", state });
     }
   });
 }

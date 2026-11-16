@@ -11,17 +11,34 @@ export function createLinuxSystemdAdapter({ run, allowedServices = [], timeoutMs
     throw new TypeError("timeoutMs must be between 100 and 60000");
   }
   const allowed = new Set(allowedServices);
+
+  function assertAllowed(serviceId) {
+    if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
+  }
+
+  function assertSuccess(result, action) {
+    if (!result || (result.exitCode ?? result.code) !== 0) {
+      throw new Error("systemctl " + action + " failed");
+    }
+    return result;
+  }
+
   return Object.freeze({
     platform: "linux-systemd",
     async restartService(serviceId) {
-      if (!allowed.has(serviceId)) throw new Error("service is not allowlisted");
+      assertAllowed(serviceId);
       const result = await run("systemctl", ["restart", serviceId], {
         shell: false, timeoutMs, windowsHide: true
       });
-      if (!result || (result.exitCode ?? result.code) !== 0) {
-        throw new Error("systemctl restart failed");
-      }
-      return result;
+      return assertSuccess(result, "restart");
+    },
+    async verifyService(serviceId) {
+      assertAllowed(serviceId);
+      const result = await run("systemctl", ["is-active", "--quiet", serviceId], {
+        shell: false, timeoutMs, windowsHide: true
+      });
+      const active = Boolean(result) && (result.exitCode ?? result.code) === 0;
+      return Object.freeze({ healthy: active, state: active ? "active" : "inactive" });
     }
   });
 }

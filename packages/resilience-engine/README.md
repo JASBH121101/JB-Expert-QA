@@ -1,26 +1,55 @@
 # JB Resilience Engine
 
-Independent service-health and controlled-recovery engine for Linux and Windows.
+Independent, policy-bounded service health and recovery engine for Linux and Windows.
 
-## v1 laboratory scope
+## v0.2 laboratory scope
 
 - Validated, server-owned service allowlist.
 - Bounded recovery policy: failure threshold, restart limit and cooldown. The health monitor continues recording observations at its own attempt cap while suppressing further recovery proposals.
-- Recovery proposals include random proposal IDs/nonces and expire after 60 seconds; expiry is rechecked after any asynchronous approval verification and immediately before adapter invocation.
+- Recovery proposals contain random IDs/nonces and expire after 60 seconds. Expiry is checked after asynchronous approval, before the durable claim, and again immediately before adapter invocation.
+- Atomic recovery claims prevent reuse of the same proposal and enforce the policy restart limit across engine instances when a shared durable store is configured.
+- Built-in JSON file ledger uses exclusive lock creation, bounded lock waits, dead-process lock recovery, restrictive file modes, write-to-temp + fsync + atomic rename, bounded history, and fail-closed validation. It is a single-host store, not a distributed database.
+- A memory-only ledger remains available for tests and development. Production configurations should set \`requireDurableStore: true\` and inject \`createFileRecoveryStore(...)\` or a host-provided transactional store.
 - Automatic execution is limited to explicitly allowlisted, non-critical services.
 - Critical services require an injected human-approval verifier. The host verifier must validate a signed approval bound to the exact proposal ID, nonce, service, action, issue/expiry times and authorized human subject; it must also enforce durable one-time replay protection.
-- Linux systemd and Windows Service Control Manager adapters use fixed executables, fixed argument shapes, shell disabled, and caller-injected command runners. Windows recovery waits for SCM `STOPPED` before issuing `start`, then confirms `RUNNING` within a bounded timeout.
+- Linux systemd and Windows Service Control Manager adapters use fixed executables, fixed argument shapes, shell disabled, and caller-injected command runners. Windows recovery waits for SCM \`STOPPED\` before issuing \`start\`, then confirms \`RUNNING\` with a bounded timeout.
+- Built-in adapters expose \`verifyService()\`; the engine can also run a host-owned application health check. Set \`requireHealthVerification: true\` to refuse configurations without at least one verifier.
+- Execution and recovery outcome are reported separately: a restart command may execute successfully while the service remains unhealthy. A failed post-recovery check is recorded as \`verification-failed\`.
 - A host-provided active Security Guard/Malware Engine threat or tamper signal suspends recovery. Resilience never overwrites binaries or attempts file repair.
-- No daemon installation, host configuration changes, user creation, firewall changes, or production infrastructure access.
+
+## Durable recovery ledger
+
+\`\`\`js
+import {
+  createResilienceEngine,
+  createFileRecoveryStore
+} from "@jb/resilience-engine";
+
+const recoveryStore = createFileRecoveryStore({
+  filePath: "/var/lib/jb-resilience/recovery-ledger.json"
+});
+
+const engine = createResilienceEngine({
+  policy,
+  adapter,
+  recoveryStore,
+  requireDurableStore: true,
+  requireHealthVerification: true,
+  // approvalVerifier: verifySignedOneTimeApproval,
+  // healthCheck: async ({ proposal }) => checkApplicationHealth(proposal.serviceId)
+});
+\`\`\`
+
+The file store serializes local operations across processes on the same host. It protects each claim with an atomic lock and increments the per-service attempt counter before invoking the OS adapter. Thus a process crash after the claim does not silently permit a repeated attempt. A claimed attempt that cannot be conclusively finalized is deliberately left consumed for operator review. Store lock timeout, malformed ledger, exhausted capacity, and failed storage writes block recovery rather than bypassing the ledger.
+
+The file ledger is not a cross-host consensus system. For multi-host orchestration, inject a database-backed store whose claim operation uses a transaction/unique constraint or compare-and-swap. Keep the durable ledger on a protected local volume and back it up under the host's operational policy. It contains operational metadata, not approval signatures or application secrets.
 
 ## Usage boundary
 
-The host application provides health observations and a command runner with appropriate OS permissions. Adapters do not spawn processes themselves. The caller must authenticate and audit human approvals. A boolean supplied by an untrusted client is not an approval mechanism; use `approvalVerifier` to validate a signed, one-time, actor-bound record covering the exact proposal ID, nonce, service ID, action and expiry. The engine prevents in-process proposal reuse, but durable replay protection across process restarts is the host verifier's responsibility.
+The host application provides health observations and a command runner with appropriate OS permissions. Adapters do not spawn processes themselves. The caller must authenticate and audit human approvals. A boolean supplied by an untrusted client is not an approval mechanism; use \`approvalVerifier\` to validate a signed, one-time, actor-bound record covering the exact proposal ID, nonce, service ID, action and expiry. The host verifier remains responsible for signature validation, actor authorization and replay protection across process restarts.
 
-## Not included in v1
+The health monitor's observation counters are still in-memory by default, but `restoreState()` lets the host hydrate the monitor before its first observation. Use `await recoveryStore.getServiceState(serviceId)` and pass its `attemptCount` and `lastAttemptAt` as `restartCount` and `lastRestartAt`. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore failure trends should persist those observations in their monitoring system.
+
+## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
-
-## State and deployment boundary
-
-Health observations and restart-attempt counters are held in bounded in-memory state in v1. They reset when the host process restarts and are not a durable production recovery ledger. The host must persist and atomically reconcile recovery attempts before enabling host-level automation; this package does not provide a durable database store, resident agent, scheduler or background probe.
