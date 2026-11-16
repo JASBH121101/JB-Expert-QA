@@ -3,6 +3,16 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  validateRateLimitCheckV1,
+  validateRateLimitDecisionV1,
+  validateAuthenticationAttemptV1,
+  validateAuthenticationDecisionV1,
+  validateSecurityEventV1,
+  validateRateLimitPolicyV1,
+  validateThreatSignalV1,
+  validateThreatAssessmentV1
+} from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -110,6 +120,17 @@ const fixtureSchemas = [
   ["threat-detection/assessment-observe.valid.json", "urn:jb:security-guard:threat-assessment:v1"]
 ];
 
+const runtimeValidators = new Map([
+  ["urn:jb:security-guard:rate-limit:check-request:v1", validateRateLimitCheckV1],
+  ["urn:jb:security-guard:rate-limit:decision:v1", validateRateLimitDecisionV1],
+  ["urn:jb:security-guard:policies:rate-limit:v1", validateRateLimitPolicyV1],
+  ["urn:jb:security-guard:authentication:attempt:v1", validateAuthenticationAttemptV1],
+  ["urn:jb:security-guard:authentication:decision:v1", validateAuthenticationDecisionV1],
+  ["urn:jb:security-guard:security-event:v1", validateSecurityEventV1],
+  ["urn:jb:security-guard:threat-signal:v1", validateThreatSignalV1],
+  ["urn:jb:security-guard:threat-assessment:v1", validateThreatAssessmentV1]
+]);
+
 for (const [relativePath, schemaId] of fixtureSchemas) {
   test("Core fixture conforms to " + schemaId + ": " + relativePath, async () => {
     const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests", "fixtures", relativePath), "utf8"));
@@ -117,7 +138,55 @@ for (const [relativePath, schemaId] of fixtureSchemas) {
     assert.ok(schema, "schema must exist: " + schemaId);
     assert.deepEqual(validateSchema(schema, fixture), []);
   });
+
+  test("JavaScript runtime validator accepts shared Core fixture: " + relativePath, async () => {
+    const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests", "fixtures", relativePath), "utf8"));
+    const validate = runtimeValidators.get(schemaId);
+    assert.equal(typeof validate, "function", "runtime validator must exist for " + schemaId);
+    assert.doesNotThrow(() => validate(fixture));
+  });
 }
+
+test("JSON Schema and JavaScript validators reject undeclared fields for every shared fixture", async () => {
+  for (const [relativePath, schemaId] of fixtureSchemas) {
+    const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests", "fixtures", relativePath), "utf8"));
+    const invalid = { ...fixture, rawCredentialLeak: "must-never-cross-contract" };
+    const schema = schemasById.get(schemaId);
+    const validate = runtimeValidators.get(schemaId);
+    assert.ok(validateSchema(schema, invalid).some((issue) => issue.includes("additional property")), relativePath);
+    assert.throws(() => validate(invalid), relativePath);
+  }
+});
+
+test("authentication schema and runtime validator agree on nullable client key pairing", async () => {
+  const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests/fixtures/authentication/attempt-failed.valid.json"), "utf8"));
+  fixture.client = { key: null, keyId: "client-key" };
+  const schema = schemasById.get("urn:jb:security-guard:authentication:attempt:v1");
+  assert.ok(validateSchema(schema, fixture).length > 0);
+  assert.throws(() => validateAuthenticationAttemptV1(fixture));
+});
+
+test("event and threat schemas and runtime validators require key IDs for opaque subject keys", async () => {
+  const cases = [
+    ["security-events/request-blocked.valid.json", "urn:jb:security-guard:security-event:v1", validateSecurityEventV1],
+    ["threat-detection/signal-brute-force.valid.json", "urn:jb:security-guard:threat-signal:v1", validateThreatSignalV1]
+  ];
+  for (const [relativePath, schemaId, validate] of cases) {
+    const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests/fixtures", relativePath), "utf8"));
+    delete fixture.subjectKeyId;
+    const schema = schemasById.get(schemaId);
+    assert.ok(validateSchema(schema, fixture).length > 0, relativePath);
+    assert.throws(() => validate(fixture), relativePath);
+  }
+});
+
+test("rate-limit decision schema and runtime validator reject incoherent enforced decisions", async () => {
+  const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests/fixtures/rate-limit/decision-blocked.valid.json"), "utf8"));
+  fixture.unavailable = true;
+  const schema = schemasById.get("urn:jb:security-guard:rate-limit:decision:v1");
+  assert.ok(validateSchema(schema, fixture).length > 0);
+  assert.throws(() => validateRateLimitDecisionV1(fixture));
+});
 
 test("rate-limit wire request rejects raw identity fields", async () => {
   const fixture = JSON.parse(await readFile(path.join(coreRoot, "tests/fixtures/rate-limit/check-request.valid.json"), "utf8"));
