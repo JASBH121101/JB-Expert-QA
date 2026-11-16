@@ -381,14 +381,17 @@ test("a process terminated immediately after a durable claim cannot replay the a
           JB_RESILIENCE_STORE_PATH: filePath,
           JB_RESILIENCE_CLAIM: JSON.stringify(first)
         },
-        stdio: "ignore",
+        stdio: ["ignore", "ignore", "pipe"],
         windowsHide: true
       });
+      let stderr = "";
+      processHandle.stderr.setEncoding("utf8");
+      processHandle.stderr.on("data", (chunk) => { stderr += chunk; });
       processHandle.once("error", reject);
-      processHandle.once("close", (code, signal) => resolve({ code, signal }));
+      processHandle.once("close", (code, signal) => resolve({ code, signal, stderr }));
     });
 
-    assert.deepEqual(child, { code: 23, signal: null });
+    assert.equal(child.code, 23, child.stderr);
 
     const restartedStore = createFileOrchestrationStore({ filePath });
     const afterRestart = await restartedStore.claimAction(claimAction({
