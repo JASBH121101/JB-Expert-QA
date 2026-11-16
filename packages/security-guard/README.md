@@ -467,3 +467,24 @@ For deployment configuration, the Worker must use the Worker-native rate-limit a
 The Worker and Pages adapters share a runtime-neutral request and service-decision contract. See [Rate-limit contract](docs/RATE-LIMIT-CONTRACT.md) for the normalized payload, validation rules, and the current boundary for future non-JavaScript integrations.
 
 This is request-rate protection for Pages Functions, not a substitute for Cloudflare DDoS protection, WAF rules, authentication, authorization, or application-level input validation.
+
+
+## Core v1 cross-runtime rate-limit contracts (additive)
+
+The versioned Core adapter is exposed as a separate subpath. It does not alter the legacy middleware API or the older Worker/Pages contract:
+
+```js
+import {
+  deriveCoreIdentityKey,
+  normalizeCoreRateLimitCheckRequest,
+  normalizeCoreRateLimitDecision,
+  normalizeCoreRateLimitPolicy,
+  createCoreRateLimitCounterKey
+} from "@jb/security-guard/core-contract-v1";
+```
+
+Derive opaque identities only in trusted server-side code. Use a random secret of at least 32 bytes and keep it in a secret manager. Resolve the account ID, client IP (only through a trusted proxy configuration), or session ID on the server; never accept a browser-provided identity digest or raw identity. deriveCoreIdentityKey() uses the Core v1 Web Crypto HMAC-SHA-256 formula and can run in Node.js or a runtime with Web Crypto. It does not normalize account IDs, IP addresses, or sessions for you; the host identity resolver must apply the same canonicalization in every runtime.
+
+The normalizers reject unknown fields, raw identity fields, malformed identifiers, invalid decision combinations, and out-of-range policies. createCoreRateLimitCounterKey() builds an ambiguity-free length-prefixed key from tenant, application, policy, scope, identity type, key version, and the opaque digest. Pass this key to an atomic shared-store adapter; this helper is not a store and does not make a process-local or edge counter globally exact.
+
+Core v1 is a new contract boundary. Existing createDistributedRateLimit(), Worker, and Pages exports retain their existing key derivation and behavior for backwards compatibility. The v1 digest formula is not automatically active in old integrations. A runtime is not cross-runtime compatible until it passes the shared HMAC and contract vectors.
