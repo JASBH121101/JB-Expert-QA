@@ -89,7 +89,8 @@ const decision = controller.evaluate(request);
 const result = await controller.authorize(request);
 if (result.authorized) {
   const stillValid = await controller.assertAuthorization({
-    authorization: result.authorization
+    authorization: result.authorization,
+    request: await readFreshHostHealthAndSecurityContext()
   });
   // The host executor must require stillValid.valid immediately before its typed adapter.
   // v0.3 does not include that executor or perform the OS operation.
@@ -102,7 +103,7 @@ if (result.authorized) {
 }
 ```
 
-The authorization object is an opaque in-process capability. Do not serialize it, accept a client-supplied replacement, or treat its presence as evidence that an operating-system action succeeded. The host executor must supply a fresh host health/security context to `assertAuthorization()` immediately before a typed adapter invocation and record the outcome exactly once. The service/environment/incident/action binding cannot change between authorization and execution.
+The authorization object is an opaque in-process capability. Do not serialize it, accept a client-supplied replacement, or treat its presence as evidence that an operating-system action succeeded. The host executor must supply a fresh host health/security context to `assertAuthorization()` immediately before a typed adapter invocation and record the outcome exactly once. The `securityState` field is a host-authoritative aggregate in v0.3, not a signed inter-engine event; do not source it directly from an untrusted client. A trusted signal gateway is still required before A2 containment can be enabled. The service/environment/incident/action binding cannot change between authorization and execution.
 
 ## Current capability matrix
 
