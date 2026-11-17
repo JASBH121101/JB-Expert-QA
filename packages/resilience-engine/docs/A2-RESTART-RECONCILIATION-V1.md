@@ -16,7 +16,7 @@ The coordinator does not resume an action. It produces findings only.
 
 The host must inject:
 
-- **Durable journal:** `durable: true`, `listPending({ cursor, limit, atMs, signal })`, and `getPendingByClaimId({ claimId, atMs, signal })`. Both methods must be read-only. The list response is exactly `{ claimIds, nextCursor }`; exact lookup is exactly `{ found, record }`.
+- **Durable action journal:** the controller's `actionLedger` must be one host-owned durable source of truth (`durable: true`) and implement `createPendingRecord`, `listPending`, and `getPendingByClaimId`, in addition to its claim/marker/reconcile/complete methods. `listPending({ cursor, limit, atMs, signal })` and `getPendingByClaimId({ claimId, atMs, signal })` are read-only. The list response is exactly `{ claimIds, nextCursor }`; exact lookup is exactly `{ found, record }`. Do not split action claims and recovery records across independently committed stores.
 - **Containment provider:** `providerId`, `reconciliationReadOnly: true`, `reconcile`, and `reconcileRelease`. Both reconciliation methods must query authoritative provider state and must never submit, retry, reverse, or otherwise mutate a provider operation.
 - **Independent verifier:** a verifier identity distinct from the provider, with `verifyContainment` and `verifyRelease`. It must use an observation path independent of the executor.
 - **Forensic recorder:** `recorderId` and read-only `lookupRetention`. It must return the previously stored retention receipt; it must not create a new preservation record during this scan.
@@ -32,12 +32,14 @@ Every journal record must use schema `jb.resilience.a2-recovery-record/v1` and c
 - exact `scope`: assetId, environment, incidentId, policyId, policyRevision and policyHash
 - `profileId`, `providerId`, `verifierId`, `recorderId`
 - deterministic `idempotencyKey` bound to action, exact scope and profile
-- `state` (`provider-started` or `held-for-reconciliation`)
+- `state` (`claimed`, `provider-started`, or `held-for-reconciliation`)
 - `originalOperationId` (required for release reconciliation)
 - dense, unique `evidenceRefs` containing `refId` and lowercase SHA-256
 - `createdAtMs`, `updatedAtMs`, and `leaseExpiresAtMs`
 
-The pending index contains claim IDs only. Each ID is re-fetched from the journal before any provider query. A record whose identity, schema, state, action key or scope does not match the configured adapters is held.
+The controller first writes a complete `claimed` recovery record after durable resource reservation and before any provider-start marker. The action ledger's `markProviderStarted` operation must atomically transition both its action claim and the corresponding recovery record to `provider-started`; the controller then exact-reads the record and refuses to invoke the provider unless that transition is confirmed. The action ledger's `complete` operation must atomically remove terminal `succeeded`/`not-applied` records from the pending index, while preserving `held-for-reconciliation` records in that index. These operations must share one durable transaction boundary.
+
+The pending index contains claim IDs only. Each ID is re-fetched from the journal before any provider query. A `claimed` record means the provider-start marker was not durably confirmed: the restart coordinator keeps it held and does not query, retry, or release the provider. A record whose identity, schema, state, action key or scope does not match the configured adapters is held.
 
 ## Reconciliation sequence
 
@@ -66,7 +68,7 @@ The coordinator intentionally has no policy-authority, `apply`, `release`, journ
 
 ## Integration gap that remains open
 
-The existing A2 controller's successful result handle remains process-local. Its current action-ledger contract does not itself expose this complete pending-record schema, paginated read-only index, exact record lookup, evidence resolver or retention lookup contract. A host adapter must implement and certify those interfaces before this coordinator can inspect real interrupted operations. The coordinator is not automatically wired into the existing controller and does not close the production restart-recovery gap by itself.
+The A2 controller now requires the durable action ledger to implement the complete pending-record schema, paginated read-only index, and exact record lookup. It creates the `claimed` record before provider start, requires the provider-start marker to atomically update that record, and relies on the ledger's terminal completion operation to preserve held records or remove terminal records. The read-only coordinator can consume that same journal contract, but the host must still implement and independently certify its durable semantics, provider reconciliation, evidence resolver, verifier independence, and forensic retention lookup. The successful containment handle remains process-local; this lifecycle does not reconstruct release authority after restart and does not certify production A2 readiness.
 
 ## Lab test coverage
 
