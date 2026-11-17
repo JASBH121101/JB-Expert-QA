@@ -42,3 +42,47 @@ The client does not retry requests, because retries can consume extra quota. Aut
 ## Validation boundary
 
 The PHP package validates Core v1 rate-limit check, decision and policy objects and constructs the same length-prefixed counter key as Node. It calls the central server for quota decisions rather than implementing a second, divergent rate-limit store.
+
+
+## PHP upload quarantine contract
+
+The PHP package also provides a runtime-native upload inspection orchestrator:
+
+- `UploadInspectionService`
+- `UploadQuarantineStorage`
+- `UploadMalwareScanner`
+
+The service accepts a server-side temporary file path (for example, Laravel's `UploadedFile::getRealPath()`), streams it into a quarantine adapter under an opaque server-generated ID, enforces a byte limit, checks a narrow file-signature allowlist, and calculates SHA-256. It then asks the scanner to consume the quarantined object and requires an explicit `clean` verdict whose reported digest and byte count match the ingested object. Finally, it calls the storage adapter's atomic promotion method with the expected digest and size.
+
+The storage adapter contract is security-critical:
+
+- `createQuarantineStream($uploadId)` must write only to private quarantine storage.
+- `openQuarantineStream($uploadId)` must return the complete quarantined object.
+- `promote($uploadId, $expectedSha256, $expectedSize)` must atomically verify the exact bytes and move them to a **private approved namespace**. It must not publish a public URL.
+- `delete($uploadId)` must be idempotent and operate only on the opaque server-generated ID.
+
+The scanner must consume the entire stream, enforce its own execution deadline, and return `verdict`, `sha256`, `size`, `engine` and `version`. The service has no bundled antivirus engine or production storage implementation. An unknown verdict, scanner outage, invalid result, or digest mismatch never approves an object; uncertain objects remain in quarantine. A malicious verdict is rejected and the default flow requests deletion.
+
+The built-in signature allowlist is JPEG, PNG, GIF, WebP and PDF. Signature identification is not full format validation, image sanitization, or proof that a file is safe. The host application must decode and re-encode uploaded images with a maintained image library before publication, serve approved files through authorization-aware routes, set explicit content types and `X-Content-Type-Options: nosniff`, and use safe content disposition. PDFs should be attachments by default. Do not use Laravel's `public` disk for incoming or quarantined uploads.
+
+Example wiring (the adapters are supplied by the host application):
+
+```php
+$inspector = new UploadInspectionService(
+    $privateQuarantineStorage,
+    $versionedMalwareScanner,
+    maxBytes: 5 * 1024 * 1024,
+);
+
+$result = $inspector->inspect(
+    $uploadedFile->getRealPath(),
+    $uploadedFile->getClientOriginalName(),
+    $uploadedFile->getClientMimeType(),
+);
+
+// Persist result.uploadId and result.sha256 against the authenticated actor.
+// Publish/serve the object only after the application's own authorization
+// and image-processing steps have completed.
+```
+
+The PHP test suite exercises clean promotion, extension mismatch, oversized streams, unknown and malicious verdicts, digest mismatch, and scanner unavailability using test-only adapters. These tests verify the orchestration contract, not a production antivirus or storage provider.
