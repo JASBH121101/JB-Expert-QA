@@ -613,14 +613,17 @@ export function createA2ContainmentController({
         reason: "containment-preflight-failed"
       });
     }
+    const mutationAllowed = await assertMutationAllowed(scope, action, "before-apply");
+    const authorizationStillValid = await assertAuthorization(
+      authorization, action, scope, profileId
+    );
     const preApplyNow = assertTimestamp(clock(), "A2 pre-apply clock");
-    if (preApplyNow < readinessMetadata.observedAtMs ||
-        preApplyNow >= readinessMetadata.expiresAtMs ||
-        !await assertMutationAllowed(scope, action, "before-apply") ||
-        !await assertAuthorization(authorization, action, scope, profileId)) {
+    if (!mutationAllowed || !authorizationStillValid ||
+        preApplyNow < readinessMetadata.observedAtMs ||
+        preApplyNow >= readinessMetadata.expiresAtMs) {
       return finishNotApplied({
         action, scope, profileId, claimId, reservationId, authorization,
-        reason: "policy-or-mutation-control-changed-before-apply"
+        reason: "policy-or-readiness-changed-before-apply"
       });
     }
 
@@ -853,6 +856,7 @@ export function createA2ContainmentController({
       });
     }
 
+    const releaseVerification = Object.freeze({ ...verification.value });
     const budgetOkay = await settleBudget(reservationId, "succeeded");
     const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
@@ -878,7 +882,7 @@ export function createA2ContainmentController({
       scope,
       profileId,
       operationReceipt: releaseReceipt,
-      verification: verification.value,
+      verification: releaseVerification,
       forensicReceipt: preservedReceipt,
       idempotencyKey
     });
