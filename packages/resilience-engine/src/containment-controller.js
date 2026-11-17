@@ -14,10 +14,20 @@ function isRecord(value) {
 
 function exactKeys(value, keys, label) {
   if (!isRecord(value) ||
-      Object.keys(value).length !== keys.length ||
-      Object.getOwnPropertySymbols(value).length > 0 ||
-      keys.some((key) => !Object.hasOwn(value, key))) {
+      Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null ||
+      Object.getOwnPropertySymbols(value).length > 0) {
+    throw new TypeError(label + " must be a plain data object");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const actual = Object.keys(descriptors);
+  if (actual.length !== keys.length || actual.some((key) => !keys.includes(key))) {
     throw new TypeError(label + " has missing or unsupported fields");
+  }
+  for (const descriptor of Object.values(descriptors)) {
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError(label + " must not contain accessors or hidden fields");
+    }
   }
 }
 
@@ -134,8 +144,15 @@ async function invokeBounded(callback, input, timeoutMs, label, clock) {
 }
 
 function validateAuthorization(value, action, scope, profileId, now) {
-  if (!isRecord(value) ||
-      value.schema !== "jb.resilience.a2-authorization/v1" ||
+  try {
+    exactKeys(value, [
+      "schema", "authorizationId", "action", "profileId",
+      ...SCOPE_KEYS, "issuedAtMs", "expiresAtMs"
+    ], "A2 authorization");
+  } catch {
+    return false;
+  }
+  if (value.schema !== "jb.resilience.a2-authorization/v1" ||
       typeof value.authorizationId !== "string" ||
       !IDENTIFIER.test(value.authorizationId) ||
       value.action !== action ||
@@ -154,8 +171,15 @@ function validateAuthorization(value, action, scope, profileId, now) {
 function validateOperationReceipt(receipt, {
   providerId, action, scope, profileId, idempotencyKey, now, expectedState
 }) {
-  if (!isRecord(receipt) ||
-      receipt.schema !== "jb.resilience.a2-operation-receipt/v1" ||
+  try {
+    exactKeys(receipt, [
+      "schema", "providerId", "operationId", "action", "idempotencyKey",
+      "profileId", ...SCOPE_KEYS, "state", "occurredAtMs"
+    ], "A2 operation receipt");
+  } catch {
+    return false;
+  }
+  if (receipt.schema !== "jb.resilience.a2-operation-receipt/v1" ||
       receipt.providerId !== providerId ||
       typeof receipt.operationId !== "string" ||
       !IDENTIFIER.test(receipt.operationId) ||
@@ -172,8 +196,15 @@ function validateOperationReceipt(receipt, {
 }
 
 function validatePreflight(value, providerId, scope, profileId) {
-  return isRecord(value) &&
-    value.schema === "jb.resilience.a2-preflight/v1" &&
+  try {
+    exactKeys(value, [
+      "schema", "providerId", "ready", "profileId", ...SCOPE_KEYS,
+      "managementPathAvailable", "forensicPathAvailable"
+    ], "A2 preflight result");
+  } catch {
+    return false;
+  }
+  return value.schema === "jb.resilience.a2-preflight/v1" &&
     value.providerId === providerId &&
     value.ready === true &&
     value.profileId === profileId &&
@@ -185,8 +216,15 @@ function validatePreflight(value, providerId, scope, profileId) {
 function validateIndependentVerification(value, {
   verifierId, scope, profileId, expectedState, now
 }) {
-  return isRecord(value) &&
-    value.schema === "jb.resilience.a2-verification/v1" &&
+  try {
+    exactKeys(value, [
+      "schema", "verifierId", "verified", "state", "profileId",
+      ...SCOPE_KEYS, "observedAtMs", "expiresAtMs"
+    ], "A2 independent verification");
+  } catch {
+    return false;
+  }
+  return value.schema === "jb.resilience.a2-verification/v1" &&
     value.verifierId === verifierId &&
     value.verified === true &&
     value.state === expectedState &&
@@ -199,8 +237,15 @@ function validateIndependentVerification(value, {
 }
 
 function validateForensicReceipt(value, recorderId, scope, now) {
-  return isRecord(value) &&
-    value.schema === "jb.resilience.a2-forensic-receipt/v1" &&
+  try {
+    exactKeys(value, [
+      "schema", "recorderId", "retained", ...SCOPE_KEYS, "evidenceIds",
+      "retentionPolicyId", "preservedAtMs", "expiresAtMs"
+    ], "A2 forensic receipt");
+  } catch {
+    return false;
+  }
+  return value.schema === "jb.resilience.a2-forensic-receipt/v1" &&
     value.recorderId === recorderId &&
     value.retained === true &&
     sameScope(value, scope) &&
@@ -326,7 +371,12 @@ export function createA2ContainmentController({
       return null;
     }
     const now = assertTimestamp(clock(), "authorization clock");
-    if (!isRecord(issued) || issued.authorized !== true ||
+    try {
+      exactKeys(issued, ["authorized", "authorization"], "A2 authorization response");
+    } catch {
+      return null;
+    }
+    if (issued.authorized !== true ||
         !validateAuthorization(issued.authorization, action, scope, profileId, now)) {
       return null;
     }
@@ -387,6 +437,11 @@ export function createA2ContainmentController({
     } catch {
       claim = null;
     }
+    try {
+      exactKeys(claim, ["claimed", "claimId"], "A2 action claim");
+    } catch {
+      claim = null;
+    }
     if (!isRecord(claim) || claim.claimed !== true ||
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
       return { ok: false, reason: "duplicate-or-unavailable-action-claim" };
@@ -394,6 +449,11 @@ export function createA2ContainmentController({
     let budget;
     try {
       budget = await budgetLedger.reserve({ action, scope, profileId, idempotencyKey, atMs: now });
+    } catch {
+      budget = null;
+    }
+    try {
+      exactKeys(budget, ["reserved", "reservationId"], "A2 budget reservation");
     } catch {
       budget = null;
     }
