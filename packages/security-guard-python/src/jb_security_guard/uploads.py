@@ -229,10 +229,11 @@ class UploadInspectionService:
                 retain_quarantine = True
                 raise UploadInspectionError("SCAN_NOT_CLEAN")
 
+            retain_quarantine = True
             if self._storage.promote(upload_id, sha256, size) is not True:
-                retain_quarantine = True
                 raise UploadInspectionError("PROMOTION_FAILED")
             promoted = True
+            retain_quarantine = False
             self._emit("upload-approved")
             return {
                 "schema": "jb.security.upload-inspection-result/v1",
