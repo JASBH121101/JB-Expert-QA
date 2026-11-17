@@ -15,8 +15,9 @@ function hasRecoveryStoreContract(store) {
 }
 
 function isHealthyResult(value) {
-  if (value === true) return true;
-  return isRecord(value) && value.healthy === true;
+  if (value === true || (isRecord(value) && value.healthy === true)) return true;
+  if (value === false || (isRecord(value) && value.healthy === false)) return false;
+  return null;
 }
 
 async function invokeWithTimeout(callback, input, timeoutMs, label) {
@@ -48,6 +49,7 @@ export function createResilienceEngine({
   healthCheck = null,
   approvalTimeoutMs = 10_000,
   healthCheckTimeoutMs = 5_000,
+  adapterTimeoutMs = 15_000,
   clock = Date.now
 } = {}) {
   const validatedPolicy = validateResiliencePolicy(policy);
@@ -62,8 +64,9 @@ export function createResilienceEngine({
     throw new TypeError("recovery safety requirements must be boolean");
   }
   if (!Number.isSafeInteger(approvalTimeoutMs) || approvalTimeoutMs < 100 || approvalTimeoutMs > 60_000 ||
-      !Number.isSafeInteger(healthCheckTimeoutMs) || healthCheckTimeoutMs < 100 || healthCheckTimeoutMs > 60_000) {
-    throw new TypeError("approval and health-check timeouts must be between 100 and 60000 milliseconds");
+      !Number.isSafeInteger(healthCheckTimeoutMs) || healthCheckTimeoutMs < 100 || healthCheckTimeoutMs > 60_000 ||
+      !Number.isSafeInteger(adapterTimeoutMs) || adapterTimeoutMs < 100 || adapterTimeoutMs > 60_000) {
+    throw new TypeError("approval, health-check and adapter timeouts must be between 100 and 60000 milliseconds");
   }
   if (healthCheck !== null && typeof healthCheck !== "function") {
     throw new TypeError("healthCheck must be a function");
@@ -201,42 +204,61 @@ export function createResilienceEngine({
       consumedProposals.add(proposal);
       let adapterResult;
       try {
-        adapterResult = await adapter.restartService(proposal.serviceId);
+        adapterResult = await invokeWithTimeout(
+          ({ serviceId, signal }) => adapter.restartService(serviceId, { signal }),
+          { serviceId: proposal.serviceId },
+          adapterTimeoutMs,
+          "service restart adapter"
+        );
       } catch {
-        const ledgerRecorded = await finalizeClaim(proposal, "failed");
+        // A timed-out or throwing adapter may have submitted the OS operation before
+        // failing. Consume the claim and record an unknown outcome; never auto-retry it.
+        const ledgerRecorded = await finalizeClaim(proposal, "unverified");
         return Object.freeze({
           executed: false,
-          reason: "recovery-adapter-failed",
+          executionOutcome: "unknown",
+          recovered: null,
+          verified: false,
+          reason: ledgerRecorded
+            ? "recovery-adapter-outcome-unknown"
+            : "recovery-ledger-finalization-failed",
           serviceId: proposal.serviceId,
           ledgerRecorded
         });
       }
 
       const verificationResults = [];
-      let verificationFailed = false;
-      try {
-        if (typeof adapter.verifyService === "function") {
-          verificationResults.push(isHealthyResult(
-            await adapter.verifyService(proposal.serviceId)
-          ));
+      let verificationUnavailable = false;
+      if (typeof adapter.verifyService === "function") {
+        try {
+          verificationResults.push(isHealthyResult(await invokeWithTimeout(
+            ({ serviceId, signal }) => adapter.verifyService(serviceId, { signal }),
+            { serviceId: proposal.serviceId },
+            adapterTimeoutMs,
+            "service adapter verification"
+          )));
+        } catch {
+          verificationUnavailable = true;
         }
-        if (healthCheck !== null) {
-          verificationResults.push(isHealthyResult(
-            await invokeWithTimeout(
-              healthCheck, { proposal, adapterResult }, healthCheckTimeoutMs, "health check"
-            )
-          ));
+      }
+      if (healthCheck !== null) {
+        try {
+          verificationResults.push(isHealthyResult(await invokeWithTimeout(
+            healthCheck, { proposal, adapterResult }, healthCheckTimeoutMs, "health check"
+          )));
+        } catch {
+          verificationUnavailable = true;
         }
-      } catch {
-        verificationFailed = true;
-        verificationResults.push(false);
       }
 
-      const verified = verificationResults.length > 0;
-      const recovered = verified ? verificationResults.every(Boolean) : null;
-      const outcome = verificationFailed
-        ? "verification-failed"
-        : recovered === true ? "succeeded"
+      const verified = verificationResults.length > 0 &&
+        !verificationUnavailable && verificationResults.every((result) => result !== null);
+      const hasUnhealthyEvidence = verificationResults.includes(false);
+      const recovered = hasUnhealthyEvidence
+        ? false
+        : verified && verificationResults.every((result) => result === true) ? true : null;
+      const outcome = recovered === true
+        ? "succeeded"
         : recovered === false ? "verification-failed" : "unverified";
       const ledgerRecorded = await finalizeClaim(proposal, outcome);
 
@@ -244,9 +266,11 @@ export function createResilienceEngine({
         executed: true,
         recovered,
         verified,
-        reason: ledgerRecorded
-          ? recovered === false ? "post-recovery-health-check-failed" : null
-          : "recovery-ledger-finalization-failed",
+        reason: !ledgerRecorded
+          ? "recovery-ledger-finalization-failed"
+          : recovered === false
+            ? "post-recovery-health-check-failed"
+            : recovered === null ? "post-recovery-health-check-unavailable" : null,
         ledgerRecorded,
         action: proposal.action,
         serviceId: proposal.serviceId,
