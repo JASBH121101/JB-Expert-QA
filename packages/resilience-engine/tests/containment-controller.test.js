@@ -193,6 +193,7 @@ function createDependencies({
   budgetReserveMode = "normal",
   budgetReconcileState = "from-ledger",
   providerStartMode = "normal",
+  releaseStartMode = "normal",
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -394,13 +395,14 @@ function createDependencies({
         actionStage = "claimed";
         return { claimed: true, claimId: "claim-" + claimNumber };
       },
-      async markProviderStarted() {
-        events.push("action-mark-provider-started");
-        if (providerStartMode === "hang") {
+      async markProviderStarted(input) {
+        events.push("action-mark-provider-started:" + input.action);
+        const mode = input.action === "release-containment" ? releaseStartMode : providerStartMode;
+        if (mode === "hang") {
           actionStage = "provider-started";
           return new Promise(() => {});
         }
-        if (providerStartMode === "deny") return { started: false };
+        if (mode === "deny") return { started: false };
         actionStage = "provider-started";
         return { started: true };
       },
@@ -517,6 +519,7 @@ test("A2 executes only after policy authorization, budget claim, bounded preflig
   assert.equal(released.executed, true);
   assert.equal(released.verified, true);
   assert.ok(events.includes("verify-release"));
+  assert.ok(events.includes("action-mark-provider-started:release-containment"));
   assert.ok(events.includes("complete-authorization:succeeded"));
 
   const repeatedRelease = await controller.releaseContainment({
@@ -714,4 +717,24 @@ test("A2 requires a durable provider-start marker before invoking the containmen
   assert.ok(deps.events.includes("action-mark-provider-started"));
   assert.ok(deps.events.includes("action-reconcile"));
   assert.equal(deps.events.includes("apply"), false);
+});
+
+
+test("A2 requires a durable provider-start marker before releasing containment", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({
+    releaseStartMode: "hang",
+    actionReconcileState: "provider-started"
+  });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+  const released = await deps.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(released.state, "held-for-reconciliation");
+  assert.equal(released.executed, false);
+  assert.ok(deps.events.includes("action-mark-provider-started:release-containment"));
+  assert.equal(deps.events.includes("release"), false);
 });
