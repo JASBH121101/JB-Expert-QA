@@ -65,3 +65,32 @@ When this middleware is installed globally, GET/HEAD requests bypass the rate-li
 ## Validation boundary
 
 The Python package includes strict rate-limit check, decision and policy normalizers plus the same length-prefixed counter-key format as Node/PHP. Its unit tests consume the same HMAC known-answer fixture. The FastAPI middleware only adapts the central endpoint response; it does not create or migrate policy, secrets, databases or counters.
+
+## Upload quarantine orchestration
+
+The Python package now exposes `UploadInspectionService`, `UploadInspectionError`,
+`UploadQuarantineStorage` and `UploadMalwareScanner`.
+
+The service streams a bounded source file into host-provided quarantine storage,
+calculates SHA-256, checks a narrow JPEG/PNG/GIF/WebP/PDF signature allowlist,
+verifies the scanner's explicit verdict, engine/version, byte count and digest,
+and only then requests private atomic promotion.
+
+Host adapters must keep quarantine and approved objects private, enforce scanner
+deadlines, consume the complete stream, verify exact bytes during promotion, and
+make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
+and uncertain promotion outcomes never produce an approval. Uncertain objects
+remain quarantined for review.
+
+No antivirus engine or production storage implementation is bundled. Signature
+identification is not full format validation or image sanitization. The host
+application must decode and re-encode images before publication, authorize every
+download, set explicit content types and `X-Content-Type-Options: nosniff`, and
+serve PDFs as attachments by default. Never write untrusted uploads directly to
+a public web root or public object-store bucket.
+
+Run the Python upload and middleware tests with:
+
+```bash
+PYTHONPATH=packages/security-guard-python/src python3 -m unittest discover -s packages/security-guard-python/tests -v
+```
