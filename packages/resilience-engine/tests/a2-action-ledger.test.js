@@ -370,6 +370,50 @@ test("pending pagination is bounded and uses stable snapshot cursors", async () 
   });
 });
 
+test("public action-ledger methods reject accessors and unsupported input fields without invoking getters", async () => {
+  await withTempDirectory(async (directory) => {
+    const store = createStore(join(directory, "a2-actions.json"));
+    let getterCalled = false;
+    const hostile = {
+      scope: SCOPE,
+      profileId: PROFILE_ID,
+      idempotencyKey: makeIdempotencyKey(),
+      claimedAtMs: NOW,
+      expiresAtMs: NOW + 10_000
+    };
+    Object.defineProperty(hostile, "action", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return "apply-containment-profile";
+      }
+    });
+    await assert.rejects(store.claim(hostile), /accessors/);
+    assert.equal(getterCalled, false);
+    await assert.rejects(store.claim({
+      action: "apply-containment-profile",
+      scope: SCOPE,
+      profileId: PROFILE_ID,
+      idempotencyKey: makeIdempotencyKey(),
+      claimedAtMs: NOW,
+      expiresAtMs: NOW + 10_000,
+      extraPermission: true
+    }), /unsupported fields/);
+  });
+});
+
+test("file ledger rejects identity collisions and unsafe option bounds", async () => {
+  await withTempDirectory(async (directory) => {
+    assert.throws(() => createFileA2ActionLedger({
+      filePath: join(directory, "invalid.json"),
+      providerId: "same", verifierId: "same", recorderId: "recorder"
+    }), /identities must differ/);
+    assert.throws(() => createStore(join(directory, "invalid-limit.json"), {
+      maxClaims: 0
+    }), /maxClaims is invalid/);
+  });
+});
+
 test("malformed ledger data fails closed and is never overwritten", async () => {
   await withTempDirectory(async (directory) => {
     const filePath = join(directory, "a2-actions.json");
