@@ -412,6 +412,70 @@ test("authentication events do not expose account identifiers or client addresse
   });
 });
 
+test("authentication fails closed when both account and client identity resolvers are unavailable", () => {
+  const events = [];
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const auth = guard.createAuthProtection({
+    identityKeyGenerator() { throw new Error("account resolver unavailable"); },
+    clientKeyGenerator() { throw new Error("client resolver unavailable"); },
+    onEvent(event) { events.push(event); }
+  });
+  const request = { headers: {} };
+  const status = auth.getStatus(request);
+  assert.equal(status.identityUnavailable, true);
+
+  let nextCalled = false;
+  const response = {
+    headersSent: false,
+    writableEnded: false,
+    headers: {},
+    setHeader(name, value) { this.headers[name.toLowerCase()] = String(value); },
+    end(body) { this.body = body; this.writableEnded = true; }
+  };
+  auth.middleware(request, response, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, false);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.equal(response.headers["retry-after"], "5");
+  assert.equal(JSON.parse(response.body).error, "authentication_security_control_unavailable");
+  assert.equal(auth.getStats().identityUnavailable, 1);
+  assert.equal(auth.getStats().blocked, 1);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].ruleIds[0], "JBG-AUTH-IDENTITY-001");
+  assert.equal(events[0].action, "identity-rejected");
+});
+
+test("monitor mode records unavailable authentication identity without blocking or flooding events", () => {
+  const events = [];
+  const guard = createSecurityGuard({ mode: "monitor", rateLimit: { enabled: false } });
+  const auth = guard.createAuthProtection({
+    identityKeyGenerator: () => null,
+    clientKeyGenerator: () => null,
+    onEvent(event) { events.push(event); }
+  });
+  let nextCalls = 0;
+  const request = { headers: {} };
+  const makeResponse = () => ({
+    headersSent: false,
+    writableEnded: false,
+    setHeader() {},
+    end() {}
+  });
+
+  auth.middleware(request, makeResponse(), () => { nextCalls += 1; });
+  auth.middleware(request, makeResponse(), () => { nextCalls += 1; });
+  const failed = auth.recordFailure(request);
+
+  assert.equal(nextCalls, 2);
+  assert.equal(failed.identityUnavailable, true);
+  assert.equal(failed.enforced, false);
+  assert.equal(auth.getStats().identityUnavailable, 2);
+  assert.equal(auth.getStats().unattributedFailures, 1);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].action, "identity-unavailable");
+});
+
 test("auth protection validates identity resolver and safely bounds tracked keys", () => {
   const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
   assert.throws(() => guard.createAuthProtection(), /identityKeyGenerator is required/);
