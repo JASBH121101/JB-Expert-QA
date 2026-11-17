@@ -187,6 +187,7 @@ function createDependencies({
   blockMutationAt = null,
   denyAuthorization = false,
   auditFails = false,
+  auditFailsForOutcome = null,
   forensicValid = true,
   forensicEvidenceIds = null,
   mutationTimeout = false,
@@ -519,7 +520,7 @@ function createDependencies({
       durable: true,
       async append(input) {
         events.push("audit:" + input.outcome);
-        return !auditFails;
+        return !auditFails && input.outcome !== auditFailsForOutcome;
       }
     },
     mutationControl: {
@@ -728,6 +729,19 @@ test("A2 keeps a pre-marker claim held across restart and never queries or retri
   assert.equal(report.executable, false);
   assert.equal(report.safeToRetry, false);
   assert.equal(report.releaseAllowed, false);
+});
+
+test("A2 keeps its pending recovery record when final audit prevents successful finalization", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ auditFailsForOutcome: "contained" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  const [record] = [...deps.pendingRecords.values()];
+  assert.equal(record.state, "held-for-reconciliation");
+  assert.equal(deps.pendingTransitions.at(-1).state, "held-for-reconciliation");
 });
 
 test("A2 reconciles an ambiguous apply before accepting provider success", async () => {
