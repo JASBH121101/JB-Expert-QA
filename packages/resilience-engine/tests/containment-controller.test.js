@@ -611,7 +611,8 @@ test("A2 controller rejects copied readiness, mismatched scope and invalid evide
 
 test("A2 executes only after policy authorization, budget claim, bounded preflight, independent verification and forensics; release is separate", async () => {
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
-  const { controller, events, profileId } = createDependencies();
+  const deps = createDependencies();
+  const { controller, events, profileId } = deps;
   const contained = await controller.executeContainment({
     readiness, scope: SCOPE, profileId, evidenceRefs
   });
