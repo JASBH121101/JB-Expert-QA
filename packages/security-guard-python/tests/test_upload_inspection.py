@@ -141,6 +141,8 @@ class UploadInspectionTests(unittest.TestCase):
                 self.assertEqual(caught.exception.reason, reason)
                 self.assertEqual(storage.approved, {})
                 self.assertEqual(bool(storage.quarantine), retain)
+                if reason == "MALWARE_DETECTED":
+                    self.assertEqual(storage.deleted, [])
 
     def test_promotion_failure_never_returns_approved(self):
         with tempfile.TemporaryDirectory() as directory:
