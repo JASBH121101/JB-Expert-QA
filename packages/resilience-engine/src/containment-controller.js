@@ -682,7 +682,11 @@ export function createA2ContainmentController({
     return { ok: true, verification, forensicReceipt };
   }
 
-  async function runContainment({ readiness, scope: rawScope, profileId, evidenceRefs } = {}, markProviderStartRecorded) {
+  async function runContainment(
+    { readiness, scope: rawScope, profileId, evidenceRefs } = {},
+    markLedgerAttempted,
+    markProviderStartRecorded
+  ) {
     if (!enableExecution) return makeResult("disabled", "a2-execution-disabled");
     let scope;
     let refs;
@@ -729,6 +733,7 @@ export function createA2ContainmentController({
       return makeResult("denied", "a2-policy-authorization-invalid");
     }
 
+    markLedgerAttempted();
     const reserved = await reserveResources(action, scope, profileId, idempotencyKey);
     if (!reserved.ok) {
       const authorizationFinalized = await completeAuthorization(
@@ -914,7 +919,11 @@ export function createA2ContainmentController({
     return result;
   }
 
-  async function runReleaseContainment({ containment, reasonCode } = {}, markProviderStartRecorded) {
+  async function runReleaseContainment(
+    { containment, reasonCode } = {},
+    markLedgerAttempted,
+    markProviderStartRecorded
+  ) {
     if (!enableExecution) return makeResult("disabled", "a2-execution-disabled");
     const record = CONTAINMENT_RESULTS.get(containment);
     if (!record || record.state !== "contained") {
@@ -941,6 +950,7 @@ export function createA2ContainmentController({
       if (authorization) await completeAuthorization(authorization, "failed");
       return makeResult("denied", "a2-release-authorization-denied");
     }
+    markLedgerAttempted();
     const reserved = await reserveResources(action, scope, profileId, idempotencyKey);
     if (!reserved.ok) {
       await completeAuthorization(authorization, "failed");
@@ -1124,28 +1134,38 @@ export function createA2ContainmentController({
   }
 
   async function executeContainment(input = {}) {
+    let ledgerAttempted = false;
     let providerStartRecorded = false;
     try {
-      return await runContainment(input, () => { providerStartRecorded = true; });
+      return await runContainment(
+        input,
+        () => { ledgerAttempted = true; },
+        () => { providerStartRecorded = true; }
+      );
     } catch {
+      const held = ledgerAttempted || providerStartRecorded;
       return makeResult(
-        providerStartRecorded ? "held-for-reconciliation" : "denied",
-        providerStartRecorded
-          ? "a2-post-start-execution-state-unknown"
+        held ? "held-for-reconciliation" : "denied",
+        held ? "a2-ledger-or-post-start-execution-state-unknown"
           : "a2-execution-prerequisite-failed"
       );
     }
   }
 
   async function releaseContainment(input = {}) {
+    let ledgerAttempted = false;
     let providerStartRecorded = false;
     try {
-      return await runReleaseContainment(input, () => { providerStartRecorded = true; });
+      return await runReleaseContainment(
+        input,
+        () => { ledgerAttempted = true; },
+        () => { providerStartRecorded = true; }
+      );
     } catch {
+      const held = ledgerAttempted || providerStartRecorded;
       return makeResult(
-        providerStartRecorded ? "held-for-reconciliation" : "denied",
-        providerStartRecorded
-          ? "a2-post-start-release-state-unknown"
+        held ? "held-for-reconciliation" : "denied",
+        held ? "a2-ledger-or-post-start-release-state-unknown"
           : "a2-release-prerequisite-failed"
       );
     }
