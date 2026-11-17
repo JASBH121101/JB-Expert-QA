@@ -88,3 +88,5 @@ The provider signature bundle now has a second-stage verifier for every referenc
 ## A3 closeout plan — still non-executable
 
 The current PostgreSQL lease/fencing target protects state stored in that same PostgreSQL primary only. A3 still needs an independent external monitor with a defined quorum/failure model, source-side fencing, target-enforced monotonic fencing for every promoted resource, replication/RPO verification, dependency readiness, a concrete traffic-cutover provider, independently tested rollback, post-cutover verification, durable budget/idempotency/audit and split-brain/fault-injection tests. A single database lease is not quorum and cannot prove that the old writer is fenced. Until every control is implemented and tested against the actual target provider, policy authorization must continue to deny `switch-route` and `failover`.
+
+Implementation contract: see [A2/A3 execution adapter contracts v1](./CONTINUITY-EXECUTION-ADAPTER-CONTRACTS-V1.md) for typed provider interfaces, lifecycle ordering, unknown-outcome handling, rollback boundaries and provider-specific certification tests.
