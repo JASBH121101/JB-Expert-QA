@@ -41,12 +41,14 @@ class SecurityGuardRateLimitMiddleware:
         self.identity_resolver = identity_resolver
         if not isinstance(excluded_extensions, (tuple, frozenset)) or len(excluded_extensions) > 32:
             raise ValueError("excluded_extensions must be a bounded tuple or frozenset")
-        normalized_extensions = tuple(item.lower() for item in excluded_extensions)
         if any(
             not isinstance(item, str) or len(item) < 2 or len(item) > 12
             or not item.startswith(".") or "/" in item or "\\\\" in item
-            for item in normalized_extensions
-        ) or len(set(normalized_extensions)) != len(normalized_extensions):
+            for item in excluded_extensions
+        ):
+            raise ValueError("excluded_extensions must contain file extensions such as .css or .webp")
+        normalized_extensions = tuple(item.lower() for item in excluded_extensions)
+        if len(set(normalized_extensions)) != len(normalized_extensions):
             raise ValueError("excluded_extensions must contain unique extensions such as .css or .webp")
         if not isinstance(excluded_prefixes, tuple) or len(excluded_prefixes) > 32:
             raise ValueError("excluded_prefixes must be a bounded tuple")
