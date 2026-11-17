@@ -664,7 +664,7 @@ test("A2 persists exact pending recovery data before provider start and verifies
   assert.equal(created.schema, "jb.resilience.a2-recovery-record/v1");
   assert.equal(created.claimId, "claim-1");
   assert.equal(created.action, "apply-containment-profile");
-  assert.deepEqual(created.scope, SCOPE);
+  assert.deepEqual({ ...created.scope }, SCOPE);
   assert.equal(created.profileId, deps.profileId);
   assert.equal(created.providerId, "containment-provider-01");
   assert.equal(created.verifierId, "independent-control-plane-02");
