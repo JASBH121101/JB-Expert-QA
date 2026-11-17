@@ -174,7 +174,9 @@ function validateAuthorization(value, action, scope, profileId, now) {
       value.profileId !== profileId ||
       !sameScope(value, scope) ||
       !Number.isSafeInteger(value.issuedAtMs) ||
+      value.issuedAtMs < 0 ||
       !Number.isSafeInteger(value.expiresAtMs) ||
+      value.expiresAtMs < 0 ||
       value.issuedAtMs > now ||
       value.expiresAtMs <= now ||
       value.expiresAtMs <= value.issuedAtMs) {
@@ -558,10 +560,11 @@ export function createA2ContainmentController({
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
       const journal = await reconcileActionClaim(action, scope, profileId, idempotencyKey);
       if (journal.state === "claimed") {
-        const finalized = await completeAction(journal.claimId, "not-applied", "provider-not-started");
+        // The claim may belong to a concurrent owner. Without a valid claim
+        // receipt from this call, never cancel another process's live lease.
         return {
-          ok: false, hold: !finalized,
-          reason: finalized ? "action-claim-reconciled-before-provider" : "action-claim-finalization-failed"
+          ok: false, hold: true,
+          reason: "existing-action-claim-not-owned-by-this-invocation"
         };
       }
       if (journal.state === "not-found") return { ok: false, reason: "action-claim-not-recorded" };
