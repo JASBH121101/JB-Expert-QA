@@ -12,7 +12,8 @@ import {
   evaluateA2ProviderReadiness,
   verifyA2EvidenceReferences,
   verifyA2ProviderEvidenceBundle,
-  createA2ContainmentController
+  createA2ContainmentController,
+  createA2RecoveryCoordinator
 } from "../src/index.js";
 import {
   createMemoryTrustedSignalStore,
@@ -205,6 +206,8 @@ function createDependencies({
   forensicOperationIdOverride = null,
   forensicReferenceDigestOverride = null,
   clockThrowsAfterProviderStart = false,
+  clockThrowsAfterPendingRecord = false,
+  skipRecoveryRecordPersist = false,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -214,6 +217,8 @@ function createDependencies({
   let actionStage = "not-found";
   let budgetStage = "not-found";
   let clockFailed = false;
+  const pendingRecords = new Map();
+  const pendingTransitions = [];
   const effectiveClock = () => {
     if (clockFailed) throw new Error("clock unavailable after provider-start marker");
     return clock();
@@ -358,7 +363,7 @@ function createDependencies({
       return { recorded: true };
     }
   };
-  const controller = createA2ContainmentController({
+  const actionLedger = {
     enableExecution: true,
     policyAuthority,
     containmentProvider: provider,
@@ -412,6 +417,31 @@ function createDependencies({
     },
     actionLedger: {
       durable: true,
+      async createPendingRecord(input) {
+        events.push("pending-create:" + input.record.action);
+        if (pendingRecords.has(input.record.claimId)) return { created: false };
+        pendingRecords.set(input.record.claimId, { ...input.record });
+        pendingTransitions.push({ claimId: input.record.claimId, state: "claimed", record: { ...input.record } });
+        if (clockThrowsAfterPendingRecord) clockFailed = true;
+        return { created: true };
+      },
+      async listPending(input) {
+        events.push("pending-list");
+        const claimIds = [...pendingRecords.values()]
+          .filter((record) => ["claimed", "provider-started", "held-for-reconciliation"].includes(record.state))
+          .map((record) => record.claimId);
+        const offset = input.cursor === null ? 0 : Number(input.cursor);
+        const page = claimIds.slice(offset, offset + input.limit);
+        const nextOffset = offset + page.length;
+        return { claimIds: page, nextCursor: nextOffset < claimIds.length ? String(nextOffset) : null };
+      },
+      async getPendingByClaimId(input) {
+        events.push("pending-get:" + input.claimId);
+        const record = pendingRecords.get(input.claimId);
+        return record
+          ? { found: true, record: { ...record } }
+          : { found: false, record: null };
+      },
       async claim(input) {
         events.push("action-claim:" + input.action);
         const mode = input.action === "release-containment" ? releaseClaimMode : actionClaimMode;
@@ -430,10 +460,24 @@ function createDependencies({
         const mode = input.action === "release-containment" ? releaseStartMode : providerStartMode;
         if (mode === "hang") {
           actionStage = "provider-started";
+          if (!skipRecoveryRecordPersist && input.recoveryRecord) {
+            pendingRecords.set(input.claimId, { ...input.recoveryRecord });
+            pendingTransitions.push({
+              claimId: input.claimId, state: "provider-started",
+              record: { ...input.recoveryRecord }
+            });
+          }
           return new Promise(() => {});
         }
         if (mode === "deny") return { started: false };
         actionStage = "provider-started";
+        if (!skipRecoveryRecordPersist && input.recoveryRecord) {
+          pendingRecords.set(input.claimId, { ...input.recoveryRecord });
+          pendingTransitions.push({
+            claimId: input.claimId, state: "provider-started",
+            record: { ...input.recoveryRecord }
+          });
+        }
         if (clockThrowsAfterProviderStart && input.action === "apply-containment-profile") {
           clockFailed = true;
         }
@@ -449,7 +493,25 @@ function createDependencies({
       },
       async complete(input) {
         events.push("action-complete:" + input.outcome);
-        actionStage = input.outcome === "held-for-reconciliation" ? "completed" : "completed";
+        actionStage = "completed";
+        const pending = pendingRecords.get(input.claimId);
+        if (pending) {
+          if (input.outcome === "held-for-reconciliation") {
+            const heldRecord = {
+              ...pending,
+              state: "held-for-reconciliation",
+              updatedAtMs: input.completedAtMs
+            };
+            pendingRecords.set(input.claimId, heldRecord);
+            pendingTransitions.push({
+              claimId: input.claimId, state: "held-for-reconciliation",
+              record: { ...heldRecord }
+            });
+          } else {
+            pendingRecords.delete(input.claimId);
+            pendingTransitions.push({ claimId: input.claimId, state: "terminal-removed" });
+          }
+        }
         return { completed: true };
       }
     },
@@ -470,7 +532,12 @@ function createDependencies({
     clock: effectiveClock,
     operationTimeoutMs: 500
   });
-  return { controller, events, profileId };
+  const recoveryJournal = {
+    durable: true,
+    listPending: (...args) => actionLedger.listPending(...args),
+    getPendingByClaimId: (...args) => actionLedger.getPendingByClaimId(...args)
+  };
+  return { controller, events, profileId, actionLedger: recoveryJournal, pendingRecords, pendingTransitions };
 }
 
 test("A2 controller defaults to disabled and never treats readiness as execution permission", async () => {
