@@ -953,7 +953,16 @@ export function createA2ContainmentController({
     markLedgerAttempted();
     const reserved = await reserveResources(action, scope, profileId, idempotencyKey);
     if (!reserved.ok) {
-      await completeAuthorization(authorization, "failed");
+      const authorizationFinalized = await completeAuthorization(
+        authorization, reserved.hold ? "unverified" : "failed"
+      );
+      if (reserved.hold || !authorizationFinalized) {
+        await appendAudit({
+          action, scope, profileId, outcome: "held-for-reconciliation",
+          reason: reserved.reason, idempotencyKey
+        });
+        return makeResult("held-for-reconciliation", reserved.reason);
+      }
       return makeResult("denied", reserved.reason);
     }
     const { claimId, reservationId } = reserved;
