@@ -34,6 +34,10 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
             }
         }
 
+        if (!@chmod($root, 0700) || ((fileperms($root) ?: 0) & 0077) !== 0) {
+            throw new RuntimeException('Private upload storage root permissions are not restrictive');
+        }
+
         $this->root = rtrim($root, DIRECTORY_SEPARATOR);
         $this->quarantineDirectory = $this->root . DIRECTORY_SEPARATOR . 'quarantine';
         $this->approvedDirectory = $this->root . DIRECTORY_SEPARATOR . 'approved';
