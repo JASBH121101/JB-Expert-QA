@@ -295,22 +295,24 @@ function createDependencies({
       events.push("verify-containment");
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
-        state: verificationState
+        state: verificationState,
+        operationId: input.operationReceipt.operationId
       });
     },
     async verifyRelease(input) {
       events.push("verify-release");
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
-        state: releaseVerificationState
+        state: releaseVerificationState,
+        operationId: input.operationReceipt.operationId
       });
     }
   };
-  function makeVerification({ verifierId, scope, profileId, state }) {
+  function makeVerification({ verifierId, scope, profileId, state, operationId }) {
     return {
       schema: "jb.resilience.a2-verification/v1",
       verifierId, verified: state === "contained" || state === "released",
-      state, ...scope, profileId,
+      state, ...scope, profileId, operationId,
       observedAtMs: NOW, expiresAtMs: NOW + 10_000
     };
   }
@@ -356,6 +358,7 @@ function createDependencies({
           ...input.scope,
           evidenceIds: ["forensic-record-01"],
           retentionPolicyId: input.retentionPolicyId,
+          referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex"),
           preservedAtMs: NOW,
           expiresAtMs: NOW + 100_000
         };
