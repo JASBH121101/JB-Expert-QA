@@ -788,12 +788,17 @@ export function createA2ContainmentController({
     action, scope, profileId, claimId, reservationId, authorization, reason
   }) {
     const budgetOkay = await settleBudget(reservationId, "not-applied");
-    const actionOkay = await completeAction(claimId, "not-applied", reason);
     const authOkay = await completeAuthorization(authorization, "failed");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "not-applied", reason
     });
-    return makeResult(budgetOkay && actionOkay && authOkay && auditOkay
+    const priorFinalizationOkay = budgetOkay && authOkay && auditOkay;
+    const actionOkay = await completeAction(
+      claimId,
+      priorFinalizationOkay ? "not-applied" : "held-for-reconciliation",
+      priorFinalizationOkay ? reason : "not-applied-finalization-incomplete"
+    );
+    return makeResult(priorFinalizationOkay && actionOkay
       ? "not-applied" : "held-for-reconciliation", reason);
   }
 
@@ -1058,7 +1063,6 @@ export function createA2ContainmentController({
     }
 
     const budgetOkay = await settleBudget(reservationId, "succeeded");
-    const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "contained",
@@ -1066,6 +1070,11 @@ export function createA2ContainmentController({
       verifierId,
       forensicEvidenceCount: verified.forensicReceipt.evidenceIds.length
     });
+    const actionOkay = await completeAction(
+      claimId,
+      budgetOkay && authorizationOkay && auditOkay ? "succeeded" : "held-for-reconciliation",
+      budgetOkay && authorizationOkay && auditOkay ? null : "success-finalization-incomplete"
+    );
     if (!budgetOkay || !actionOkay || !authorizationOkay || !auditOkay) {
       return makeResult("held-for-reconciliation", "success-finalization-incomplete", {
         operationReceipt
@@ -1313,12 +1322,16 @@ export function createA2ContainmentController({
     }
 
     const budgetOkay = await settleBudget(reservationId, "succeeded");
-    const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "released",
       operationId: releaseReceipt.operationId, verifierId
     });
+    const actionOkay = await completeAction(
+      claimId,
+      budgetOkay && authorizationOkay && auditOkay ? "succeeded" : "held-for-reconciliation",
+      budgetOkay && authorizationOkay && auditOkay ? null : "release-finalization-incomplete"
+    );
     if (!budgetOkay || !actionOkay || !authorizationOkay || !auditOkay) {
       return makeResult("held-for-reconciliation", "release-finalization-incomplete", {
         operationReceipt: releaseReceipt
