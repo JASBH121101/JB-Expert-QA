@@ -437,17 +437,17 @@ export function createA2ContainmentController({
       throw new TypeError(label + " must be durable for A2 execution");
     }
   }
-  if (enableExecution &&
-      ["createPendingRecord", "listPending", "getPendingByClaimId"].some(
-        (method) => typeof actionLedger[method] !== "function"
-      )) {
-    throw new TypeError("actionLedger must implement the durable A2 pending recovery journal");
-  }
   const providerId = assertIdentifier(containmentProvider.providerId, "containment providerId");
   const verifierId = assertIdentifier(independentVerifier.verifierId, "independent verifierId");
   const recorderId = assertIdentifier(forensicRecorder.recorderId, "forensic recorderId");
   if (providerId === verifierId) {
     throw new TypeError("containment executor and independent verifier must have distinct identities");
+  }
+  if (enableExecution &&
+      ["createPendingRecord", "listPending", "getPendingByClaimId"].some(
+        (method) => typeof actionLedger[method] !== "function"
+      )) {
+    throw new TypeError("actionLedger must implement the durable A2 pending recovery journal");
   }
 
   async function invokeDependency(owner, method, input, label) {
