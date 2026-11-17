@@ -189,9 +189,9 @@ function createDependencies({
   forensicValid = true,
   mutationTimeout = false,
   actionClaimMode = "normal",
-  actionReconcileState = "claimed",
+  actionReconcileState = "from-ledger",
   budgetReserveMode = "normal",
-  budgetReconcileState = "reserved",
+  budgetReconcileState = "from-ledger",
   providerStartMode = "normal",
   clock = () => NOW
 } = {}) {
@@ -396,9 +396,12 @@ function createDependencies({
       },
       async markProviderStarted() {
         events.push("action-mark-provider-started");
-        actionStage = providerStartMode === "normal" ? "provider-started" : "provider-started";
-        if (providerStartMode === "hang") return new Promise(() => {});
+        if (providerStartMode === "hang") {
+          actionStage = "provider-started";
+          return new Promise(() => {});
+        }
         if (providerStartMode === "deny") return { started: false };
+        actionStage = "provider-started";
         return { started: true };
       },
       async reconcile() {
@@ -592,8 +595,8 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     },
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
-    budgetLedger: { durable: false, reserve() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, complete() {} },
+    budgetLedger: { durable: false, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /must be durable/);
@@ -609,8 +612,8 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
       verifierId: "same", verifyContainment() {}, verifyRelease() {}
     },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
-    budgetLedger: { durable: true, reserve() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, complete() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);
