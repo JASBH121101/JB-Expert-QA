@@ -312,5 +312,6 @@ export {
   A2_PROVIDER_EVIDENCE_ROLES,
   createProviderEvidenceSigningPayload,
   createProviderEvidenceVerifier,
-  verifyA2ProviderEvidenceBundle
+  verifyA2ProviderEvidenceBundle,
+  verifyA2EvidenceReferences
 } from "./provider-evidence.js";
