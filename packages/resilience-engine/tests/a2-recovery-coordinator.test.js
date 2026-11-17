@@ -126,9 +126,11 @@ function createFixture({
       if (claimId !== record.claimId) return { found: false, record: null };
       return {
         found: true,
-        record: malformedRecord
-          ? { ...record, providerId: "unexpected-provider" }
-          : record
+        record: malformedRecord === "apply-original-operation"
+          ? { ...record, originalOperationId: "stale-operation-01" }
+          : malformedRecord
+            ? { ...record, providerId: "unexpected-provider" }
+            : record
       };
     }
   };
@@ -246,6 +248,16 @@ test("evidence digest mismatch blocks verifier and recovery success", async () =
 
 test("durable record identity mismatch remains held", async () => {
   const { coordinator, events } = createFixture({ malformedRecord: true });
+  const report = await coordinator.reconcilePending();
+  assert.equal(report.complete, false);
+  assert.equal(report.findings[0].reason, "durable-journal-record-missing-or-invalid");
+  assert.equal(events.includes("reconcile-apply"), false);
+});
+
+test("containment recovery rejects an unrelated prior operation ID", async () => {
+  const { coordinator, events } = createFixture({
+    malformedRecord: "apply-original-operation"
+  });
   const report = await coordinator.reconcilePending();
   assert.equal(report.complete, false);
   assert.equal(report.findings[0].reason, "durable-journal-record-missing-or-invalid");
