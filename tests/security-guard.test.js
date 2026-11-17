@@ -446,6 +446,28 @@ test("authentication fails closed when both account and client identity resolver
   assert.equal(events[0].action, "identity-rejected");
 });
 
+test("custom blocking mode fails closed on missing identity even when high severity is not configured", () => {
+  const guard = createSecurityGuard({ mode: "balanced", rateLimit: { enabled: false } });
+  const auth = guard.createAuthProtection({
+    identityKeyGenerator: () => null,
+    clientKeyGenerator: () => null,
+    mode: "custom",
+    blockSeverities: ["critical"]
+  });
+  let nextCalled = false;
+  const response = {
+    headersSent: false,
+    writableEnded: false,
+    setHeader() {},
+    end(body) { this.body = body; this.writableEnded = true; }
+  };
+
+  auth.middleware({ headers: {} }, response, () => { nextCalled = true; });
+  assert.equal(nextCalled, false);
+  assert.equal(response.statusCode, 503);
+  assert.equal(JSON.parse(response.body).error, "authentication_security_control_unavailable");
+});
+
 test("monitor mode records unavailable authentication identity without blocking or flooding events", () => {
   const events = [];
   const guard = createSecurityGuard({ mode: "monitor", rateLimit: { enabled: false } });
