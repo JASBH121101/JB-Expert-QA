@@ -803,7 +803,6 @@ export function createA2ContainmentController({
     }
 
     markProviderStartRecorded();
-    markProviderStartRecorded();
     const postMarkerAuthorization = await assertAuthorization(
       authorization, action, scope, profileId
     );
@@ -1021,6 +1020,7 @@ export function createA2ContainmentController({
         operationReceipt
       });
     }
+    markProviderStartRecorded();
     const postMarkerAuthorization = await assertAuthorization(
       authorization, action, scope, profileId
     );
