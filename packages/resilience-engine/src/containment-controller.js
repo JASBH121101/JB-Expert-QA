@@ -274,6 +274,25 @@ function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs, op
   } catch {
     return false;
   }
+
+  const evidenceIds = value.evidenceIds;
+  if (!Array.isArray(evidenceIds) || Object.getPrototypeOf(evidenceIds) !== Array.prototype ||
+      evidenceIds.length < 1 || evidenceIds.length > 128 ||
+      Object.getOwnPropertySymbols(evidenceIds).length !== 0 ||
+      Reflect.ownKeys(evidenceIds).length !== evidenceIds.length + 1) {
+    return false;
+  }
+  const seenEvidenceIds = new Set();
+  for (let index = 0; index < evidenceIds.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(evidenceIds, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value") ||
+        typeof descriptor.value !== "string" || !IDENTIFIER.test(descriptor.value) ||
+        seenEvidenceIds.has(descriptor.value)) {
+      return false;
+    }
+    seenEvidenceIds.add(descriptor.value);
+  }
+
   return value.schema === "jb.resilience.a2-forensic-receipt/v1" &&
     value.recorderId === recorderId &&
     value.retained === true &&
@@ -282,13 +301,6 @@ function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs, op
     IDENTIFIER.test(value.operationId) &&
     value.referencesSha256 === createHash("sha256").update(canonical(evidenceRefs), "utf8").digest("hex") &&
     sameScope(value, scope) &&
-    Array.isArray(value.evidenceIds) &&
-    value.evidenceIds.length > 0 &&
-    value.evidenceIds.length <= 128 &&
-    Object.getOwnPropertySymbols(value.evidenceIds).length === 0 &&
-    Object.keys(value.evidenceIds).length === value.evidenceIds.length &&
-    value.evidenceIds.every((id) => typeof id === "string" && IDENTIFIER.test(id)) &&
-    new Set(value.evidenceIds).size === value.evidenceIds.length &&
     typeof value.retentionPolicyId === "string" &&
     IDENTIFIER.test(value.retentionPolicyId) &&
     Number.isSafeInteger(value.preservedAtMs) &&
