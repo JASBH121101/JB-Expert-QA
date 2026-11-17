@@ -10,9 +10,11 @@ import {
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
 const DEFAULT_INGEST_TIMEOUT_MS = 30_000;
+const DEFAULT_BRIDGE_TIMEOUT_MS = 3_000;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_SCANNER_TIMEOUT_MS = 120_000;
 const MAX_INGEST_TIMEOUT_MS = 300_000;
+const MAX_BRIDGE_TIMEOUT_MS = 10_000;
 const MAX_SIGNATURE_BYTES = 8_192;
 
 const TYPE_DEFINITIONS = Object.freeze({
@@ -409,7 +411,7 @@ export function createUploadInspector(options = {}) {
   if (!isRecord(options)) throw new TypeError("upload inspector options must be an object");
 
   const allowedOptions = new Set([
-    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "allowedMimeTypes", "onEvent",
+    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "bridgeTimeoutMs", "allowedMimeTypes", "onEvent",
     "securityBridge", "coreContract", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
@@ -436,6 +438,11 @@ export function createUploadInspector(options = {}) {
     "ingestTimeoutMs",
     MAX_INGEST_TIMEOUT_MS
   );
+  const bridgeTimeoutMs = positiveInteger(
+    options.bridgeTimeoutMs ?? DEFAULT_BRIDGE_TIMEOUT_MS,
+    "bridgeTimeoutMs",
+    MAX_BRIDGE_TIMEOUT_MS
+  );
 
   const allowedMimeTypes = Object.freeze([...(options.allowedMimeTypes ?? Object.keys(TYPE_DEFINITIONS))]);
   if (!Array.isArray(allowedMimeTypes) ||
@@ -454,6 +461,13 @@ export function createUploadInspector(options = {}) {
   if (securityBridge !== null && (!isRecord(securityBridge) ||
       typeof securityBridge.submitAssessment !== "function")) {
     throw new TypeError("securityBridge must implement submitAssessment(input)");
+  }
+
+  async function submitBridgeAssessment(input) {
+    return runAdapterOperation(
+      () => securityBridge.submitAssessment(input),
+      bridgeTimeoutMs
+    );
   }
 
   async function inspect({ source, fileName, declaredMimeType, correlationId } = {}) {
@@ -578,7 +592,7 @@ export function createUploadInspector(options = {}) {
       if (scanResult.verdict === "malicious") {
         if (securityBridge) {
           try {
-            await securityBridge.submitAssessment({
+            await submitBridgeAssessment({
               correlationId,
               verdict: "block",
               severity: "critical",
@@ -595,7 +609,7 @@ export function createUploadInspector(options = {}) {
         retainQuarantine = true;
         if (securityBridge) {
           try {
-            await securityBridge.submitAssessment({
+            await submitBridgeAssessment({
               correlationId,
               verdict: "quarantine",
               severity: "high",
@@ -616,7 +630,7 @@ export function createUploadInspector(options = {}) {
       if (securityBridge) {
         let decision;
         try {
-          decision = await securityBridge.submitAssessment({
+          decision = await submitBridgeAssessment({
             correlationId,
             verdict: "pass",
             severity: "low",

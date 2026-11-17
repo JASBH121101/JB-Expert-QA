@@ -132,7 +132,8 @@ const uploads = createUploadInspector({
   store: privateQuarantineAdapter,
   scanner: malwareScannerAdapter,
   maxBytes: 5 * 1024 * 1024,
-  scannerTimeoutMs: 15_000
+  scannerTimeoutMs: 15_000,
+  bridgeTimeoutMs: 3_000
 });
 
 const approved = await uploads.inspect({
@@ -141,6 +142,8 @@ const approved = await uploads.inspect({
   declaredMimeType: upload.mimeType
 });
 ~~~
+
+Coordinated assessment calls are bounded by bridgeTimeoutMs (default 3 seconds, maximum 10 seconds). A bridge timeout fails a clean upload closed and leaves the object private in quarantine; a malicious verdict is rejected locally even when bridge reporting is unavailable.
 
 The storage adapter must create a private quarantine write stream, return a read stream for scanning, atomically promote only after a clean verdict, and delete rejected temporary objects. The scanner must consume the entire quarantined stream and return an explicit verdict plus engine and version. Timeouts, outages, malformed results, unknown verdicts and promotion errors never result in approval; uncertain objects remain private in quarantine.
 
