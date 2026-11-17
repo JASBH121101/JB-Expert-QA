@@ -210,6 +210,7 @@ function createDependencies({
   clockThrowsAfterPendingRecord = false,
   skipRecoveryRecordPersist = false,
   tamperPendingOperationId = false,
+  tamperPendingState = false,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -446,7 +447,9 @@ function createDependencies({
               found: true,
               record: tamperPendingOperationId && record.action === "apply-containment-profile"
                 ? { ...record, originalOperationId: "unrelated-operation-01" }
-                : { ...record }
+                : tamperPendingState
+                  ? { ...record, state: "succeeded" }
+                  : { ...record }
             }
           : { found: false, record: null };
       },
@@ -705,6 +708,17 @@ test("A2 persists exact pending recovery data before provider start and verifies
 test("A2 holds when its durable journal returns a prior operation ID for containment", async () => {
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
   const deps = createDependencies({ tamperPendingOperationId: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 rejects a terminal state returned from its pending recovery index", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ tamperPendingState: true });
   const result = await deps.controller.executeContainment({
     readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
   });
