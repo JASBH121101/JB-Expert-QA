@@ -919,3 +919,35 @@ test("A2 rejects an independent verifier receipt bound to a substituted evidence
   assert.equal(result.executed, false);
   assert.equal(result.reason, "independent-containment-verification-failed");
 });
+
+
+test("A2 refuses release when the independent release verifier binds a different operation", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({
+    releaseVerificationState: "released",
+    verificationOperationIdOverride: "different-release-operation"
+  });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+  const released = await deps.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(released.state, "held-for-reconciliation");
+  assert.equal(released.executed, false);
+  assert.equal(released.reason, "independent-release-verification-failed");
+});
+
+test("A2 refuses release when the pre-release verifier cannot bind the existing evidence set", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ verificationReferenceDigestOverride: "e".repeat(64) });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  // The same verifier fixture is also used for the current-state check. A
+  // mismatch there must keep the asset in containment and prevent release.
+  assert.equal(contained.state, "held-for-reconciliation");
+  assert.equal(contained.executed, false);
+  assert.equal(deps.events.includes("release"), false);
+});
