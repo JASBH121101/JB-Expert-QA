@@ -217,6 +217,7 @@ function createDependencies({
   let operationNumber = 0;
   let actionStage = "not-found";
   let budgetStage = "not-found";
+  const claimedIdempotencyKeys = new Set();
   let clockFailed = false;
   const pendingRecords = new Map();
   const pendingTransitions = [];
@@ -445,15 +446,20 @@ function createDependencies({
       },
       async claim(input) {
         events.push("action-claim:" + input.action);
+        if (claimedIdempotencyKeys.has(input.idempotencyKey)) {
+          return { claimed: false, claimId: null };
+        }
         const mode = input.action === "release-containment" ? releaseClaimMode : actionClaimMode;
         if (mode === "hang") {
           actionStage = "claimed";
+          claimedIdempotencyKeys.add(input.idempotencyKey);
           claimNumber += 1;
           return new Promise(() => {});
         }
         if (mode === "deny") return { claimed: false, claimId: null };
         claimNumber += 1;
         actionStage = "claimed";
+        claimedIdempotencyKeys.add(input.idempotencyKey);
         return { claimed: true, claimId: "claim-" + claimNumber };
       },
       async markProviderStarted(input) {
@@ -643,6 +649,22 @@ test("A2 executes only after policy authorization, budget claim, bounded preflig
     containment: contained, reasonCode: "owner-release-approved"
   });
   assert.equal(repeatedRelease.state, "denied");
+});
+
+test("A2 concurrent duplicate requests with the same idempotency key cannot apply twice", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies();
+  const input = {
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  };
+  const results = await Promise.all([
+    deps.controller.executeContainment(input),
+    deps.controller.executeContainment(input)
+  ]);
+  assert.equal(results.filter((result) => result.state === "contained").length, 1);
+  assert.equal(deps.events.filter((event) => event === "apply").length, 1);
+  assert.equal(deps.events.filter((event) => event === "action-claim:apply-containment-profile").length, 2);
+  assert.equal(results.some((result) => result.state === "held-for-reconciliation"), true);
 });
 
 test("A2 persists exact pending recovery data before provider start and verifies the atomic transition", async () => {
