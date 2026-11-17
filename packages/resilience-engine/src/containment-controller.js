@@ -976,6 +976,30 @@ export function createA2ContainmentController({
       ...preserved.value,
       evidenceIds: Object.freeze([...preserved.value.evidenceIds])
     });
+    if (!await appendAudit({
+      action, scope, profileId, outcome: "provider-start-authorized", idempotencyKey
+    })) {
+      return finishNotApplied({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "durable-audit-unavailable-before-release"
+      });
+    }
+    const releaseStartMarker = await markProviderStarted(
+      claimId, action, scope, profileId, idempotencyKey
+    );
+    if (!releaseStartMarker.started) {
+      if (releaseStartMarker.safeNotStarted) {
+        return finishNotApplied({
+          action, scope, profileId, claimId, reservationId, authorization,
+          reason: "release-start-not-recorded"
+        });
+      }
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: releaseStartMarker.reason ?? "release-start-state-unknown",
+        operationReceipt
+      });
+    }
     const release = await invokeBounded(
       containmentProvider.release.bind(containmentProvider),
       { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
