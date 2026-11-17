@@ -209,7 +209,7 @@ test("A1 restart is not granted to stateful, critical or data-bearing services",
   }
 });
 
-test("A2 and A3 are denied until their independent signal and failover control planes are certified", () => {
+test("A2 and A3 remain denied until trusted A2 authorization and the A3 failover control plane are certified", () => {
   const containment = makePolicy();
   containment.services[0].allowedActions = ["apply-containment-profile"];
   containment.services[0].recovery = null;
@@ -218,7 +218,10 @@ test("A2 and A3 are denied until their independent signal and failover control p
   const containmentEngine = makeEngine(containment);
   assert.equal(containmentEngine.evaluate({
     ...REQUEST, action: "apply-containment-profile", securityState: "confirmed"
-  }).reason, "trusted-signal-gateway-not-certified");
+  }).reason, "a2-trusted-evidence-context-required");
+  assert.equal(containmentEngine.evaluate({
+    ...REQUEST, action: "apply-containment-profile", securityState: "unknown"
+  }).reason, "confirmed-security-verdict-required");
 
   const failover = makePolicy();
   failover.services[0].allowedActions = ["failover"];
