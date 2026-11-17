@@ -103,6 +103,42 @@ jobs:
       - name: Run Advisor Engine syntax, domain, evidence and recommendation tests
         run: npm run check --workspace @jb/advisor-engine
 
+  language-qa:
+    name: Language QA tests / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Check Language QA source syntax
+        run: |
+          node --check src/language/locale.js
+          node --check src/language/placeholders.js
+          node --check src/language/php-array-parser.js
+          node --check src/language/glossary.js
+          node --check src/language/translation-memory.js
+          node --check src/language/review.js
+          node --check src/language/audit.js
+          node --check src/adapters/filesystem/audit-language.js
+          node --check src/specialists/language/index.js
+          node --check src/language-cli.js
+          node --check src/adapters/filesystem/audit-project.js
+          node --check src/index.js
+      - name: Run Language QA regression tests
+        run: node --test tests/language-qa-engine.test.js
+
   expert-qa-package-cross-platform:
     name: Expert QA package / ${{ matrix.os }} / Node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
