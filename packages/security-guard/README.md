@@ -51,8 +51,9 @@ The default mode is `monitor` to reduce deployment risk. Blocking is opt-in.
 - Header count and byte limits.
 - Content-Length limit before body parsing.
 - Per-process, in-memory request rate limiting.
-- GET/HEAD requests for common static CSS, JavaScript, image, font, and source-map extensions are excluded from the rate-limit counter by default; request-threat inspection still runs.
-- The static extension exclusion can be customized with `rateLimit.excludedExtensions`; set it to an empty array to disable extension-based exclusions.
+- GET/HEAD requests are excluded from the rate-limit counter only when both conditions match: a configured static directory (`/assets/`, `/static/`, `/media/`, `/images/`, or `/fonts/` by default) and an allowed static extension. Request-threat inspection still runs.
+- A dynamic route such as `/api/catalog.js` or `/reports/export.pdf` does not bypass rate limiting just because its path ends in a static-looking extension.
+- Customize `rateLimit.excludedExtensions` and `rateLimit.excludedPrefixes` for the host application. Set either list to an empty array to disable that exclusion dimension.
 - Sanitized incident events without query strings, header values, cookies, request bodies, or client IP addresses by default.
 
 ## Brute-force protection for authentication routes
