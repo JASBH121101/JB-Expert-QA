@@ -121,6 +121,10 @@ if [ "$1" = "--version" ]; then
   printf '%s\n' 'ClamAV 1.4.2'
   exit 0
 fi
+if [ -n "$JB_TEST_CLAMAV_TIMEOUT" ]; then
+  sleep 2
+  exit 0
+fi
 if [ -n "$JB_TEST_CLAMAV_MALICIOUS" ]; then
   printf '%s\n' "$3: Eicar-Signature FOUND"
   exit 1
@@ -158,6 +162,15 @@ SH;
             putenv('JB_TEST_CLAMAV_UNKNOWN');
         }
         expect(($unknownResult['verdict'] ?? null) === 'unknown', 'ClamAV adapter must fail closed for scanner errors');
+
+        $timeoutClamAv = new ClamAvScanner($fakeClamAv, 100);
+        putenv('JB_TEST_CLAMAV_TIMEOUT=1');
+        try {
+            $timeoutResult = $timeoutClamAv->scan($sourcePath);
+        } finally {
+            putenv('JB_TEST_CLAMAV_TIMEOUT');
+        }
+        expect(($timeoutResult['verdict'] ?? null) === 'unknown', 'ClamAV adapter must fail closed when the scanner times out');
 
         $publicRootRejected = false;
         try {
