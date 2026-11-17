@@ -10,15 +10,15 @@ The selected target profile is **autonomous-advanced**. The runtime descriptor r
 
 - Validated, server-owned service allowlist.
 - Bounded recovery policy: failure threshold, restart limit and cooldown. The health monitor continues recording observations at its own attempt cap while suppressing further recovery proposals.
-- Recovery proposals contain random IDs/nonces and expire after 60 seconds. Expiry is checked after asynchronous approval, before the durable claim, and again immediately before adapter invocation.
+- Recovery proposals contain random IDs/nonces and expire after 60 seconds. Expiry is checked after asynchronous approval, before the durable claim, and again immediately before adapter invocation. OS restart and service-verification adapter calls are bounded by `adapterTimeoutMs` (100–60,000 ms) and receive an `AbortSignal`; a timeout or ambiguous adapter exception is recorded as `unverified`, consumes the claimed attempt and is never retried automatically.
 - Atomic recovery claims prevent reuse of the same proposal and enforce the policy restart limit across engine instances when a shared durable store is configured.
 - Built-in JSON file ledger uses exclusive lock creation, bounded lock waits, dead-process lock recovery, restrictive file modes, write-to-temp + fsync + atomic rename, bounded history, and fail-closed validation. It is a single-host store, not a distributed database.
 - A memory-only ledger remains available for tests and development. Production configurations should set \`requireDurableStore: true\` and inject \`createFileRecoveryStore(...)\` or a host-provided transactional store.
 - Automatic execution is limited to explicitly allowlisted, non-critical services.
 - Critical services require an injected human-approval verifier. The host verifier must validate a signed approval bound to the exact proposal ID, nonce, service, action, issue/expiry times and authorized human subject; it must also enforce durable one-time replay protection.
 - Linux systemd and Windows Service Control Manager adapters use fixed executables, fixed argument shapes, shell disabled, and caller-injected command runners. Windows recovery waits for SCM \`STOPPED\` before issuing \`start\`, then confirms \`RUNNING\` with a bounded timeout.
-- Built-in adapters expose \`verifyService()\`; the engine can also run a host-owned application health check. Set \`requireHealthVerification: true\` to refuse configurations without at least one verifier.
-- Execution and recovery outcome are reported separately: a restart command may execute successfully while the service remains unhealthy. A failed post-recovery check is recorded as \`verification-failed\`.
+- Built-in adapters expose `verifyService()`; the engine can also run a host-owned application health check. Set `requireHealthVerification: true` to refuse configurations without at least one verifier. Adapter timeouts, thrown errors and malformed health responses remain `unverified`; only an explicit unhealthy result is recorded as `verification-failed`.
+- Execution and recovery outcome are reported separately: a restart command may execute successfully while the service remains unhealthy. An adapter timeout means the OS operation may have started but was not confirmed; the durable attempt remains consumed for reconciliation instead of risking a duplicate restart.
 - A host-provided active Security Guard/Malware Engine threat or tamper signal suspends recovery. Resilience never overwrites binaries or attempts file repair.
 
 ## Durable recovery ledger

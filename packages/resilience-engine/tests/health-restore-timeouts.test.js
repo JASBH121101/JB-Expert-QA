@@ -86,7 +86,7 @@ test("critical approval verification is bounded and abort signal is raised on ti
   assert.equal(restarts, 0);
 });
 
-test("application health verification is bounded and records an unsuccessful recovery", async () => {
+test("application health verification timeout stays unknown and consumes the recovery attempt", async () => {
   let observedSignal;
   const engine = createResilienceEngine({
     policy: nonCriticalPolicy,
@@ -108,8 +108,12 @@ test("application health verification is bounded and records an unsuccessful rec
   }).proposal;
   const result = await engine.executeRecovery({ proposal });
   assert.equal(result.executed, true);
-  assert.equal(result.recovered, false);
-  assert.equal(result.reason, "post-recovery-health-check-failed");
+  assert.equal(result.verified, false);
+  assert.equal(result.recovered, null);
+  assert.equal(result.reason, "post-recovery-health-check-unavailable");
   assert.equal(result.ledgerRecorded, true);
   assert.equal(observedSignal.aborted, true);
+  const state = await engine.recoveryStore.getServiceState("catalog-api.service");
+  assert.equal(state.attemptCount, 1);
+  assert.equal(state.lastStatus, "unverified");
 });
