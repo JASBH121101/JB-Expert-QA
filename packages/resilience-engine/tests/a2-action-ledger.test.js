@@ -192,7 +192,7 @@ test("provider start atomically transitions the action claim and its pending rec
   });
 });
 
-test("provider start rejects a stale claim and never permits a second transition", async () => {
+test("provider start rejects an expired claim without changing its durable state", async () => {
   await withTempDirectory(async (directory) => {
     const store = createStore(join(directory, "a2-actions.json"));
     const claim = await claimAndCreateRecord(store, { expiresAt: NOW + 3 });
@@ -206,8 +206,27 @@ test("provider start rejects a stale claim and never permits a second transition
       profileId: PROFILE_ID, idempotencyKey: claim.idempotencyKey,
       recoveryRecord, atMs: NOW + 4
     }), { started: false });
-    const retry = await markStarted(store, claim);
-    assert.deepEqual(retry.result, { started: false });
+    const exact = await store.getPendingByClaimId({ claimId: claim.claimId, atMs: NOW + 4 });
+    assert.equal(exact.found, true);
+    assert.equal(exact.record.state, "claimed");
+    assert.deepEqual(await store.reconcile({
+      action: claim.record.action, scope: SCOPE, profileId: PROFILE_ID,
+      idempotencyKey: claim.idempotencyKey, atMs: NOW + 4
+    }), { state: "claimed", claimId: claim.claimId });
+  });
+});
+
+test("provider-start transition can never be repeated for an existing claim", async () => {
+  await withTempDirectory(async (directory) => {
+    const store = createStore(join(directory, "a2-actions.json"));
+    const claim = await claimAndCreateRecord(store);
+    const started = await markStarted(store, claim);
+    assert.deepEqual(started.result, { started: true });
+    assert.deepEqual(await store.markProviderStarted({
+      claimId: claim.claimId, action: claim.record.action, scope: SCOPE,
+      profileId: PROFILE_ID, idempotencyKey: claim.idempotencyKey,
+      recoveryRecord: started.recoveryRecord, atMs: started.atMs + 1
+    }), { started: false });
   });
 });
 
