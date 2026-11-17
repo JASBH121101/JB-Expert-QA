@@ -185,7 +185,8 @@ function createDependencies({
   releaseVerificationState = "released",
   blockMutationAt = null,
   denyAuthorization = false,
-  auditFails = false
+  auditFails = false,
+  forensicValid = true
 } = {}) {
   const events = [];
   let claimNumber = 0;
@@ -332,7 +333,7 @@ function createDependencies({
         return {
           schema: "jb.resilience.a2-forensic-receipt/v1",
           recorderId: "forensic-vault-01",
-          retained: true,
+          retained: forensicValid,
           ...input.scope,
           evidenceIds: ["forensic-record-01"],
           retentionPolicyId: input.retentionPolicyId,
@@ -496,9 +497,12 @@ test("A2 never reports containment when the independent verifier or forensic rec
   assert.equal(first.state, "held-for-reconciliation");
   assert.equal(first.executed, false);
 
-  const forensicFailure = createDependencies();
-  const original = forensicFailure.controller;
-  assert.equal(typeof original.executeContainment, "function");
+  const forensicFailure = createDependencies({ forensicValid: false });
+  const second = await forensicFailure.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: forensicFailure.profileId, evidenceRefs
+  });
+  assert.equal(second.state, "held-for-reconciliation");
+  assert.equal(second.executed, false);
 });
 
 test("A2 blocks when mutation control or policy authorization denies the operation", async () => {
@@ -521,6 +525,21 @@ test("A2 blocks when mutation control or policy authorization denies the operati
 test("A2 refuses non-durable ledgers and executor/verifier identity collisions", () => {
   const { controller } = createDependencies();
   assert.equal(controller.enabled, true);
+  assert.throws(() => createA2ContainmentController({
+    enableExecution: true,
+    policyAuthority: {
+      authorize() {}, assertAuthorization() {}, completeAuthorization() {}
+    },
+    containmentProvider: {
+      providerId: "p", preflight() {}, apply() {}, reconcile() {}, release() {}, reconcileRelease() {}
+    },
+    independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
+    forensicRecorder: { recorderId: "f", preserveEvidence() {} },
+    budgetLedger: { durable: false, reserve() {}, settle() {} },
+    actionLedger: { durable: true, claim() {}, complete() {} },
+    auditStore: { durable: true, append() {} },
+    mutationControl: { assertAllowed() {} }
+  }), /must be durable/);
   assert.throws(() => createA2ContainmentController({
     enableExecution: true,
     policyAuthority: {
