@@ -114,6 +114,51 @@ function runUploadInspectionTests(): void
         $unavailable = $missingClamAv->scan($sourcePath);
         expect(($unavailable['verdict'] ?? null) === 'unknown', 'Missing ClamAV must fail closed as an unknown verdict');
 
+        $fakeClamAv = $base . DIRECTORY_SEPARATOR . 'fake-clamscan';
+        $fakeScript = <<<'SH'
+#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '%s\\n' 'ClamAV 1.4.2'
+  exit 0
+fi
+if [ -n "$JB_TEST_CLAMAV_MALICIOUS" ]; then
+  printf '%s\\n' "$3: Eicar-Signature FOUND"
+  exit 1
+fi
+if [ -n "$JB_TEST_CLAMAV_UNKNOWN" ]; then
+  printf '%s\\n' 'scanner internal error'
+  exit 2
+fi
+printf '%s\\n' "$3: OK"
+exit 0
+SH;
+        if (file_put_contents($fakeClamAv, $fakeScript) !== strlen($fakeScript) || !@chmod($fakeClamAv, 0700)) {
+            throw new RuntimeException('Fake ClamAV test executable could not be prepared');
+        }
+
+        $cleanClamAv = new ClamAvScanner($fakeClamAv);
+        $cleanResult = $cleanClamAv->scan($sourcePath);
+        expect(($cleanResult['verdict'] ?? null) === 'clean', 'ClamAV adapter must accept an explicit clean result');
+        expect(($cleanResult['version'] ?? null) === '1.4.2', 'ClamAV adapter must capture a bounded engine version');
+
+        $maliciousClamAv = new ClamAvScanner($fakeClamAv);
+        putenv('JB_TEST_CLAMAV_MALICIOUS=1');
+        try {
+            $maliciousResult = $maliciousClamAv->scan($sourcePath);
+        } finally {
+            putenv('JB_TEST_CLAMAV_MALICIOUS');
+        }
+        expect(($maliciousResult['verdict'] ?? null) === 'malicious', 'ClamAV adapter must reject a FOUND result');
+
+        $unknownClamAv = new ClamAvScanner($fakeClamAv);
+        putenv('JB_TEST_CLAMAV_UNKNOWN=1');
+        try {
+            $unknownResult = $unknownClamAv->scan($sourcePath);
+        } finally {
+            putenv('JB_TEST_CLAMAV_UNKNOWN');
+        }
+        expect(($unknownResult['verdict'] ?? null) === 'unknown', 'ClamAV adapter must fail closed for scanner errors');
+
         $publicRootRejected = false;
         try {
             new LocalPrivateUploadStore($publicRoot, $publicRoot);
