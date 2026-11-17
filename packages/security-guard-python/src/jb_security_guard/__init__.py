@@ -10,6 +10,8 @@ from .core_v1 import (
 
 __all__ = [
     "UniversalRateLimitClient",
+    "UploadInspectionError",
+    "UploadInspectionService",
     "create_rate_limit_counter_key",
     "derive_identity_key",
     "normalize_rate_limit_check",
