@@ -106,6 +106,9 @@ Events contain only a rule ID, scope names, timestamp, action, severity, and coo
 - `monitor` records a would-be lockout but does not reject authentication requests.
 - `balanced` and `strict` enforce high-severity authentication throttles.
 - `custom` enforces the throttle only when `high` is included in `blockSeverities`.
+- In every enforcing mode (balanced, strict, or custom), if both the account and client identity resolvers are unavailable, authentication is rejected with a generic HTTP 503 before the route handler runs. This is treated as a critical control-integrity failure and is not weakened by the custom severity filter.
+- Explicit monitor mode preserves request flow when both identities are unavailable, but increments the identity-coverage counters and emits a sanitized `JBG-AUTH-IDENTITY-001` event once per protector instance to avoid event flooding. Raw identities and resolver exception details are never included.
+- Configure independent, trusted account and client identity sources. Never use passwords, tokens, session secrets, or untrusted forwarding headers as identity keys. This protection remains process-local; multiple instances still require a shared atomic authentication-failure store.
 - The resolver is application-specific and must be explicitly configured.
 - This first version is process-local. Multiple app instances require a shared atomic store before treating limits as global.
 - Account-level throttling is intentionally short to limit account-denial-of-service risk. Applications should also use MFA or step-up verification for high-risk accounts.

@@ -146,8 +146,11 @@ export function createAuthProtection(options = {}) {
     failures: 0,
     lockouts: 0,
     blocked: 0,
-    observed: 0
+    observed: 0,
+    identityUnavailable: 0,
+    unattributedFailures: 0
   };
+  let identityUnavailableEventEmitted = false;
 
   function readNow() {
     const now = clock();
@@ -175,10 +178,13 @@ export function createAuthProtection(options = {}) {
       // Ignore a failing client resolver and keep any available account scope.
     }
 
+    const accountKey = account ? digest("account", account) : null;
+    const clientKey = client ? digest("ip", client) : null;
     return {
-      account: account ? digest("account", account) : null,
-      ip: client ? digest("ip", client) : null,
-      accountIp: account && client ? digest("account-ip", account + "\0" + client) : null
+      account: accountKey,
+      ip: clientKey,
+      accountIp: account && client ? digest("account-ip", account + "\0" + client) : null,
+      identityUnavailable: accountKey === null && clientKey === null
     };
   }
 
@@ -250,7 +256,11 @@ export function createAuthProtection(options = {}) {
 
   function statusFor(request) {
     const now = readNow();
-    return getActiveStatus(getKeys(request), now);
+    const keys = getKeys(request);
+    return {
+      ...getActiveStatus(keys, now),
+      identityUnavailable: keys.identityUnavailable
+    };
   }
 
   function recordFailure(request) {
@@ -259,6 +269,11 @@ export function createAuthProtection(options = {}) {
     }
     const now = readNow();
     const keys = getKeys(request);
+    if (keys.identityUnavailable) {
+      // Count the attempt without assigning it to a misleading account or client bucket.
+      stats.failures += 1;
+      stats.unattributedFailures += 1;
+    }
     const triggered = [];
     const active = [];
 
@@ -300,7 +315,8 @@ export function createAuthProtection(options = {}) {
       enforced: latest.blocked && enforced,
       retryAfterMs: latest.retryAfterMs,
       retryAfterSeconds: latest.blocked ? Math.max(1, Math.ceil(latest.retryAfterMs / 1000)) : 0,
-      scopes: Object.freeze([...new Set([...active, ...latest.scopes])])
+      scopes: Object.freeze([...new Set([...active, ...latest.scopes])]),
+      identityUnavailable: keys.identityUnavailable
     });
 
     if (triggered.length > 0) {
@@ -363,7 +379,46 @@ export function createAuthProtection(options = {}) {
       throw new TypeError("Authentication middleware requires (request, response, next)");
     }
     const status = statusFor(request);
+    // Missing identity attribution means the authentication control cannot enforce
+    // its own scope. Treat that as a control-integrity failure in every enforcing mode,
+    // independent of ordinary severity filters; only explicit monitor mode may pass.
+    const identityEnforced = status.identityUnavailable === true && mode !== "monitor";
     const enforced = status.blocked && mode !== "monitor" && blockSeverities.includes(SEVERITY);
+
+    if (status.identityUnavailable === true) {
+      stats.identityUnavailable += 1;
+      if (!identityUnavailableEventEmitted) {
+        identityUnavailableEventEmitted = true;
+        safeNotify(onEvent, {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          component: "jb-security-guard",
+          action: identityEnforced ? "identity-rejected" : "identity-unavailable",
+          mode,
+          severity: "critical",
+          ruleIds: ["JBG-AUTH-IDENTITY-001"],
+          scopes: [],
+          retryAfterSeconds: identityEnforced ? 5 : 0
+        });
+      }
+    }
+
+    if (identityEnforced) {
+      stats.blocked += 1;
+      if (response.headersSent || response.writableEnded) {
+        response.destroy?.();
+        return;
+      }
+      response.statusCode = 503;
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Retry-After", "5");
+      response.setHeader("Content-Type", "application/json; charset=utf-8");
+      response.end(JSON.stringify({
+        error: "authentication_security_control_unavailable",
+        message: "Authentication is temporarily unavailable due to a security control."
+      }));
+      return;
+    }
     if (status.blocked && coreContract) {
       try {
         const keys = getKeys(request);
@@ -418,6 +473,8 @@ export function createAuthProtection(options = {}) {
       lockouts: stats.lockouts,
       blocked: stats.blocked,
       observed: stats.observed,
+      identityUnavailable: stats.identityUnavailable,
+      unattributedFailures: stats.unattributedFailures,
       trackedIpKeys: buckets.ip.size,
       trackedAccountIpKeys: buckets.accountIp.size,
       trackedAccountKeys: buckets.account.size
@@ -428,6 +485,7 @@ export function createAuthProtection(options = {}) {
     for (const store of Object.values(buckets)) store.clear();
     for (const scope of Object.keys(overflowBuckets)) overflowBuckets[scope] = null;
     for (const key of Object.keys(stats)) stats[key] = 0;
+    identityUnavailableEventEmitted = false;
   }
 
   return Object.freeze({
