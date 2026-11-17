@@ -43,7 +43,7 @@ class SecurityGuardRateLimitMiddleware:
             raise ValueError("excluded_extensions must be a bounded tuple or frozenset")
         if any(
             not isinstance(item, str) or len(item) < 2 or len(item) > 12
-            or not item.startswith(".") or "/" in item or "\\\\" in item
+            or not item.startswith(".") or not item[1:].isascii() or not item[1:].isalnum()
             for item in excluded_extensions
         ):
             raise ValueError("excluded_extensions must contain file extensions such as .css or .webp")
