@@ -315,3 +315,13 @@ export {
   verifyA2ProviderEvidenceBundle,
   verifyA2EvidenceReferences
 } from "./provider-evidence.js";
+
+export {
+  A3_PROVIDER_EVIDENCE_ROLES,
+  createA3ProviderEvidenceSigningPayload,
+  createA3ProviderEvidenceVerifier,
+  verifyA3ProviderEvidenceBundle,
+  verifyA3EvidenceReferences
+} from "./provider-evidence-a3.js";
+
+export { evaluateA3ProviderReadiness } from "./provider-evidence-a3.js";
