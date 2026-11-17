@@ -774,7 +774,10 @@ export function evaluateA2ProviderReadiness({
     A2_READINESS_SCOPES.set(readiness, Object.freeze({
       scope: bundle.scope,
       observedAtMs: observedAt,
-      expiresAtMs: expiresAt
+      expiresAtMs: expiresAt,
+      evidenceRefs: Object.freeze(references.references.map((reference) =>
+        Object.freeze({ refId: reference.refId, sha256: reference.sha256 })
+      ))
     }));
   }
   return readiness;
