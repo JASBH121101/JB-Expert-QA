@@ -105,9 +105,11 @@ function createFixture({
   providerOutcome = null,
   resolvedContent = CONTENT,
   malformedRecord = false,
+  recorderIdOverride = "recorder-lab-01",
   listPending = null
 } = {}) {
   const record = makeRecord(action);
+  record.recorderId = recorderIdOverride;
   const events = [];
   const receipt = makeOperationReceipt(
     record,
@@ -252,6 +254,12 @@ test("durable record identity mismatch remains held", async () => {
   assert.equal(report.complete, false);
   assert.equal(report.findings[0].reason, "durable-journal-record-missing-or-invalid");
   assert.equal(events.includes("reconcile-apply"), false);
+});
+
+test("recovery coordinator rejects a recorder sharing the provider identity", () => {
+  assert.throws(() => createFixture({
+    recorderIdOverride: "provider-lab-01"
+  }), /distinct/);
 });
 
 test("containment recovery rejects an unrelated prior operation ID", async () => {
