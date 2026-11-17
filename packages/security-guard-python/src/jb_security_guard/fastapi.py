@@ -8,6 +8,14 @@ from typing import Any
 from .client import UniversalRateLimitClient
 
 
+DEFAULT_STATIC_ASSET_EXTENSIONS = frozenset({
+    ".css", ".js", ".mjs", ".cjs",
+    ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg", ".ico",
+    ".woff", ".woff2", ".ttf", ".eot", ".map",
+})
+DEFAULT_STATIC_ASSET_PREFIXES = ("/static/", "/assets/", "/media/")
+
+
 class SecurityGuardRateLimitMiddleware:
     """ASGI middleware for FastAPI/Starlette using a trusted identity resolver."""
 
@@ -19,6 +27,8 @@ class SecurityGuardRateLimitMiddleware:
         identity_resolver: Callable,
         policy: str,
         scope: str,
+        excluded_extensions: tuple[str, ...] | frozenset[str] = tuple(DEFAULT_STATIC_ASSET_EXTENSIONS),
+        excluded_prefixes: tuple[str, ...] = DEFAULT_STATIC_ASSET_PREFIXES,
     ) -> None:
         if not callable(app) or not isinstance(client, UniversalRateLimitClient):
             raise TypeError("app and UniversalRateLimitClient are required")
@@ -29,11 +39,42 @@ class SecurityGuardRateLimitMiddleware:
         self.app = app
         self.client = client
         self.identity_resolver = identity_resolver
+        if not isinstance(excluded_extensions, (tuple, frozenset)) or len(excluded_extensions) > 32:
+            raise ValueError("excluded_extensions must be a bounded tuple or frozenset")
+        normalized_extensions = tuple(item.lower() for item in excluded_extensions)
+        if any(
+            not isinstance(item, str) or len(item) < 2 or len(item) > 12
+            or not item.startswith(".") or "/" in item or "\\\\" in item
+            for item in normalized_extensions
+        ) or len(set(normalized_extensions)) != len(normalized_extensions):
+            raise ValueError("excluded_extensions must contain unique extensions such as .css or .webp")
+        if not isinstance(excluded_prefixes, tuple) or len(excluded_prefixes) > 32:
+            raise ValueError("excluded_prefixes must be a bounded tuple")
+        if any(
+            not isinstance(item, str) or not item.startswith("/")
+            or "?" in item or "#" in item or ".." in item
+            for item in excluded_prefixes
+        ) or len(set(excluded_prefixes)) != len(excluded_prefixes):
+            raise ValueError("excluded_prefixes must contain unique absolute path prefixes")
+        self.excluded_extensions = frozenset(normalized_extensions)
+        self.excluded_prefixes = excluded_prefixes
         self.policy = policy
         self.scope = scope
 
+    def _is_static_asset(self, request_scope: dict[str, Any]) -> bool:
+        method = request_scope.get("method", "GET")
+        if not isinstance(method, str) or method.upper() not in ("GET", "HEAD"):
+            return False
+        path = request_scope.get("path", "")
+        if not isinstance(path, str):
+            return False
+        normalized_path = path.lower()
+        if any(normalized_path.startswith(prefix.lower()) for prefix in self.excluded_prefixes):
+            return True
+        return any(normalized_path.endswith(extension) for extension in self.excluded_extensions)
+
     async def __call__(self, scope, receive, send):
-        if scope.get("type") != "http":
+        if scope.get("type") != "http" or self._is_static_asset(scope):
             await self.app(scope, receive, send)
             return
 
