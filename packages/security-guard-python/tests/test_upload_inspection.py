@@ -186,7 +186,7 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertEqual(storage.approved, {})
 
     def test_windows_style_client_filename_is_reduced_to_extension_only(self):
-        result, storage = self.inspect_fixture(filename=r"C:\\fake\\photo.png")
+        result, storage = self.inspect_fixture(filename=r"C:\fake\photo.png")
         self.assertEqual(result["status"], "approved")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
 
