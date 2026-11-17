@@ -29,7 +29,7 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
 
         if ($publicPath !== null && is_dir($publicPath)) {
             $public = realpath($publicPath);
-            if ($public !== false && $this->isWithinDirectory($root, $public)) {
+            if ($public !== false && (rtrim($root, DIRECTORY_SEPARATOR) === rtrim($public, DIRECTORY_SEPARATOR) || $this->isWithinDirectory($root, $public))) {
                 throw new RuntimeException('Private upload storage must not be inside the public directory');
             }
         }
@@ -50,7 +50,11 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
         }
 
         $target = $this->quarantineFilePath($uploadId);
-        if (file_exists($target) || !@copy($sourcePath, $target)) {
+        if (file_exists($target)) {
+            throw new RuntimeException('Quarantine object already exists');
+        }
+        if (!@copy($sourcePath, $target)) {
+            if (is_file($target)) @unlink($target);
             throw new RuntimeException('Upload could not be copied into quarantine');
         }
 
