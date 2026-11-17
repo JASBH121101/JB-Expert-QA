@@ -770,18 +770,27 @@ export function evaluateA2ProviderReadiness({
     expiresAt,
     now
   });
-  if (readiness.eligible === true) A2_READINESS_SCOPES.set(readiness, bundle.scope);
+  if (readiness.eligible === true) {
+    A2_READINESS_SCOPES.set(readiness, Object.freeze({
+      scope: bundle.scope,
+      observedAtMs: observedAt,
+      expiresAtMs: expiresAt
+    }));
+  }
   return readiness;
 }
 
 /**
- * Returns the exact asset/environment/incident/policy scope for an eligible
- * readiness object created by this module. Copies and caller-built lookalikes
- * are not accepted by the execution controller.
+ * Returns scope and freshness metadata only for an exact eligible readiness
+ * object created by this module. Copies and caller-built lookalikes are denied.
  */
-export function getA2ProviderReadinessScope(value) {
+export function getA2ProviderReadinessMetadata(value) {
   if (value === null || typeof value !== "object") return null;
   return A2_READINESS_SCOPES.get(value) ?? null;
+}
+
+export function getA2ProviderReadinessScope(value) {
+  return getA2ProviderReadinessMetadata(value)?.scope ?? null;
 }
 
 export const A2_PROVIDER_EVIDENCE_ROLES = ROLES;
