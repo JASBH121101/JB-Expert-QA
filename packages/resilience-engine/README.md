@@ -81,9 +81,16 @@ The optional `./provider-evidence` entry point verifies short-lived Ed25519 atte
 The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
 
 
+## Signed A3 Provider Evidence (v1 laboratory)
+
+The optional `./provider-evidence-a3` entry point verifies nine Ed25519 provider roles for one exact failover source, target, lease, fencing epoch, policy revision/hash and RPO. It checks independent identities for traffic execution versus failover verification, source fencing versus target fencing verification, and coordination versus failover verification. Its second-stage evidence resolver checks scope and SHA-256 with bounded timeouts and size limits.
+
+These are signed evidence contracts, not a failover controller. They do not supply quorum, source-fence operations, target-enforced fencing, replication, target promotion, traffic cutover or rollback. A3 remains denied by the policy engine. See [A3 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-A3-V1.md).
+
 ### A2 provider evidence to ARC readiness
 
 The read-only `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })` function combines the verified A2 provider bundle and byte-integrity result with an exact Trusted Signal Gateway result. It rejects copied/fabricated Gateway outputs, non-durable replay stores, missing evidence, non-confirmed states and stale signals. It maps only authenticated Gateway provenance and signed provider facts into the existing A2 readiness gate. Its result always has `executable: false` and does not grant containment authorization.
+
 
 ## Not included
 
