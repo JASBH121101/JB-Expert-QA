@@ -54,8 +54,9 @@ Release is not an inverse command and is never implicit. It requires:
 2. A new policy authorization for release-containment bound to the same asset, environment, incident, policy revision and profile.
 3. Independent confirmation that the asset is still contained.
 4. A fresh forensic preservation receipt before release.
-5. A typed release result or authoritative release reconciliation.
-6. Independent confirmation that the exact asset/profile is now released.
+5. A durable action-ledger provider-start marker for the release operation.
+6. A typed release result or authoritative release reconciliation.
+7. Independent confirmation that the exact asset/profile is now released.
 
 A failed, expired or unknown release authorization blocks the operation. An uncertain provider result is held for reconciliation. The original containment result cannot be released twice.
 
