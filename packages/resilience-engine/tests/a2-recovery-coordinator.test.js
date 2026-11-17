@@ -201,6 +201,22 @@ test("read-only startup reconciliation verifies contained state without exposing
   assert.equal("releaseContainment" in coordinator, false);
 });
 
+test("concurrent startup scans remain observational and never expose mutation methods", async () => {
+  const { coordinator, events } = createFixture();
+  const [left, right] = await Promise.all([
+    coordinator.reconcilePending(),
+    coordinator.reconcilePending()
+  ]);
+  assert.equal(left.findings[0].state, "contained-observed-and-verified");
+  assert.equal(right.findings[0].state, "contained-observed-and-verified");
+  assert.equal(events.filter((event) => event === "reconcile-apply").length, 2);
+  assert.equal(events.some((event) =>
+    ["apply", "release", "complete", "journal-write"].includes(event)
+  ), false);
+  assert.equal("executeContainment" in coordinator, false);
+  assert.equal("releaseContainment" in coordinator, false);
+});
+
 test("expired claim lease does not become permission to retry", async () => {
   const { coordinator } = createFixture();
   const report = await coordinator.reconcilePending();
