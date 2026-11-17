@@ -189,6 +189,7 @@ function createDependencies({
   forensicValid = true,
   mutationTimeout = false,
   actionClaimMode = "normal",
+  releaseClaimMode = "normal",
   actionReconcileState = "from-ledger",
   budgetReserveMode = "normal",
   budgetReconcileState = "from-ledger",
@@ -390,14 +391,15 @@ function createDependencies({
     },
     actionLedger: {
       durable: true,
-      async claim() {
-        events.push("action-claim");
-        if (actionClaimMode === "hang") {
+      async claim(input) {
+        events.push("action-claim:" + input.action);
+        const mode = input.action === "release-containment" ? releaseClaimMode : actionClaimMode;
+        if (mode === "hang") {
           actionStage = "claimed";
           claimNumber += 1;
           return new Promise(() => {});
         }
-        if (actionClaimMode === "deny") return { claimed: false, claimId: null };
+        if (mode === "deny") return { claimed: false, claimId: null };
         claimNumber += 1;
         actionStage = "claimed";
         return { claimed: true, claimId: "claim-" + claimNumber };
@@ -840,4 +842,25 @@ test("A2 converts a clock failure after provider-start marking into a held resul
   assert.equal(result.executed, false);
   assert.equal(deps.events.includes("action-mark-provider-started:apply-containment-profile"), true);
   assert.equal(deps.events.includes("apply"), false);
+});
+
+
+test("A2 keeps release authorization held when the durable release claim times out", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({
+    releaseClaimMode: "hang",
+    actionReconcileState: "claimed"
+  });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+
+  const released = await deps.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(released.state, "held-for-reconciliation");
+  assert.equal(released.executed, false);
+  assert.equal(deps.events.includes("release"), false);
+  assert.ok(deps.events.includes("complete-authorization:unverified"));
 });
