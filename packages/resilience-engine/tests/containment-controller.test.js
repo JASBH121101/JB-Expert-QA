@@ -984,3 +984,45 @@ test("A2 holds a verified release when authorization or stop control changes bef
   assert.ok(deps.events.includes("verify-release"));
   assert.ok(deps.events.includes("mutation-check:before-release-finalization"));
 });
+
+
+test("A2 containment result handles are bound to the issuing controller instance", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const issuing = createDependencies();
+  const unrelated = createDependencies();
+
+  const contained = await issuing.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: issuing.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+
+  const attemptedRelease = await unrelated.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(attemptedRelease.state, "denied");
+  assert.equal(attemptedRelease.reason, "verified-controller-containment-result-required");
+  assert.equal(unrelated.events.includes("release"), false);
+});
+
+test("A2 evidence references reject accessor-backed arrays without invoking getters", async () => {
+  const { readiness } = await createVerifiedReadiness();
+  const deps = createDependencies();
+  let getterCalled = false;
+  const evidenceRefs = [];
+  evidenceRefs.length = 1;
+  Object.defineProperty(evidenceRefs, "0", {
+    enumerable: true,
+    configurable: false,
+    get() {
+      getterCalled = true;
+      return { refId: "evidence-1", sha256: "a".repeat(64) };
+    }
+  });
+
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "invalid-a2-execution-context");
+  assert.equal(getterCalled, false);
+});
