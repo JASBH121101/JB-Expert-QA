@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -73,6 +74,21 @@ async function withTempDirectory(run) {
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+}
+
+function runChild(source, env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", source], {
+      env: { ...process.env, ...env },
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true
+    });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({ code, signal, stderr }));
+  });
 }
 
 function createStore(filePath, overrides = {}) {
@@ -213,6 +229,110 @@ test("provider start rejects an expired claim without changing its durable state
       action: claim.record.action, scope: SCOPE, profileId: PROFILE_ID,
       idempotencyKey: claim.idempotencyKey, atMs: NOW + 4
     }), { state: "claimed", claimId: claim.claimId });
+  });
+});
+
+test("separate OS processes serialize the same A2 idempotency claim", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const input = {
+      action: "apply-containment-profile",
+      scope: SCOPE,
+      profileId: PROFILE_ID,
+      idempotencyKey: makeIdempotencyKey(),
+      claimedAtMs: NOW,
+      expiresAtMs: NOW + 10_000
+    };
+    const source = [
+      'const { createFileA2ActionLedger } = await import(process.env.JB_A2_LEDGER_MODULE);',
+      'const store = createFileA2ActionLedger(JSON.parse(process.env.JB_A2_LEDGER_CONFIG));',
+      'const result = await store.claim(JSON.parse(process.env.JB_A2_CLAIM));',
+      'process.exit(result.claimed ? 23 : 10);'
+    ].join(" ");
+    const env = {
+      JB_A2_LEDGER_MODULE: new URL("../src/a2-action-ledger.js", import.meta.url).href,
+      JB_A2_LEDGER_CONFIG: JSON.stringify({
+        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID
+      }),
+      JB_A2_CLAIM: JSON.stringify(input)
+    };
+    const results = await Promise.all([
+      runChild(source, env),
+      runChild(source, env)
+    ]);
+    assert.deepEqual(results.map((result) => result.code).sort((a, b) => a - b), [10, 23]);
+    const store = createStore(filePath);
+    const reconciled = await store.reconcile({
+      action: input.action, scope: input.scope, profileId: input.profileId,
+      idempotencyKey: input.idempotencyKey, atMs: NOW + 1
+    });
+    assert.equal(reconciled.state, "claimed");
+  });
+});
+
+test("A2 provider-start record survives process exit and a fresh store instance", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const action = "apply-containment-profile";
+    const idempotencyKey = makeIdempotencyKey(action);
+    const claim = {
+      action, scope: SCOPE, profileId: PROFILE_ID, idempotencyKey,
+      claimedAtMs: NOW, expiresAtMs: NOW + 10_000
+    };
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: "replaced-by-child",
+      action,
+      scope: SCOPE,
+      profileId: PROFILE_ID,
+      providerId: PROVIDER_ID,
+      verifierId: VERIFIER_ID,
+      recorderId: RECORDER_ID,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: EVIDENCE_REFS,
+      createdAtMs: NOW + 1,
+      updatedAtMs: NOW + 1,
+      leaseExpiresAtMs: NOW + 20_000
+    };
+    const source = [
+      'const { createFileA2ActionLedger } = await import(process.env.JB_A2_LEDGER_MODULE);',
+      'const config = JSON.parse(process.env.JB_A2_LEDGER_CONFIG);',
+      'const values = JSON.parse(process.env.JB_A2_RESTART_INPUT);',
+      'const store = createFileA2ActionLedger(config);',
+      'const claim = await store.claim(values.claim);',
+      'if (!claim.claimed) process.exit(10);',
+      'const record = { ...values.record, claimId: claim.claimId };',
+      'const created = await store.createPendingRecord({ record, atMs: record.createdAtMs });',
+      'if (!created.created) process.exit(11);',
+      'const atMs = record.createdAtMs + 1;',
+      'const recoveryRecord = { ...record, state: "provider-started", updatedAtMs: atMs };',
+      'const started = await store.markProviderStarted({ claimId: claim.claimId, action: record.action, scope: record.scope, profileId: record.profileId, idempotencyKey: record.idempotencyKey, recoveryRecord, atMs });',
+      'if (!started.started) process.exit(12);',
+      'process.exit(23);'
+    ].join(" ");
+    const child = await runChild(source, {
+      JB_A2_LEDGER_MODULE: new URL("../src/a2-action-ledger.js", import.meta.url).href,
+      JB_A2_LEDGER_CONFIG: JSON.stringify({
+        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID
+      }),
+      JB_A2_RESTART_INPUT: JSON.stringify({ claim, record })
+    });
+    assert.equal(child.code, 23, child.stderr);
+
+    const restartedStore = createStore(filePath);
+    const page = await restartedStore.listPending({ cursor: null, limit: 10, atMs: NOW + 3 });
+    assert.equal(page.claimIds.length, 1);
+    const exact = await restartedStore.getPendingByClaimId({
+      claimId: page.claimIds[0], atMs: NOW + 3
+    });
+    assert.equal(exact.found, true);
+    assert.equal(exact.record.state, "provider-started");
+    assert.deepEqual(await restartedStore.reconcile({
+      action, scope: SCOPE, profileId: PROFILE_ID,
+      idempotencyKey, atMs: NOW + 3
+    }), { state: "provider-started", claimId: page.claimIds[0] });
   });
 });
 
