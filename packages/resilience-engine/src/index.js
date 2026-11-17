@@ -357,3 +357,4 @@ export {
 export { evaluateA3ProviderReadiness } from "./provider-evidence-a3.js";
 
 export { createA2RecoveryCoordinator } from "./a2-recovery-coordinator.js";
+export { createFileA2ActionLedger } from "./a2-action-ledger.js";
