@@ -45,7 +45,7 @@ class UploadMalwareScanner(Protocol):
 def _extension(filename: str) -> str | None:
     if not isinstance(filename, str) or not filename or len(filename) > 255:
         raise UploadInspectionError("INVALID_INPUT")
-    leaf = filename.replace("\\\\", "/").rsplit("/", 1)[-1]
+    leaf = filename.replace("\\", "/").rsplit("/", 1)[-1]
     if leaf in ("", ".", ".."):
         raise UploadInspectionError("INVALID_INPUT")
     suffix = Path(leaf).suffix.lower()
@@ -53,10 +53,12 @@ def _extension(filename: str) -> str | None:
 
 
 def _normalize_mime(value: str | None) -> str | None:
-    if value is None or value.strip() == "":
+    if value is None:
         return None
     if not isinstance(value, str) or len(value) > 128:
         raise UploadInspectionError("INVALID_INPUT")
+    if value.strip() == "":
+        return None
     return value.split(";", 1)[0].strip().lower()
 
 
@@ -99,8 +101,8 @@ class UploadInspectionService:
         max_bytes: int = DEFAULT_MAX_BYTES,
         on_event: Callable[[dict[str, str]], None] | None = None,
     ) -> None:
-        if not 1 <= max_bytes <= MAX_BYTES:
-            raise ValueError("max_bytes must be between 1 and 104857600")
+        if type(max_bytes) is not int or not 1 <= max_bytes <= MAX_BYTES:
+            raise ValueError("max_bytes must be an integer between 1 and 104857600")
         if not callable(getattr(storage, "create_quarantine_stream", None)) or not callable(
             getattr(storage, "open_quarantine_stream", None)
         ) or not callable(getattr(storage, "promote", None)) or not callable(
@@ -243,6 +245,18 @@ class UploadInspectionService:
             }
         except UploadInspectionError as exc:
             self._emit("upload-rejected", exc.reason)
+            if writer is not None:
+                try:
+                    writer.close()
+                except Exception:
+                    pass
+                writer = None
+            if source is not None:
+                try:
+                    source.close()
+                except Exception:
+                    pass
+                source = None
             if quarantine_attempted and not promoted and not retain_quarantine:
                 try:
                     self._storage.delete(upload_id)
@@ -251,6 +265,18 @@ class UploadInspectionService:
             raise
         except Exception as exc:
             self._emit("upload-rejected", "INSPECTION_FAILED")
+            if writer is not None:
+                try:
+                    writer.close()
+                except Exception:
+                    pass
+                writer = None
+            if source is not None:
+                try:
+                    source.close()
+                except Exception:
+                    pass
+                source = None
             if quarantine_attempted and not promoted and not retain_quarantine:
                 try:
                     self._storage.delete(upload_id)
