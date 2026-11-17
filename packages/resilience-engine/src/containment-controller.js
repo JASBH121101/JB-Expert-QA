@@ -104,7 +104,13 @@ function assertTimestamp(value, label) {
 }
 
 function successful(value, property) {
-  return value === true || (isRecord(value) && value[property] === true);
+  if (value === true) return true;
+  try {
+    exactKeys(value, [property], "A2 dependency result");
+    return value[property] === true;
+  } catch {
+    return false;
+  }
 }
 
 function exactOutcome(value, outcome, includeReceipt = false) {
