@@ -291,13 +291,17 @@ export function createA2ContainmentController({
   }
 
   async function appendAudit(entry) {
-    return successful(await auditStore.append(Object.freeze({
-      schema: "jb.resilience.a2-audit-event/v1",
-      atMs: assertTimestamp(clock(), "audit clock"),
-      providerId,
-      verifierId,
-      ...entry
-    })), "recorded");
+    try {
+      return successful(await auditStore.append(Object.freeze({
+        schema: "jb.resilience.a2-audit-event/v1",
+        atMs: assertTimestamp(clock(), "audit clock"),
+        providerId,
+        verifierId,
+        ...entry
+      })), "recorded");
+    } catch {
+      return false;
+    }
   }
 
   async function assertMutationAllowed(scope, action, phase) {
@@ -373,11 +377,16 @@ export function createA2ContainmentController({
 
   async function reserveResources(action, scope, profileId, idempotencyKey) {
     const now = assertTimestamp(clock(), "resource reservation clock");
-    const claim = await actionLedger.claim({
-      action, scope, profileId, idempotencyKey,
-      claimedAtMs: now,
-      expiresAtMs: now + operationTimeoutMs * 8
-    });
+    let claim;
+    try {
+      claim = await actionLedger.claim({
+        action, scope, profileId, idempotencyKey,
+        claimedAtMs: now,
+        expiresAtMs: now + operationTimeoutMs * 8
+      });
+    } catch {
+      claim = null;
+    }
     if (!isRecord(claim) || claim.claimed !== true ||
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
       return { ok: false, reason: "duplicate-or-unavailable-action-claim" };
@@ -605,7 +614,7 @@ export function createA2ContainmentController({
       idempotencyKey
     });
     CONTAINMENT_RESULTS.set(result, {
-      state: "contained", scope, profileId, operationReceipt
+      state: "contained", scope, profileId, operationReceipt, evidenceRefs: refs
     });
     return result;
   }
@@ -622,7 +631,7 @@ export function createA2ContainmentController({
       return makeResult("denied", "release-reason-required");
     }
 
-    const { scope, profileId, operationReceipt } = record;
+    const { scope, profileId, operationReceipt, evidenceRefs } = record;
     const action = "release-containment";
     const idempotencyKey = makeIdempotencyKey(action, scope, profileId);
     if (!await appendAudit({ action, scope, profileId, outcome: "release-requested", idempotencyKey })) {
@@ -660,7 +669,6 @@ export function createA2ContainmentController({
       });
     }
 
-    const evidenceRefs = operationReceipt.evidenceRefs ?? [];
     if (!Array.isArray(evidenceRefs) || evidenceRefs.length < 1) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
@@ -771,7 +779,7 @@ export function createA2ContainmentController({
       idempotencyKey
     });
     CONTAINMENT_RESULTS.set(result, {
-      state: "released", scope, profileId, operationReceipt: releaseReceipt
+      state: "released", scope, profileId, operationReceipt: releaseReceipt, evidenceRefs
     });
     return result;
   }
