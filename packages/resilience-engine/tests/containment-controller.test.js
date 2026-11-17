@@ -875,6 +875,21 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);
+  assert.throws(() => createA2ContainmentController({
+    enableExecution: true,
+    policyAuthority: {
+      authorize() {}, assertAuthorization() {}, completeAuthorization() {}
+    },
+    containmentProvider: {
+      providerId: "shared", preflight() {}, apply() {}, reconcile() {}, release() {}, reconcileRelease() {}
+    },
+    independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
+    forensicRecorder: { recorderId: "shared", preserveEvidence() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    auditStore: { durable: true, append() {} },
+    mutationControl: { assertAllowed() {} }
+  }), /distinct identities/);
 });
 
 
