@@ -422,8 +422,7 @@ test("A3 ARC readiness preserves signed false facts and rejects forged or mismat
     clock: () => NOW
   });
   assert.equal(readiness.eligible, false);
-  assert.ok(readiness.denied.includes("targetEnforcesFencing") === false);
-  // The gate maps target enforcement, while the extra stale-write probe is a separate hard certification invariant.
+  assert.ok(readiness.denied.includes("targetEnforcesFencing"));
   assert.equal(readiness.executable, false);
 
   const forged = evaluateA3ProviderReadiness({
