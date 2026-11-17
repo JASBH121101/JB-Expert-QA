@@ -315,8 +315,11 @@ export {
   createProviderEvidenceVerifier,
   verifyA2ProviderEvidenceBundle,
   verifyA2EvidenceReferences,
-  evaluateA2ProviderReadiness
+  evaluateA2ProviderReadiness,
+  getA2ProviderReadinessScope
 } from "./provider-evidence.js";
+
+export { createA2ContainmentController } from "./containment-controller.js";
 
 export {
   A3_PROVIDER_EVIDENCE_ROLES,
