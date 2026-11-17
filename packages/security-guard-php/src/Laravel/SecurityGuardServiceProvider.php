@@ -6,6 +6,9 @@ namespace JB\SecurityGuard\Laravel;
 
 use Closure;
 use JB\SecurityGuard\UniversalRateLimitClient;
+use JB\SecurityGuard\UploadInspectionService;
+use JB\SecurityGuard\UploadMalwareScanner;
+use JB\SecurityGuard\UploadQuarantineStorage;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -28,6 +31,14 @@ final class SecurityGuardServiceProvider extends ServiceProvider
             $resolver = $app['config']->get('jb-security-guard.identity_resolver');
             if (!is_callable($resolver)) throw new RuntimeException('jb-security-guard.identity_resolver must be callable');
             return new RateLimitMiddleware($app->make(UniversalRateLimitClient::class), Closure::fromCallable($resolver));
+        });
+        $this->app->bind(UploadInspectionService::class, function ($app): UploadInspectionService {
+            $uploadConfig = $app['config']->get('jb-security-guard.uploads', []);
+            return new UploadInspectionService(
+                $app->make(UploadQuarantineStorage::class),
+                $app->make(UploadMalwareScanner::class),
+                (int) ($uploadConfig['max_bytes'] ?? 5 * 1024 * 1024)
+            );
         });
     }
 
