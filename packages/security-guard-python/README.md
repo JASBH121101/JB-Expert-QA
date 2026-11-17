@@ -60,7 +60,7 @@ app.add_middleware(
 
 The client is asynchronous, uses HTTPS with certificate verification and does not follow redirects or retry requests. Keep credentials on the application server. Use `failure_mode="closed"` unless a documented risk decision explicitly approves fail-open.
 
-When this middleware is installed globally, GET/HEAD requests for common static extensions and the default `/static/`, `/assets/` and `/media/` prefixes bypass the rate-limit service. Use `excluded_extensions` and `excluded_prefixes` to match the application's static paths; pass empty tuples to disable either exclusion. POST requests are never skipped solely because their path has a static-looking extension.
+When this middleware is installed globally, GET/HEAD requests bypass the rate-limit service only when both the directory prefix and file extension are allowlisted. Defaults are `/assets/`, `/static/`, `/media/`, `/images/` and `/fonts/` plus common static extensions. A dynamic route such as `/api/catalog.js` remains rate-limited. Configure `excluded_extensions` and `excluded_prefixes` for the host application's actual static paths; an empty tuple disables that exclusion dimension. POST requests are never skipped.
 
 ## Validation boundary
 
