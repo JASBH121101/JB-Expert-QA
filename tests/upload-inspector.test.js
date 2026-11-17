@@ -568,3 +568,50 @@ test("upload Core v1 telemetry failures never alter the upload decision", async 
   assert.equal(result.status, "approved");
   assert.equal(store.approved.size, 1);
 });
+
+
+test("a stalled security bridge fails clean uploads closed and retains quarantine", async () => {
+  const store = createMemoryStore();
+  const securityBridge = {
+    submitAssessment() { return new Promise(() => {}); }
+  };
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { securityBridge, bridgeTimeoutMs: 20 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "bridge-timeout.png",
+      correlationId: "bridge-timeout-001"
+    }),
+    (error) => error.code === "BRIDGE_UNAVAILABLE"
+  );
+
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+});
+
+test("a stalled security bridge cannot delay local rejection of a malicious upload indefinitely", async () => {
+  const store = createMemoryStore();
+  const maliciousScanner = {
+    async scan({ stream }) {
+      for await (const chunk of stream) void chunk;
+      return { verdict: "malicious", engine: "MockAV", version: "1.0" };
+    }
+  };
+  const securityBridge = {
+    submitAssessment() { return new Promise(() => {}); }
+  };
+
+  await assert.rejects(
+    inspector(store, maliciousScanner, { securityBridge, bridgeTimeoutMs: 20 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "malicious-bridge-timeout.png",
+      correlationId: "bridge-timeout-002"
+    }),
+    (error) => error.code === "MALWARE_DETECTED"
+  );
+
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 0);
+  assert.ok(store.calls.some(([name]) => name === "delete"));
+});
