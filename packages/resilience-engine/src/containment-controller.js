@@ -357,15 +357,26 @@ export function createA2ContainmentController({
     throw new TypeError("containment executor and independent verifier must have distinct identities");
   }
 
+  async function invokeDependency(owner, method, input, label) {
+    return invokeBounded(
+      owner[method].bind(owner),
+      input,
+      operationTimeoutMs,
+      label,
+      clock
+    );
+  }
+
   async function appendAudit(entry) {
     try {
-      return successful(await auditStore.append(Object.freeze({
+      const call = await invokeDependency(auditStore, "append", Object.freeze({
         schema: "jb.resilience.a2-audit-event/v1",
         atMs: assertTimestamp(clock(), "audit clock"),
         providerId,
         verifierId,
         ...entry
-      })), "recorded");
+      }), "audit-write");
+      return !call.timedOut && !call.error && successful(call.value, "recorded");
     } catch {
       return false;
     }
@@ -373,25 +384,30 @@ export function createA2ContainmentController({
 
   async function assertMutationAllowed(scope, action, phase) {
     try {
-      return successful(await mutationControl.assertAllowed({ scope, action, phase }), "allowed");
+      const call = await invokeDependency(
+        mutationControl, "assertAllowed", { scope, action, phase }, "mutation-control"
+      );
+      return !call.timedOut && !call.error && successful(call.value, "allowed");
     } catch {
       return false;
     }
   }
 
   async function authorize(action, scope, profileId, reasonCode) {
-    let issued;
+    let call;
     try {
-      issued = await policyAuthority.authorize({
+      call = await invokeDependency(policyAuthority, "authorize", {
         schema: "jb.resilience.a2-authorization-request/v1",
         action,
         scope,
         profileId,
         reasonCode
-      });
+      }, "policy-authorize");
     } catch {
       return null;
     }
+    if (call.timedOut || call.error) return null;
+    const issued = call.value;
     const now = assertTimestamp(clock(), "authorization clock");
     try {
       exactKeys(issued, ["authorized", "authorization"], "A2 authorization response");
@@ -409,9 +425,10 @@ export function createA2ContainmentController({
     const now = assertTimestamp(clock(), "authorization clock");
     if (!validateAuthorization(authorization, action, scope, profileId, now)) return false;
     try {
-      return successful(await policyAuthority.assertAuthorization({
+      const call = await invokeDependency(policyAuthority, "assertAuthorization", {
         authorization, action, scope, profileId
-      }), "valid");
+      }, "policy-assert-authorization");
+      return !call.timedOut && !call.error && successful(call.value, "valid");
     } catch {
       return false;
     }
@@ -419,7 +436,10 @@ export function createA2ContainmentController({
 
   async function completeAuthorization(authorization, outcome) {
     try {
-      return successful(await policyAuthority.completeAuthorization({ authorization, outcome }), "recorded");
+      const call = await invokeDependency(policyAuthority, "completeAuthorization", {
+        authorization, outcome
+      }, "policy-complete-authorization");
+      return !call.timedOut && !call.error && successful(call.value, "recorded");
     } catch {
       return false;
     }
@@ -428,9 +448,10 @@ export function createA2ContainmentController({
   async function settleBudget(reservationId, outcome) {
     if (typeof reservationId !== "string") return true;
     try {
-      return successful(await budgetLedger.settle({
+      const call = await invokeDependency(budgetLedger, "settle", {
         reservationId, outcome, atMs: assertTimestamp(clock(), "budget clock")
-      }), "settled");
+      }, "budget-settlement");
+      return !call.timedOut && !call.error && successful(call.value, "settled");
     } catch {
       return false;
     }
@@ -438,10 +459,11 @@ export function createA2ContainmentController({
 
   async function completeAction(claimId, outcome, reason) {
     try {
-      return successful(await actionLedger.complete({
+      const call = await invokeDependency(actionLedger, "complete", {
         claimId, outcome, reason,
         completedAtMs: assertTimestamp(clock(), "action completion clock")
-      }), "completed");
+      }, "action-completion");
+      return !call.timedOut && !call.error && successful(call.value, "completed");
     } catch {
       return false;
     }
@@ -449,16 +471,21 @@ export function createA2ContainmentController({
 
   async function reserveResources(action, scope, profileId, idempotencyKey) {
     const now = assertTimestamp(clock(), "resource reservation clock");
-    let claim;
+    const expiresAtMs = now + operationTimeoutMs * 8;
+    if (!Number.isSafeInteger(expiresAtMs)) {
+      return { ok: false, reason: "action-claim-expiry-invalid" };
+    }
+    let claimCall;
     try {
-      claim = await actionLedger.claim({
+      claimCall = await invokeDependency(actionLedger, "claim", {
         action, scope, profileId, idempotencyKey,
         claimedAtMs: now,
-        expiresAtMs: now + operationTimeoutMs * 8
-      });
+        expiresAtMs
+      }, "action-claim");
     } catch {
-      claim = null;
+      claimCall = { value: null, timedOut: false, error: "action-claim-failed" };
     }
+    let claim = claimCall.timedOut || claimCall.error ? null : claimCall.value;
     try {
       exactKeys(claim, ["claimed", "claimId"], "A2 action claim");
     } catch {
@@ -466,14 +493,20 @@ export function createA2ContainmentController({
     }
     if (!isRecord(claim) || claim.claimed !== true ||
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
-      return { ok: false, reason: "duplicate-or-unavailable-action-claim" };
+      return {
+        ok: false,
+        reason: claimCall.timedOut ? "action-claim-outcome-unknown" : "duplicate-or-unavailable-action-claim"
+      };
     }
-    let budget;
+    let budgetCall;
     try {
-      budget = await budgetLedger.reserve({ action, scope, profileId, idempotencyKey, atMs: now });
+      budgetCall = await invokeDependency(budgetLedger, "reserve", {
+        action, scope, profileId, idempotencyKey, atMs: now
+      }, "budget-reservation");
     } catch {
-      budget = null;
+      budgetCall = { value: null, timedOut: false, error: "budget-reservation-failed" };
     }
+    let budget = budgetCall.timedOut || budgetCall.error ? null : budgetCall.value;
     try {
       exactKeys(budget, ["reserved", "reservationId"], "A2 budget reservation");
     } catch {
@@ -481,8 +514,15 @@ export function createA2ContainmentController({
     }
     if (!isRecord(budget) || budget.reserved !== true ||
         typeof budget.reservationId !== "string" || !IDENTIFIER.test(budget.reservationId)) {
-      const recorded = await completeAction(claim.claimId, "not-applied", "budget-reservation-denied");
-      return { ok: false, reason: recorded ? "budget-reservation-denied" : "action-ledger-finalization-failed" };
+      const recorded = await completeAction(
+        claim.claimId, "not-applied",
+        budgetCall.timedOut ? "budget-reservation-outcome-unknown" : "budget-reservation-denied"
+      );
+      return {
+        ok: false,
+        reason: !recorded ? "action-ledger-finalization-failed"
+          : budgetCall.timedOut ? "budget-reservation-outcome-unknown" : "budget-reservation-denied"
+      };
     }
     return { ok: true, claimId: claim.claimId, reservationId: budget.reservationId };
   }
