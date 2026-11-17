@@ -25,7 +25,8 @@ const inspector = createUploadInspector({
   store: privateQuarantineAdapter,
   scanner: malwareScannerAdapter,
   maxBytes: 5 * 1024 * 1024,
-  scannerTimeoutMs: 15_000
+  scannerTimeoutMs: 15_000,
+  bridgeTimeoutMs: 3_000
 });
 
 // fileStream must be the individual file stream emitted by a bounded
@@ -55,7 +56,7 @@ The store adapter must implement:
 
 scanner.scan({ stream, uploadId, size, sha256, detectedMimeType, signal }) must consume the entire stream and return { verdict: clean | malicious | unknown, engine, version }. The scanner adapter must honor AbortSignal; it must not return clean before the complete file has been inspected. Guard wraps the scanner input in a streaming verifier. It recalculates SHA-256 and byte count over the bytes flowing to the scanner, rejects truncation, extension, or content substitution, and verifies that the readable stream reached its end before accepting a clean verdict. It then passes the expected digest and size to promote(); the storage adapter must atomically verify those values against the quarantined object at promotion time. This closes the gap between the initial upload hash, the object scanned, and the object approved, provided the production adapter honors the atomic verification contract.
 
-Guard defaults to a 5 MiB file limit and a 15-second scan timeout. Storage writer and reader initialization are also bounded by the ingestion timeout; late-arriving streams are destroyed and cleanup is retried without leaving the request waiting indefinitely. Quarantine deletion has a bounded cleanup wait and emits a sanitized cleanup-failed event when the adapter does not respond. These adapter timeouts do not make an uncooperative remote store transactional: production adapters must still implement idempotent writes, atomic promotion, and lifecycle cleanup. All limits are configurable within hard upper bounds. Scanner outages, timeouts, invalid results, unknown verdicts, and promotion failures never approve the file. Items whose scanner/approval status is uncertain remain in quarantine and must be private.
+Guard defaults to a 5 MiB file limit, a 15-second scan timeout, and a 3-second coordinated-assessment timeout (configurable up to 10 seconds). Storage writer and reader initialization are also bounded by the ingestion timeout; late-arriving streams are destroyed and cleanup is retried without leaving the request waiting indefinitely. Quarantine deletion has a bounded cleanup wait and emits a sanitized cleanup-failed event when the adapter does not respond. These adapter timeouts do not make an uncooperative remote store transactional: production adapters must still implement idempotent writes, atomic promotion, and lifecycle cleanup. All limits are configurable within hard upper bounds. Scanner outages, timeouts, invalid results, unknown verdicts, bridge timeouts, and promotion failures never approve the file. A bridge timeout during a clean assessment leaves the object private in quarantine; a malicious scan verdict is rejected locally even if bridge reporting times out. Items whose scanner/approval status is uncertain remain in quarantine and must be private.
 
 ## Fail-closed requirements
 
