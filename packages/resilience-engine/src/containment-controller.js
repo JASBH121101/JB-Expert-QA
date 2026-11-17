@@ -682,7 +682,7 @@ export function createA2ContainmentController({
     return { ok: true, verification, forensicReceipt };
   }
 
-  async function executeContainment({ readiness, scope: rawScope, profileId, evidenceRefs } = {}) {
+  async function runContainment({ readiness, scope: rawScope, profileId, evidenceRefs } = {}, markProviderStartRecorded) {
     if (!enableExecution) return makeResult("disabled", "a2-execution-disabled");
     let scope;
     let refs;
@@ -802,6 +802,8 @@ export function createA2ContainmentController({
       });
     }
 
+    markProviderStartRecorded();
+    markProviderStartRecorded();
     const postMarkerAuthorization = await assertAuthorization(
       authorization, action, scope, profileId
     );
@@ -913,7 +915,7 @@ export function createA2ContainmentController({
     return result;
   }
 
-  async function releaseContainment({ containment, reasonCode } = {}) {
+  async function runReleaseContainment({ containment, reasonCode } = {}, markProviderStartRecorded) {
     if (!enableExecution) return makeResult("disabled", "a2-execution-disabled");
     const record = CONTAINMENT_RESULTS.get(containment);
     if (!record || record.state !== "contained") {
@@ -1119,6 +1121,34 @@ export function createA2ContainmentController({
       state: "released", scope, profileId, operationReceipt: releaseReceipt, evidenceRefs
     });
     return result;
+  }
+
+  async function executeContainment(input = {}) {
+    let providerStartRecorded = false;
+    try {
+      return await runContainment(input, () => { providerStartRecorded = true; });
+    } catch {
+      return makeResult(
+        providerStartRecorded ? "held-for-reconciliation" : "denied",
+        providerStartRecorded
+          ? "a2-post-start-execution-state-unknown"
+          : "a2-execution-prerequisite-failed"
+      );
+    }
+  }
+
+  async function releaseContainment(input = {}) {
+    let providerStartRecorded = false;
+    try {
+      return await runReleaseContainment(input, () => { providerStartRecorded = true; });
+    } catch {
+      return makeResult(
+        providerStartRecorded ? "held-for-reconciliation" : "denied",
+        providerStartRecorded
+          ? "a2-post-start-release-state-unknown"
+          : "a2-release-prerequisite-failed"
+      );
+    }
   }
 
   return Object.freeze({
