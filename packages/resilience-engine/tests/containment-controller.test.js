@@ -187,6 +187,7 @@ function createDependencies({
   denyAuthorization = false,
   auditFails = false,
   forensicValid = true,
+  forensicEvidenceIds = null,
   mutationTimeout = false,
   actionClaimMode = "normal",
   releaseClaimMode = "normal",
@@ -371,7 +372,7 @@ function createDependencies({
           recorderId: "forensic-vault-01",
           retained: forensicValid,
           ...input.scope,
-          evidenceIds: ["forensic-record-01"],
+          evidenceIds: forensicEvidenceIds ?? ["forensic-record-01"],
           retentionPolicyId: input.retentionPolicyId,
           operationId: forensicOperationIdOverride ?? input.operationId,
           referencesSha256: forensicReferenceDigestOverride ??
@@ -1025,4 +1026,28 @@ test("A2 evidence references reject accessor-backed arrays without invoking gett
   assert.equal(result.state, "denied");
   assert.equal(result.reason, "invalid-a2-execution-context");
   assert.equal(getterCalled, false);
+});
+
+
+test("A2 forensic receipts reject accessor-backed evidence ID arrays without invoking getters", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  let getterCalled = false;
+  const evidenceIds = [];
+  evidenceIds.length = 1;
+  Object.defineProperty(evidenceIds, "0", {
+    enumerable: true,
+    configurable: false,
+    get() {
+      getterCalled = true;
+      return "forensic-record-01";
+    }
+  });
+  const deps = createDependencies({ forensicEvidenceIds: evidenceIds });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.reason, "forensic-evidence-preservation-failed");
+  assert.equal(getterCalled, false);
+  assert.equal(deps.events.includes("apply"), true);
 });
