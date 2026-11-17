@@ -45,7 +45,7 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
     public function quarantine(string $uploadId, string $sourcePath): string
     {
         $this->assertUploadId($uploadId);
-        if (!is_file($sourcePath) || !is_readable($sourcePath)) {
+        if (is_link($sourcePath) || !is_file($sourcePath) || !is_readable($sourcePath)) {
             throw new RuntimeException('Upload source is unavailable');
         }
 
@@ -58,7 +58,10 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
             throw new RuntimeException('Upload could not be copied into quarantine');
         }
 
-        @chmod($target, 0600);
+        if (!@chmod($target, 0600) || ((fileperms($target) ?: 0) & 0077) !== 0) {
+            @unlink($target);
+            throw new RuntimeException('Quarantined upload permissions are not private');
+        }
         return $target;
     }
 
@@ -101,7 +104,10 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
             throw new RuntimeException('Verified upload could not be promoted atomically');
         }
 
-        @chmod($target, 0600);
+        if (!@chmod($target, 0600) || ((fileperms($target) ?: 0) & 0077) !== 0) {
+            @unlink($target);
+            throw new RuntimeException('Approved upload permissions are not private');
+        }
         return $relativePath;
     }
 
@@ -155,7 +161,9 @@ final class LocalPrivateUploadStore implements PrivateUploadStoreInterface
         if (is_link($path)) {
             throw new RuntimeException('Private upload directory must not be a symlink');
         }
-        @chmod($path, 0700);
+        if (!@chmod($path, 0700) || ((fileperms($path) ?: 0) & 0077) !== 0) {
+            throw new RuntimeException('Private upload directory permissions are not restrictive');
+        }
     }
 
     private function isWithinDirectory(string $path, string $directory): bool
