@@ -1119,6 +1119,8 @@ export function createA2ContainmentController({
     }
 
     const releaseVerification = Object.freeze({ ...verification.value });
+    // Release is a high-impact mutation too: recheck current policy and stop controls
+    // after independent verification so a revoked approval cannot finalize success.
     const finalReleaseAuthorization = await assertAuthorization(
       authorization, action, scope, profileId
     );
