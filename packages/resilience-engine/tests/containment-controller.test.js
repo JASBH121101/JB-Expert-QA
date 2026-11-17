@@ -196,6 +196,9 @@ function createDependencies({
   providerStartMode = "normal",
   releaseStartMode = "normal",
   authorizationIssuedAtMs = NOW,
+  verificationOperationIdOverride = null,
+  forensicOperationIdOverride = null,
+  forensicReferenceDigestOverride = null,
   clockThrowsAfterProviderStart = false,
   clock = () => NOW
 } = {}) {
@@ -296,7 +299,8 @@ function createDependencies({
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: verificationState,
-        operationId: input.operationReceipt.operationId
+        operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
+        referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     },
     async verifyRelease(input) {
@@ -304,7 +308,8 @@ function createDependencies({
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: releaseVerificationState,
-        operationId: input.operationReceipt.operationId
+        operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
+        referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     }
   };
@@ -358,7 +363,9 @@ function createDependencies({
           ...input.scope,
           evidenceIds: ["forensic-record-01"],
           retentionPolicyId: input.retentionPolicyId,
-          referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex"),
+          operationId: forensicOperationIdOverride ?? input.operationId,
+          referencesSha256: forensicReferenceDigestOverride ??
+            createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex"),
           preservedAtMs: NOW,
           expiresAtMs: NOW + 100_000
         };
@@ -866,4 +873,35 @@ test("A2 keeps release authorization held when the durable release claim times o
   assert.equal(released.executed, false);
   assert.equal(deps.events.includes("release"), false);
   assert.ok(deps.events.includes("complete-authorization:unverified"));
+});
+
+
+test("A2 rejects an independent verification receipt bound to another provider operation", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ verificationOperationIdOverride: "different-operation" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(result.reason, "independent-containment-verification-failed");
+});
+
+test("A2 rejects forensic receipts bound to another provider operation or evidence set", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const wrongOperation = createDependencies({ forensicOperationIdOverride: "different-operation" });
+  const first = await wrongOperation.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: wrongOperation.profileId, evidenceRefs
+  });
+  assert.equal(first.state, "held-for-reconciliation");
+  assert.equal(first.executed, false);
+  assert.equal(first.reason, "forensic-evidence-preservation-failed");
+
+  const wrongEvidence = createDependencies({ forensicReferenceDigestOverride: "0".repeat(64) });
+  const second = await wrongEvidence.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: wrongEvidence.profileId, evidenceRefs
+  });
+  assert.equal(second.state, "held-for-reconciliation");
+  assert.equal(second.executed, false);
+  assert.equal(second.reason, "forensic-evidence-preservation-failed");
 });
