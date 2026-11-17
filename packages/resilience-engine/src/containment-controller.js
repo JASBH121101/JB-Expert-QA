@@ -331,8 +331,8 @@ export function createA2ContainmentController({
     [containmentProvider, ["preflight", "apply", "reconcile", "release", "reconcileRelease"], "containmentProvider"],
     [independentVerifier, ["verifyContainment", "verifyRelease"], "independentVerifier"],
     [forensicRecorder, ["preserveEvidence"], "forensicRecorder"],
-    [budgetLedger, ["reserve", "settle"], "budgetLedger"],
-    [actionLedger, ["claim", "complete"], "actionLedger"],
+    [budgetLedger, ["reserve", "reconcile", "settle"], "budgetLedger"],
+    [actionLedger, ["claim", "markProviderStarted", "reconcile", "complete"], "actionLedger"],
     [auditStore, ["append"], "auditStore"],
     [mutationControl, ["assertAllowed"], "mutationControl"]
   ];
@@ -469,12 +469,75 @@ export function createA2ContainmentController({
     }
   }
 
+  async function reconcileActionClaim(action, scope, profileId, idempotencyKey) {
+    const call = await invokeDependency(actionLedger, "reconcile", {
+      action, scope, profileId, idempotencyKey,
+      atMs: assertTimestamp(clock(), "action claim reconciliation clock")
+    }, "action-claim-reconciliation");
+    if (call.timedOut || call.error) return { state: "unknown", claimId: null };
+    try {
+      exactKeys(call.value, ["state", "claimId"], "A2 action claim reconciliation");
+    } catch {
+      return { state: "unknown", claimId: null };
+    }
+    const { state, claimId } = call.value;
+    if (!["claimed", "provider-started", "completed", "not-found", "unknown"].includes(state)) {
+      return { state: "unknown", claimId: null };
+    }
+    if (state === "not-found" || state === "unknown") {
+      return claimId === null ? { state, claimId: null } : { state: "unknown", claimId: null };
+    }
+    return typeof claimId === "string" && IDENTIFIER.test(claimId)
+      ? { state, claimId } : { state: "unknown", claimId: null };
+  }
+
+  async function reconcileBudgetReservation(action, scope, profileId, idempotencyKey) {
+    const call = await invokeDependency(budgetLedger, "reconcile", {
+      action, scope, profileId, idempotencyKey,
+      atMs: assertTimestamp(clock(), "budget reconciliation clock")
+    }, "budget-reconciliation");
+    if (call.timedOut || call.error) return { state: "unknown", reservationId: null };
+    try {
+      exactKeys(call.value, ["state", "reservationId"], "A2 budget reconciliation");
+    } catch {
+      return { state: "unknown", reservationId: null };
+    }
+    const { state, reservationId } = call.value;
+    if (!["reserved", "settled", "not-found", "unknown"].includes(state)) {
+      return { state: "unknown", reservationId: null };
+    }
+    if (state === "not-found" || state === "unknown") {
+      return reservationId === null ? { state, reservationId: null } : { state: "unknown", reservationId: null };
+    }
+    return typeof reservationId === "string" && IDENTIFIER.test(reservationId)
+      ? { state, reservationId } : { state: "unknown", reservationId: null };
+  }
+
+  async function markProviderStarted(claimId, action, scope, profileId, idempotencyKey) {
+    const call = await invokeDependency(actionLedger, "markProviderStarted", {
+      claimId, action, scope, profileId, idempotencyKey,
+      atMs: assertTimestamp(clock(), "provider-start marker clock")
+    }, "provider-start-marker");
+    if (!call.timedOut && !call.error) {
+      try {
+        exactKeys(call.value, ["started"], "A2 provider-start marker");
+        if (call.value.started === true) return { started: true };
+      } catch {
+        // Resolve ambiguous marker responses using the durable claim journal.
+      }
+    }
+    const journal = await reconcileActionClaim(action, scope, profileId, idempotencyKey);
+    if (journal.state === "claimed") return { started: false, safeNotStarted: true };
+    return { started: false, hold: true, reason: "provider-start-state-unknown-or-already-started" };
+  }
+
   async function reserveResources(action, scope, profileId, idempotencyKey) {
     const now = assertTimestamp(clock(), "resource reservation clock");
     const expiresAtMs = now + operationTimeoutMs * 8;
     if (!Number.isSafeInteger(expiresAtMs)) {
       return { ok: false, reason: "action-claim-expiry-invalid" };
     }
+
     let claimCall;
     try {
       claimCall = await invokeDependency(actionLedger, "claim", {
@@ -493,12 +556,22 @@ export function createA2ContainmentController({
     }
     if (!isRecord(claim) || claim.claimed !== true ||
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
+      const journal = await reconcileActionClaim(action, scope, profileId, idempotencyKey);
+      if (journal.state === "claimed") {
+        const finalized = await completeAction(journal.claimId, "not-applied", "provider-not-started");
+        return {
+          ok: false, hold: !finalized,
+          reason: finalized ? "action-claim-reconciled-before-provider" : "action-claim-finalization-failed"
+        };
+      }
+      if (journal.state === "not-found") return { ok: false, reason: "action-claim-not-recorded" };
       return {
-        ok: false,
-        hold: claimCall.timedOut === true,
-        reason: claimCall.timedOut ? "action-claim-outcome-unknown" : "duplicate-or-unavailable-action-claim"
+        ok: false, hold: true,
+        reason: journal.state === "provider-started" || journal.state === "completed"
+          ? "existing-action-may-have-started" : "action-claim-reconciliation-unknown"
       };
     }
+
     let budgetCall;
     try {
       budgetCall = await invokeDependency(budgetLedger, "reserve", {
@@ -515,15 +588,34 @@ export function createA2ContainmentController({
     }
     if (!isRecord(budget) || budget.reserved !== true ||
         typeof budget.reservationId !== "string" || !IDENTIFIER.test(budget.reservationId)) {
-      const reason = budgetCall.timedOut
-        ? "budget-reservation-outcome-unknown" : "budget-reservation-denied";
-      const recorded = await completeAction(
-        claim.claimId, budgetCall.timedOut ? "held-for-reconciliation" : "not-applied", reason
+      const journal = await reconcileBudgetReservation(action, scope, profileId, idempotencyKey);
+      if (journal.state === "reserved") {
+        const settled = await settleBudget(journal.reservationId, "not-applied");
+        const finalized = await completeAction(
+          claim.claimId, settled ? "not-applied" : "held-for-reconciliation",
+          "budget-reservation-reconciled-before-provider"
+        );
+        const okay = settled && finalized;
+        return {
+          ok: false, hold: !okay,
+          reason: okay ? "budget-reservation-reconciled-before-provider" : "budget-reservation-finalization-unknown"
+        };
+      }
+      if (journal.state === "not-found") {
+        const finalized = await completeAction(
+          claim.claimId, "not-applied", "budget-reservation-not-recorded"
+        );
+        return {
+          ok: false, hold: !finalized,
+          reason: finalized ? "budget-reservation-denied" : "action-ledger-finalization-failed"
+        };
+      }
+      const finalized = await completeAction(
+        claim.claimId, "held-for-reconciliation", "budget-reservation-reconciliation-unknown"
       );
       return {
-        ok: false,
-        hold: budgetCall.timedOut === true,
-        reason: !recorded ? "action-ledger-finalization-failed" : reason
+        ok: false, hold: true,
+        reason: finalized ? "budget-reservation-reconciliation-unknown" : "action-ledger-finalization-failed"
       };
     }
     return { ok: true, claimId: claim.claimId, reservationId: budget.reservationId };
@@ -681,6 +773,29 @@ export function createA2ContainmentController({
       return finishNotApplied({
         action, scope, profileId, claimId, reservationId, authorization,
         reason: "policy-or-readiness-changed-before-apply"
+      });
+    }
+    if (!await appendAudit({
+      action, scope, profileId, outcome: "provider-start-authorized", idempotencyKey
+    })) {
+      return finishNotApplied({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "durable-audit-unavailable-before-provider"
+      });
+    }
+    const startMarker = await markProviderStarted(
+      claimId, action, scope, profileId, idempotencyKey
+    );
+    if (!startMarker.started) {
+      if (startMarker.safeNotStarted) {
+        return finishNotApplied({
+          action, scope, profileId, claimId, reservationId, authorization,
+          reason: "provider-start-not-recorded"
+        });
+      }
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: startMarker.reason ?? "provider-start-state-unknown"
       });
     }
 
