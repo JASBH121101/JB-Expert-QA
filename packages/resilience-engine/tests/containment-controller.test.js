@@ -323,11 +323,11 @@ function createDependencies({
       });
     }
   };
-  function makeVerification({ verifierId, scope, profileId, state, operationId }) {
+  function makeVerification({ verifierId, scope, profileId, state, operationId, referencesSha256 }) {
     return {
       schema: "jb.resilience.a2-verification/v1",
       verifierId, verified: state === "contained" || state === "released",
-      state, ...scope, profileId, operationId,
+      state, ...scope, profileId, operationId, referencesSha256,
       observedAtMs: NOW, expiresAtMs: NOW + 10_000
     };
   }
@@ -958,4 +958,22 @@ test("A2 refuses release when the pre-release verifier cannot bind the existing 
   assert.equal(contained.state, "held-for-reconciliation");
   assert.equal(contained.executed, false);
   assert.equal(deps.events.includes("release"), false);
+});
+
+
+test("A2 release rechecks mutation control after independent verification and before finalization", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ blockMutationAt: "before-release-finalization" });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+
+  const released = await deps.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(released.state, "held-for-reconciliation");
+  assert.equal(released.reason, "authorization-or-mutation-control-changed-after-release");
+  assert.ok(deps.events.includes("verify-release"));
+  assert.equal(deps.events.includes("action-complete:succeeded"), false);
 });
