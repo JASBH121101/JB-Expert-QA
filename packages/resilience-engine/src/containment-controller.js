@@ -519,7 +519,7 @@ export function createA2ContainmentController({
     action, scope, profileId, operationReceipt, evidenceRefs
   }) {
     const verifyCall = await invokeBounded(
-      independentVerifier.verifyContainment,
+      independentVerifier.verifyContainment.bind(independentVerifier),
       { action, scope, profileId, operationReceipt },
       operationTimeoutMs, "independent-verification", clock
     );
@@ -530,7 +530,7 @@ export function createA2ContainmentController({
     const verification = Object.freeze({ ...verifyCall.value });
 
     const preserveCall = await invokeBounded(
-      forensicRecorder.preserveEvidence,
+      forensicRecorder.preserveEvidence.bind(forensicRecorder),
       { scope, profileId, evidenceRefs, retentionPolicyId: "owner-approved" },
       operationTimeoutMs, "forensic-preservation", clock
     );
@@ -609,7 +609,7 @@ export function createA2ContainmentController({
     }
 
     const preflight = await invokeBounded(
-      containmentProvider.preflight,
+      containmentProvider.preflight.bind(containmentProvider),
       { scope, profileId },
       operationTimeoutMs, "containment-preflight", clock
     );
@@ -634,7 +634,7 @@ export function createA2ContainmentController({
     }
 
     const apply = await invokeBounded(
-      containmentProvider.apply,
+      containmentProvider.apply.bind(containmentProvider),
       { scope, profileId, idempotencyKey },
       operationTimeoutMs, "containment-apply", clock
     );
@@ -648,7 +648,7 @@ export function createA2ContainmentController({
     } else {
       // A timeout or malformed response is ambiguous. Reconcile before any retry.
       const reconcile = await invokeBounded(
-        containmentProvider.reconcile,
+        containmentProvider.reconcile.bind(containmentProvider),
         { scope, profileId, idempotencyKey },
         operationTimeoutMs, "containment-reconciliation", clock
       );
@@ -763,7 +763,7 @@ export function createA2ContainmentController({
     const { claimId, reservationId } = reserved;
 
     const current = await invokeBounded(
-      independentVerifier.verifyContainment,
+      independentVerifier.verifyContainment.bind(independentVerifier),
       { action: "verify-before-release", scope, profileId, operationReceipt },
       operationTimeoutMs, "pre-release-verification", clock
     );
@@ -786,7 +786,7 @@ export function createA2ContainmentController({
     }
 
     const preserved = await invokeBounded(
-      forensicRecorder.preserveEvidence,
+      forensicRecorder.preserveEvidence.bind(forensicRecorder),
       { scope, profileId, evidenceRefs, retentionPolicyId: "owner-approved-before-release" },
       operationTimeoutMs, "pre-release-forensics", clock
     );
@@ -811,7 +811,7 @@ export function createA2ContainmentController({
       evidenceIds: Object.freeze([...preserved.value.evidenceIds])
     });
     const release = await invokeBounded(
-      containmentProvider.release,
+      containmentProvider.release.bind(containmentProvider),
       { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
       operationTimeoutMs, "containment-release", clock
     );
@@ -824,7 +824,7 @@ export function createA2ContainmentController({
       releaseReceipt = Object.freeze({ ...release.value.receipt });
     } else {
       const reconcile = await invokeBounded(
-        containmentProvider.reconcileRelease,
+        containmentProvider.reconcileRelease.bind(containmentProvider),
         { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
         operationTimeoutMs, "release-reconciliation", clock
       );
@@ -848,7 +848,7 @@ export function createA2ContainmentController({
     }
 
     const verification = await invokeBounded(
-      independentVerifier.verifyRelease,
+      independentVerifier.verifyRelease.bind(independentVerifier),
       { scope, profileId, operationReceipt: releaseReceipt },
       operationTimeoutMs, "independent-release-verification", clock
     );
