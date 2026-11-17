@@ -46,7 +46,7 @@ const UNSIGNED_FIELDS = Object.freeze([
 ]);
 const ATTESTATION_FIELDS = Object.freeze([...UNSIGNED_FIELDS, "signature"]);
 const VERIFIERS = new WeakSet();
-const VERIFIED_BUNDLES = new WeakSet();
+const VERIFIED_BUNDLES = new WeakSet();\nconst VERIFIED_REFERENCES = new WeakSet();\nconst REFERENCE_BUNDLES = new WeakMap();
 
 function isRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -503,15 +503,75 @@ export async function verifyA3EvidenceReferences({
   if (now < bundle.observedAtMs || now >= bundle.expiresAtMs) {
     return denied("provider-evidence-stale-or-expired");
   }
-  return Object.freeze({
+  const verification = Object.freeze({
     schema: "jb.resilience.a3-evidence-reference-verification/v1",
     verified: true,
     executable: false,
     scope: bundle.scope,
     referenceCount: references.length,
     totalBytes,
+    verifiedAtMs: now,
     references: Object.freeze(references)
   });
+  VERIFIED_REFERENCES.add(verification);
+  REFERENCE_BUNDLES.set(verification, bundle);
+  return verification;
+}
+
+/**
+ * Feed only an A3 bundle and reference result produced by this module into
+ * the existing read-only continuity gates. This is readiness, never authority.
+ */
+export function evaluateA3ProviderReadiness({
+  bundle,
+  references,
+  clock = Date.now
+} = {}) {
+  const denied = (reason) => Object.freeze({
+    schema: "jb.resilience.continuity-readiness/v1",
+    capability: "A3-controlled-failover",
+    eligible: false,
+    denied: Object.freeze(["providerEvidence"]),
+    reason,
+    executable: false
+  });
+  if (!VERIFIED_BUNDLES.has(bundle) || !VERIFIED_REFERENCES.has(references) ||
+      REFERENCE_BUNDLES.get(references) !== bundle || typeof clock !== "function") {
+    return denied("verified-a3-bundle-and-matching-reference-check-required");
+  }
+  let now;
+  try { now = timestamp(clock(), "A3 readiness clock"); }
+  catch { return denied("invalid-a3-readiness-clock"); }
+  if (now < bundle.observedAtMs || now >= bundle.expiresAtMs ||
+      references.verifiedAtMs < bundle.observedAtMs ||
+      references.verifiedAtMs >= bundle.expiresAtMs ||
+      now < references.verifiedAtMs) {
+    return denied("provider-evidence-stale-or-expired");
+  }
+
+  const requiredFacts = [
+    "independentExternalMonitor",
+    "monitorQuorum",
+    "durableCoordination",
+    "exclusiveUnexpiredLease",
+    "monotonicFencing",
+    "targetEnforcesFencing",
+    "sourceFenced",
+    "replicationHealthy",
+    "replicationWithinRpo",
+    "targetReady",
+    "dependenciesReady",
+    "trafficCutoverPrepared",
+    "rollbackPrepared",
+    "postFailoverVerification",
+    "budgetAvailable"
+  ];
+  const evidence = Object.create(null);
+  for (const fact of requiredFacts) evidence[fact] = bundle.facts[fact] === true;
+  evidence.observedAt = bundle.observedAtMs;
+  evidence.expiresAt = bundle.expiresAtMs;
+  evidence.now = now;
+  return evaluateA3FailoverReadiness(evidence);
 }
 
 export const A3_PROVIDER_EVIDENCE_ROLES = ROLES;
