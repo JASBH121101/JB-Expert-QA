@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const SCHEMA = "jb.resilience.trusted-signal/v1";
+const TRUSTED_SIGNAL_STATE_METADATA = new WeakMap();
 const ENGINES = new Set(["security-guard", "malware-engine"]);
 const STATES = new Set(["clear", "suspected", "confirmed", "tampered", "unknown"]);
 const SEVERITIES = new Set(["info", "low", "medium", "high", "critical"]);
