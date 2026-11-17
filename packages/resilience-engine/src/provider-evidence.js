@@ -43,6 +43,7 @@ const PROVIDER_VERIFIERS = new WeakSet();
 const VERIFIED_A2_BUNDLES = new WeakSet();
 const VERIFIED_A2_REFERENCES = new WeakSet();
 const A2_REFERENCE_BUNDLES = new WeakMap();
+const A2_READINESS_SCOPES = new WeakMap();
 const EXPECTED_FIELDS = [
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ];
@@ -753,7 +754,7 @@ export function evaluateA2ProviderReadiness({
   }
 
   const facts = bundle.facts;
-  return evaluateA2ContainmentReadiness({
+  const readiness = evaluateA2ContainmentReadiness({
     confirmedSecurityVerdict: true,
     trustedSignal: true,
     replayProtectedSignal: true,
@@ -769,6 +770,30 @@ export function evaluateA2ProviderReadiness({
     expiresAt,
     now
   });
+  if (readiness.eligible === true) {
+    A2_READINESS_SCOPES.set(readiness, Object.freeze({
+      scope: bundle.scope,
+      observedAtMs: observedAt,
+      expiresAtMs: expiresAt,
+      evidenceRefs: Object.freeze(references.references.map((reference) =>
+        Object.freeze({ refId: reference.refId, sha256: reference.sha256 })
+      ))
+    }));
+  }
+  return readiness;
+}
+
+/**
+ * Returns scope and freshness metadata only for an exact eligible readiness
+ * object created by this module. Copies and caller-built lookalikes are denied.
+ */
+export function getA2ProviderReadinessMetadata(value) {
+  if (value === null || typeof value !== "object") return null;
+  return A2_READINESS_SCOPES.get(value) ?? null;
+}
+
+export function getA2ProviderReadinessScope(value) {
+  return getA2ProviderReadinessMetadata(value)?.scope ?? null;
 }
 
 export const A2_PROVIDER_EVIDENCE_ROLES = ROLES;
