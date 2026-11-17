@@ -8,43 +8,6 @@ use Closure;
 use RuntimeException;
 use Throwable;
 
-interface UploadQuarantineStorage
-{
-    /** Return a writable stream backed only by private quarantine storage. */
-    public function createQuarantineStream(string $uploadId): mixed;
-
-    /** Return a readable stream for the complete quarantined object. */
-    public function openQuarantineStream(string $uploadId): mixed;
-
-    /**
-     * Atomically verify the quarantined object's digest and size, then promote
-     * that exact immutable object to a private approved namespace.
-     */
-    public function promote(string $uploadId, string $expectedSha256, int $expectedSize): bool;
-
-    /** Idempotently delete an uncommitted object by opaque server-generated ID. */
-    public function delete(string $uploadId): void;
-}
-
-interface UploadMalwareScanner
-{
-    /**
-     * Consume the complete stream and return:
-     * verdict (clean|malicious|unknown), sha256, size, engine and version.
-     */
-    public function scan(mixed $stream, array $metadata): array;
-}
-
-final class UploadInspectionException extends RuntimeException
-{
-    public function __construct(
-        public readonly string $reason,
-        string $message = 'Upload could not be safely approved'
-    ) {
-        parent::__construct($message);
-    }
-}
-
 /**
  * Runtime-native PHP upload inspection contract.
  *
