@@ -46,7 +46,9 @@ const UNSIGNED_FIELDS = Object.freeze([
 ]);
 const ATTESTATION_FIELDS = Object.freeze([...UNSIGNED_FIELDS, "signature"]);
 const VERIFIERS = new WeakSet();
-const VERIFIED_BUNDLES = new WeakSet();\nconst VERIFIED_REFERENCES = new WeakSet();\nconst REFERENCE_BUNDLES = new WeakMap();
+const VERIFIED_BUNDLES = new WeakSet();
+const VERIFIED_REFERENCES = new WeakSet();
+const REFERENCE_BUNDLES = new WeakMap();
 
 function isRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
