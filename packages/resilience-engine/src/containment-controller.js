@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getA2ProviderReadinessScope } from "./provider-evidence.js";
+import { getA2ProviderReadinessMetadata } from "./provider-evidence.js";
 
 const SCOPE_KEYS = Object.freeze([
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
@@ -240,8 +240,10 @@ function validateIndependentVerification(value, {
     value.profileId === profileId &&
     sameScope(value, scope) &&
     Number.isSafeInteger(value.observedAtMs) &&
+    value.observedAtMs >= 0 &&
     value.observedAtMs <= now &&
     Number.isSafeInteger(value.expiresAtMs) &&
+    value.expiresAtMs >= 0 &&
     value.expiresAtMs > now;
 }
 
@@ -261,13 +263,17 @@ function validateForensicReceipt(value, recorderId, scope, now) {
     Array.isArray(value.evidenceIds) &&
     value.evidenceIds.length > 0 &&
     value.evidenceIds.length <= 128 &&
+    Object.getOwnPropertySymbols(value.evidenceIds).length === 0 &&
+    Object.keys(value.evidenceIds).length === value.evidenceIds.length &&
     value.evidenceIds.every((id) => typeof id === "string" && IDENTIFIER.test(id)) &&
     new Set(value.evidenceIds).size === value.evidenceIds.length &&
     typeof value.retentionPolicyId === "string" &&
     IDENTIFIER.test(value.retentionPolicyId) &&
     Number.isSafeInteger(value.preservedAtMs) &&
+    value.preservedAtMs >= 0 &&
     value.preservedAtMs <= now &&
     Number.isSafeInteger(value.expiresAtMs) &&
+    value.expiresAtMs >= 0 &&
     value.expiresAtMs > now;
 }
 
@@ -539,10 +545,23 @@ export function createA2ContainmentController({
       return makeResult("denied", "invalid-a2-execution-context");
     }
 
-    const readinessScope = getA2ProviderReadinessScope(readiness);
-    if (!readinessScope || readiness.eligible !== true ||
-        readiness.executable !== false || !sameScope(readinessScope, scope)) {
+    const readinessMetadata = getA2ProviderReadinessMetadata(readiness);
+    if (!readinessMetadata || readiness.eligible !== true ||
+        readiness.executable !== false || !sameScope(readinessMetadata.scope, scope)) {
       return makeResult("denied", "verified-a2-readiness-for-exact-scope-required");
+    }
+    const readinessNow = assertTimestamp(clock(), "A2 readiness execution clock");
+    if (!Number.isSafeInteger(readinessMetadata.observedAtMs) ||
+        !Number.isSafeInteger(readinessMetadata.expiresAtMs) ||
+        readinessNow < readinessMetadata.observedAtMs ||
+        readinessNow >= readinessMetadata.expiresAtMs) {
+      return makeResult("denied", "a2-readiness-evidence-stale-at-execution");
+    }
+    if (readinessMetadata.evidenceRefs.length !== refs.length ||
+        readinessMetadata.evidenceRefs.some((verified, index) =>
+          verified.refId !== refs[index].refId || verified.sha256 !== refs[index].sha256
+        )) {
+      return makeResult("denied", "a2-forensic-references-not-bound-to-verified-readiness");
     }
 
     const action = "apply-containment-profile";
@@ -588,7 +607,10 @@ export function createA2ContainmentController({
         reason: "containment-preflight-failed"
       });
     }
-    if (!await assertMutationAllowed(scope, action, "before-apply") ||
+    const preApplyNow = assertTimestamp(clock(), "A2 pre-apply clock");
+    if (preApplyNow < readinessMetadata.observedAtMs ||
+        preApplyNow >= readinessMetadata.expiresAtMs ||
+        !await assertMutationAllowed(scope, action, "before-apply") ||
         !await assertAuthorization(authorization, action, scope, profileId)) {
       return finishNotApplied({
         action, scope, profileId, claimId, reservationId, authorization,
@@ -644,7 +666,10 @@ export function createA2ContainmentController({
       });
     }
 
-    if (!await assertAuthorization(authorization, action, scope, profileId) ||
+    const finalReadinessNow = assertTimestamp(clock(), "A2 final readiness clock");
+    if (finalReadinessNow < readinessMetadata.observedAtMs ||
+        finalReadinessNow >= readinessMetadata.expiresAtMs ||
+        !await assertAuthorization(authorization, action, scope, profileId) ||
         !await assertMutationAllowed(scope, action, "before-finalization")) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
