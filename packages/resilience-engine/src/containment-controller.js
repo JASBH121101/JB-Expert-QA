@@ -6,7 +6,6 @@ const SCOPE_KEYS = Object.freeze([
 ]);
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-const CONTAINMENT_RESULTS = new WeakMap();
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -81,21 +80,29 @@ function assertIdentifier(value, label) {
 }
 
 function normalizeEvidenceRefs(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 128 ||
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype ||
+      value.length < 1 || value.length > 128 ||
       Object.getOwnPropertySymbols(value).length > 0 ||
       Object.keys(value).length !== value.length) {
-    throw new TypeError("evidenceRefs must contain between 1 and 128 exact references");
+    throw new TypeError("evidenceRefs must be a dense plain array with 1 to 128 exact references");
   }
   const seen = new Set();
-  return Object.freeze(value.map((entry) => {
+  const normalized = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("evidenceRefs must not contain holes, getters or hidden values");
+    }
+    const entry = descriptor.value;
     exactKeys(entry, ["refId", "sha256"], "evidence reference");
     const refId = assertIdentifier(entry.refId, "evidence refId");
     if (typeof entry.sha256 !== "string" || !SHA256.test(entry.sha256) || seen.has(refId)) {
       throw new TypeError("evidence reference digest or identity is invalid");
     }
     seen.add(refId);
-    return Object.freeze({ refId, sha256: entry.sha256 });
-  }));
+    normalized.push(Object.freeze({ refId, sha256: entry.sha256 }));
+  }
+  return Object.freeze(normalized);
 }
 
 function assertTimestamp(value, label) {
@@ -329,6 +336,9 @@ export function createA2ContainmentController({
   if (typeof enableExecution !== "boolean") {
     throw new TypeError("enableExecution must be boolean");
   }
+  // A successful containment handle is scoped to this controller instance.
+  // Another controller, even in the same process, cannot release it.
+  const containmentResults = new WeakMap();
   if (typeof clock !== "function" ||
       !Number.isSafeInteger(operationTimeoutMs) ||
       operationTimeoutMs < 100 || operationTimeoutMs > 30_000) {
@@ -922,7 +932,7 @@ export function createA2ContainmentController({
       forensicReceipt: verified.forensicReceipt,
       idempotencyKey
     });
-    CONTAINMENT_RESULTS.set(result, {
+    containmentResults.set(result, {
       state: "contained", scope, profileId, operationReceipt, evidenceRefs: refs
     });
     return result;
@@ -934,7 +944,7 @@ export function createA2ContainmentController({
     markProviderStartRecorded
   ) {
     if (!enableExecution) return makeResult("disabled", "a2-execution-disabled");
-    const record = CONTAINMENT_RESULTS.get(containment);
+    const record = containmentResults.get(containment);
     if (!record || record.state !== "contained") {
       return makeResult("denied", "verified-controller-containment-result-required");
     }
@@ -1164,7 +1174,7 @@ export function createA2ContainmentController({
       forensicReceipt: preservedReceipt,
       idempotencyKey
     });
-    CONTAINMENT_RESULTS.set(result, {
+    containmentResults.set(result, {
       state: "released", scope, profileId, operationReceipt: releaseReceipt, evidenceRefs
     });
     return result;
