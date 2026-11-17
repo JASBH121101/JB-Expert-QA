@@ -5,6 +5,7 @@ import {
   A3_PROVIDER_EVIDENCE_ROLES,
   createA3ProviderEvidenceSigningPayload,
   createA3ProviderEvidenceVerifier,
+  evaluateA3ProviderReadiness,
   verifyA3EvidenceReferences,
   verifyA3ProviderEvidenceBundle
 } from "../src/provider-evidence-a3.js";
@@ -103,7 +104,7 @@ function createFixture({ providerOverrides = {} } = {}) {
   return { keys, verifier, makeAttestation, makeBundle };
 }
 
-function createReferenceFixture() {
+function createReferenceFixture({ factsByRole = {} } = {}) {
   const fixture = createFixture();
   const artifacts = new Map();
   const overrides = {};
@@ -112,6 +113,7 @@ function createReferenceFixture() {
     const bytes = Buffer.from("verified-a3-evidence:" + role, "utf8");
     artifacts.set(refId, bytes);
     overrides[role] = {
+      ...(factsByRole[role] ? { facts: factsByRole[role] } : {}),
       evidenceRefs: [{
         refId,
         sha256: createHash("sha256").update(bytes).digest("hex")
@@ -380,4 +382,68 @@ test("A3 evidence references reject evidence that expires while provider retriev
   });
   assert.equal(result.verified, false);
   assert.equal(result.reason, "provider-evidence-stale-or-expired");
+});
+
+
+test("A3 signed evidence and matching reference verification feed ARC readiness without authorizing failover", async () => {
+  const { bundle, artifacts } = createReferenceFixture();
+  const references = await verifyA3EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: resolverFor(artifacts),
+    clock: () => NOW
+  });
+  const readiness = evaluateA3ProviderReadiness({
+    bundle,
+    references,
+    clock: () => NOW
+  });
+  assert.equal(readiness.eligible, true);
+  assert.deepEqual(readiness.denied, []);
+  assert.equal(readiness.executable, false);
+});
+
+test("A3 ARC readiness preserves signed false facts and rejects forged or mismatched reference results", async () => {
+  const { bundle, artifacts } = createReferenceFixture({
+    factsByRole: {
+      "target-fencing-verifier": {
+        targetEnforcesFencing: true,
+        staleEpochRejected: false
+      }
+    }
+  });
+  const references = await verifyA3EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: resolverFor(artifacts),
+    clock: () => NOW
+  });
+  const readiness = evaluateA3ProviderReadiness({
+    bundle,
+    references,
+    clock: () => NOW
+  });
+  assert.equal(readiness.eligible, false);
+  assert.ok(readiness.denied.includes("targetEnforcesFencing") === false);
+  // The gate maps target enforcement, while the extra stale-write probe is a separate hard certification invariant.
+  assert.equal(readiness.executable, false);
+
+  const forged = evaluateA3ProviderReadiness({
+    bundle: { ...bundle },
+    references,
+    clock: () => NOW
+  });
+  assert.equal(forged.eligible, false);
+
+  const other = createReferenceFixture();
+  const otherReferences = await verifyA3EvidenceReferences({
+    bundle: other.bundle,
+    resolveEvidenceReference: resolverFor(other.artifacts),
+    clock: () => NOW
+  });
+  const mismatch = evaluateA3ProviderReadiness({
+    bundle,
+    references: otherReferences,
+    clock: () => NOW
+  });
+  assert.equal(mismatch.eligible, false);
+  assert.equal(mismatch.reason, "verified-a3-bundle-and-matching-reference-check-required");
 });
