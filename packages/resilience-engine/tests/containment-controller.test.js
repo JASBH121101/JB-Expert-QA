@@ -187,6 +187,7 @@ function createDependencies({
   denyAuthorization = false,
   auditFails = false,
   forensicValid = true,
+  mutationTimeout = false,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -212,7 +213,8 @@ function createDependencies({
     },
     async apply(input) {
       events.push("apply");
-      if (applyOutcome === "throw") throw new Error("provider timed out");
+      if (applyOutcome === "throw") throw new Error("provider failed");
+      if (applyOutcome === "hang") return new Promise(() => {});
       if (applyOutcome === "unknown") return { outcome: "unknown" };
       if (applyOutcome === "not-applied") return { outcome: "not-applied" };
       operationNumber += 1;
@@ -377,6 +379,7 @@ function createDependencies({
     mutationControl: {
       async assertAllowed(input) {
         events.push("mutation-check:" + input.phase);
+        if (mutationTimeout) return new Promise(() => {});
         return input.phase !== blockMutationAt;
       }
     },
@@ -587,5 +590,28 @@ test("A2 audit outage blocks the request before invoking the provider", async ()
   });
   assert.equal(result.state, "denied");
   assert.equal(result.reason, "durable-audit-unavailable");
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+
+test("A2 reconciles a provider deadline timeout before accepting a confirmed apply", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ applyOutcome: "hang", reconcileOutcome: "applied" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "contained");
+  assert.ok(deps.events.includes("reconcile"));
+  assert.ok(deps.events.includes("verify-containment"));
+});
+
+test("A2 treats a mutation-control timeout as a deny and never invokes the provider", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ mutationTimeout: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "mutation-control-blocked");
   assert.equal(deps.events.includes("apply"), false);
 });
