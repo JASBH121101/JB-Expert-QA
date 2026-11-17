@@ -318,8 +318,9 @@ function createDependencies({
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: releaseVerificationState,
-        operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
-        referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
+        operationId: releaseVerificationOperationIdOverride ?? input.operationReceipt.operationId,
+        referencesSha256: releaseVerificationReferenceDigestOverride ??
+          createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     }
   };
