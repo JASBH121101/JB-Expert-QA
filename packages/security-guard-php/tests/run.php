@@ -138,4 +138,7 @@ $authFailureClient = new UniversalRateLimitClient(
 );
 expect(!$authFailureClient->check('user-123', 'catalog-read', 'public')['allowed'], 'Authentication errors must never fail open');
 
-echo "PASS: PHP Core v1 HMAC vector, normalizers, counter keys and universal API client.\n";
+require_once __DIR__ . '/upload-inspection.php';
+runUploadInspectionTests();
+
+echo "PASS: PHP Core v1 HMAC vector, normalizers, universal API client and upload inspection.\n";
