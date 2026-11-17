@@ -603,11 +603,12 @@ export function createA2ContainmentController({
     }
   }
 
-  async function completeAction(claimId, outcome, reason) {
+  async function completeAction(claimId, outcome, reason, providerReconciliation = null) {
     try {
       const call = await invokeDependency(actionLedger, "complete", {
         claimId, outcome, reason,
-        completedAtMs: assertTimestamp(clock(), "action completion clock")
+        completedAtMs: assertTimestamp(clock(), "action completion clock"),
+        ...(providerReconciliation === null ? {} : { providerReconciliation })
       }, "action-completion");
       return !call.timedOut && !call.error && successful(call.value, "completed");
     } catch {
@@ -789,7 +790,8 @@ export function createA2ContainmentController({
   }
 
   async function finishNotApplied({
-    action, scope, profileId, claimId, reservationId, authorization, reason
+    action, scope, profileId, claimId, reservationId, authorization, reason,
+    providerReconciliation = null
   }) {
     const budgetOkay = await settleBudget(reservationId, "not-applied");
     const authOkay = await completeAuthorization(authorization, "failed");
@@ -800,7 +802,8 @@ export function createA2ContainmentController({
     const actionOkay = await completeAction(
       claimId,
       priorFinalizationOkay ? "not-applied" : "held-for-reconciliation",
-      priorFinalizationOkay ? reason : "not-applied-finalization-incomplete"
+      priorFinalizationOkay ? reason : "not-applied-finalization-incomplete",
+      providerReconciliation
     );
     return makeResult(priorFinalizationOkay && actionOkay
       ? "not-applied" : "held-for-reconciliation", reason);
@@ -1029,7 +1032,13 @@ export function createA2ContainmentController({
       if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
-          reason: "provider-confirmed-not-applied"
+          reason: "provider-confirmed-not-applied",
+          providerReconciliation: {
+            schema: "jb.resilience.a2-provider-non-application/v1",
+            providerId, action, scope, profileId, idempotencyKey,
+            outcome: "not-applied",
+            observedAtMs: assertTimestamp(clock(), "provider non-application observation clock")
+          }
         });
       }
       if (!exactOutcome(reconcile.value, "applied", true) ||
@@ -1276,7 +1285,13 @@ export function createA2ContainmentController({
       if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
-          reason: "provider-confirmed-release-not-applied"
+          reason: "provider-confirmed-release-not-applied",
+          providerReconciliation: {
+            schema: "jb.resilience.a2-provider-non-application/v1",
+            providerId, action, scope, profileId, idempotencyKey,
+            outcome: "not-applied",
+            observedAtMs: assertTimestamp(clock(), "provider release non-application observation clock")
+          }
         });
       }
       if (!exactOutcome(reconcile.value, "released", true) ||
