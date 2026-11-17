@@ -232,11 +232,11 @@ function validatePreflight(value, providerId, scope, profileId) {
 }
 
 function validateIndependentVerification(value, {
-  verifierId, scope, profileId, expectedState, now
+  verifierId, scope, profileId, expectedState, operationId, now
 }) {
   try {
     exactKeys(value, [
-      "schema", "verifierId", "verified", "state", "profileId",
+      "schema", "verifierId", "verified", "state", "profileId", "operationId",
       ...SCOPE_KEYS, "observedAtMs", "expiresAtMs"
     ], "A2 independent verification");
   } catch {
@@ -247,6 +247,7 @@ function validateIndependentVerification(value, {
     value.verified === true &&
     value.state === expectedState &&
     value.profileId === profileId &&
+    value.operationId === operationId &&
     sameScope(value, scope) &&
     Number.isSafeInteger(value.observedAtMs) &&
     value.observedAtMs >= 0 &&
@@ -256,11 +257,11 @@ function validateIndependentVerification(value, {
     value.expiresAtMs > now;
 }
 
-function validateForensicReceipt(value, recorderId, scope, now) {
+function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs) {
   try {
     exactKeys(value, [
       "schema", "recorderId", "retained", ...SCOPE_KEYS, "evidenceIds",
-      "retentionPolicyId", "preservedAtMs", "expiresAtMs"
+      "retentionPolicyId", "preservedAtMs", "expiresAtMs", "referencesSha256"
     ], "A2 forensic receipt");
   } catch {
     return false;
@@ -268,6 +269,7 @@ function validateForensicReceipt(value, recorderId, scope, now) {
   return value.schema === "jb.resilience.a2-forensic-receipt/v1" &&
     value.recorderId === recorderId &&
     value.retained === true &&
+    value.referencesSha256 === createHash("sha256").update(canonical(evidenceRefs), "utf8").digest("hex") &&
     sameScope(value, scope) &&
     Array.isArray(value.evidenceIds) &&
     value.evidenceIds.length > 0 &&
@@ -662,7 +664,8 @@ export function createA2ContainmentController({
     );
     const verifyNow = assertTimestamp(clock(), "verification clock");
     if (!validateIndependentVerification(verifyCall.value, {
-      verifierId, scope, profileId, expectedState: "contained", now: verifyNow
+      verifierId, scope, profileId, expectedState: "contained",
+      operationId: operationReceipt.operationId, now: verifyNow
     })) return { ok: false, reason: "independent-containment-verification-failed" };
     const verification = Object.freeze({ ...verifyCall.value });
 
@@ -672,7 +675,7 @@ export function createA2ContainmentController({
       operationTimeoutMs, "forensic-preservation", clock
     );
     const preserveNow = assertTimestamp(clock(), "forensic clock");
-    if (!validateForensicReceipt(preserveCall.value, recorderId, scope, preserveNow)) {
+    if (!validateForensicReceipt(preserveCall.value, recorderId, scope, preserveNow, evidenceRefs)) {
       return { ok: false, reason: "forensic-evidence-preservation-failed" };
     }
     const forensicReceipt = Object.freeze({
@@ -974,6 +977,7 @@ export function createA2ContainmentController({
     );
     if (!validateIndependentVerification(current.value, {
       verifierId, scope, profileId, expectedState: "contained",
+      operationId: operationReceipt.operationId,
       now: assertTimestamp(clock(), "pre-release verification clock")
     })) {
       return finishUnknown({
@@ -996,7 +1000,7 @@ export function createA2ContainmentController({
       operationTimeoutMs, "pre-release-forensics", clock
     );
     if (!validateForensicReceipt(preserved.value, recorderId, scope,
-        assertTimestamp(clock(), "pre-release forensic clock"))) {
+        assertTimestamp(clock(), "pre-release forensic clock"), evidenceRefs)) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
         reason: "pre-release-forensic-preservation-failed", operationReceipt
@@ -1098,6 +1102,7 @@ export function createA2ContainmentController({
     );
     if (!validateIndependentVerification(verification.value, {
       verifierId, scope, profileId, expectedState: "released",
+      operationId: releaseReceipt.operationId,
       now: assertTimestamp(clock(), "release verification clock")
     })) {
       return finishUnknown({
