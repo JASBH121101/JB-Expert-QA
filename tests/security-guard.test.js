@@ -829,6 +829,10 @@ test("static GET and HEAD assets do not consume the Node request rate-limit coun
 
     assert.equal((await request("/api/catalog")).statusCode, 200);
     assert.equal((await request("/api/catalog")).statusCode, 429);
+    // A dynamic API route must not bypass rate limiting just because its name
+    // ends with a normally static extension.
+    assert.equal((await request("/api/catalog.js")).statusCode, 429);
+    assert.equal((await request("/reports/export.pdf")).statusCode, 429);
     assert.equal(guard.getStats().rateLimitKeys, 1);
     assert.equal(events.length, 1);
     assert.deepEqual(events[0].ruleIds, ["JBG-RATE-001"]);
