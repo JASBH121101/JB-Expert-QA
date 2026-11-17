@@ -194,6 +194,7 @@ function createDependencies({
   budgetReconcileState = "from-ledger",
   providerStartMode = "normal",
   releaseStartMode = "normal",
+  authorizationIssuedAtMs = NOW,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -318,7 +319,7 @@ function createDependencies({
           action: input.action,
           ...input.scope,
           profileId: input.profileId,
-          issuedAtMs: NOW,
+          issuedAtMs: authorizationIssuedAtMs,
           expiresAtMs: NOW + 20_000
         }
       };
@@ -748,4 +749,43 @@ test("A2 requires a durable provider-start marker before releasing containment",
   assert.equal(released.executed, false);
   assert.ok(deps.events.includes("action-mark-provider-started:release-containment"));
   assert.equal(deps.events.includes("release"), false);
+});
+
+
+test("A2 holds a budget reservation whose durable reconciliation remains unknown", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({
+    budgetReserveMode: "hang",
+    budgetReconcileState: "unknown"
+  });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.ok(deps.events.includes("budget-reconcile"));
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 safely abandons a provider-start marker denied by the ledger before any provider call", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ providerStartMode: "deny" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "not-applied");
+  assert.equal(result.executed, false);
+  assert.ok(deps.events.includes("action-reconcile"));
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 rejects negative authorization issue timestamps", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ authorizationIssuedAtMs: -1 });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "a2-policy-authorization-denied");
+  assert.equal(deps.events.includes("apply"), false);
 });
