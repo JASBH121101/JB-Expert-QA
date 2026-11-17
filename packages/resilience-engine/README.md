@@ -80,6 +80,13 @@ The optional `./provider-evidence` entry point verifies short-lived Ed25519 atte
 
 The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
 
+
+## Signed A3 Provider Evidence (v1 laboratory)
+
+The optional `./provider-evidence-a3` entry point verifies nine Ed25519 provider roles for one exact failover source, target, lease, fencing epoch, policy revision/hash and RPO. It checks independent identities for traffic execution versus failover verification, source fencing versus target fencing verification, and coordination versus failover verification. Its second-stage evidence resolver checks scope and SHA-256 with bounded timeouts and size limits.
+
+These are signed evidence contracts, not a failover controller. They do not supply quorum, source-fence operations, target-enforced fencing, replication, target promotion, traffic cutover or rollback. A3 remains denied by the policy engine. See [A3 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-A3-V1.md).
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
