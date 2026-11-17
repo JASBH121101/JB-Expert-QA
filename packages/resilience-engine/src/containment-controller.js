@@ -802,6 +802,22 @@ export function createA2ContainmentController({
       });
     }
 
+    const postMarkerAuthorization = await assertAuthorization(
+      authorization, action, scope, profileId
+    );
+    const postMarkerMutation = await assertMutationAllowed(
+      scope, action, "after-provider-start-marker"
+    );
+    const postMarkerNow = assertTimestamp(clock(), "A2 post-marker clock");
+    if (!postMarkerAuthorization || !postMarkerMutation ||
+        postMarkerNow < readinessMetadata.observedAtMs ||
+        postMarkerNow >= readinessMetadata.expiresAtMs) {
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "policy-mutation-control-or-readiness-changed-after-provider-start-marker"
+      });
+    }
+
     const apply = await invokeBounded(
       containmentProvider.apply.bind(containmentProvider),
       { scope, profileId, idempotencyKey },
@@ -1003,6 +1019,20 @@ export function createA2ContainmentController({
         operationReceipt
       });
     }
+    const postMarkerAuthorization = await assertAuthorization(
+      authorization, action, scope, profileId
+    );
+    const postMarkerMutation = await assertMutationAllowed(
+      scope, action, "after-release-start-marker"
+    );
+    if (!postMarkerAuthorization || !postMarkerMutation) {
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "policy-or-mutation-control-changed-after-release-start-marker",
+        operationReceipt
+      });
+    }
+
     const release = await invokeBounded(
       containmentProvider.release.bind(containmentProvider),
       { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
