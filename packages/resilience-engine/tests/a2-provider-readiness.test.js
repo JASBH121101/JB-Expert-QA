@@ -220,7 +220,7 @@ test("A2 readiness rejects a genuine Gateway result backed by an in-memory repla
   assert.equal(result.executable, false);
 });
 
-test("A2 readiness rejects suspected signals, forged state objects and unverified provider references", async () => {
+test("A2 readiness rejects forged Gateway state objects and unverified provider references", async () => {
   const { gateway } = createGateway({ durable: true });
   const securityState = await getConfirmedSignalState(gateway);
   const { bundle, artifacts } = createProviderBundle();
