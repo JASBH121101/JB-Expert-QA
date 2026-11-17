@@ -230,7 +230,11 @@ class UploadInspectionService:
                 raise UploadInspectionError("SCAN_NOT_CLEAN")
 
             retain_quarantine = True
-            if self._storage.promote(upload_id, sha256, size) is not True:
+            try:
+                promotion_result = self._storage.promote(upload_id, sha256, size)
+            except Exception as exc:
+                raise UploadInspectionError("PROMOTION_FAILED") from exc
+            if promotion_result is not True:
                 raise UploadInspectionError("PROMOTION_FAILED")
             promoted = True
             retain_quarantine = False
