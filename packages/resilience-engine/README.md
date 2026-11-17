@@ -80,6 +80,11 @@ The optional `./provider-evidence` entry point verifies short-lived Ed25519 atte
 
 The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
 
+
+### A2 provider evidence to ARC readiness
+
+The read-only `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })` function combines the verified A2 provider bundle and byte-integrity result with an exact Trusted Signal Gateway result. It rejects copied/fabricated Gateway outputs, non-durable replay stores, missing evidence, non-confirmed states and stale signals. It maps only authenticated Gateway provenance and signed provider facts into the existing A2 readiness gate. Its result always has `executable: false` and does not grant containment authorization.
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
