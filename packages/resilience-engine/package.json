@@ -28,7 +28,8 @@
     "./provider-evidence": "./src/provider-evidence.js",
     "./provider-evidence-a3": "./src/provider-evidence-a3.js",
     "./containment-controller": "./src/containment-controller.js",
-    "./a2-recovery-coordinator": "./src/a2-recovery-coordinator.js"
+    "./a2-recovery-coordinator": "./src/a2-recovery-coordinator.js",
+    "./a2-action-ledger": "./src/a2-action-ledger.js"
   },
   "files": [
     "src/**",
