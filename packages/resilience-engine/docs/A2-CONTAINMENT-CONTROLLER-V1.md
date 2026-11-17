@@ -21,6 +21,12 @@ The host must inject all of the following:
 
 All store durability markers are host integration assertions. The controller cannot prove that a custom adapter or database is truly durable; the host must certify its implementation and operational configuration.
 
+### Durable action journal semantics
+
+The action ledger is a transactional state machine, not a boolean idempotency cache. Its reconciliation result uses exactly one of these states: `claimed`, `provider-started`, `completed`, `not-found`, or `unknown`. The budget ledger uses `reserved`, `settled`, `not-found`, or `unknown`. Every lookup is keyed by the exact action, scope, profile and idempotency key.
+
+The action ledger must atomically allow `markProviderStarted` only from an unexpired `claimed` state. It must reject a competing or stale marker after the claim has been completed, cancelled or moved to provider-started. A completion request with outcome `not-applied` must never overwrite a `provider-started` or `completed` state without an authoritative provider reconciliation. A budget reservation reported as `reserved` after an ambiguous reserve call must be settled as `not-applied` before the controller abandons the operation. Unknown or malformed ledger state remains held; it is not permission to retry.
+
 Every injected adapter and durable dependency call is time-bounded by the controller. The host method receives an absolute deadline and an AbortSignal; production implementations must honor cancellation and make durable reservation/settlement calls idempotent for the supplied operation key. Timed-out action claims and budget reservations are queried again by that exact key. The action ledger must distinguish a claim that has not started the provider from a provider-started or completed action. A durable provider-start marker is required before the controller can call apply. If that marker times out, the controller reconciles the action journal; it will not call the provider unless the journal proves the provider has not started and the operation is safely finalized as not applied. Any ambiguous journal state is held for reconciliation.
 
 ## Exact scope
