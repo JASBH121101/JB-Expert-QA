@@ -135,7 +135,8 @@ function normalizeEvidenceRefs(input) {
     throw new TypeError("evidenceRefs must contain 1 to 20 dense references");
   }
   const seen = new Set();
-  return Object.freeze(input.map((entry, index) => {
+  const refs = [];
+  for (let index = 0; index < input.length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
       throw new TypeError("evidenceRefs must not contain holes or accessors");
@@ -148,8 +149,9 @@ function normalizeEvidenceRefs(input) {
     if (typeof ref.sha256 !== "string" || !SHA256.test(ref.sha256)) {
       throw new TypeError("A3 evidence reference digest is invalid");
     }
-    return Object.freeze({ refId, sha256: ref.sha256 });
-  }));
+    refs.push(Object.freeze({ refId, sha256: ref.sha256 }));
+  }
+  return Object.freeze(refs);
 }
 
 function normalizeUnsigned(input) {
@@ -389,6 +391,121 @@ export function verifyA3ProviderEvidenceBundle({ attestations, expected, verifie
   });
   VERIFIED_BUNDLES.add(bundle);
   return bundle;
+}
+
+/**
+ * Verify the raw bytes behind each signed A3 evidence reference. The host
+ * resolver must fetch from authoritative monitor/provider systems. This
+ * validates scope and digest, not the semantic truth of the evidence.
+ */
+export async function verifyA3EvidenceReferences({
+  bundle,
+  resolveEvidenceReference,
+  clock = Date.now,
+  maxReferenceBytes = 10 * 1024 * 1024,
+  maxTotalBytes = 50 * 1024 * 1024,
+  timeoutMs = 5_000
+} = {}) {
+  const denied = (reason) => Object.freeze({
+    schema: "jb.resilience.a3-evidence-reference-verification/v1",
+    verified: false,
+    executable: false,
+    reason
+  });
+  if (!VERIFIED_BUNDLES.has(bundle) ||
+      typeof resolveEvidenceReference !== "function" ||
+      typeof clock !== "function" ||
+      !Number.isSafeInteger(maxReferenceBytes) || maxReferenceBytes < 1 ||
+      maxReferenceBytes > 25 * 1024 * 1024 ||
+      !Number.isSafeInteger(maxTotalBytes) || maxTotalBytes < maxReferenceBytes ||
+      maxTotalBytes > 100 * 1024 * 1024 ||
+      !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
+    return denied("invalid-evidence-reference-verification-input");
+  }
+  let now;
+  try { now = timestamp(clock(), "A3 evidence verifier clock"); }
+  catch { return denied("invalid-evidence-reference-clock"); }
+  if (now < bundle.observedAtMs || now >= bundle.expiresAtMs) {
+    return denied("provider-evidence-stale-or-expired");
+  }
+
+  const references = [];
+  let totalBytes = 0;
+  for (const provider of bundle.providers) {
+    for (const reference of provider.evidenceRefs) {
+      if (references.length >= 180) return denied("evidence-reference-count-exceeded");
+      const controller = new AbortController();
+      let timer;
+      let timedOut = false;
+      const pending = Promise.resolve().then(() => resolveEvidenceReference(Object.freeze({
+        refId: reference.refId,
+        sha256: reference.sha256,
+        providerId: provider.providerId,
+        role: provider.role,
+        scope: bundle.scope,
+        signal: controller.signal
+      })));
+      pending.catch(() => {});
+      const deadline = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(new Error("A3 evidence lookup timed out"));
+        }, timeoutMs);
+      });
+      let resolved;
+      try { resolved = await Promise.race([pending, deadline]); }
+      catch { return denied(timedOut ? "evidence-reference-timeout" : "evidence-reference-unavailable"); }
+      finally { clearTimeout(timer); }
+
+      try { now = timestamp(clock(), "A3 evidence verifier clock"); }
+      catch { return denied("invalid-evidence-reference-clock"); }
+      if (now < bundle.observedAtMs || now >= bundle.expiresAtMs) {
+        return denied("provider-evidence-stale-or-expired");
+      }
+
+      try {
+        exactKeys(resolved, [
+          "providerId", "role", ...EXPECTED_FIELDS, "bytes"
+        ], "resolved A3 evidence reference");
+      } catch { return denied("invalid-resolved-evidence-reference"); }
+
+      if (resolved.providerId !== provider.providerId || resolved.role !== provider.role ||
+          EXPECTED_FIELDS.some((key) => resolved[key] !== bundle.scope[key])) {
+        return denied("evidence-reference-scope-mismatch");
+      }
+      if (!(resolved.bytes instanceof Uint8Array)) return denied("invalid-evidence-reference-bytes");
+      const bytes = Buffer.from(resolved.bytes);
+      if (bytes.length < 1 || bytes.length > maxReferenceBytes ||
+          totalBytes + bytes.length > maxTotalBytes) {
+        return denied("evidence-reference-size-limit-exceeded");
+      }
+      const actualSha256 = createHash("sha256").update(bytes).digest("hex");
+      if (actualSha256 !== reference.sha256) return denied("evidence-reference-digest-mismatch");
+      totalBytes += bytes.length;
+      references.push(Object.freeze({
+        refId: reference.refId,
+        providerId: provider.providerId,
+        role: provider.role,
+        sha256: actualSha256,
+        size: bytes.length
+      }));
+    }
+  }
+  try { now = timestamp(clock(), "A3 evidence verifier clock"); }
+  catch { return denied("invalid-evidence-reference-clock"); }
+  if (now < bundle.observedAtMs || now >= bundle.expiresAtMs) {
+    return denied("provider-evidence-stale-or-expired");
+  }
+  return Object.freeze({
+    schema: "jb.resilience.a3-evidence-reference-verification/v1",
+    verified: true,
+    executable: false,
+    scope: bundle.scope,
+    referenceCount: references.length,
+    totalBytes,
+    references: Object.freeze(references)
+  });
 }
 
 export const A3_PROVIDER_EVIDENCE_ROLES = ROLES;
