@@ -281,8 +281,11 @@ function safeClock(clock) {
   return now;
 }
 
-function stateResult({ state, reason, assetId, environment, sources = [], evidenceRefs = [] }) {
-  return Object.freeze({
+function stateResult({
+  state, reason, assetId, environment, sources = [], evidenceRefs = [],
+  replayStoreDurable = false, observedAtMs = null, expiresAtMs = null
+}) {
+  const result = Object.freeze({
     schema: "jb.resilience.signal-state/v1",
     state,
     reason,
@@ -293,6 +296,21 @@ function stateResult({ state, reason, assetId, environment, sources = [], eviden
     preserveEvidence: true,
     authorizationGranted: false
   });
+  TRUSTED_SIGNAL_STATE_METADATA.set(result, Object.freeze({
+    replayStoreDurable: replayStoreDurable === true,
+    observedAtMs: Number.isSafeInteger(observedAtMs) && observedAtMs >= 0 ? observedAtMs : null,
+    expiresAtMs: Number.isSafeInteger(expiresAtMs) && expiresAtMs >= 0 ? expiresAtMs : null
+  }));
+  return result;
+}
+
+/**
+ * Returns gateway-owned trust metadata only for exact result objects created
+ * by getSecurityState(). It adds no enumerable fields to the public contract.
+ */
+export function getTrustedSignalStateMetadata(value) {
+  if (value === null || typeof value !== "object") return null;
+  return TRUSTED_SIGNAL_STATE_METADATA.get(value) ?? null;
 }
 
 /**
@@ -406,13 +424,17 @@ export function createTrustedSignalGateway({
   }
 
   async function getSecurityState({ assetId, environment } = {}) {
+    const buildStateResult = (input) => stateResult({
+      ...input,
+      replayStoreDurable: replayStore.durable === true
+    });
     assertIdentifier(assetId, ASSET_ID, "assetId");
     assertIdentifier(environment, IDENTIFIER, "environment");
     const matchingSources = registry.all.filter((source) =>
       source.environment === environment && source.assetIds.includes(assetId)
     );
     if (matchingSources.length === 0) {
-      return stateResult({
+      return buildStateResult({
         state: "unknown", reason: "no-trusted-sources-for-asset", assetId, environment
       });
     }
@@ -428,22 +450,22 @@ export function createTrustedSignalGateway({
       });
       now = safeClock(clock);
     } catch {
-      return stateResult({
+      return buildStateResult({
         state: "unknown", reason: "replay-store-unavailable", assetId, environment
       });
     }
     if (!Array.isArray(records)) {
-      return stateResult({
+      return buildStateResult({
         state: "tampered", reason: "invalid-replay-store-response", assetId, environment
       });
     }
     if (records.length > 10_000) {
-      return stateResult({
+      return buildStateResult({
         state: "unknown", reason: "replay-store-result-limit-exceeded", assetId, environment
       });
     }
     if (records.length === 0) {
-      return stateResult({
+      return buildStateResult({
         state: "unknown", reason: "no-trusted-signals", assetId, environment
       });
     }
@@ -485,7 +507,7 @@ export function createTrustedSignalGateway({
         if (!validBySource.has(envelope.sourceId)) validBySource.set(envelope.sourceId, []);
         validBySource.get(envelope.sourceId).push(envelope);
       } catch {
-        return stateResult({
+        return buildStateResult({
           state: "tampered",
           reason: "persisted-signal-integrity-failure",
           assetId,
@@ -506,7 +528,7 @@ export function createTrustedSignalGateway({
       const newestTimestamp = events[0].issuedAtMs;
       const sameTime = events.filter((item) => item.issuedAtMs === newestTimestamp);
       if (new Set(sameTime.map((item) => item.state)).size > 1) {
-        return stateResult({
+        return buildStateResult({
           state: "conflicting",
           reason: "same-source-conflicting-signals",
           assetId,
@@ -525,7 +547,7 @@ export function createTrustedSignalGateway({
 
     if (missing.length > 0) {
       const expired = missing.some((sourceId) => expiredSources.has(sourceId));
-      return stateResult({
+      return buildStateResult({
         state: expired ? "stale" : "unknown",
         reason: expired ? "required-source-signal-expired" : "required-source-signal-missing",
         assetId,
@@ -574,7 +596,7 @@ export function createTrustedSignalGateway({
         }
       }
     }
-    return stateResult({
+    return buildStateResult({
       state,
       reason,
       assetId,
@@ -587,7 +609,9 @@ export function createTrustedSignalGateway({
         issuedAtMs: item.issuedAtMs,
         reasonCode: item.reasonCode
       })),
-      evidenceRefs
+      evidenceRefs,
+      observedAtMs: Math.min(...latest.map((item) => item.issuedAtMs)),
+      expiresAtMs: Math.min(...latest.map((item) => item.expiresAtMs))
     });
   }
 
