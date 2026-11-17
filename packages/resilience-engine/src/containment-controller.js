@@ -419,10 +419,7 @@ export function createA2ContainmentController({
     [independentVerifier, ["verifyContainment", "verifyRelease"], "independentVerifier"],
     [forensicRecorder, ["preserveEvidence"], "forensicRecorder"],
     [budgetLedger, ["reserve", "reconcile", "settle"], "budgetLedger"],
-    [actionLedger, [
-      "claim", "markProviderStarted", "reconcile", "complete",
-      "createPendingRecord", "listPending", "getPendingByClaimId"
-    ], "actionLedger"],
+    [actionLedger, ["claim", "markProviderStarted", "reconcile", "complete"], "actionLedger"],
     [auditStore, ["append"], "auditStore"],
     [mutationControl, ["assertAllowed"], "mutationControl"]
   ];
@@ -439,6 +436,12 @@ export function createA2ContainmentController({
     if (dependency.durable !== true) {
       throw new TypeError(label + " must be durable for A2 execution");
     }
+  }
+  if (enableExecution &&
+      ["createPendingRecord", "listPending", "getPendingByClaimId"].some(
+        (method) => typeof actionLedger[method] !== "function"
+      )) {
+    throw new TypeError("actionLedger must implement the durable A2 pending recovery journal");
   }
   const providerId = assertIdentifier(containmentProvider.providerId, "containment providerId");
   const verifierId = assertIdentifier(independentVerifier.verifierId, "independent verifierId");
