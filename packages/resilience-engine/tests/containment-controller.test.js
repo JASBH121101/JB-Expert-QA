@@ -197,6 +197,7 @@ function createDependencies({
   releaseStartMode = "normal",
   authorizationIssuedAtMs = NOW,
   verificationOperationIdOverride = null,
+  verificationReferenceDigestOverride = null,
   forensicOperationIdOverride = null,
   forensicReferenceDigestOverride = null,
   clockThrowsAfterProviderStart = false,
@@ -300,7 +301,8 @@ function createDependencies({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: verificationState,
         operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
-        referencesSha256: createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
+        referencesSha256: verificationReferenceDigestOverride ??
+          createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     },
     async verifyRelease(input) {
@@ -904,4 +906,16 @@ test("A2 rejects forensic receipts bound to another provider operation or eviden
   assert.equal(second.state, "held-for-reconciliation");
   assert.equal(second.executed, false);
   assert.equal(second.reason, "forensic-evidence-preservation-failed");
+});
+
+
+test("A2 rejects an independent verifier receipt bound to a substituted evidence set", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ verificationReferenceDigestOverride: "f".repeat(64) });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(result.reason, "independent-containment-verification-failed");
 });
