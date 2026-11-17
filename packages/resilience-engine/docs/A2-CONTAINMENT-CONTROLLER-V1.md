@@ -65,6 +65,7 @@ Release is not an inverse command and is never implicit. It requires:
 5. A durable action-ledger provider-start marker for the release operation.
 6. A typed release result or authoritative release reconciliation.
 7. Independent confirmation that the exact asset/profile is now released.
+8. A final authorization and mutation-stop recheck after independent release verification and before durable success finalization.
 
 A failed, expired or unknown release authorization blocks the operation. An uncertain provider result is held for reconciliation. The original containment result cannot be released twice.
 
