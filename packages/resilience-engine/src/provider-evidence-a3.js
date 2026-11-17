@@ -355,8 +355,14 @@ export function verifyA3ProviderEvidenceBundle({ attestations, expected, verifie
   }
   if (ROLES.some((role) => !byRole.has(role))) return denied("required-provider-role-missing");
 
+  if (byRole.get("external-monitor").providerId === scope.sourceId ||
+      byRole.get("external-monitor").providerId === scope.targetId) {
+    return denied("external-monitor-must-be-outside-failover-endpoints");
+  }
+
   const independentPairs = [
     ["traffic-provider", "failover-verifier"],
+    ["traffic-provider", "target-fencing-verifier"],
     ["source-fencing-provider", "target-fencing-verifier"],
     ["coordination-authority", "failover-verifier"]
   ];
