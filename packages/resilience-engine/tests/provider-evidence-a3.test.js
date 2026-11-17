@@ -245,6 +245,21 @@ test("requires independent traffic execution, failover verification and fencing-
   }
 });
 
+test("external monitor identity cannot be the failed source or failover target", () => {
+  for (const endpoint of [SCOPE.sourceId, SCOPE.targetId]) {
+    const fixture = createFixture({
+      providerOverrides: { "external-monitor": endpoint }
+    });
+    const result = verifyA3ProviderEvidenceBundle({
+      attestations: fixture.makeBundle(),
+      expected: SCOPE,
+      verifier: fixture.verifier
+    });
+    assert.equal(result.verified, false);
+    assert.equal(result.reason, "external-monitor-must-be-outside-failover-endpoints");
+  }
+});
+
 test("rejects arbitrary verifier objects, invalid scope and unsupported attestation fields", () => {
   const fixture = createFixture();
   const forged = verifyA3ProviderEvidenceBundle({
