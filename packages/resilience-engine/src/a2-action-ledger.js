@@ -188,7 +188,12 @@ function emptyLedger() {
 }
 
 function validateLedger(value, maxClaims, identities) {
-  if (!isRecord(value) || value.schema !== LEDGER_SCHEMA ||
+  try {
+    exactKeys(value, ["schema", "revision", "claims", "idempotency"], "A2 action ledger");
+  } catch {
+    throw new Error("A2 action ledger is malformed or exceeds configured capacity");
+  }
+  if (value.schema !== LEDGER_SCHEMA ||
       !Number.isSafeInteger(value.revision) || value.revision < 0 ||
       !isRecord(value.claims) || !isRecord(value.idempotency) ||
       Object.keys(value.claims).length > maxClaims ||
@@ -198,6 +203,15 @@ function validateLedger(value, maxClaims, identities) {
   const keys = new Set();
   const sequences = new Set();
   for (const [claimId, entry] of Object.entries(value.claims)) {
+    try {
+      exactKeys(entry, [
+        "claimId", "sequence", "action", "scope", "profileId", "idempotencyKey",
+        "claimedAtMs", "expiresAtMs", "status", "outcome", "reason",
+        "completedAtMs", "recoveryRecord"
+      ], "A2 ledger claim");
+    } catch {
+      throw new Error("A2 action ledger contains an invalid claim");
+    }
     if (!IDENTIFIER.test(claimId) || !isRecord(entry) ||
         entry.claimId !== claimId ||
         !ACTIONS.has(entry.action) ||
@@ -206,7 +220,8 @@ function validateLedger(value, maxClaims, identities) {
         !Number.isSafeInteger(entry.claimedAtMs) || entry.claimedAtMs < 0 ||
         !Number.isSafeInteger(entry.expiresAtMs) || entry.expiresAtMs <= entry.claimedAtMs ||
         typeof entry.idempotencyKey !== "string" || !SHA256.test(entry.idempotencyKey) ||
-        !["claimed", "provider-started", "completed"].includes(entry.status)) {
+        !["claimed", "provider-started", "completed"].includes(entry.status) ||
+        (entry.reason !== null && (typeof entry.reason !== "string" || entry.reason.length > 160))) {
       throw new Error("A2 action ledger contains an invalid claim");
     }
     sequences.add(entry.sequence);
@@ -402,6 +417,31 @@ function assertSignal(signal) {
   }
 }
 
+function validateMethodInput(input, requiredKeys, optionalKeys = []) {
+  if (!isRecord(input) ||
+      (Object.getPrototypeOf(input) !== Object.prototype &&
+       Object.getPrototypeOf(input) !== null) ||
+      Object.getOwnPropertySymbols(input).length !== 0) {
+    throw new TypeError("A2 action ledger input must be a plain data object");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const allowed = new Set([...requiredKeys, ...optionalKeys, "deadline", "signal"]);
+  const actual = Object.keys(descriptors);
+  if (requiredKeys.some((key) => !Object.hasOwn(descriptors, key)) ||
+      actual.some((key) => !allowed.has(key))) {
+    throw new TypeError("A2 action ledger input has missing or unsupported fields");
+  }
+  for (const descriptor of Object.values(descriptors)) {
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("A2 action ledger input must not contain accessors or hidden fields");
+    }
+  }
+  if (Object.hasOwn(descriptors, "deadline")) {
+    assertTimestamp(descriptors.deadline.value, "A2 dependency deadline");
+  }
+  if (Object.hasOwn(descriptors, "signal")) assertSignal(descriptors.signal.value);
+}
+
 function actionMatches(entry, action, scope, profileId, idempotencyKey) {
   return entry.action === action && entry.profileId === profileId &&
     entry.idempotencyKey === idempotencyKey &&
@@ -467,6 +507,9 @@ export function createFileA2ActionLedger({
   }
 
   async function claim(input = {}) {
+    validateMethodInput(input, [
+      "action", "scope", "profileId", "idempotencyKey", "claimedAtMs", "expiresAtMs"
+    ]);
     const action = input.action;
     if (!ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
     const scope = normalizeScope(input.scope);
@@ -513,6 +556,7 @@ export function createFileA2ActionLedger({
   }
 
   async function createPendingRecord(input = {}) {
+    validateMethodInput(input, ["record", "atMs"]);
     const atMs = assertTimestamp(input.atMs, "pending record creation time");
     const record = normalizeRecoveryRecord(input.record, identities);
     return mutate(input.signal, async (ledger) => {
@@ -531,6 +575,9 @@ export function createFileA2ActionLedger({
   }
 
   async function markProviderStarted(input = {}) {
+    validateMethodInput(input, [
+      "claimId", "action", "scope", "profileId", "idempotencyKey", "recoveryRecord", "atMs"
+    ]);
     const claimId = assertIdentifier(input.claimId, "claimId");
     const action = input.action;
     if (!ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
@@ -559,6 +606,7 @@ export function createFileA2ActionLedger({
   }
 
   async function reconcile(input = {}) {
+    validateMethodInput(input, ["action", "scope", "profileId", "idempotencyKey", "atMs"]);
     const action = input.action;
     if (!ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
     const scope = normalizeScope(input.scope);
@@ -590,6 +638,9 @@ export function createFileA2ActionLedger({
   }
 
   async function complete(input = {}) {
+    validateMethodInput(input, [
+      "claimId", "outcome", "reason", "completedAtMs"
+    ], ["providerReconciliation"]);
     const claimId = assertIdentifier(input.claimId, "claimId");
     const completedAtMs = assertTimestamp(input.completedAtMs, "completedAtMs");
     const outcome = input.outcome;
@@ -654,6 +705,7 @@ export function createFileA2ActionLedger({
   }
 
   async function listPending(input = {}) {
+    validateMethodInput(input, ["limit", "atMs"], ["cursor"]);
     const atMs = assertTimestamp(input.atMs, "pending journal page time");
     const limit = input.limit;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
@@ -696,6 +748,7 @@ export function createFileA2ActionLedger({
   }
 
   async function getPendingByClaimId(input = {}) {
+    validateMethodInput(input, ["claimId", "atMs"]);
     const claimId = assertIdentifier(input.claimId, "claimId");
     assertTimestamp(input.atMs, "pending journal exact lookup time");
     return read(input.signal, async (ledger) => {
