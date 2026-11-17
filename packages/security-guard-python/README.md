@@ -79,8 +79,8 @@ and only then requests private atomic promotion.
 Host adapters must keep quarantine and approved objects private, enforce scanner
 deadlines, consume the complete stream, verify exact bytes during promotion, and
 make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
-and uncertain promotion outcomes never produce an approval. Uncertain objects
-remain quarantined for review.
+and uncertain promotion outcomes never produce an approval. Malicious files,
+unknown verdicts and uncertain objects remain quarantined for forensic review.
 
 No antivirus engine or production storage implementation is bundled. Signature
 identification is not full format validation or image sanitization. The host
