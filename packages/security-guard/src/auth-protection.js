@@ -379,8 +379,10 @@ export function createAuthProtection(options = {}) {
       throw new TypeError("Authentication middleware requires (request, response, next)");
     }
     const status = statusFor(request);
-    const identityEnforced = status.identityUnavailable === true &&
-      mode !== "monitor" && blockSeverities.includes(SEVERITY);
+    // Missing identity attribution means the authentication control cannot enforce
+    // its own scope. Treat that as a control-integrity failure in every enforcing mode,
+    // independent of ordinary severity filters; only explicit monitor mode may pass.
+    const identityEnforced = status.identityUnavailable === true && mode !== "monitor";
     const enforced = status.blocked && mode !== "monitor" && blockSeverities.includes(SEVERITY);
 
     if (status.identityUnavailable === true) {
@@ -393,7 +395,7 @@ export function createAuthProtection(options = {}) {
           component: "jb-security-guard",
           action: identityEnforced ? "identity-rejected" : "identity-unavailable",
           mode,
-          severity: SEVERITY,
+          severity: "critical",
           ruleIds: ["JBG-AUTH-IDENTITY-001"],
           scopes: [],
           retryAfterSeconds: identityEnforced ? 5 : 0
