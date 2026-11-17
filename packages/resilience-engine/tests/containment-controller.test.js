@@ -789,3 +789,32 @@ test("A2 rejects negative authorization issue timestamps", async () => {
   assert.equal(result.reason, "a2-policy-authorization-denied");
   assert.equal(deps.events.includes("apply"), false);
 });
+
+
+test("A2 holds rather than applying when mutation control changes after the provider-start marker", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ blockMutationAt: "after-provider-start-marker" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("action-mark-provider-started:apply-containment-profile"), true);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 holds rather than releasing when mutation control changes after the release-start marker", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ blockMutationAt: "after-release-start-marker" });
+  const contained = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(contained.state, "contained");
+  const released = await deps.controller.releaseContainment({
+    containment: contained, reasonCode: "owner-release-approved"
+  });
+  assert.equal(released.state, "held-for-reconciliation");
+  assert.equal(released.executed, false);
+  assert.equal(deps.events.includes("action-mark-provider-started:release-containment"), true);
+  assert.equal(deps.events.includes("release"), false);
+});
