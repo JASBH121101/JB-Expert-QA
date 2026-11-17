@@ -232,12 +232,12 @@ function validatePreflight(value, providerId, scope, profileId) {
 }
 
 function validateIndependentVerification(value, {
-  verifierId, scope, profileId, expectedState, operationId, now
+  verifierId, scope, profileId, expectedState, operationId, evidenceRefs, now
 }) {
   try {
     exactKeys(value, [
       "schema", "verifierId", "verified", "state", "profileId", "operationId",
-      ...SCOPE_KEYS, "observedAtMs", "expiresAtMs"
+      "referencesSha256", ...SCOPE_KEYS, "observedAtMs", "expiresAtMs"
     ], "A2 independent verification");
   } catch {
     return false;
@@ -248,6 +248,7 @@ function validateIndependentVerification(value, {
     value.state === expectedState &&
     value.profileId === profileId &&
     value.operationId === operationId &&
+    value.referencesSha256 === createHash("sha256").update(canonical(evidenceRefs), "utf8").digest("hex") &&
     sameScope(value, scope) &&
     Number.isSafeInteger(value.observedAtMs) &&
     value.observedAtMs >= 0 &&
@@ -662,13 +663,13 @@ export function createA2ContainmentController({
   }) {
     const verifyCall = await invokeBounded(
       independentVerifier.verifyContainment.bind(independentVerifier),
-      { action, scope, profileId, operationReceipt },
+      { action, scope, profileId, operationReceipt, evidenceRefs },
       operationTimeoutMs, "independent-verification", clock
     );
     const verifyNow = assertTimestamp(clock(), "verification clock");
     if (!validateIndependentVerification(verifyCall.value, {
       verifierId, scope, profileId, expectedState: "contained",
-      operationId: operationReceipt.operationId, now: verifyNow
+      operationId: operationReceipt.operationId, evidenceRefs, now: verifyNow
     })) return { ok: false, reason: "independent-containment-verification-failed" };
     const verification = Object.freeze({ ...verifyCall.value });
 
@@ -983,7 +984,7 @@ export function createA2ContainmentController({
     if (!validateIndependentVerification(current.value, {
       verifierId, scope, profileId, expectedState: "contained",
       operationId: operationReceipt.operationId,
-      now: assertTimestamp(clock(), "pre-release verification clock")
+      evidenceRefs, now: assertTimestamp(clock(), "pre-release verification clock")
     })) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
@@ -1103,13 +1104,13 @@ export function createA2ContainmentController({
 
     const verification = await invokeBounded(
       independentVerifier.verifyRelease.bind(independentVerifier),
-      { scope, profileId, operationReceipt: releaseReceipt },
+      { scope, profileId, operationReceipt: releaseReceipt, evidenceRefs },
       operationTimeoutMs, "independent-release-verification", clock
     );
     if (!validateIndependentVerification(verification.value, {
       verifierId, scope, profileId, expectedState: "released",
       operationId: releaseReceipt.operationId,
-      now: assertTimestamp(clock(), "release verification clock")
+      evidenceRefs, now: assertTimestamp(clock(), "release verification clock")
     })) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
