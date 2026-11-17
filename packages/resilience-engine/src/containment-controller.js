@@ -198,6 +198,7 @@ function validateOperationReceipt(receipt, {
       !sameScope(receipt, scope) ||
       receipt.state !== expectedState ||
       !Number.isSafeInteger(receipt.occurredAtMs) ||
+      receipt.occurredAtMs < 0 ||
       receipt.occurredAtMs > now) {
     return false;
   }
@@ -395,7 +396,7 @@ export function createA2ContainmentController({
         !validateAuthorization(issued.authorization, action, scope, profileId, now)) {
       return null;
     }
-    return issued.authorization;
+    return Object.freeze({ ...issued.authorization });
   }
 
   async function assertAuthorization(authorization, action, scope, profileId) {
@@ -520,6 +521,7 @@ export function createA2ContainmentController({
     if (!validateIndependentVerification(verifyCall.value, {
       verifierId, scope, profileId, expectedState: "contained", now: verifyNow
     })) return { ok: false, reason: "independent-containment-verification-failed" };
+    const verification = Object.freeze({ ...verifyCall.value });
 
     const preserveCall = await invokeBounded(
       forensicRecorder.preserveEvidence,
@@ -530,7 +532,11 @@ export function createA2ContainmentController({
     if (!validateForensicReceipt(preserveCall.value, recorderId, scope, preserveNow)) {
       return { ok: false, reason: "forensic-evidence-preservation-failed" };
     }
-    return { ok: true, verification: verifyCall.value, forensicReceipt: preserveCall.value };
+    const forensicReceipt = Object.freeze({
+      ...preserveCall.value,
+      evidenceIds: Object.freeze([...preserveCall.value.evidenceIds])
+    });
+    return { ok: true, verification, forensicReceipt };
   }
 
   async function executeContainment({ readiness, scope: rawScope, profileId, evidenceRefs } = {}) {
@@ -629,7 +635,7 @@ export function createA2ContainmentController({
           providerId, action, scope, profileId, idempotencyKey,
           now: assertTimestamp(clock(), "provider receipt clock"), expectedState: "contained"
         })) {
-      operationReceipt = apply.value.receipt;
+      operationReceipt = Object.freeze({ ...apply.value.receipt });
     } else {
       // A timeout or malformed response is ambiguous. Reconcile before any retry.
       const reconcile = await invokeBounded(
@@ -653,7 +659,7 @@ export function createA2ContainmentController({
           reason: "provider-outcome-unknown"
         });
       }
-      operationReceipt = reconcile.value.receipt;
+      operationReceipt = Object.freeze({ ...reconcile.value.receipt });
     }
 
     const verified = await verifyAndPreserve({
@@ -791,6 +797,10 @@ export function createA2ContainmentController({
       });
     }
 
+    const preservedReceipt = Object.freeze({
+      ...preserved.value,
+      evidenceIds: Object.freeze([...preserved.value.evidenceIds])
+    });
     const release = await invokeBounded(
       containmentProvider.release,
       { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
@@ -802,7 +812,7 @@ export function createA2ContainmentController({
           providerId, action, scope, profileId, idempotencyKey,
           now: assertTimestamp(clock(), "release receipt clock"), expectedState: "released"
         })) {
-      releaseReceipt = release.value.receipt;
+      releaseReceipt = Object.freeze({ ...release.value.receipt });
     } else {
       const reconcile = await invokeBounded(
         containmentProvider.reconcileRelease,
@@ -825,7 +835,7 @@ export function createA2ContainmentController({
           reason: "release-outcome-unknown", operationReceipt
         });
       }
-      releaseReceipt = reconcile.value.receipt;
+      releaseReceipt = Object.freeze({ ...reconcile.value.receipt });
     }
 
     const verification = await invokeBounded(
@@ -869,7 +879,7 @@ export function createA2ContainmentController({
       profileId,
       operationReceipt: releaseReceipt,
       verification: verification.value,
-      forensicReceipt: preserved.value,
+      forensicReceipt: preservedReceipt,
       idempotencyKey
     });
     CONTAINMENT_RESULTS.set(result, {
