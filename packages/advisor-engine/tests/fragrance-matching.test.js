@@ -106,3 +106,50 @@ test("validates preference input, product identity and coverage threshold", () =
   assert.throws(() => matchFragrances({ products, preferences: { avoidNotes: "vanilla" } }), /array of non-empty strings/u);
   assert.throws(() => matchFragrances({ products: [products[0], products[0]] }), /unique/u);
 });
+
+test("normalizes very-strong ordinal levels across intensity, projection and sillage", () => {
+  const product = {
+    ...products[0],
+    id: "very-strong",
+    name: "Very Strong",
+    attributes: {
+      intensityLevel: "very_strong",
+      projectionLevel: "very-strong",
+      sillageLevel: "very strong",
+    },
+  };
+  const result = matchFragrances({
+    products: [product],
+    preferences: {
+      intensity: "very strong",
+      projection: "very_strong",
+      maxSillage: "very-strong",
+    },
+  });
+
+  assert.equal(result.decision, "matched");
+  assert.equal(result.ranking[0].eligibility, "eligible");
+  for (const key of ["intensity", "projection", "maxSillage"]) {
+    assert.equal(result.ranking[0].breakdown.find(item => item.key === key)?.score, 100);
+  }
+});
+
+test("matches hot-humid and tropical climate aliases after normalization", () => {
+  for (const [preference, productClimate] of [
+    ["hot_humid", "tropical"],
+    ["tropical", "hot_humid"],
+  ]) {
+    const candidate = {
+      ...products[0],
+      id: "climate-" + preference,
+      attributes: { climateTags: [productClimate] },
+    };
+    const result = matchFragrances({
+      products: [candidate],
+      preferences: { climate: preference },
+    });
+
+    assert.equal(result.decision, "matched");
+    assert.equal(result.ranking[0].breakdown.find(item => item.key === "climate")?.score, 100);
+  }
+});
