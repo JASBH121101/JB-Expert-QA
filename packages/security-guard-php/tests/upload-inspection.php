@@ -118,18 +118,18 @@ function runUploadInspectionTests(): void
         $fakeScript = <<<'SH'
 #!/bin/sh
 if [ "$1" = "--version" ]; then
-  printf '%s\\n' 'ClamAV 1.4.2'
+  printf '%s\n' 'ClamAV 1.4.2'
   exit 0
 fi
 if [ -n "$JB_TEST_CLAMAV_MALICIOUS" ]; then
-  printf '%s\\n' "$3: Eicar-Signature FOUND"
+  printf '%s\n' "$3: Eicar-Signature FOUND"
   exit 1
 fi
 if [ -n "$JB_TEST_CLAMAV_UNKNOWN" ]; then
-  printf '%s\\n' 'scanner internal error'
+  printf '%s\n' 'scanner internal error'
   exit 2
 fi
-printf '%s\\n' "$3: OK"
+printf '%s\n' "$3: OK"
 exit 0
 SH;
         if (file_put_contents($fakeClamAv, $fakeScript) !== strlen($fakeScript) || !@chmod($fakeClamAv, 0700)) {
