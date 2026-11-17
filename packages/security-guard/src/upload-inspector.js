@@ -11,10 +11,12 @@ const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
 const DEFAULT_INGEST_TIMEOUT_MS = 30_000;
 const DEFAULT_BRIDGE_TIMEOUT_MS = 3_000;
+const DEFAULT_PROMOTION_TIMEOUT_MS = 15_000;
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_SCANNER_TIMEOUT_MS = 120_000;
 const MAX_INGEST_TIMEOUT_MS = 300_000;
 const MAX_BRIDGE_TIMEOUT_MS = 10_000;
+const MAX_PROMOTION_TIMEOUT_MS = 120_000;
 const MAX_SIGNATURE_BYTES = 8_192;
 
 const TYPE_DEFINITIONS = Object.freeze({
@@ -67,6 +69,7 @@ const ERROR_MESSAGES = Object.freeze({
   INVALID_SCAN_RESULT: "Malware scanner returned an invalid result",
   MALWARE_DETECTED: "File was rejected by malware scanning",
   APPROVAL_FAILED: "File could not be promoted to approved storage",
+  APPROVAL_TIMEOUT: "Storage promotion exceeded its time limit",
   BRIDGE_UNAVAILABLE: "Coordinated security decision is unavailable",
   BRIDGE_REVIEW_REQUIRED: "The other security filter has not approved this object",
   BRIDGE_BLOCKED: "The coordinated security decision blocked this object",
@@ -309,7 +312,7 @@ async function deleteQuarantine(store, uploadId, notify) {
   }
 }
 
-async function runAdapterOperation(operation, timeoutMs, onLateValue) {
+async function runAdapterOperation(operation, timeoutMs, onLateValue, onTimeout, timeoutCode = "STORAGE_TIMEOUT") {
   let timeoutHandle;
   let timedOut = false;
   const operationPromise = Promise.resolve().then(operation);
@@ -326,7 +329,12 @@ async function runAdapterOperation(operation, timeoutMs, onLateValue) {
   const timeoutPromise = new Promise((resolve, reject) => {
     timeoutHandle = setTimeout(() => {
       timedOut = true;
-      reject(new UploadInspectionError("STORAGE_TIMEOUT"));
+      try {
+        onTimeout?.();
+      } catch {
+        // Cancellation failure cannot change the fail-closed timeout result.
+      }
+      reject(new UploadInspectionError(timeoutCode));
     }, timeoutMs);
   });
 
@@ -411,7 +419,7 @@ export function createUploadInspector(options = {}) {
   if (!isRecord(options)) throw new TypeError("upload inspector options must be an object");
 
   const allowedOptions = new Set([
-    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "bridgeTimeoutMs", "allowedMimeTypes", "onEvent",
+    "store", "scanner", "maxBytes", "scannerTimeoutMs", "ingestTimeoutMs", "bridgeTimeoutMs", "promotionTimeoutMs", "allowedMimeTypes", "onEvent",
     "securityBridge", "coreContract", "onCoreEvent"
   ]);
   for (const key of Object.keys(options)) {
@@ -442,6 +450,11 @@ export function createUploadInspector(options = {}) {
     options.bridgeTimeoutMs ?? DEFAULT_BRIDGE_TIMEOUT_MS,
     "bridgeTimeoutMs",
     MAX_BRIDGE_TIMEOUT_MS
+  );
+  const promotionTimeoutMs = positiveInteger(
+    options.promotionTimeoutMs ?? DEFAULT_PROMOTION_TIMEOUT_MS,
+    "promotionTimeoutMs",
+    MAX_PROMOTION_TIMEOUT_MS
   );
 
   const allowedMimeTypes = Object.freeze([...(options.allowedMimeTypes ?? Object.keys(TYPE_DEFINITIONS))]);
@@ -661,15 +674,27 @@ export function createUploadInspector(options = {}) {
       });
 
       let promotion;
+      const promotionController = new AbortController();
       try {
-        promotion = await store.promote({
-          uploadId,
-          metadata,
-          expectedSha256: sha256,
-          expectedSize: inspector.size
-        });
-      } catch {
+        promotion = await runAdapterOperation(
+          () => store.promote({
+            uploadId,
+            metadata,
+            expectedSha256: sha256,
+            expectedSize: inspector.size,
+            signal: promotionController.signal
+          }),
+          promotionTimeoutMs,
+          () => deleteQuarantine(store, uploadId, notify),
+          () => {
+            retainQuarantine = true;
+            promotionController.abort();
+          },
+          "APPROVAL_TIMEOUT"
+        );
+      } catch (error) {
         retainQuarantine = true;
+        if (error instanceof UploadInspectionError) throw error;
         throw new UploadInspectionError("APPROVAL_FAILED");
       }
       if (!isRecord(promotion) || promotion.promoted !== true) {
