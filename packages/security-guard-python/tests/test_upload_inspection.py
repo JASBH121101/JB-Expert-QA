@@ -86,7 +86,7 @@ class UploadInspectionTests(unittest.TestCase):
     def test_clean_upload_is_scanned_and_promoted_privately(self):
         result, storage = self.inspect_fixture()
         self.assertEqual(result["status"], "approved")
-        self.assertRegex(result["scannedAt"], r"^\\d{4}-\\d{2}-\\d{2}T.*Z$")
+        self.assertRegex(result["scannedAt"], r"^\d{4}-\d{2}-\d{2}T.*Z$")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
         self.assertEqual(storage.quarantine, {})
 
