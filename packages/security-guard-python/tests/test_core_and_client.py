@@ -253,10 +253,6 @@ class UniversalClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["app"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     async def test_asgi_middleware_skips_static_assets_before_calling_the_rate_limit_service(self):
         transport_calls = []
         app_calls = []
@@ -319,3 +315,54 @@ if __name__ == "__main__":
 
         await invoke("/api/upload.js", method="POST")
         self.assertEqual(len(transport_calls), 2, "POST requests are never skipped by extension")
+
+    async def test_asgi_static_asset_exclusions_can_be_disabled_or_reconfigured(self):
+        calls = []
+
+        async def transport(url, headers, body, timeout):
+            calls.append(json.loads(body.decode("utf-8")))
+            return {
+                "status": 200,
+                "headers": {},
+                "body": json.dumps({
+                    "allowed": True,
+                    "policy": "public",
+                    "scope": "catalog-read",
+                }),
+            }
+
+        client = UniversalRateLimitClient(
+            "https://guard.example/check", "catalog-api",
+            "python-client-secret-at-least-32-bytes", transport=transport,
+        )
+
+        async def app(scope, receive, send):
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok", "more_body": False})
+
+        middleware = SecurityGuardRateLimitMiddleware(
+            app, client=client, identity_resolver=lambda scope: "trusted-user",
+            policy="public", scope="catalog-read",
+            excluded_extensions=(".css",),
+            excluded_prefixes=(),
+        )
+
+        async def invoke(path):
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                return None
+
+            await middleware(
+                {"type": "http", "method": "GET", "path": path, "user_id": "trusted-user"},
+                receive, send,
+            )
+
+        await invoke("/assets/site.css")
+        await invoke("/assets/site.js")
+        self.assertEqual(len(calls), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
