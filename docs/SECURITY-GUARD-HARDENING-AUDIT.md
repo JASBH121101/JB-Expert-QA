@@ -18,13 +18,14 @@
 
 ## Confirmed integration risks / hardening work
 
-1. **Production upload path:** require private quarantine and private approved storage adapters, real scanner integration, bounded multipart parsing, atomic digest-and-size verification during promotion, and cleanup/retention monitoring.
-2. **Image publication:** image uploads must be decoded and re-encoded by a maintained image library before publication. Never expose untrusted originals directly from a public web root.
-3. **Application serving boundary:** approved files still require authorization, explicit content type, `nosniff`, safe content disposition, and a separate untrusted origin for previews where appropriate.
-4. **Distributed enforcement:** verify every production multi-instance deployment uses a shared atomic store; process-local counters must not be represented as global protection.
-5. **PHP/Laravel parity:** the current Node package cannot be assumed to protect Laravel automatically. The PHP adapter must be audited separately for middleware ordering, CSRF/session semantics, request limits, upload lifecycle, and fail-closed behavior.
-6. **Policy rollout:** preserve monitor-first rollout, then enable blocking by route and severity only after observing false positives and validating application compatibility.
-7. **Telemetry:** verify sanitized events, bounded cardinality, alerting on scanner/storage/cleanup failures, and no secrets, raw credentials, file bytes, or untrusted filenames in logs.
+1. **Static-path rate-limit exclusion:** the previous suffix-only exclusion could exempt dynamic GET/HEAD routes such as `/api/catalog.js`. The hardening branch now requires both an approved static directory prefix and an allowed extension, with regression coverage. Host applications must still configure their actual static directories deliberately.
+2. **Production upload path:** require private quarantine and private approved storage adapters, real scanner integration, bounded multipart parsing, atomic digest-and-size verification during promotion, and cleanup/retention monitoring.
+3. **Image publication:** image uploads must be decoded and re-encoded by a maintained image library before publication. Never expose untrusted originals directly from a public web root.
+4. **Application serving boundary:** approved files still require authorization, explicit content type, `nosniff`, safe content disposition, and a separate untrusted origin for previews where appropriate.
+5. **Distributed enforcement:** verify every production multi-instance deployment uses a shared atomic store; process-local counters must not be represented as global protection.
+6. **PHP/Laravel parity:** the current Node package cannot be assumed to protect Laravel automatically. The PHP adapter must be audited separately for middleware ordering, CSRF/session semantics, request limits, upload lifecycle, and fail-closed behavior.
+7. **Policy rollout:** preserve monitor-first rollout, then enable blocking by route and severity only after observing false positives and validating application compatibility.
+8. **Telemetry:** verify sanitized events, bounded cardinality, alerting on scanner/storage/cleanup failures, and no secrets, raw credentials, file bytes, or untrusted filenames in logs.
 
 ## Required certification gates
 
