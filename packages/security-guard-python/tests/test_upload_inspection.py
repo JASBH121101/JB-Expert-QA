@@ -165,7 +165,7 @@ class UploadInspectionTests(unittest.TestCase):
             service = UploadInspectionService(storage, Scanner())
             with self.assertRaises(UploadInspectionError) as caught:
                 service.inspect(path, "photo.png", "image/png")
-            self.assertEqual(caught.exception.reason, "INSPECTION_FAILED")
+            self.assertEqual(caught.exception.reason, "PROMOTION_FAILED")
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
 
