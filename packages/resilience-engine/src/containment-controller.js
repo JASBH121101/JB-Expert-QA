@@ -471,10 +471,10 @@ export function createA2ContainmentController({
     try {
       exactKeys(call.value, ["found", "record"], "A2 pending record lookup");
       if (call.value.found !== true || call.value.record === null) return false;
-      const actual = normalizeRecoveryRecord(call.value.record, {
-        providerId, verifierId, recorderId
-      });
-      return canonical(actual) === canonical(expectedRecord);
+      const dependencies = { providerId, verifierId, recorderId };
+      const actual = normalizeRecoveryRecord(call.value.record, dependencies);
+      const expected = normalizeRecoveryRecord(expectedRecord, dependencies);
+      return canonical(actual) === canonical(expected);
     } catch {
       return false;
     }
