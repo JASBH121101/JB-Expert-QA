@@ -978,7 +978,7 @@ export function createA2ContainmentController({
 
     const current = await invokeBounded(
       independentVerifier.verifyContainment.bind(independentVerifier),
-      { action: "verify-before-release", scope, profileId, operationReceipt },
+      { action: "verify-before-release", scope, profileId, operationReceipt, evidenceRefs },
       operationTimeoutMs, "pre-release-verification", clock
     );
     if (!validateIndependentVerification(current.value, {
