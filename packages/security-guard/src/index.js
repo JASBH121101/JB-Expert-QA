@@ -39,12 +39,16 @@ const DEFAULT_STATIC_ASSET_EXTENSIONS = Object.freeze([
   ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg", ".ico",
   ".woff", ".woff2", ".ttf", ".eot", ".map"
 ]);
+const DEFAULT_STATIC_ASSET_PREFIXES = Object.freeze([
+  "/assets/", "/static/", "/media/", "/images/", "/fonts/"
+]);
 const DEFAULT_RATE_LIMIT = Object.freeze({
   enabled: true,
   max: 120,
   windowMs: 60_000,
   maxKeys: 5000,
-  excludedExtensions: DEFAULT_STATIC_ASSET_EXTENSIONS
+  excludedExtensions: DEFAULT_STATIC_ASSET_EXTENSIONS,
+  excludedPrefixes: DEFAULT_STATIC_ASSET_PREFIXES
 });
 
 function isRecord(value) {
@@ -59,7 +63,7 @@ function positiveInteger(value, name, maximum) {
 }
 
 
-function isStaticAssetRequest(request, excludedExtensions) {
+function isStaticAssetRequest(request, excludedExtensions, excludedPrefixes) {
   const method = typeof request?.method === "string" ? request.method.toUpperCase() : "";
   if (method !== "GET" && method !== "HEAD") return false;
 
@@ -76,7 +80,8 @@ function isStaticAssetRequest(request, excludedExtensions) {
     // A malformed path is still inspected by the request-threat detector below.
   }
   const normalizedPath = pathname.toLowerCase();
-  return excludedExtensions.some((extension) => normalizedPath.endsWith(extension));
+  const trustedStaticPath = excludedPrefixes.some((prefix) => normalizedPath.startsWith(prefix));
+  return trustedStaticPath && excludedExtensions.some((extension) => normalizedPath.endsWith(extension));
 }
 
 function decodeForInspection(value) {
@@ -335,7 +340,7 @@ function normalizeOptions(options) {
   const rateLimitInput = options.rateLimit ?? {};
   if (!isRecord(rateLimitInput)) throw new TypeError("rateLimit must be an object");
   for (const key of Object.keys(rateLimitInput)) {
-    if (!["enabled", "max", "windowMs", "maxKeys", "excludedExtensions"].includes(key)) {
+    if (!["enabled", "max", "windowMs", "maxKeys", "excludedExtensions", "excludedPrefixes"].includes(key)) {
       throw new TypeError("Unknown rateLimit option: " + key);
     }
   }
@@ -355,6 +360,19 @@ function normalizeOptions(options) {
   }
   rateLimit.excludedExtensions = Object.freeze(
     rateLimit.excludedExtensions.map((extension) => extension.toLowerCase())
+  );
+  if (!Array.isArray(rateLimit.excludedPrefixes) ||
+      rateLimit.excludedPrefixes.length > 32 ||
+      rateLimit.excludedPrefixes.some((prefix) =>
+        typeof prefix !== "string" || prefix.length > 128 ||
+        !/^\/(?:[a-z0-9_-]+\/)+$/i.test(prefix)
+      ) ||
+      new Set(rateLimit.excludedPrefixes.map((prefix) => prefix.toLowerCase())).size !==
+        rateLimit.excludedPrefixes.length) {
+    throw new TypeError("rateLimit.excludedPrefixes must contain unique absolute directory prefixes such as /assets/");
+  }
+  rateLimit.excludedPrefixes = Object.freeze(
+    rateLimit.excludedPrefixes.map((prefix) => prefix.toLowerCase())
   );
 
   const limits = {
@@ -636,7 +654,11 @@ export function createSecurityGuard(options = {}) {
 
   function getRateLimitFinding(request, now, resolvedIdentity) {
     if (!settings.rateLimit.enabled) return null;
-    if (isStaticAssetRequest(request, settings.rateLimit.excludedExtensions)) return null;
+    if (isStaticAssetRequest(
+      request,
+      settings.rateLimit.excludedExtensions,
+      settings.rateLimit.excludedPrefixes
+    )) return null;
 
     const clientKey = resolvedIdentity ?? resolveClientIdentity(request);
     let entry = rateState.get(clientKey);

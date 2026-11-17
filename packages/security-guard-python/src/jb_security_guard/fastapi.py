@@ -13,7 +13,7 @@ DEFAULT_STATIC_ASSET_EXTENSIONS = frozenset({
     ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg", ".ico",
     ".woff", ".woff2", ".ttf", ".eot", ".map",
 })
-DEFAULT_STATIC_ASSET_PREFIXES = ("/static/", "/assets/", "/media/")
+DEFAULT_STATIC_ASSET_PREFIXES = ("/assets/", "/static/", "/media/", "/images/", "/fonts/")
 
 
 class SecurityGuardRateLimitMiddleware:
@@ -71,9 +71,15 @@ class SecurityGuardRateLimitMiddleware:
         if not isinstance(path, str):
             return False
         normalized_path = path.lower()
-        if any(normalized_path.startswith(prefix.lower()) for prefix in self.excluded_prefixes):
-            return True
-        return any(normalized_path.endswith(extension) for extension in self.excluded_extensions)
+        under_trusted_static_prefix = any(
+            normalized_path.startswith(prefix.lower()) for prefix in self.excluded_prefixes
+        )
+        has_static_extension = any(
+            normalized_path.endswith(extension) for extension in self.excluded_extensions
+        )
+        # An extension alone is not sufficient: dynamic routes such as
+        # /api/catalog.js must remain subject to the rate-limit policy.
+        return under_trusted_static_prefix and has_static_extension
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http" or self._is_static_asset(scope):

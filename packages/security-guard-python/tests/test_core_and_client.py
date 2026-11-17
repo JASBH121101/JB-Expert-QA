@@ -313,8 +313,13 @@ class UniversalClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(transport_calls), 1)
         self.assertEqual(app_calls[-1], "/catalog")
 
+        await invoke("/api/catalog.js")
+        self.assertEqual(
+            len(transport_calls), 2,
+            "dynamic GET routes must not bypass rate limits because of a static-looking extension",
+        )
         await invoke("/api/upload.js", method="POST")
-        self.assertEqual(len(transport_calls), 2, "POST requests are never skipped by extension")
+        self.assertEqual(len(transport_calls), 3, "POST requests are never skipped by extension")
 
     async def test_asgi_static_asset_exclusions_can_be_disabled_or_reconfigured(self):
         calls = []
@@ -361,7 +366,10 @@ class UniversalClientTests(unittest.IsolatedAsyncioTestCase):
 
         await invoke("/assets/site.css")
         await invoke("/assets/site.js")
-        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            len(calls), 2,
+            "an empty trusted-prefix list disables all static exclusions, even for matching extensions",
+        )
 
 
 if __name__ == "__main__":

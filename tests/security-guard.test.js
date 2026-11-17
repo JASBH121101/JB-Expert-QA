@@ -829,10 +829,26 @@ test("static GET and HEAD assets do not consume the Node request rate-limit coun
 
     assert.equal((await request("/api/catalog")).statusCode, 200);
     assert.equal((await request("/api/catalog")).statusCode, 429);
+    // A dynamic API route must not bypass rate limiting just because its name
+    // ends with a normally static extension.
+    assert.equal((await request("/api/catalog.js")).statusCode, 429);
+    assert.equal((await request("/reports/export.js")).statusCode, 429);
     assert.equal(guard.getStats().rateLimitKeys, 1);
     assert.equal(events.length, 1);
     assert.deepEqual(events[0].ruleIds, ["JBG-RATE-001"]);
   });
+});
+
+test("static asset rate-limit prefixes reject broad or unsafe paths", () => {
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/"] }
+  }), /rateLimit\.excludedPrefixes/);
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/../public/"] }
+  }), /rateLimit\.excludedPrefixes/);
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/assets/", "/ASSETS/"] }
+  }), /rateLimit\.excludedPrefixes/);
 });
 
 test("static asset rate-limit exclusions can be customized without skipping POST requests", async () => {

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/CoreV1.php';
 require_once __DIR__ . '/../src/UniversalRateLimitClient.php';
+require_once __DIR__ . '/../src/UploadQuarantineStorage.php';
+require_once __DIR__ . '/../src/UploadMalwareScanner.php';
+require_once __DIR__ . '/../src/UploadInspectionException.php';
+require_once __DIR__ . '/../src/UploadInspectionService.php';
+require_once __DIR__ . '/UploadInspectionServiceTest.php';
 
 use JB\SecurityGuard\CoreV1;
 use JB\SecurityGuard\UniversalRateLimitClient;
@@ -138,4 +143,6 @@ $authFailureClient = new UniversalRateLimitClient(
 );
 expect(!$authFailureClient->check('user-123', 'catalog-read', 'public')['allowed'], 'Authentication errors must never fail open');
 
-echo "PASS: PHP Core v1 HMAC vector, normalizers, counter keys and universal API client.\n";
+\JB\SecurityGuard\Tests\runUploadInspectionServiceTests();
+
+echo "PASS: PHP Core v1 HMAC, universal API client and fail-closed upload quarantine contract.\n";
