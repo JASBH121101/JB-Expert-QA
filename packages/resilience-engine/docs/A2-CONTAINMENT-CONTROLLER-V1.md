@@ -14,14 +14,14 @@ The host must inject all of the following:
 - **Containment provider:** a server-configured provider identity plus preflight, apply, reconcile, release, and reconcileRelease. The adapter must use server-owned credentials and a fixed allowlist of exact resources/profiles.
 - **Independent verifier:** verifierId, verifyContainment, and verifyRelease. Its identity must differ from the executor. It must query authoritative state through a genuinely independent observation path; echoing the executor receipt is not verification.
 - **Forensic recorder:** recorderId and preserveEvidence, returning durable evidence IDs and a retention receipt.
-- **Budget ledger:** durable atomic reserve and settle methods.
-- **Action ledger:** durable atomic claim and complete methods with uniqueness enforced for the supplied idempotency key.
+- **Budget ledger:** durable atomic reserve, reconcile-by-idempotency-key and settle methods.
+- **Action ledger:** durable atomic claim, provider-start marker, reconcile-by-idempotency-key and complete methods with uniqueness enforced for the supplied idempotency key.
 - **Audit store:** durable append-only append.
 - **Mutation control:** host-owned assertAllowed, rechecked before the provider side effect and before finalization.
 
 All store durability markers are host integration assertions. The controller cannot prove that a custom adapter or database is truly durable; the host must certify its implementation and operational configuration.
 
-Every injected adapter and durable dependency call is time-bounded by the controller. The host method receives an absolute deadline and an AbortSignal; production implementations must honor cancellation and must make durable reservation/settlement calls idempotent for the supplied operation key. A timed-out action-claim or budget reservation is treated as uncertain and held for reconciliation, never as permission to apply containment.
+Every injected adapter and durable dependency call is time-bounded by the controller. The host method receives an absolute deadline and an AbortSignal; production implementations must honor cancellation and make durable reservation/settlement calls idempotent for the supplied operation key. Timed-out action claims and budget reservations are queried again by that exact key. The action ledger must distinguish a claim that has not started the provider from a provider-started or completed action. A durable provider-start marker is required before the controller can call apply. If that marker times out, the controller reconciles the action journal; it will not call the provider unless the journal proves the provider has not started and the operation is safely finalized as not applied. Any ambiguous journal state is held for reconciliation.
 
 ## Exact scope
 
@@ -38,7 +38,7 @@ The exact profileId is supplied separately and must be resolved through the host
 
 ## Apply lifecycle
 
-VERIFIED_READINESS → AUDIT_REQUESTED → POLICY_AUTHORIZED → ACTION_CLAIMED → BUDGET_RESERVED → PREFLIGHT_PASSED → APPLY → RECONCILE_IF_AMBIGUOUS → INDEPENDENTLY_VERIFIED → FORENSICS_PRESERVED → FINALIZED
+VERIFIED_READINESS → AUDIT_REQUESTED → POLICY_AUTHORIZED → ACTION_CLAIMED → BUDGET_RESERVED → PREFLIGHT_PASSED → PROVIDER_START_MARKED → APPLY → RECONCILE_IF_AMBIGUOUS → INDEPENDENTLY_VERIFIED → FORENSICS_PRESERVED → FINALIZED
 
 A2 readiness must be the exact eligible object created by evaluateA2ProviderReadiness. Copies, reconstructed objects, stale evidence and a different scope are rejected.
 
