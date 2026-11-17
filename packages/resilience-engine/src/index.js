@@ -292,7 +292,8 @@ export {
   createTrustedSignalGateway,
   createMemoryTrustedSignalStore,
   signTrustedSignalEnvelope,
-  validateTrustedSignalEnvelope
+  validateTrustedSignalEnvelope,
+  getTrustedSignalStateMetadata
 } from "./trusted-signal-gateway.js";
 
 export { createFileTrustedSignalStore } from "./trusted-signal-store.js";
@@ -313,7 +314,8 @@ export {
   createProviderEvidenceSigningPayload,
   createProviderEvidenceVerifier,
   verifyA2ProviderEvidenceBundle,
-  verifyA2EvidenceReferences
+  verifyA2EvidenceReferences,
+  evaluateA2ProviderReadiness
 } from "./provider-evidence.js";
 
 export {

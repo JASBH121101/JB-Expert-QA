@@ -1,3 +1,5 @@
+import { evaluateA2ContainmentReadiness } from "./continuity-gates.js";
+import { getTrustedSignalStateMetadata } from "./trusted-signal-gateway.js";
 import {
   createHash,
   createPublicKey,
@@ -39,6 +41,8 @@ const ATTESTATION_UNSIGNED_FIELDS = [
 const ATTESTATION_FIELDS = [...ATTESTATION_UNSIGNED_FIELDS, "signature"];
 const PROVIDER_VERIFIERS = new WeakSet();
 const VERIFIED_A2_BUNDLES = new WeakSet();
+const VERIFIED_A2_REFERENCES = new WeakSet();
+const A2_REFERENCE_BUNDLES = new WeakMap();
 const EXPECTED_FIELDS = [
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ];
@@ -675,14 +679,95 @@ export async function verifyA2EvidenceReferences({
     return denied("provider-evidence-stale-or-expired");
   }
 
-  return Object.freeze({
+  const verification = Object.freeze({
     schema: "jb.resilience.a2-evidence-reference-verification/v1",
     verified: true,
     executable: false,
     scope: bundle.scope,
     referenceCount: references.length,
     totalBytes,
+    verifiedAtMs: finalNow,
     references: Object.freeze(references)
+  });
+  VERIFIED_A2_REFERENCES.add(verification);
+  A2_REFERENCE_BUNDLES.set(verification, bundle);
+  return verification;
+}
+
+/**
+ * Combine verified A2 provider evidence with an exact result produced by the
+ * Trusted Signal Gateway. This derives readiness only; it never authorizes or
+ * executes containment.
+ */
+export function evaluateA2ProviderReadiness({
+  bundle,
+  references,
+  securityState,
+  clock = Date.now
+} = {}) {
+  const denied = (reason) => Object.freeze({
+    schema: "jb.resilience.continuity-readiness/v1",
+    capability: "A2-bounded-containment",
+    eligible: false,
+    denied: Object.freeze(["trusted-provider-and-security-evidence"]),
+    reason,
+    executable: false
+  });
+
+  if (!VERIFIED_A2_BUNDLES.has(bundle) ||
+      !VERIFIED_A2_REFERENCES.has(references) ||
+      A2_REFERENCE_BUNDLES.get(references) !== bundle ||
+      typeof clock !== "function") {
+    return denied("verified-a2-bundle-and-matching-reference-check-required");
+  }
+
+  const signalMetadata = getTrustedSignalStateMetadata(securityState);
+  if (!signalMetadata || securityState.schema !== "jb.resilience.signal-state/v1" ||
+      securityState.state !== "confirmed" ||
+      securityState.assetId !== bundle.scope.assetId ||
+      securityState.environment !== bundle.scope.environment ||
+      securityState.preserveEvidence !== true ||
+      securityState.authorizationGranted !== false ||
+      !Array.isArray(securityState.sources) || securityState.sources.length < 1 ||
+      !Array.isArray(securityState.evidenceRefs) || securityState.evidenceRefs.length < 1) {
+    return denied("trusted-confirmed-signal-required");
+  }
+  if (signalMetadata.replayStoreDurable !== true ||
+      !Number.isSafeInteger(signalMetadata.observedAtMs) ||
+      !Number.isSafeInteger(signalMetadata.expiresAtMs)) {
+    return denied("durable-replay-protected-signal-required");
+  }
+
+  let now;
+  try {
+    now = assertTimestamp(clock(), "A2 readiness clock");
+  } catch {
+    return denied("invalid-a2-readiness-clock");
+  }
+  const observedAt = Math.min(bundle.observedAtMs, signalMetadata.observedAtMs);
+  const expiresAt = Math.min(bundle.expiresAtMs, signalMetadata.expiresAtMs);
+  if (expiresAt <= observedAt || now < observedAt ||
+      now >= expiresAt || references.verifiedAtMs < observedAt ||
+      references.verifiedAtMs >= expiresAt || now < references.verifiedAtMs) {
+    return denied("a2-provider-or-signal-evidence-stale");
+  }
+
+  const facts = bundle.facts;
+  return evaluateA2ContainmentReadiness({
+    confirmedSecurityVerdict: true,
+    trustedSignal: true,
+    replayProtectedSignal: true,
+    exactAssetBinding: securityState.assetId === bundle.scope.assetId &&
+      securityState.environment === bundle.scope.environment,
+    ownerApprovedProfile: facts.ownerApprovedProfile === true,
+    reversibleAdapter: facts.reversibleAdapter === true,
+    independentContainmentVerification: facts.independentContainmentVerification === true,
+    rollbackPlan: facts.rollbackPlan === true,
+    forensicEvidencePreserved: facts.forensicEvidencePreserved === true,
+    budgetAvailable: facts.budgetAvailable === true,
+    observedAt,
+    expiresAt,
+    now
   });
 }
 
