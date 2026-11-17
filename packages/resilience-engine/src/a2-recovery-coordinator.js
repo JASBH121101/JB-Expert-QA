@@ -139,7 +139,7 @@ function normalizeRecord(input, dependencies) {
       idempotencyKey !== makeIdempotencyKey(action, scope, profileId)) {
     throw new TypeError("A2 recovery idempotency key mismatch");
   }
-  if (!["provider-started", "held-for-reconciliation"].includes(input.state)) {
+  if (!["claimed", "provider-started", "held-for-reconciliation"].includes(input.state)) {
     throw new TypeError("A2 recovery record is not pending");
   }
   const originalOperationId = input.originalOperationId;
@@ -367,6 +367,14 @@ export function createA2RecoveryCoordinator({
   }
 
   async function inspectRecord(record, now) {
+    // A claimed record proves only that the host reserved an action. Without
+    // the durable provider-start marker, no provider call is inferred or retried.
+    if (record.state === "claimed") {
+      return held(record.claimId, "provider-start-not-marked-no-provider-call-authorized", {
+        providerQuerySkipped: true,
+        leaseExpired: record.leaseExpiresAtMs <= now
+      });
+    }
     const method = record.action === "apply-containment-profile" ? "reconcile" : "reconcileRelease";
     const providerCall = await invokeBounded(containmentProvider, method, {
       scope: record.scope,
