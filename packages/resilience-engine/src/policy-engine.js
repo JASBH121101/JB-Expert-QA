@@ -417,7 +417,7 @@ function evaluatePolicyCapability(policy, request, now) {
   if (riskClass === "A2") {
     return Object.freeze({
       permitted: false, reason: input.securityState === "confirmed"
-        ? "trusted-signal-gateway-not-certified"
+        ? "a2-trusted-evidence-context-required"
         : "confirmed-security-verdict-required"
     });
   }

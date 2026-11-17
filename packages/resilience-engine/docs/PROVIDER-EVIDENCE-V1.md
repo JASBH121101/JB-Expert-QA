@@ -68,3 +68,11 @@ This is not a concrete containment provider. No Cloudflare, AWS, Azure, endpoint
 No provider attestation is automatically trusted merely because it has a valid signature: provider enrollment and evidence retrieval remain host responsibilities. The bundle verifier does not create one-time action authorization and does not change the policy engine's A1-only executable action set. A2 remains blocked until a real typed containment adapter, authoritative provider enrollment/revocation, evidence retrieval, independent out-of-band verification, tested rollback, budget accounting and fault-injection/end-to-end certification are implemented.
 
 The module is laboratory-only until those external integrations and safety gates have been reviewed and certified.
+
+## Authoritative evidence-reference verification (v2 lab increment)
+
+The provider-bundle signature check validates who signed the reference metadata; it does not validate the referenced object. The package now also exposes `verifyA2EvidenceReferences({ bundle, resolveEvidenceReference, clock, maxReferenceBytes, maxTotalBytes })`.
+
+The host resolver is called once for each signed reference and must fetch it from the authoritative evidence/provider system. It receives an AbortSignal and has a bounded per-reference timeout (5 seconds by default, configurable up to 30 seconds). It must return the exact attested provider ID, role, asset, environment, incident, policy revision/hash and raw bytes. The verifier copies the bytes, enforces per-object and aggregate limits, recomputes SHA-256, and rechecks the bundle's expiry after each asynchronous lookup and before returning a verified reference inventory. Forged bundle objects, stale bundles, mismatched scope, missing objects, oversized evidence and digest mismatches fail closed. Raw evidence bytes are never returned or persisted by this module.
+
+This closes the **reference integrity and scope-check gap**, not the semantic truth gap: the host resolver/provider integration must still validate that the referenced record actually proves the claimed control (for example, that an isolation operation is active, a rollback was exercised, or forensic evidence was durably preserved). The output continues to include `executable: false`; it is not an A2 execution authorization.

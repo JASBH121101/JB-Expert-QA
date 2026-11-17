@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  createHash,
   generateKeyPairSync,
   sign
 } from "node:crypto";
@@ -8,7 +9,8 @@ import {
   A2_PROVIDER_EVIDENCE_ROLES,
   createProviderEvidenceSigningPayload,
   createProviderEvidenceVerifier,
-  verifyA2ProviderEvidenceBundle
+  verifyA2ProviderEvidenceBundle,
+  verifyA2EvidenceReferences
 } from "../src/provider-evidence.js";
 
 const NOW = 1_800_000_000_000;
@@ -362,4 +364,177 @@ test("fails closed when provider key resolution is asynchronous or unavailable",
     fixture.makeAttestation("policy-authority"), SCOPE
   ).verified, false);
   assert.equal(asyncVerifier.getObservedKeyVersion("missing-key"), null);
+});
+
+
+function createEvidenceReferenceFixture() {
+  const fixture = createFixture();
+  const artifacts = new Map();
+  const overrides = {};
+  for (const role of A2_PROVIDER_EVIDENCE_ROLES) {
+    const refId = "verified-artifact:" + role;
+    const bytes = Buffer.from("authoritative-evidence:" + role, "utf8");
+    artifacts.set(refId, bytes);
+    overrides[role] = {
+      evidenceRefs: [{
+        refId,
+        sha256: createHash("sha256").update(bytes).digest("hex")
+      }]
+    };
+  }
+  const bundle = verifyA2ProviderEvidenceBundle({
+    attestations: fixture.makeBundle(overrides),
+    expected: SCOPE,
+    verifier: fixture.verifier
+  });
+  return { bundle, artifacts };
+}
+
+function evidenceResolverFor(artifacts, transform = (input, bytes) => bytes) {
+  return async (input) => {
+    const bytes = artifacts.get(input.refId);
+    const resolvedBytes = transform(input, bytes);
+    return {
+      providerId: input.providerId,
+      role: input.role,
+      ...SCOPE,
+      bytes: resolvedBytes
+    };
+  };
+}
+
+test("verifies every authoritative A2 evidence reference by exact scope and SHA-256", async () => {
+  const { bundle, artifacts } = createEvidenceReferenceFixture();
+  const result = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => NOW
+  });
+
+  assert.equal(result.verified, true);
+  assert.equal(result.executable, false);
+  assert.equal(result.referenceCount, 5);
+  assert.equal(result.references.length, 5);
+  assert.equal(result.totalBytes, [...artifacts.values()].reduce((sum, value) => sum + value.length, 0));
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.references), true);
+});
+
+test("A2 reference verification rejects tampering, wrong provider scope and unavailable evidence", async () => {
+  const { bundle, artifacts } = createEvidenceReferenceFixture();
+
+  const mismatch = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts, (input, bytes) =>
+      input.role === "containment-provider" ? Buffer.from("tampered") : bytes
+    ),
+    clock: () => NOW
+  });
+  assert.equal(mismatch.verified, false);
+  assert.equal(mismatch.executable, false);
+  assert.equal(mismatch.reason, "evidence-reference-digest-mismatch");
+
+  const wrongScope = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: async (input) => ({
+      providerId: input.providerId,
+      role: input.role,
+      ...SCOPE,
+      assetId: "different-asset",
+      bytes: artifacts.get(input.refId)
+    }),
+    clock: () => NOW
+  });
+  assert.equal(wrongScope.verified, false);
+  assert.equal(wrongScope.reason, "evidence-reference-scope-mismatch");
+
+  const unavailable = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: async () => { throw new Error("private provider detail"); },
+    clock: () => NOW
+  });
+  assert.equal(unavailable.verified, false);
+  assert.equal(unavailable.reason, "evidence-reference-unavailable");
+});
+
+test("A2 reference verification rejects forged bundles, stale evidence and size-budget overflow", async () => {
+  const { bundle, artifacts } = createEvidenceReferenceFixture();
+
+  const forged = await verifyA2EvidenceReferences({
+    bundle: { ...bundle },
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => NOW
+  });
+  assert.equal(forged.verified, false);
+  assert.equal(forged.reason, "invalid-evidence-reference-verification-input");
+
+  const stale = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => bundle.expiresAtMs
+  });
+  assert.equal(stale.verified, false);
+  assert.equal(stale.reason, "provider-evidence-stale-or-expired");
+
+  const tooSmall = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => NOW,
+    maxReferenceBytes: 8,
+    maxTotalBytes: 64
+  });
+  assert.equal(tooSmall.verified, false);
+  assert.equal(tooSmall.reason, "evidence-reference-size-limit-exceeded");
+});
+
+test("A2 reference verification rejects missing or malformed host resolver results", async () => {
+  const { bundle } = createEvidenceReferenceFixture();
+  const missing = await verifyA2EvidenceReferences({
+    bundle,
+    clock: () => NOW
+  });
+  assert.equal(missing.verified, false);
+  assert.equal(missing.reason, "invalid-evidence-reference-verification-input");
+
+  const malformed = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: async () => ({ bytes: Buffer.from("not-scoped") }),
+    clock: () => NOW
+  });
+  assert.equal(malformed.verified, false);
+  assert.equal(malformed.reason, "invalid-resolved-evidence-reference");
+});
+
+
+test("A2 evidence reference resolution is bounded and abortable", async () => {
+  const { bundle } = createEvidenceReferenceFixture();
+  let aborted = false;
+  const result = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: ({ signal }) => new Promise(() => {
+      signal.addEventListener("abort", () => {
+        aborted = true;
+      }, { once: true });
+    }),
+    clock: () => NOW,
+    timeoutMs: 100
+  });
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "evidence-reference-timeout");
+  assert.equal(aborted, true);
+});
+
+test("A2 evidence references are rejected when the signed bundle expires during resolution", async () => {
+  const { bundle, artifacts } = createEvidenceReferenceFixture();
+  let clockCalls = 0;
+  const result = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => {
+      clockCalls += 1;
+      return clockCalls === 1 ? NOW : bundle.expiresAtMs;
+    }
+  });
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "provider-evidence-stale-or-expired");
 });

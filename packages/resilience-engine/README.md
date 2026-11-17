@@ -98,7 +98,7 @@ The policy gate uses exact service IDs, exact environments and explicit action c
 
 The included `createMemoryPolicyRevisionStore()` and `createMemoryCapabilityLedger()` are test/development fixtures only. They have `durable: false` and are rejected unless `allowInMemoryStores: true` is explicitly set. They are not suitable for production or multiple processes.
 
-**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. A2 containment remains blocked until the trusted signal gateway is certified. A3 failover remains blocked until external monitoring, transactional coordination, quorum and fencing are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
+**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. The Trusted Signal Gateway, replay protection, producer adapters and signed A2 provider-attestation verifier exist as laboratory components. A2 containment remains blocked until authoritative evidence-reference retrieval/semantic validation, a concrete typed containment provider, independent out-of-band verification, tested rollback, durable budget/action authorization and end-to-end fault-injection certification are complete. A3 failover remains blocked until an independent external monitor/quorum, source and target-enforced fencing, replication/RPO validation, a traffic-cutover provider, rollback and post-failover verification are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
 
 See [POLICY-V2-CONTROL.md](./docs/POLICY-V2-CONTROL.md) for the schema, injected-store contracts and integration boundary.
 
@@ -133,9 +133,12 @@ laboratory increment, the only executable capability is A1
 service, with clear trusted security state, durable budgets and both
 service-manager and application-level health verification.
 
-A2 containment and A3 failover remain denied by the existing policy gate until
-their independent signal, containment, external monitoring, quorum, fencing
-and consistency certification requirements are complete. No arbitrary shell
+A2 containment and A3 failover remain denied by the existing policy gate.
+A2 now has a second-stage authoritative evidence-reference integrity check, but
+still lacks a concrete containment provider and independently verified execution.
+A3 has a single-PostgreSQL-primary lease/fencing primitive, not external quorum
+or target-enforced fencing for unrelated resources. Both capabilities remain
+non-executable until provider-specific end-to-end certification is complete. No arbitrary shell
 commands, self-modifying policy, evidence deletion, binary restoration or
 destructive data actions are permitted.
 

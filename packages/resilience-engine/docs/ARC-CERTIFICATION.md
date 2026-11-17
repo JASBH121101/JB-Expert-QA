@@ -19,8 +19,8 @@ The runtime must continue to report `mode: semi-autonomous` and `targetMode: aut
 
 1. **Contract integrity:** exact schemas, immutable outputs, bounded inputs and no unsupported fields.
 2. **A1 execution envelope:** exact service/asset/environment binding, trusted signal provenance, signed policy and current revision, durable atomic idempotency claim, mutation-stop checks immediately before execution, typed host adapter, bounded execution, service verification and application health verification.
-3. **A2 denial boundary:** each required evidence item is independently necessary; stale, missing, false, malformed or unsupported evidence denies readiness; readiness never grants execution.
-4. **A3 denial boundary:** every monitor, quorum, lease, fencing, replication, readiness, rollback and verification gate is independently necessary; readiness never grants execution.
+3. **A2 denial boundary:** each required evidence item is independently necessary; signed provider attestations and each referenced object must pass scope, freshness, resolver-deadline, size and SHA-256 checks; stale, missing, false, malformed or unsupported evidence denies readiness; readiness never grants execution.
+4. **A3 denial boundary:** every monitor, quorum, lease, fencing, replication, readiness, rollback and verification gate is independently necessary. Until an A3 provider-evidence contract and concrete provider control plane exist, these are host-verified readiness inputs only; readiness never grants execution.
 5. **Fault injection:** store/audit outage, stale or replayed signal, policy revocation, expired authorization, adapter timeout, failed health verification, duplicate incident, circuit open, and mutation-stop activation must fail closed.
 6. **Cross-platform:** run the same deterministic contracts on Ubuntu and Windows, Node.js 22 and 24. Platform adapters additionally require their own OS-specific integration lab.
 7. **Evidence report:** record commit SHA, runtime matrix, test counts, failures, scenario IDs and capability disposition. Do not label a test-only result as production certification.
