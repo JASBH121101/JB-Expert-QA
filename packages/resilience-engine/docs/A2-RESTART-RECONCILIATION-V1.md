@@ -68,7 +68,9 @@ The coordinator intentionally has no policy-authority, `apply`, `release`, journ
 
 ## Integration gap that remains open
 
-The A2 controller now requires the durable action ledger to implement the complete pending-record schema, paginated read-only index, and exact record lookup. It creates the `claimed` record before provider start, requires the provider-start marker to atomically update that record, and relies on the ledger's terminal completion operation to preserve held records or remove terminal records. The read-only coordinator can consume that same journal contract, but the host must still implement and independently certify its durable semantics, provider reconciliation, evidence resolver, verifier independence, and forensic retention lookup. The successful containment handle remains process-local; this lifecycle does not reconstruct release authority after restart and does not certify production A2 readiness.
+The A2 controller now requires one durable action ledger to own claims, complete pending records, provider-start transitions, bounded read-only paging and exact record lookup. The package includes `createFileA2ActionLedger`, a single-host file implementation that keeps those records in one lock-protected atomic ledger. The restart coordinator reads that same contract and never resumes or mutates an operation.
+
+The built-in file adapter is not a distributed database. A multi-host deployment still needs a separately implemented transactional PostgreSQL action ledger. The host must certify the chosen storage semantics, restart/restore behavior, provider read-only reconciliation, evidence resolver, verifier independence and forensic retention lookup. The successful containment handle remains process-local; this lifecycle does not reconstruct release authority after restart and does not certify production A2 readiness.
 
 ## Lab test coverage
 
