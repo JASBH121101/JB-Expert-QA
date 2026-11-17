@@ -38,6 +38,7 @@ const ATTESTATION_UNSIGNED_FIELDS = [
 ];
 const ATTESTATION_FIELDS = [...ATTESTATION_UNSIGNED_FIELDS, "signature"];
 const PROVIDER_VERIFIERS = new WeakSet();
+const VERIFIED_A2_BUNDLES = new WeakSet();
 const EXPECTED_FIELDS = [
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ];
@@ -508,7 +509,7 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
     });
   }
 
-  return Object.freeze({
+  const bundle = Object.freeze({
     schema: BUNDLE_SCHEMA,
     verified: true,
     executable: false,
@@ -524,6 +525,126 @@ export function verifyA2ProviderEvidenceBundle({ attestations, expected, verifie
       attestationId: result.attestationId,
       evidenceRefs: result.evidenceRefs
     })))
+  });
+  VERIFIED_A2_BUNDLES.add(bundle);
+  return bundle;
+}
+
+/**
+ * Resolve and hash every evidence object referenced by a verified A2 bundle.
+ *
+ * The injected host resolver must fetch from the authoritative provider/evidence
+ * system and return the exact scope metadata together with raw bytes. This checks
+ * identity, scope, size and SHA-256 integrity; it does not decide whether the
+ * underlying evidence semantically proves the provider's claim.
+ */
+export async function verifyA2EvidenceReferences({
+  bundle,
+  resolveEvidenceReference,
+  clock = Date.now,
+  maxReferenceBytes = 10 * 1024 * 1024,
+  maxTotalBytes = 25 * 1024 * 1024
+} = {}) {
+  const denied = (reason) => Object.freeze({
+    schema: "jb.resilience.a2-evidence-reference-verification/v1",
+    verified: false,
+    executable: false,
+    reason
+  });
+
+  if (!VERIFIED_A2_BUNDLES.has(bundle) ||
+      typeof resolveEvidenceReference !== "function" ||
+      typeof clock !== "function" ||
+      !Number.isSafeInteger(maxReferenceBytes) || maxReferenceBytes < 1 ||
+      maxReferenceBytes > 25 * 1024 * 1024 ||
+      !Number.isSafeInteger(maxTotalBytes) || maxTotalBytes < 1 ||
+      maxTotalBytes > 100 * 1024 * 1024 ||
+      maxTotalBytes < maxReferenceBytes) {
+    return denied("invalid-evidence-reference-verification-input");
+  }
+
+  let now;
+  try {
+    now = assertTimestamp(clock(), "evidence reference verifier clock");
+  } catch {
+    return denied("invalid-evidence-reference-clock");
+  }
+  if (now < bundle.observedAtMs || now >= bundle.expiresAtMs) {
+    return denied("provider-evidence-stale-or-expired");
+  }
+
+  const references = [];
+  let totalBytes = 0;
+  for (const provider of bundle.providers) {
+    for (const reference of provider.evidenceRefs) {
+      if (references.length >= 100) return denied("evidence-reference-count-exceeded");
+
+      let resolved;
+      try {
+        resolved = await resolveEvidenceReference(Object.freeze({
+          refId: reference.refId,
+          sha256: reference.sha256,
+          providerId: provider.providerId,
+          role: provider.role,
+          scope: bundle.scope
+        }));
+      } catch {
+        return denied("evidence-reference-unavailable");
+      }
+
+      try {
+        exactKeys(resolved, [
+          "providerId", "role", "assetId", "environment", "incidentId",
+          "policyId", "policyRevision", "policyHash", "bytes"
+        ], "resolved provider evidence reference");
+      } catch {
+        return denied("invalid-resolved-evidence-reference");
+      }
+
+      if (resolved.providerId !== provider.providerId ||
+          resolved.role !== provider.role ||
+          resolved.assetId !== bundle.scope.assetId ||
+          resolved.environment !== bundle.scope.environment ||
+          resolved.incidentId !== bundle.scope.incidentId ||
+          resolved.policyId !== bundle.scope.policyId ||
+          resolved.policyRevision !== bundle.scope.policyRevision ||
+          resolved.policyHash !== bundle.scope.policyHash) {
+        return denied("evidence-reference-scope-mismatch");
+      }
+      if (!(resolved.bytes instanceof Uint8Array)) {
+        return denied("invalid-evidence-reference-bytes");
+      }
+
+      // Copy the bytes before hashing to avoid mutable caller-owned views.
+      const bytes = Buffer.from(resolved.bytes);
+      if (bytes.length < 1 || bytes.length > maxReferenceBytes ||
+          totalBytes + bytes.length > maxTotalBytes) {
+        return denied("evidence-reference-size-limit-exceeded");
+      }
+      const actualSha256 = createHash("sha256").update(bytes).digest("hex");
+      if (actualSha256 !== reference.sha256) {
+        return denied("evidence-reference-digest-mismatch");
+      }
+
+      totalBytes += bytes.length;
+      references.push(Object.freeze({
+        refId: reference.refId,
+        providerId: provider.providerId,
+        role: provider.role,
+        sha256: actualSha256,
+        size: bytes.length
+      }));
+    }
+  }
+
+  return Object.freeze({
+    schema: "jb.resilience.a2-evidence-reference-verification/v1",
+    verified: true,
+    executable: false,
+    scope: bundle.scope,
+    referenceCount: references.length,
+    totalBytes,
+    references: Object.freeze(references)
   });
 }
 
