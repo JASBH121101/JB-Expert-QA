@@ -21,6 +21,8 @@ The host must inject all of the following:
 
 All store durability markers are host integration assertions. The controller cannot prove that a custom adapter or database is truly durable; the host must certify its implementation and operational configuration.
 
+Every injected adapter and durable dependency call is time-bounded by the controller. The host method receives an absolute deadline and an AbortSignal; production implementations must honor cancellation and must make durable reservation/settlement calls idempotent for the supplied operation key. A timed-out action-claim or budget reservation is treated as uncertain and held for reconciliation, never as permission to apply containment.
+
 ## Exact scope
 
 Every policy decision, adapter call and receipt is bound to these six fields:
