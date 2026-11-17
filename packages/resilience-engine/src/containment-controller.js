@@ -1119,6 +1119,20 @@ export function createA2ContainmentController({
     }
 
     const releaseVerification = Object.freeze({ ...verification.value });
+    const finalReleaseAuthorization = await assertAuthorization(
+      authorization, action, scope, profileId
+    );
+    const finalReleaseMutation = await assertMutationAllowed(
+      scope, action, "before-release-finalization"
+    );
+    if (!finalReleaseAuthorization || !finalReleaseMutation) {
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "authorization-or-mutation-control-changed-after-release",
+        operationReceipt: releaseReceipt
+      });
+    }
+
     const budgetOkay = await settleBudget(reservationId, "succeeded");
     const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
