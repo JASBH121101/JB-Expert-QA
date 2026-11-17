@@ -714,7 +714,7 @@ test("A2 requires a durable provider-start marker before invoking the containmen
   });
   assert.equal(result.state, "held-for-reconciliation");
   assert.equal(result.executed, false);
-  assert.ok(deps.events.includes("action-mark-provider-started"));
+  assert.ok(deps.events.includes("action-mark-provider-started:apply-containment-profile"));
   assert.ok(deps.events.includes("action-reconcile"));
   assert.equal(deps.events.includes("apply"), false);
 });
