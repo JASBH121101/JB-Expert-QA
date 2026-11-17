@@ -52,7 +52,9 @@ function createMemoryStore() {
     },
     async delete({ uploadId }) {
       calls.push(["delete", uploadId]);
+      // Delete an uncommitted upload from quarantine or a late private promotion.
       quarantine.delete(uploadId);
+      approved.delete(uploadId);
       return { deleted: true };
     }
   };
@@ -614,4 +616,62 @@ test("a stalled security bridge cannot delay local rejection of a malicious uplo
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 0);
   assert.ok(store.calls.some(([name]) => name === "delete"));
+});
+
+
+test("a stalled storage promotion is aborted and remains quarantined", async () => {
+  const store = createMemoryStore();
+  let abortObserved = false;
+  store.promote = ({ signal }) => new Promise((resolve, reject) => {
+    signal.addEventListener("abort", () => {
+      abortObserved = true;
+      reject(new Error("promotion aborted"));
+    }, { once: true });
+  });
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { promotionTimeoutMs: 20 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "promotion-timeout.png"
+    }),
+    (error) => error.code === "APPROVAL_TIMEOUT"
+  );
+
+  assert.equal(abortObserved, true);
+  assert.equal(store.approved.size, 0);
+  assert.equal(store.quarantine.size, 1);
+});
+
+test("a late promotion is cleaned by opaque upload ID and never left in approved storage", async () => {
+  const store = createMemoryStore();
+  let uploadId;
+  store.promote = async ({ uploadId: id, metadata, expectedSha256, expectedSize }) => {
+    uploadId = id;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const bytes = store.quarantine.get(id);
+    if (!bytes ||
+        bytes.length !== expectedSize ||
+        createHash("sha256").update(bytes).digest("hex") !== expectedSha256) {
+      return { promoted: false };
+    }
+    // Model a non-cooperative adapter completing late into a private approved namespace.
+    store.approved.set(id, { bytes, metadata });
+    store.quarantine.delete(id);
+    return { promoted: true };
+  };
+
+  await assert.rejects(
+    inspector(store, cleanScanner(), { promotionTimeoutMs: 20 }).inspect({
+      source: Readable.from([PNG]),
+      fileName: "late-promotion.png"
+    }),
+    (error) => error.code === "APPROVAL_TIMEOUT"
+  );
+
+  assert.ok(uploadId);
+  assert.equal(store.approved.size, 0);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(store.approved.has(uploadId), false);
+  assert.equal(store.quarantine.has(uploadId), false);
+  assert.ok(store.calls.some(([name, id]) => name === "delete" && id === uploadId));
 });
