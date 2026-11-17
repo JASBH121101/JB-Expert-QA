@@ -197,7 +197,10 @@ function createDependencies({
   releaseStartMode = "normal",
   authorizationIssuedAtMs = NOW,
   verificationOperationIdOverride = null,
+  releaseVerificationOperationIdOverride = null,
   verificationReferenceDigestOverride = null,
+  preReleaseVerificationReferenceDigestOverride = null,
+  releaseVerificationReferenceDigestOverride = null,
   forensicOperationIdOverride = null,
   forensicReferenceDigestOverride = null,
   clockThrowsAfterProviderStart = false,
@@ -300,9 +303,14 @@ function createDependencies({
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: verificationState,
-        operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
-        referencesSha256: verificationReferenceDigestOverride ??
-          createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
+        operationId: input.action === "verify-before-release"
+          ? verificationOperationIdOverride ?? input.operationReceipt.operationId
+          : input.operationReceipt.operationId,
+        referencesSha256: input.action === "verify-before-release"
+          ? preReleaseVerificationReferenceDigestOverride ??
+            verificationReferenceDigestOverride ??
+            createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
+          : createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     },
     async verifyRelease(input) {
@@ -925,7 +933,7 @@ test("A2 refuses release when the independent release verifier binds a different
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
   const deps = createDependencies({
     releaseVerificationState: "released",
-    verificationOperationIdOverride: "different-release-operation"
+    releaseVerificationOperationIdOverride: "different-release-operation"
   });
   const contained = await deps.controller.executeContainment({
     readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
@@ -941,7 +949,7 @@ test("A2 refuses release when the independent release verifier binds a different
 
 test("A2 refuses release when the pre-release verifier cannot bind the existing evidence set", async () => {
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
-  const deps = createDependencies({ verificationReferenceDigestOverride: "e".repeat(64) });
+  const deps = createDependencies({ preReleaseVerificationReferenceDigestOverride: "e".repeat(64) });
   const contained = await deps.controller.executeContainment({
     readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
   });
