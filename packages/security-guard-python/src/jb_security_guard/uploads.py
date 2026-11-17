@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO, Callable, Protocol, Any
 
@@ -240,13 +241,13 @@ class UploadInspectionService:
             retain_quarantine = False
             self._emit("upload-approved")
             return {
-                "schema": "jb.security.upload-inspection-result/v1",
                 "status": "approved",
                 "uploadId": upload_id,
                 "sha256": sha256,
                 "size": size,
                 "mimeType": detected_type,
                 "scanner": {"engine": scan_result["engine"], "version": scan_result["version"]},
+                "scannedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }
         except UploadInspectionError as exc:
             self._emit("upload-rejected", exc.reason)
