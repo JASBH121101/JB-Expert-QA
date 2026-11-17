@@ -125,6 +125,7 @@ final class UploadInspector
             $relativePath = $this->store->promote($uploadId, $sha256, $size, $mimeType);
             $approvedPath = $this->store->resolveApproved($relativePath);
         } catch (Throwable) {
+            $this->safeDelete($uploadId);
             throw new UploadInspectionException('APPROVAL_FAILED');
         }
 
