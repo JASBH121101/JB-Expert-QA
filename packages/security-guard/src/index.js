@@ -335,7 +335,7 @@ function normalizeOptions(options) {
   const rateLimitInput = options.rateLimit ?? {};
   if (!isRecord(rateLimitInput)) throw new TypeError("rateLimit must be an object");
   for (const key of Object.keys(rateLimitInput)) {
-    if (!["enabled", "max", "windowMs", "maxKeys"].includes(key)) {
+    if (!["enabled", "max", "windowMs", "maxKeys", "excludedExtensions"].includes(key)) {
       throw new TypeError("Unknown rateLimit option: " + key);
     }
   }
@@ -347,7 +347,7 @@ function normalizeOptions(options) {
   if (!Array.isArray(rateLimit.excludedExtensions) ||
       rateLimit.excludedExtensions.length > 32 ||
       rateLimit.excludedExtensions.some((extension) =>
-        typeof extension !== "string" || !/^\\.[a-z0-9]{1,10}$/i.test(extension)
+        typeof extension !== "string" || !/^\.[a-z0-9]{1,10}$/i.test(extension)
       ) ||
       new Set(rateLimit.excludedExtensions.map((extension) => extension.toLowerCase())).size !==
         rateLimit.excludedExtensions.length) {
