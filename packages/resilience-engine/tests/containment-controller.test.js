@@ -363,7 +363,7 @@ function createDependencies({
       return { recorded: true };
     }
   };
-  const actionLedger = {
+  const controller = createA2ContainmentController({
     enableExecution: true,
     policyAuthority,
     containmentProvider: provider,
@@ -534,8 +534,19 @@ function createDependencies({
   });
   const recoveryJournal = {
     durable: true,
-    listPending: (...args) => actionLedger.listPending(...args),
-    getPendingByClaimId: (...args) => actionLedger.getPendingByClaimId(...args)
+    async listPending(input) {
+      const claimIds = [...pendingRecords.values()]
+        .filter((record) => ["claimed", "provider-started", "held-for-reconciliation"].includes(record.state))
+        .map((record) => record.claimId);
+      const offset = input.cursor === null ? 0 : Number(input.cursor);
+      const page = claimIds.slice(offset, offset + input.limit);
+      const nextOffset = offset + page.length;
+      return { claimIds: page, nextCursor: nextOffset < claimIds.length ? String(nextOffset) : null };
+    },
+    async getPendingByClaimId(input) {
+      const record = pendingRecords.get(input.claimId);
+      return record ? { found: true, record: { ...record } } : { found: false, record: null };
+    }
   };
   return { controller, events, profileId, actionLedger: recoveryJournal, pendingRecords, pendingTransitions };
 }
