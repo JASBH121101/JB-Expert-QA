@@ -51,6 +51,8 @@ The default mode is `monitor` to reduce deployment risk. Blocking is opt-in.
 - Header count and byte limits.
 - Content-Length limit before body parsing.
 - Per-process, in-memory request rate limiting.
+- GET/HEAD requests for common static CSS, JavaScript, image, font, and source-map extensions are excluded from the rate-limit counter by default; request-threat inspection still runs.
+- The static extension exclusion can be customized with `rateLimit.excludedExtensions`; set it to an empty array to disable extension-based exclusions.
 - Sanitized incident events without query strings, header values, cookies, request bodies, or client IP addresses by default.
 
 ## Brute-force protection for authentication routes
@@ -111,7 +113,8 @@ Events contain only a rule ID, scope names, timestamp, action, severity, and coo
 
 - Register the middleware before body parsers and application routes.
 - The Express-compatible middleware does not read request bodies. Configure configureNodeHttpServer() before listen() for a Node HTTP/HTTPS server-level streamed body cap, and keep framework parser and multipart limits enabled as a second boundary.
-- The rate limiter is local to one Node.js process. Multi-instance deployments need a shared atomic store (for example Redis) before treating limits as global.
+- The rate limiter is local to one Node.js process. Multi-instance deployments need a shared atomic store (for example Redis or the included PostgreSQL adapter) before treating limits as global.
+- Static-asset exclusion is an extension heuristic for GET/HEAD requests, not an authorization boundary. Use route-scoped middleware or a custom router policy for applications with dynamic routes that intentionally end in a static extension.
 - Forwarded IP headers are not trusted by default. Supply a `keyGenerator` only when the application has a narrowly configured trusted-proxy chain.
 - Signature detection is heuristic and can produce false positives or miss novel attacks. It is not a replacement for parameterized database queries, output encoding, authorization checks, a WAF, or a controlled security assessment.
 - Do not expose Guard as a client-side browser script. It must run on the server.

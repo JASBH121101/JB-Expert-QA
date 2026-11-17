@@ -60,6 +60,8 @@ app.add_middleware(
 
 The client is asynchronous, uses HTTPS with certificate verification and does not follow redirects or retry requests. Keep credentials on the application server. Use `failure_mode="closed"` unless a documented risk decision explicitly approves fail-open.
 
+When this middleware is installed globally, GET/HEAD requests for common static extensions and the default `/static/`, `/assets/` and `/media/` prefixes bypass the rate-limit service. Use `excluded_extensions` and `excluded_prefixes` to match the application's static paths; pass empty tuples to disable either exclusion. POST requests are never skipped solely because their path has a static-looking extension.
+
 ## Validation boundary
 
 The Python package includes strict rate-limit check, decision and policy normalizers plus the same length-prefixed counter-key format as Node/PHP. Its unit tests consume the same HMAC known-answer fixture. The FastAPI middleware only adapts the central endpoint response; it does not create or migrate policy, secrets, databases or counters.

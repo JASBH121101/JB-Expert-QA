@@ -34,11 +34,17 @@ const DEFAULT_MAX_REQUEST_TARGET_LENGTH = 8192;
 const DEFAULT_MAX_HEADER_BYTES = 16 * 1024;
 const DEFAULT_MAX_HEADER_COUNT = 100;
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+const DEFAULT_STATIC_ASSET_EXTENSIONS = Object.freeze([
+  ".css", ".js", ".mjs", ".cjs",
+  ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg", ".ico",
+  ".woff", ".woff2", ".ttf", ".eot", ".map"
+]);
 const DEFAULT_RATE_LIMIT = Object.freeze({
   enabled: true,
   max: 120,
   windowMs: 60_000,
-  maxKeys: 5000
+  maxKeys: 5000,
+  excludedExtensions: DEFAULT_STATIC_ASSET_EXTENSIONS
 });
 
 function isRecord(value) {
@@ -50,6 +56,27 @@ function positiveInteger(value, name, maximum) {
     throw new TypeError(name + " must be a positive integer no greater than " + maximum);
   }
   return value;
+}
+
+
+function isStaticAssetRequest(request, excludedExtensions) {
+  const method = typeof request?.method === "string" ? request.method.toUpperCase() : "";
+  if (method !== "GET" && method !== "HEAD") return false;
+
+  const target = typeof request?.url === "string" ? request.url : "";
+  let pathname = target.split(/[?#]/u, 1)[0];
+  try {
+    pathname = new URL(target, "http://jb-security-guard.invalid").pathname;
+  } catch {
+    // Keep the bounded raw path fallback for non-standard HTTP request objects.
+  }
+  try {
+    pathname = decodeURIComponent(pathname);
+  } catch {
+    // A malformed path is still inspected by the request-threat detector below.
+  }
+  const normalizedPath = pathname.toLowerCase();
+  return excludedExtensions.some((extension) => normalizedPath.endsWith(extension));
 }
 
 function decodeForInspection(value) {
@@ -308,7 +335,7 @@ function normalizeOptions(options) {
   const rateLimitInput = options.rateLimit ?? {};
   if (!isRecord(rateLimitInput)) throw new TypeError("rateLimit must be an object");
   for (const key of Object.keys(rateLimitInput)) {
-    if (!["enabled", "max", "windowMs", "maxKeys"].includes(key)) {
+    if (!["enabled", "max", "windowMs", "maxKeys", "excludedExtensions"].includes(key)) {
       throw new TypeError("Unknown rateLimit option: " + key);
     }
   }
@@ -317,6 +344,18 @@ function normalizeOptions(options) {
   rateLimit.max = positiveInteger(rateLimit.max, "rateLimit.max", 1_000_000);
   rateLimit.windowMs = positiveInteger(rateLimit.windowMs, "rateLimit.windowMs", 86_400_000);
   rateLimit.maxKeys = positiveInteger(rateLimit.maxKeys, "rateLimit.maxKeys", 100_000);
+  if (!Array.isArray(rateLimit.excludedExtensions) ||
+      rateLimit.excludedExtensions.length > 32 ||
+      rateLimit.excludedExtensions.some((extension) =>
+        typeof extension !== "string" || !/^\.[a-z0-9]{1,10}$/i.test(extension)
+      ) ||
+      new Set(rateLimit.excludedExtensions.map((extension) => extension.toLowerCase())).size !==
+        rateLimit.excludedExtensions.length) {
+    throw new TypeError("rateLimit.excludedExtensions must contain unique file extensions such as .css or .webp");
+  }
+  rateLimit.excludedExtensions = Object.freeze(
+    rateLimit.excludedExtensions.map((extension) => extension.toLowerCase())
+  );
 
   const limits = {
     maxRequestTargetLength: positiveInteger(
@@ -597,6 +636,7 @@ export function createSecurityGuard(options = {}) {
 
   function getRateLimitFinding(request, now, resolvedIdentity) {
     if (!settings.rateLimit.enabled) return null;
+    if (isStaticAssetRequest(request, settings.rateLimit.excludedExtensions)) return null;
 
     const clientKey = resolvedIdentity ?? resolveClientIdentity(request);
     let entry = rateState.get(clientKey);
