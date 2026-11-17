@@ -316,6 +316,7 @@ export {
   verifyA2ProviderEvidenceBundle,
   verifyA2EvidenceReferences,
   evaluateA2ProviderReadiness,
+  getA2ProviderReadinessMetadata,
   getA2ProviderReadinessScope
 } from "./provider-evidence.js";
 
