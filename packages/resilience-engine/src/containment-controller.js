@@ -257,11 +257,11 @@ function validateIndependentVerification(value, {
     value.expiresAtMs > now;
 }
 
-function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs) {
+function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs, operationId) {
   try {
     exactKeys(value, [
       "schema", "recorderId", "retained", ...SCOPE_KEYS, "evidenceIds",
-      "retentionPolicyId", "preservedAtMs", "expiresAtMs", "referencesSha256"
+      "retentionPolicyId", "preservedAtMs", "expiresAtMs", "referencesSha256", "operationId"
     ], "A2 forensic receipt");
   } catch {
     return false;
@@ -269,6 +269,9 @@ function validateForensicReceipt(value, recorderId, scope, now, evidenceRefs) {
   return value.schema === "jb.resilience.a2-forensic-receipt/v1" &&
     value.recorderId === recorderId &&
     value.retained === true &&
+    value.operationId === operationId &&
+    typeof value.operationId === "string" &&
+    IDENTIFIER.test(value.operationId) &&
     value.referencesSha256 === createHash("sha256").update(canonical(evidenceRefs), "utf8").digest("hex") &&
     sameScope(value, scope) &&
     Array.isArray(value.evidenceIds) &&
@@ -671,11 +674,13 @@ export function createA2ContainmentController({
 
     const preserveCall = await invokeBounded(
       forensicRecorder.preserveEvidence.bind(forensicRecorder),
-      { scope, profileId, evidenceRefs, retentionPolicyId: "owner-approved" },
+      { scope, profileId, evidenceRefs, operationId: operationReceipt.operationId, retentionPolicyId: "owner-approved" },
       operationTimeoutMs, "forensic-preservation", clock
     );
     const preserveNow = assertTimestamp(clock(), "forensic clock");
-    if (!validateForensicReceipt(preserveCall.value, recorderId, scope, preserveNow, evidenceRefs)) {
+    if (!validateForensicReceipt(
+      preserveCall.value, recorderId, scope, preserveNow, evidenceRefs, operationReceipt.operationId
+    )) {
       return { ok: false, reason: "forensic-evidence-preservation-failed" };
     }
     const forensicReceipt = Object.freeze({
@@ -996,11 +1001,12 @@ export function createA2ContainmentController({
 
     const preserved = await invokeBounded(
       forensicRecorder.preserveEvidence.bind(forensicRecorder),
-      { scope, profileId, evidenceRefs, retentionPolicyId: "owner-approved-before-release" },
+      { scope, profileId, evidenceRefs, operationId: operationReceipt.operationId,
+        retentionPolicyId: "owner-approved-before-release" },
       operationTimeoutMs, "pre-release-forensics", clock
     );
     if (!validateForensicReceipt(preserved.value, recorderId, scope,
-        assertTimestamp(clock(), "pre-release forensic clock"), evidenceRefs)) {
+        assertTimestamp(clock(), "pre-release forensic clock"), evidenceRefs, operationReceipt.operationId)) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
         reason: "pre-release-forensic-preservation-failed", operationReceipt
