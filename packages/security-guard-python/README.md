@@ -80,7 +80,9 @@ Host adapters must keep quarantine and approved objects private, enforce scanner
 deadlines, consume the complete stream, verify exact bytes during promotion, and
 make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
 and uncertain promotion outcomes never produce an approval. Malicious files,
-unknown verdicts and uncertain objects remain quarantined for forensic review.
+unknown verdicts and uncertain objects remain quarantined for forensic review. The
+request path never serves a quarantined original; disposal requires a separate,
+authorized retention/disposition process after the required evidence is preserved.
 
 No antivirus engine or production storage implementation is bundled. Signature
 identification is not full format validation or image sanitization. The host
