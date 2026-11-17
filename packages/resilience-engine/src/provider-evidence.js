@@ -543,7 +543,8 @@ export async function verifyA2EvidenceReferences({
   resolveEvidenceReference,
   clock = Date.now,
   maxReferenceBytes = 10 * 1024 * 1024,
-  maxTotalBytes = 25 * 1024 * 1024
+  maxTotalBytes = 25 * 1024 * 1024,
+  timeoutMs = 5_000
 } = {}) {
   const denied = (reason) => Object.freeze({
     schema: "jb.resilience.a2-evidence-reference-verification/v1",
@@ -559,7 +560,8 @@ export async function verifyA2EvidenceReferences({
       maxReferenceBytes > 25 * 1024 * 1024 ||
       !Number.isSafeInteger(maxTotalBytes) || maxTotalBytes < 1 ||
       maxTotalBytes > 100 * 1024 * 1024 ||
-      maxTotalBytes < maxReferenceBytes) {
+      maxTotalBytes < maxReferenceBytes ||
+      !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
     return denied("invalid-evidence-reference-verification-input");
   }
 
@@ -580,16 +582,42 @@ export async function verifyA2EvidenceReferences({
       if (references.length >= 100) return denied("evidence-reference-count-exceeded");
 
       let resolved;
+      let timeoutHandle;
+      const controller = new AbortController();
+      let timedOut = false;
+      const resolvePromise = Promise.resolve().then(() => resolveEvidenceReference(Object.freeze({
+        refId: reference.refId,
+        sha256: reference.sha256,
+        providerId: provider.providerId,
+        role: provider.role,
+        scope: bundle.scope,
+        signal: controller.signal
+      })));
+      // Keep late resolver rejections observed if the deadline wins the race.
+      resolvePromise.catch(() => {});
+      const timeoutPromise = new Promise((resolve, reject) => {
+        timeoutHandle = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(new Error("evidence reference resolution timed out"));
+        }, timeoutMs);
+      });
       try {
-        resolved = await resolveEvidenceReference(Object.freeze({
-          refId: reference.refId,
-          sha256: reference.sha256,
-          providerId: provider.providerId,
-          role: provider.role,
-          scope: bundle.scope
-        }));
+        resolved = await Promise.race([resolvePromise, timeoutPromise]);
       } catch {
-        return denied("evidence-reference-unavailable");
+        return denied(timedOut ? "evidence-reference-timeout" : "evidence-reference-unavailable");
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
+
+      let verifiedAt;
+      try {
+        verifiedAt = assertTimestamp(clock(), "evidence reference verifier clock");
+      } catch {
+        return denied("invalid-evidence-reference-clock");
+      }
+      if (verifiedAt < bundle.observedAtMs || verifiedAt >= bundle.expiresAtMs) {
+        return denied("provider-evidence-stale-or-expired");
       }
 
       try {
@@ -635,6 +663,16 @@ export async function verifyA2EvidenceReferences({
         size: bytes.length
       }));
     }
+  }
+
+  let finalNow;
+  try {
+    finalNow = assertTimestamp(clock(), "evidence reference verifier clock");
+  } catch {
+    return denied("invalid-evidence-reference-clock");
+  }
+  if (finalNow < bundle.observedAtMs || finalNow >= bundle.expiresAtMs) {
+    return denied("provider-evidence-stale-or-expired");
   }
 
   return Object.freeze({
