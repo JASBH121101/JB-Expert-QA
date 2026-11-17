@@ -225,6 +225,7 @@ class UploadInspectionService:
                 retain_quarantine = True
                 raise UploadInspectionError("SCAN_INTEGRITY_MISMATCH")
             if scan_result["verdict"] == "malicious":
+                retain_quarantine = True
                 raise UploadInspectionError("MALWARE_DETECTED")
             if scan_result["verdict"] != "clean":
                 retain_quarantine = True
