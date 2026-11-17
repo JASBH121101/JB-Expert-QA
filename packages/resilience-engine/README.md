@@ -92,6 +92,11 @@ These are signed evidence contracts, not a failover controller. They do not supp
 The read-only `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })` function combines the verified A2 provider bundle and byte-integrity result with an exact Trusted Signal Gateway result. It rejects copied/fabricated Gateway outputs, non-durable replay stores, missing evidence, non-confirmed states and stale signals. It maps only authenticated Gateway provenance and signed provider facts into the existing A2 readiness gate. Its result always has `executable: false` and does not grant containment authorization.
 
 
+### A2 provider-neutral containment controller (laboratory)
+
+The opt-in `./containment-controller` entry point defines a generic A2 apply/reconcile/independent-verify/forensics/release lifecycle. It requires an exact branded A2 readiness result, an injected host policy authority, distinct executor/verifier identities, durable host action/budget/audit stores, mutation control and a typed provider implementation. The controller defaults to disabled and does not ship a firewall, cloud, endpoint or hypervisor adapter. The existing Policy Engine continues to deny A2 actions; this controller does not change that decision or grant authorization. Passing its test-double suite is contract validation, not production provider certification. See [A2 Containment Controller v1](./docs/A2-CONTAINMENT-CONTROLLER-V1.md).
+
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
