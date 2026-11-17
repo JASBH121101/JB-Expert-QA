@@ -1,3 +1,4 @@
+import { evaluateA3FailoverReadiness } from "./continuity-gates.js";
 import {
   createHash,
   createPublicKey,
