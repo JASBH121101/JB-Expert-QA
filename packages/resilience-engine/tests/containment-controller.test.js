@@ -303,14 +303,13 @@ function createDependencies({
       return makeVerification({
         verifierId, scope: input.scope, profileId: input.profileId,
         state: verificationState,
-        operationId: input.action === "verify-before-release"
-          ? verificationOperationIdOverride ?? input.operationReceipt.operationId
-          : input.operationReceipt.operationId,
+        operationId: verificationOperationIdOverride ?? input.operationReceipt.operationId,
         referencesSha256: input.action === "verify-before-release"
           ? preReleaseVerificationReferenceDigestOverride ??
             verificationReferenceDigestOverride ??
             createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
-          : createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
+          : verificationReferenceDigestOverride ??
+            createHash("sha256").update(JSON.stringify(input.evidenceRefs)).digest("hex")
       });
     },
     async verifyRelease(input) {
