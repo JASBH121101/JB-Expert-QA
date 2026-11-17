@@ -40,7 +40,8 @@ function evaluate(kind, evidence, requirements) {
       capability: kind,
       eligible: false,
       denied: Object.freeze([...requirements]),
-      reason: "invalid-evidence"
+      reason: "invalid-evidence",
+      executable: false
     });
   }
 
@@ -56,7 +57,8 @@ function evaluate(kind, evidence, requirements) {
       capability: kind,
       eligible: false,
       denied: Object.freeze([...requirements]),
-      reason: "unsupported-evidence-field"
+      reason: "unsupported-evidence-field",
+      executable: false
     });
   }
 
