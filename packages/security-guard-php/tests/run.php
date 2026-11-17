@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/CoreV1.php';
 require_once __DIR__ . '/../src/UniversalRateLimitClient.php';
+require_once __DIR__ . '/../src/UploadQuarantineStorage.php';
+require_once __DIR__ . '/../src/UploadMalwareScanner.php';
+require_once __DIR__ . '/../src/UploadInspectionException.php';
 require_once __DIR__ . '/../src/UploadInspectionService.php';
 require_once __DIR__ . '/UploadInspectionServiceTest.php';
 
