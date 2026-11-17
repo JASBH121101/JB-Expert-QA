@@ -195,6 +195,7 @@ function createDependencies({
   providerStartMode = "normal",
   releaseStartMode = "normal",
   authorizationIssuedAtMs = NOW,
+  clockThrowsAfterProviderStart = false,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -203,6 +204,11 @@ function createDependencies({
   let operationNumber = 0;
   let actionStage = "not-found";
   let budgetStage = "not-found";
+  let clockFailed = false;
+  const effectiveClock = () => {
+    if (clockFailed) throw new Error("clock unavailable after provider-start marker");
+    return clock();
+  };
   const providerId = "containment-provider-01";
   const verifierId = "independent-control-plane-02";
   const profileId = "isolate-endpoint";
@@ -405,6 +411,9 @@ function createDependencies({
         }
         if (mode === "deny") return { started: false };
         actionStage = "provider-started";
+        if (clockThrowsAfterProviderStart && input.action === "apply-containment-profile") {
+          clockFailed = true;
+        }
         return { started: true };
       },
       async reconcile() {
@@ -435,7 +444,7 @@ function createDependencies({
         return input.phase !== blockMutationAt;
       }
     },
-    clock,
+    clock: effectiveClock,
     operationTimeoutMs: 500
   });
   return { controller, events, profileId };
@@ -817,4 +826,18 @@ test("A2 holds rather than releasing when mutation control changes after the rel
   assert.equal(released.executed, false);
   assert.equal(deps.events.includes("action-mark-provider-started:release-containment"), true);
   assert.equal(deps.events.includes("release"), false);
+});
+
+
+test("A2 converts a clock failure after provider-start marking into a held result without applying", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ clockThrowsAfterProviderStart: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.reason, "a2-post-start-execution-state-unknown");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("action-mark-provider-started:apply-containment-profile"), true);
+  assert.equal(deps.events.includes("apply"), false);
 });
