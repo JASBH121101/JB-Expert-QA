@@ -72,6 +72,6 @@ The A2 controller now requires the durable action ledger to implement the comple
 
 ## Lab test coverage
 
-The tests cover successful observational reconciliation, expired lease non-retry, unknown provider outcomes, evidence digest mismatch, mismatched record identity, release-operation observation, cursor-cycle detection and accessor-backed claim-ID rejection.
+The tests cover successful observational reconciliation, concurrent read-only scans, expired lease non-retry, unknown provider outcomes, evidence digest mismatch, mismatched record identity, release-operation observation, cursor-cycle detection and accessor-backed claim-ID rejection. Controller tests also cover exact pending-record persistence, atomic provider-start read-back, pre-marker restart holds, release-operation binding, and retaining records after finalization failure.
 
 Passing these tests certifies only this provider-neutral read-only contract with test doubles. It does not certify a real provider, durable store, endpoint, firewall, hypervisor, production response process or A2 production readiness.
