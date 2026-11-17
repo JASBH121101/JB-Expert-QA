@@ -8,7 +8,8 @@
   },
   "suggest": {
     "illuminate/support": ">=10.0 <14.0",
-    "illuminate/http": ">=10.0 <14.0"
+    "illuminate/http": ">=10.0 <14.0",
+    "ext-fileinfo": "Required by the PHP upload inspector for server-side MIME detection."
   },
   "autoload": {
     "psr-4": {
