@@ -241,6 +241,13 @@ function harness(overrides = {}) {
   return { orchestrator, calls, orchestrationStore, auditStore, policyEngine };
 }
 
+test("reports the active semi-autonomous runtime separately from the advanced target profile", () => {
+  const h = harness();
+  assert.equal(h.orchestrator.mode, "semi-autonomous");
+  assert.equal(h.orchestrator.targetMode, "autonomous-advanced");
+  assert.deepEqual(h.orchestrator.executableActions, ["restart-service"]);
+});
+
 test("executes only a policy-authorized A1 restart and verifies both service and application health", async () => {
   const h = harness();
   const result = await h.orchestrator.executeIncident(trustedIncidentInput());
