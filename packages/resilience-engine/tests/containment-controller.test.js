@@ -186,7 +186,8 @@ function createDependencies({
   blockMutationAt = null,
   denyAuthorization = false,
   auditFails = false,
-  forensicValid = true
+  forensicValid = true,
+  clock = () => NOW
 } = {}) {
   const events = [];
   let claimNumber = 0;
@@ -379,7 +380,7 @@ function createDependencies({
         return input.phase !== blockMutationAt;
       }
     },
-    clock: () => NOW,
+    clock,
     operationTimeoutMs: 500
   });
   return { controller, events, profileId };
@@ -434,6 +435,13 @@ test("A2 controller rejects copied readiness, mismatched scope and invalid evide
     readiness, scope: SCOPE, profileId, evidenceRefs: [{ refId: "x", sha256: "bad" }]
   });
   assert.equal(invalidRefs.state, "denied");
+
+  const substitutedRefs = await controller.executeContainment({
+    readiness, scope: SCOPE, profileId,
+    evidenceRefs: evidenceRefs.map((ref) => ({ ...ref, refId: "substituted-" + ref.refId }))
+  });
+  assert.equal(substitutedRefs.state, "denied");
+  assert.match(substitutedRefs.reason, /not-bound-to-verified-readiness/);
 });
 
 test("A2 executes only after policy authorization, budget claim, bounded preflight, independent verification and forensics; release is separate", async () => {
@@ -557,4 +565,27 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);
+});
+
+
+test("A2 refuses readiness that expires before the provider mutation", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ clock: () => NOW + 50_000 });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "a2-readiness-evidence-stale-at-execution");
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 audit outage blocks the request before invoking the provider", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ auditFails: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "durable-audit-unavailable");
+  assert.equal(deps.events.includes("apply"), false);
 });
