@@ -105,7 +105,8 @@ function normalizeRecoveryRecord(input, dependencies) {
       idempotencyKey !== makeIdempotencyKey(action, scope, profileId)) {
     throw new TypeError("A2 recovery idempotency key mismatch");
   }
-  if (!["claimed", "provider-started", "held-for-reconciliation"].includes(input.state)) {
+  const state = input.state;
+  if (!["claimed", "provider-started", "held-for-reconciliation"].includes(state)) {
     throw new TypeError("A2 recovery record is not pending");
   }
   const originalOperationId = input.originalOperationId;
@@ -463,31 +464,19 @@ export function createA2ContainmentController({
     );
   }
 
-  let pendingRecordValidationFailure = null;
-
   async function pendingRecordMatches(claimId, expectedRecord) {
     const call = await invokeDependency(actionLedger, "getPendingByClaimId", {
       claimId, atMs: assertTimestamp(clock(), "A2 pending record lookup clock")
     }, "pending-record-exact-lookup");
-    if (call.timedOut || call.error) {
-      pendingRecordValidationFailure = call.timedOut ? "exact-readback-timeout" : "exact-readback-error";
-      return false;
-    }
+    if (call.timedOut || call.error) return false;
     try {
       exactKeys(call.value, ["found", "record"], "A2 pending record lookup");
-      if (call.value.found !== true || call.value.record === null) {
-        pendingRecordValidationFailure = "exact-readback-record-missing";
-        return false;
-      }
+      if (call.value.found !== true || call.value.record === null) return false;
       const dependencies = { providerId, verifierId, recorderId };
       const actual = normalizeRecoveryRecord(call.value.record, dependencies);
       const expected = normalizeRecoveryRecord(expectedRecord, dependencies);
-      const matches = canonical(actual) === canonical(expected);
-      pendingRecordValidationFailure = matches ? null : "exact-readback-content-mismatch";
-      return matches;
-    } catch (error) {
-      pendingRecordValidationFailure = error instanceof Error
-        ? error.message.slice(0, 160) : "exact-readback-record-invalid";
+      return canonical(actual) === canonical(expected);
+    } catch {
       return false;
     }
   }
@@ -520,7 +509,6 @@ export function createA2ContainmentController({
     return {
       ok: stored && !call.error && !call.timedOut &&
         successful(call.value, "created"),
-      reason: stored ? null : pendingRecordValidationFailure,
       record
     };
   }
@@ -940,9 +928,7 @@ export function createA2ContainmentController({
     if (!pendingRecovery.ok) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
-        reason: pendingRecovery.reason
-          ? "durable-pending-action-record-unavailable:" + pendingRecovery.reason
-          : "durable-pending-action-record-unavailable"
+        reason: "durable-pending-action-record-unavailable"
       });
     }
     const recoveryRecord = pendingRecovery.record;
@@ -1174,9 +1160,7 @@ export function createA2ContainmentController({
     if (!pendingRecovery.ok) {
       return finishUnknown({
         action, scope, profileId, claimId, reservationId, authorization,
-        reason: pendingRecovery.reason
-          ? "durable-pending-action-record-unavailable:" + pendingRecovery.reason
-          : "durable-pending-action-record-unavailable",
+        reason: "durable-pending-action-record-unavailable",
         operationReceipt
       });
     }
