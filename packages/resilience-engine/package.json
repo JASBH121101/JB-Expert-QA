@@ -26,7 +26,8 @@
     "./adapters/identity-policy-bridge": "./src/adapters/identity-policy-bridge.js",
     "./continuity-gates": "./src/continuity-gates.js",
     "./provider-evidence": "./src/provider-evidence.js",
-    "./provider-evidence-a3": "./src/provider-evidence-a3.js"
+    "./provider-evidence-a3": "./src/provider-evidence-a3.js",
+    "./containment-controller": "./src/containment-controller.js"
   },
   "files": [
     "src/**",
