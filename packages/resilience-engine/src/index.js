@@ -323,3 +323,5 @@ export {
   verifyA3ProviderEvidenceBundle,
   verifyA3EvidenceReferences
 } from "./provider-evidence-a3.js";
+
+export { evaluateA3ProviderReadiness } from "./provider-evidence-a3.js";
