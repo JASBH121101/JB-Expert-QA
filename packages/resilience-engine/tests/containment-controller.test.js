@@ -669,16 +669,27 @@ test("A2 treats a mutation-control timeout as a deny and never invokes the provi
 });
 
 
-test("A2 reconciles a timed-out action claim before permitting any provider operation", async () => {
+test("A2 holds a timed-out action claim still owned by a potentially active process", async () => {
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
   const deps = createDependencies({ actionClaimMode: "hang", actionReconcileState: "claimed" });
   const result = await deps.controller.executeContainment({
     readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
   });
-  assert.equal(result.state, "denied");
-  assert.equal(result.reason, "action-claim-reconciled-before-provider");
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.reason, "existing-action-claim-not-owned-by-this-invocation");
   assert.ok(deps.events.includes("action-reconcile"));
-  assert.ok(deps.events.includes("action-complete:not-applied"));
+  assert.equal(deps.events.includes("action-complete:not-applied"), false);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 denies a timed-out action claim only when the durable journal confirms it was not recorded", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ actionClaimMode: "hang", actionReconcileState: "not-found" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "action-claim-not-recorded");
   assert.equal(deps.events.includes("apply"), false);
 });
 
