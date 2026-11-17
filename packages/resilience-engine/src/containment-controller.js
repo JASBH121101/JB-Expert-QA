@@ -495,6 +495,7 @@ export function createA2ContainmentController({
         typeof claim.claimId !== "string" || !IDENTIFIER.test(claim.claimId)) {
       return {
         ok: false,
+        hold: claimCall.timedOut === true,
         reason: claimCall.timedOut ? "action-claim-outcome-unknown" : "duplicate-or-unavailable-action-claim"
       };
     }
@@ -514,14 +515,15 @@ export function createA2ContainmentController({
     }
     if (!isRecord(budget) || budget.reserved !== true ||
         typeof budget.reservationId !== "string" || !IDENTIFIER.test(budget.reservationId)) {
+      const reason = budgetCall.timedOut
+        ? "budget-reservation-outcome-unknown" : "budget-reservation-denied";
       const recorded = await completeAction(
-        claim.claimId, "not-applied",
-        budgetCall.timedOut ? "budget-reservation-outcome-unknown" : "budget-reservation-denied"
+        claim.claimId, budgetCall.timedOut ? "held-for-reconciliation" : "not-applied", reason
       );
       return {
         ok: false,
-        reason: !recorded ? "action-ledger-finalization-failed"
-          : budgetCall.timedOut ? "budget-reservation-outcome-unknown" : "budget-reservation-denied"
+        hold: budgetCall.timedOut === true,
+        reason: !recorded ? "action-ledger-finalization-failed" : reason
       };
     }
     return { ok: true, claimId: claim.claimId, reservationId: budget.reservationId };
@@ -634,7 +636,16 @@ export function createA2ContainmentController({
 
     const reserved = await reserveResources(action, scope, profileId, idempotencyKey);
     if (!reserved.ok) {
-      await completeAuthorization(authorization, "failed");
+      const authorizationFinalized = await completeAuthorization(
+        authorization, reserved.hold ? "unverified" : "failed"
+      );
+      if (reserved.hold || !authorizationFinalized) {
+        await appendAudit({
+          action, scope, profileId, outcome: "held-for-reconciliation",
+          reason: reserved.reason, idempotencyKey
+        });
+        return makeResult("held-for-reconciliation", reserved.reason);
+      }
       return makeResult("denied", reserved.reason);
     }
     const { claimId, reservationId } = reserved;
