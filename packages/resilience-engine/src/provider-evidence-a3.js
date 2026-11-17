@@ -568,6 +568,9 @@ export function evaluateA3ProviderReadiness({
   ];
   const evidence = Object.create(null);
   for (const fact of requiredFacts) evidence[fact] = bundle.facts[fact] === true;
+  // "targetEnforcesFencing" is only satisfied when a stale-epoch write was also rejected.
+  evidence.targetEnforcesFencing = bundle.facts.targetEnforcesFencing === true &&
+    bundle.facts.staleEpochRejected === true;
   evidence.observedAt = bundle.observedAtMs;
   evidence.expiresAt = bundle.expiresAtMs;
   evidence.now = now;
