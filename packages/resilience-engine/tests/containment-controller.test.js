@@ -188,12 +188,19 @@ function createDependencies({
   auditFails = false,
   forensicValid = true,
   mutationTimeout = false,
+  actionClaimMode = "normal",
+  actionReconcileState = "claimed",
+  budgetReserveMode = "normal",
+  budgetReconcileState = "reserved",
+  providerStartMode = "normal",
   clock = () => NOW
 } = {}) {
   const events = [];
   let claimNumber = 0;
   let reservationNumber = 0;
   let operationNumber = 0;
+  let actionStage = "not-found";
+  let budgetStage = "not-found";
   const providerId = "containment-provider-01";
   const verifierId = "independent-control-plane-02";
   const profileId = "isolate-endpoint";
@@ -349,11 +356,27 @@ function createDependencies({
       durable: true,
       async reserve() {
         events.push("budget-reserve");
+        if (budgetReserveMode === "hang") {
+          budgetStage = "reserved";
+          reservationNumber += 1;
+          return new Promise(() => {});
+        }
+        if (budgetReserveMode === "deny") return { reserved: false, reservationId: null };
         reservationNumber += 1;
+        budgetStage = "reserved";
         return { reserved: true, reservationId: "budget-" + reservationNumber };
+      },
+      async reconcile() {
+        events.push("budget-reconcile");
+        const state = budgetReconcileState === "from-ledger" ? budgetStage : budgetReconcileState;
+        return {
+          state,
+          reservationId: state === "reserved" || state === "settled" ? "budget-" + reservationNumber : null
+        };
       },
       async settle(input) {
         events.push("budget-settle:" + input.outcome);
+        budgetStage = "settled";
         return { settled: true };
       }
     },
@@ -361,11 +384,34 @@ function createDependencies({
       durable: true,
       async claim() {
         events.push("action-claim");
+        if (actionClaimMode === "hang") {
+          actionStage = "claimed";
+          claimNumber += 1;
+          return new Promise(() => {});
+        }
+        if (actionClaimMode === "deny") return { claimed: false, claimId: null };
         claimNumber += 1;
+        actionStage = "claimed";
         return { claimed: true, claimId: "claim-" + claimNumber };
+      },
+      async markProviderStarted() {
+        events.push("action-mark-provider-started");
+        actionStage = providerStartMode === "normal" ? "provider-started" : "provider-started";
+        if (providerStartMode === "hang") return new Promise(() => {});
+        if (providerStartMode === "deny") return { started: false };
+        return { started: true };
+      },
+      async reconcile() {
+        events.push("action-reconcile");
+        const state = actionReconcileState === "from-ledger" ? actionStage : actionReconcileState;
+        return {
+          state,
+          claimId: ["claimed", "provider-started", "completed"].includes(state) ? "claim-" + claimNumber : null
+        };
       },
       async complete(input) {
         events.push("action-complete:" + input.outcome);
+        actionStage = input.outcome === "held-for-reconciliation" ? "completed" : "completed";
         return { completed: true };
       }
     },
@@ -405,8 +451,8 @@ test("A2 controller defaults to disabled and never treats readiness as execution
     },
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
-    budgetLedger: { durable: true, reserve() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, complete() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   });
@@ -613,5 +659,56 @@ test("A2 treats a mutation-control timeout as a deny and never invokes the provi
   });
   assert.equal(result.state, "denied");
   assert.equal(result.reason, "mutation-control-blocked");
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+
+test("A2 reconciles a timed-out action claim before permitting any provider operation", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ actionClaimMode: "hang", actionReconcileState: "claimed" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "action-claim-reconciled-before-provider");
+  assert.ok(deps.events.includes("action-reconcile"));
+  assert.ok(deps.events.includes("action-complete:not-applied"));
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 reconciles a timed-out budget reservation and releases it without applying containment", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ budgetReserveMode: "hang", budgetReconcileState: "reserved" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "denied");
+  assert.equal(result.reason, "budget-reservation-reconciled-before-provider");
+  assert.ok(deps.events.includes("budget-reconcile"));
+  assert.ok(deps.events.includes("budget-settle:not-applied"));
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 holds an action claim whose durable reconciliation remains unknown", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ actionClaimMode: "hang", actionReconcileState: "unknown" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 requires a durable provider-start marker before invoking the containment provider", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ providerStartMode: "hang", actionReconcileState: "provider-started" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.ok(deps.events.includes("action-mark-provider-started"));
+  assert.ok(deps.events.includes("action-reconcile"));
   assert.equal(deps.events.includes("apply"), false);
 });
