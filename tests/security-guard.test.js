@@ -805,3 +805,51 @@ test("request-inspection HMAC subjects are isolated by tenant and application", 
     "the same client identity must derive different Core keys across tenants"
   );
 });
+
+
+test("static GET and HEAD assets do not consume the Node request rate-limit counter", async () => {
+  await withGuard({
+    mode: "balanced",
+    rateLimit: { enabled: true, max: 1, windowMs: 60_000, maxKeys: 10 }
+  }, async ({ events, request, guard }) => {
+    for (const path of [
+      "/assets/app.css?v=2",
+      "/assets/app.js",
+      "/images/perfume.jpg",
+      "/images/perfume.png",
+      "/media/perfume.webp",
+      "/fonts/site.woff2"
+    ]) {
+      const response = await request(path);
+      assert.equal(response.statusCode, 200, path);
+    }
+    const head = await request("/images/perfume.avif", { method: "HEAD" });
+    assert.equal(head.statusCode, 200);
+    assert.equal(guard.getStats().rateLimitKeys, 0);
+
+    assert.equal((await request("/api/catalog")).statusCode, 200);
+    assert.equal((await request("/api/catalog")).statusCode, 429);
+    assert.equal(guard.getStats().rateLimitKeys, 1);
+    assert.equal(events.length, 1);
+    assert.deepEqual(events[0].ruleIds, ["JBG-RATE-001"]);
+  });
+});
+
+test("static asset rate-limit exclusions can be customized without skipping POST requests", async () => {
+  await withGuard({
+    mode: "balanced",
+    rateLimit: {
+      enabled: true,
+      max: 1,
+      windowMs: 60_000,
+      maxKeys: 10,
+      excludedExtensions: [".css"]
+    }
+  }, async ({ request, guard }) => {
+    assert.equal((await request("/assets/app.css")).statusCode, 200);
+    assert.equal(guard.getStats().rateLimitKeys, 0);
+    assert.equal((await request("/assets/app.js")).statusCode, 200);
+    assert.equal((await request("/assets/app.js")).statusCode, 429);
+    assert.equal((await request("/api/download.js", { method: "POST", body: "x" })).statusCode, 429);
+  });
+});
