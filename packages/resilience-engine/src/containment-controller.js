@@ -107,6 +107,15 @@ function successful(value, property) {
   return value === true || (isRecord(value) && value[property] === true);
 }
 
+function exactOutcome(value, outcome, includeReceipt = false) {
+  try {
+    exactKeys(value, includeReceipt ? ["outcome", "receipt"] : ["outcome"], "A2 provider outcome");
+  } catch {
+    return false;
+  }
+  return value.outcome === outcome;
+}
+
 async function invokeBounded(callback, input, timeoutMs, label, clock) {
   const controller = new AbortController();
   const startedAt = assertTimestamp(clock(), "clock");
@@ -593,7 +602,7 @@ export function createA2ContainmentController({
       operationTimeoutMs, "containment-apply", clock
     );
     let operationReceipt = null;
-    if (isRecord(apply.value) && apply.value.outcome === "applied" &&
+    if (exactOutcome(apply.value, "applied", true) &&
         validateOperationReceipt(apply.value.receipt, {
           providerId, action, scope, profileId, idempotencyKey,
           now: assertTimestamp(clock(), "provider receipt clock"), expectedState: "contained"
@@ -606,13 +615,13 @@ export function createA2ContainmentController({
         { scope, profileId, idempotencyKey },
         operationTimeoutMs, "containment-reconciliation", clock
       );
-      if (isRecord(reconcile.value) && reconcile.value.outcome === "not-applied") {
+      if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
           reason: "provider-confirmed-not-applied"
         });
       }
-      if (!isRecord(reconcile.value) || reconcile.value.outcome !== "applied" ||
+      if (!exactOutcome(reconcile.value, "applied", true) ||
           !validateOperationReceipt(reconcile.value.receipt, {
             providerId, action, scope, profileId, idempotencyKey,
             now: assertTimestamp(clock(), "reconciliation receipt clock"), expectedState: "contained"
@@ -763,7 +772,7 @@ export function createA2ContainmentController({
       operationTimeoutMs, "containment-release", clock
     );
     let releaseReceipt = null;
-    if (isRecord(release.value) && release.value.outcome === "released" &&
+    if (exactOutcome(release.value, "released", true) &&
         validateOperationReceipt(release.value.receipt, {
           providerId, action, scope, profileId, idempotencyKey,
           now: assertTimestamp(clock(), "release receipt clock"), expectedState: "released"
@@ -775,13 +784,13 @@ export function createA2ContainmentController({
         { scope, profileId, idempotencyKey, originalOperationId: operationReceipt.operationId },
         operationTimeoutMs, "release-reconciliation", clock
       );
-      if (isRecord(reconcile.value) && reconcile.value.outcome === "not-applied") {
+      if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
           reason: "provider-confirmed-release-not-applied"
         });
       }
-      if (!isRecord(reconcile.value) || reconcile.value.outcome !== "released" ||
+      if (!exactOutcome(reconcile.value, "released", true) ||
           !validateOperationReceipt(reconcile.value.receipt, {
             providerId, action, scope, profileId, idempotencyKey,
             now: assertTimestamp(clock(), "release reconciliation clock"), expectedState: "released"
