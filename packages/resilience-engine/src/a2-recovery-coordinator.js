@@ -365,8 +365,8 @@ export function createA2RecoveryCoordinator({
   const providerId = assertIdentifier(containmentProvider.providerId, "providerId");
   const verifierId = assertIdentifier(independentVerifier.verifierId, "verifierId");
   const recorderId = assertIdentifier(forensicRecorder.recorderId, "recorderId");
-  if (providerId === verifierId) {
-    throw new TypeError("provider and independent verifier identities must differ");
+  if (new Set([providerId, verifierId, recorderId]).size !== 3) {
+    throw new TypeError("A2 provider, independent verifier and forensic recorder identities must differ");
   }
 
   async function inspectRecord(record, now) {
