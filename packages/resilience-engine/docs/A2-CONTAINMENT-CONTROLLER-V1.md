@@ -80,3 +80,7 @@ A failed, expired or unknown release authorization blocks the operation. An unce
 The existing JB Resilience Policy Engine still denies apply-containment-profile and release-containment. This module does not change that policy decision or issue authorization itself. A host-supplied A2 policy authority is required, and no production deployment should set enableExecution to true until its provider adapters, durable stores, verifier independence, release path, fault injection and risk-owner approval are certified.
 
 This laboratory tests orchestration contracts with controlled test doubles. It does not certify a real cloud account, endpoint, network, hypervisor, firewall, storage system or production incident response process.
+
+## Restart and recovery boundary
+
+The successful containment result handle is held in a process-local WeakMap and is intentionally not reconstructible from caller-supplied JSON. A process restart therefore invalidates that in-memory handle; release through this controller is denied after restart. This increment also does not include a startup recovery worker that scans the durable action journal and resumes provider reconciliation. A host integration must provide a durable recovery workflow, bind it to the exact action/scope/authorization, reconcile provider state and forensics, and obtain a separate owner-approved release authorization before resuming. Until that capability exists and passes crash/restart fault injection, A2 remains laboratory-only and is not production-certified.
