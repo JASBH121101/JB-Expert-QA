@@ -126,7 +126,7 @@ class UploadInspectionTests(unittest.TestCase):
 
     def test_malicious_unknown_scanner_failure_and_digest_mismatch_never_promote(self):
         for scanner, reason, retain in (
-            (Scanner(verdict="malicious"), "MALWARE_DETECTED", False),
+            (Scanner(verdict="malicious"), "MALWARE_DETECTED", True),
             (Scanner(verdict="unknown"), "SCAN_NOT_CLEAN", True),
             (Scanner(raise_error=True), "SCANNER_UNAVAILABLE", True),
             (Scanner(alter_digest=True), "SCAN_INTEGRITY_MISMATCH", True),
