@@ -56,6 +56,6 @@ The separate local double-filter protocol `jb.security.assessment/v1` is not int
 
 ## Compatibility and release boundary
 
-The current Node.js adapter remains the compatibility baseline and preserves existing public `@jb/security-guard` exports. Complete its assessment/policy semantics and full runtime audit before beginning PHP/Python implementation.
+The Node.js adapter remains the behavioral compatibility baseline and preserves existing public `@jb/security-guard` exports. PHP and Python already have partial rate-limit adapters; PHP also now has an upload-quarantine orchestration contract. Do not describe any runtime as fully universal until each protection has a versioned cross-runtime contract, matching conformance fixtures, equivalent enforcement semantics, and runtime-specific integration tests.
 
 The package is private and unpublished in this lab stage. No npm, Composer or PyPI release is implied.
