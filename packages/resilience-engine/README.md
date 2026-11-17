@@ -80,6 +80,18 @@ The optional `./provider-evidence` entry point verifies short-lived Ed25519 atte
 
 The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
 
+
+## Signed A3 Provider Evidence (v1 laboratory)
+
+The optional `./provider-evidence-a3` entry point verifies nine Ed25519 provider roles for one exact failover source, target, lease, fencing epoch, policy revision/hash and RPO. It checks independent identities for traffic execution versus failover verification, source fencing versus target fencing verification, and coordination versus failover verification. Its second-stage evidence resolver checks scope and SHA-256 with bounded timeouts and size limits.
+
+These are signed evidence contracts, not a failover controller. They do not supply quorum, source-fence operations, target-enforced fencing, replication, target promotion, traffic cutover or rollback. A3 remains denied by the policy engine. See [A3 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-A3-V1.md).
+
+### A2 provider evidence to ARC readiness
+
+The read-only `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })` function combines the verified A2 provider bundle and byte-integrity result with an exact Trusted Signal Gateway result. It rejects copied/fabricated Gateway outputs, non-durable replay stores, missing evidence, non-confirmed states and stale signals. It maps only authenticated Gateway provenance and signed provider facts into the existing A2 readiness gate. Its result always has `executable: false` and does not grant containment authorization.
+
+
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
@@ -98,7 +110,7 @@ The policy gate uses exact service IDs, exact environments and explicit action c
 
 The included `createMemoryPolicyRevisionStore()` and `createMemoryCapabilityLedger()` are test/development fixtures only. They have `durable: false` and are rejected unless `allowInMemoryStores: true` is explicitly set. They are not suitable for production or multiple processes.
 
-**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. A2 containment remains blocked until the trusted signal gateway is certified. A3 failover remains blocked until external monitoring, transactional coordination, quorum and fencing are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
+**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. The Trusted Signal Gateway, replay protection, producer adapters and signed A2 provider-attestation verifier exist as laboratory components. A2 containment remains blocked until authoritative evidence-reference retrieval/semantic validation, a concrete typed containment provider, independent out-of-band verification, tested rollback, durable budget/action authorization and end-to-end fault-injection certification are complete. A3 failover remains blocked until an independent external monitor/quorum, source and target-enforced fencing, replication/RPO validation, a traffic-cutover provider, rollback and post-failover verification are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
 
 See [POLICY-V2-CONTROL.md](./docs/POLICY-V2-CONTROL.md) for the schema, injected-store contracts and integration boundary.
 
@@ -133,9 +145,12 @@ laboratory increment, the only executable capability is A1
 service, with clear trusted security state, durable budgets and both
 service-manager and application-level health verification.
 
-A2 containment and A3 failover remain denied by the existing policy gate until
-their independent signal, containment, external monitoring, quorum, fencing
-and consistency certification requirements are complete. No arbitrary shell
+A2 containment and A3 failover remain denied by the existing policy gate.
+A2 now has a second-stage authoritative evidence-reference integrity check, but
+still lacks a concrete containment provider and independently verified execution.
+A3 has a single-PostgreSQL-primary lease/fencing primitive, not external quorum
+or target-enforced fencing for unrelated resources. Both capabilities remain
+non-executable until provider-specific end-to-end certification is complete. No arbitrary shell
 commands, self-modifying policy, evidence deletion, binary restoration or
 destructive data actions are permitted.
 

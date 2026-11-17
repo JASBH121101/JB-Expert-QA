@@ -80,3 +80,19 @@ The time window is checked fail-closed. Unknown fields, missing predicates, fals
 ## Certification boundary
 
 Tests in `tests/continuity-gates.test.js` validate the readiness contract and negative cases. They do not certify external providers or production infrastructure. A2/A3 remain blocked until real provider integrations, threat/fault injection and end-to-end target tests pass in an isolated environment.
+
+## A2 closeout plan — still non-executable
+
+The provider signature bundle now has a second-stage verifier for every referenced evidence object. The host must still resolve references against authoritative provider records and interpret their content. The remaining A2 execution gates are a concrete typed isolation provider, independent out-of-band verification, an exercised and owner-approved rollback adapter, durable budget accounting, a dedicated A2 policy authorization path, durable action idempotency/audit and provider-specific fault-injection tests. Until those exist, policy authorization must continue to deny `apply-containment-profile`.
+
+## A3 closeout plan — still non-executable
+
+The current PostgreSQL lease/fencing target protects state stored in that same PostgreSQL primary only. A3 still needs an independent external monitor with a defined quorum/failure model, source-side fencing, target-enforced monotonic fencing for every promoted resource, replication/RPO verification, dependency readiness, a concrete traffic-cutover provider, independently tested rollback, post-cutover verification, durable budget/idempotency/audit and split-brain/fault-injection tests. A single database lease is not quorum and cannot prove that the old writer is fenced. Until every control is implemented and tested against the actual target provider, policy authorization must continue to deny `switch-route` and `failover`.
+
+Implementation contract: see [A2/A3 execution adapter contracts v1](./CONTINUITY-EXECUTION-ADAPTER-CONTRACTS-V1.md) for typed provider interfaces, lifecycle ordering, unknown-outcome handling, rollback boundaries and provider-specific certification tests.
+
+Signed provider evidence modules:
+- [A2 provider evidence](./PROVIDER-EVIDENCE-V1.md)
+- [A3 provider evidence](./PROVIDER-EVIDENCE-A3-V1.md)
+
+Both modules verify signatures, exact scope and evidence-reference integrity only. Neither performs containment/failover or grants execution authority.

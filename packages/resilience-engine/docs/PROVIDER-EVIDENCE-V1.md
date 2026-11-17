@@ -68,3 +68,17 @@ This is not a concrete containment provider. No Cloudflare, AWS, Azure, endpoint
 No provider attestation is automatically trusted merely because it has a valid signature: provider enrollment and evidence retrieval remain host responsibilities. The bundle verifier does not create one-time action authorization and does not change the policy engine's A1-only executable action set. A2 remains blocked until a real typed containment adapter, authoritative provider enrollment/revocation, evidence retrieval, independent out-of-band verification, tested rollback, budget accounting and fault-injection/end-to-end certification are implemented.
 
 The module is laboratory-only until those external integrations and safety gates have been reviewed and certified.
+
+## Authoritative evidence-reference verification (v2 lab increment)
+
+The provider-bundle signature check validates who signed the reference metadata; it does not validate the referenced object. The package now also exposes `verifyA2EvidenceReferences({ bundle, resolveEvidenceReference, clock, maxReferenceBytes, maxTotalBytes })`.
+
+The host resolver is called once for each signed reference and must fetch it from the authoritative evidence/provider system. It receives an AbortSignal and has a bounded per-reference timeout (5 seconds by default, configurable up to 30 seconds). It must return the exact attested provider ID, role, asset, environment, incident, policy revision/hash and raw bytes. The verifier copies the bytes, enforces per-object and aggregate limits, recomputes SHA-256, and rechecks the bundle's expiry after each asynchronous lookup and before returning a verified reference inventory. Forged bundle objects, stale bundles, mismatched scope, missing objects, oversized evidence and digest mismatches fail closed. Raw evidence bytes are never returned or persisted by this module.
+
+This closes the **reference integrity and scope-check gap**, not the semantic truth gap: the host resolver/provider integration must still validate that the referenced record actually proves the claimed control (for example, that an isolation operation is active, a rollback was exercised, or forensic evidence was durably preserved). The output continues to include `executable: false`; it is not an A2 execution authorization.
+
+## ARC readiness integration
+
+After provider attestations and their references have passed verification, the host may call `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })`. It requires the exact branded bundle/reference result from this module and an exact result object produced by the Trusted Signal Gateway. The Gateway result is bound internally to the durability of its replay store and the issue/expiry window of the source signals. The evaluator requires a confirmed state, exact asset/environment binding, retained signal evidence, durable replay protection and all provider facts, then maps them into the existing read-only A2 continuity gate.
+
+The Gateway's internal provenance metadata is held outside the enumerable response object; a caller-created object with copied fields cannot satisfy this API. The result still has `executable: false`. This is readiness—not action authorization. The Policy Engine continues to deny `apply-containment-profile` until concrete isolation, independent verification, rollback and operational certification are implemented.
