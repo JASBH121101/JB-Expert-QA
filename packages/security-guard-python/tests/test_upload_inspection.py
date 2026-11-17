@@ -154,6 +154,21 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertEqual(storage.approved, {})
             self.assertTrue(storage.quarantine)
 
+    def test_uncertain_promotion_exception_retains_quarantine(self):
+        class UncertainStorage(MemoryStorage):
+            def promote(self, upload_id, expected_sha256, expected_size):
+                raise RuntimeError("promotion response lost")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = UncertainStorage()
+            service = UploadInspectionService(storage, Scanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "INSPECTION_FAILED")
+            self.assertTrue(storage.quarantine)
+            self.assertEqual(storage.approved, {})
+
     def test_invalid_scanner_contract_is_retained_for_review(self):
         class InvalidScanner:
             def scan(self, stream, metadata):
@@ -169,6 +184,22 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertEqual(caught.exception.reason, "INVALID_SCAN_RESULT")
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
+
+    def test_windows_style_client_filename_is_reduced_to_extension_only(self):
+        result, storage = self.inspect_fixture(filename=r"C:\\fake\\photo.png")
+        self.assertEqual(result["status"], "approved")
+        self.assertEqual(storage.approved[result["uploadId"]], PNG)
+
+    def test_invalid_mime_type_is_rejected_without_storage_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, Scanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", declared_mime_type=object())
+            self.assertEqual(caught.exception.reason, "INVALID_INPUT")
+            self.assertEqual(storage.quarantine, {})
 
     def test_telemetry_is_sanitized_and_cannot_change_decision(self):
         events = []
