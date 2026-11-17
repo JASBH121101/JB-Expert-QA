@@ -504,3 +504,38 @@ test("A2 reference verification rejects missing or malformed host resolver resul
   assert.equal(malformed.verified, false);
   assert.equal(malformed.reason, "invalid-resolved-evidence-reference");
 });
+
+
+test("A2 evidence reference resolution is bounded and abortable", async () => {
+  const { bundle } = createEvidenceReferenceFixture();
+  let aborted = false;
+  const result = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: ({ signal }) => new Promise((resolve) => {
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        resolve(null);
+      }, { once: true });
+    }),
+    clock: () => NOW,
+    timeoutMs: 100
+  });
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "evidence-reference-timeout");
+  assert.equal(aborted, true);
+});
+
+test("A2 evidence references are rejected when the signed bundle expires during resolution", async () => {
+  const { bundle, artifacts } = createEvidenceReferenceFixture();
+  let clockCalls = 0;
+  const result = await verifyA2EvidenceReferences({
+    bundle,
+    resolveEvidenceReference: evidenceResolverFor(artifacts),
+    clock: () => {
+      clockCalls += 1;
+      return clockCalls === 1 ? NOW : bundle.expiresAtMs;
+    }
+  });
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "provider-evidence-stale-or-expired");
+});
