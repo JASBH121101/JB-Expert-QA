@@ -839,6 +839,18 @@ test("static GET and HEAD assets do not consume the Node request rate-limit coun
   });
 });
 
+test("static asset rate-limit prefixes reject broad or unsafe paths", () => {
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/"] }
+  }), /rateLimit\.excludedPrefixes/);
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/../public/"] }
+  }), /rateLimit\.excludedPrefixes/);
+  assert.throws(() => createSecurityGuard({
+    rateLimit: { excludedPrefixes: ["/assets/", "/ASSETS/"] }
+  }), /rateLimit\.excludedPrefixes/);
+});
+
 test("static asset rate-limit exclusions can be customized without skipping POST requests", async () => {
   await withGuard({
     mode: "balanced",
