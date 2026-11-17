@@ -10,7 +10,7 @@ JB Security Guard provides the upload-inspection orchestration contract and a bo
 2. **Quarantine:** stream each object to private, non-public storage under a server-generated opaque identifier. Do not use the client filename as a filesystem path, object key, or URL.
 3. **Inspect:** Guard counts actual bytes, calculates SHA-256, identifies the file using a short signature prefix, and checks the detected type against its built-in allowlist. Client-supplied MIME type and extension are untrusted hints and must agree when supplied.
 4. **Scan:** pass the complete quarantined object to a maintained malware scanner. Require an explicit clean verdict, engine name, engine version, and scan timestamp.
-5. **Promote:** only after a clean verdict, atomically mark the object as approved and move/copy it into the application's approved storage namespace.
+5. **Promote:** only after a clean verdict, atomically mark the object as approved and move/copy it into a private approved-storage namespace. It must remain inaccessible from public URLs until the host application explicitly authorizes serving it.
 6. **Serve:** serve approved objects with an explicit Content-Type, X-Content-Type-Options: nosniff, and safe Content-Disposition. Prefer attachment for documents. Do not render HTML, SVG, or other active content inline on the authenticated application's origin.
 7. **Retain and audit:** keep a record of opaque object ID, size, SHA-256, detected type, scanner verdict/version, timestamps, and actor ID under the application's privacy policy. Never log file bytes, recovery tokens, session cookies, or other secrets.
 
@@ -26,7 +26,8 @@ const inspector = createUploadInspector({
   scanner: malwareScannerAdapter,
   maxBytes: 5 * 1024 * 1024,
   scannerTimeoutMs: 15_000,
-  bridgeTimeoutMs: 3_000
+  bridgeTimeoutMs: 3_000,
+  promotionTimeoutMs: 15_000
 });
 
 // fileStream must be the individual file stream emitted by a bounded
@@ -51,12 +52,12 @@ The store adapter must implement:
 
 - createWriteStream({ uploadId }): return a writable stream that writes only to private quarantine storage. The object must not be reachable from public URLs or normal download routes.
 - createReadStream({ uploadId }): return a readable stream of the complete quarantined object for scanning.
-- promote({ uploadId, metadata, expectedSha256, expectedSize }): atomically compare the current quarantined object's bytes to the expected digest and size, and promote that exact immutable object in one transaction. Resolve with { promoted: true } only after the verified approved object is committed. A separate check followed by a later copy is vulnerable to a time-of-check/time-of-use race.
-- delete({ uploadId }): idempotently delete a quarantined object. Repeated deletion requests for the same opaque ID must be safe because timeouts can race with late adapter completion.
+- promote({ uploadId, metadata, expectedSha256, expectedSize, signal }): atomically compare the current quarantined object's bytes to the expected digest and size, and promote that exact immutable object in one transaction. Resolve with { promoted: true } only after the verified object is committed to a private approved-storage namespace. The adapter must honor AbortSignal and must never expose a promotion to public URLs by itself. A separate check followed by a later copy is vulnerable to a time-of-check/time-of-use race.
+- delete({ uploadId }): idempotently delete an uncommitted upload by its opaque ID from quarantine or a private approved namespace if promotion completed late. It must not delete an object already committed and referenced by an application record. Repeated deletion requests for the same opaque ID must be safe because timeouts can race with late adapter completion.
 
 scanner.scan({ stream, uploadId, size, sha256, detectedMimeType, signal }) must consume the entire stream and return { verdict: clean | malicious | unknown, engine, version }. The scanner adapter must honor AbortSignal; it must not return clean before the complete file has been inspected. Guard wraps the scanner input in a streaming verifier. It recalculates SHA-256 and byte count over the bytes flowing to the scanner, rejects truncation, extension, or content substitution, and verifies that the readable stream reached its end before accepting a clean verdict. It then passes the expected digest and size to promote(); the storage adapter must atomically verify those values against the quarantined object at promotion time. This closes the gap between the initial upload hash, the object scanned, and the object approved, provided the production adapter honors the atomic verification contract.
 
-Guard defaults to a 5 MiB file limit, a 15-second scan timeout, and a 3-second coordinated-assessment timeout (configurable up to 10 seconds). Storage writer and reader initialization are also bounded by the ingestion timeout; late-arriving streams are destroyed and cleanup is retried without leaving the request waiting indefinitely. Quarantine deletion has a bounded cleanup wait and emits a sanitized cleanup-failed event when the adapter does not respond. These adapter timeouts do not make an uncooperative remote store transactional: production adapters must still implement idempotent writes, atomic promotion, and lifecycle cleanup. All limits are configurable within hard upper bounds. Scanner outages, timeouts, invalid results, unknown verdicts, bridge timeouts, and promotion failures never approve the file. A bridge timeout during a clean assessment leaves the object private in quarantine; a malicious scan verdict is rejected locally even if bridge reporting times out. Items whose scanner/approval status is uncertain remain in quarantine and must be private.
+Guard defaults to a 5 MiB file limit, a 15-second scan timeout, a 3-second coordinated-assessment timeout (configurable up to 10 seconds), and a 15-second promotion timeout (configurable up to 120 seconds). Storage writer and reader initialization are also bounded by the ingestion timeout; late-arriving streams are destroyed and cleanup is retried without leaving the request waiting indefinitely. Promotion timeout aborts the operation, fails closed, and leaves the object private in quarantine. If a non-cooperative adapter completes promotion late, Guard deletes that still-uncommitted object by opaque upload ID. The adapter's approved namespace must remain private until the host application authorizes serving it. Quarantine deletion has a bounded cleanup wait and emits a sanitized cleanup-failed event when the adapter does not respond. These adapter timeouts do not make an uncooperative remote store transactional: production adapters must still implement idempotent writes, atomic promotion, and lifecycle cleanup. All limits are configurable within hard upper bounds. Scanner outages, timeouts, invalid results, unknown verdicts, bridge timeouts, promotion timeouts, and promotion failures never approve the file. A bridge timeout during a clean assessment leaves the object private in quarantine; a malicious scan verdict is rejected locally even if bridge reporting times out. Items whose scanner/approval status is uncertain remain in quarantine and must be private.
 
 ## Fail-closed requirements
 
@@ -67,7 +68,8 @@ Guard defaults to a 5 MiB file limit, a 15-second scan timeout, and a 3-second c
 - Never extract an archive directly into a public or application directory.
 - For archives, enforce maximum entry count, nesting depth, compressed bytes, expanded bytes, expansion ratio, and reject path traversal, absolute paths, symlinks, and special files before extraction.
 - A clean verdict must be bound to the exact SHA-256 and size of the quarantined object; the storage adapter should prevent mutation between scan and promotion.
-- Promotion must be atomic. If the adapter cannot guarantee that, do not use it for production approval.
+- Promotion must be atomic and cancellable. If the adapter cannot honor the promotion AbortSignal or keep its approved namespace private, do not use it for production approval.
+- A promotion that completes after its timeout must be removed by idempotent cleanup before it can be linked to a product or served publicly.
 
 ## Parser and storage limits
 
