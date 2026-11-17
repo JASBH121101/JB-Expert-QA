@@ -66,3 +66,9 @@ A real host deployment must provide the typed adapters in [A2/A3 execution adapt
 - provider, lease, database, audit, clock and network failures never create split-brain.
 
 Until those tests pass, the runtime policy must continue to deny `switch-route` and `failover`.
+
+## ARC readiness integration
+
+After the bundle and all referenced objects have been verified, the host may call `evaluateA3ProviderReadiness({ bundle, references, clock })`. This function accepts only the exact branded bundle and reference-verification result produced by this module, requires that both refer to the same bundle, rechecks freshness, maps the verified provider facts into the existing read-only A3 continuity gate and always returns `executable: false`. It also treats `targetEnforcesFencing` as satisfied only when the signed evidence says both that the target enforces the epoch and that a stale-epoch write was rejected.
+
+This closes the contract gap between provider evidence and ARC's readiness checklist. It remains a readiness result—not authorization. The host still must inspect evidence semantics, and the policy engine continues to deny `switch-route` and `failover`.
