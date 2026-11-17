@@ -115,6 +115,9 @@ function normalizeRecoveryRecord(input, dependencies) {
   if (action === "release-containment" && originalOperationId === null) {
     throw new TypeError("release recovery requires the original containment operation ID");
   }
+  if (action === "apply-containment-profile" && originalOperationId !== null) {
+    throw new TypeError("containment recovery must not include a prior operation ID");
+  }
   const evidenceRefs = normalizeEvidenceRefs(input.evidenceRefs);
   const createdAtMs = assertTimestamp(input.createdAtMs, "createdAtMs");
   const updatedAtMs = assertTimestamp(input.updatedAtMs, "updatedAtMs");
