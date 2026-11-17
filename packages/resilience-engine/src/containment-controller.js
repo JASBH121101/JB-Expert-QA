@@ -443,8 +443,8 @@ export function createA2ContainmentController({
   const providerId = assertIdentifier(containmentProvider.providerId, "containment providerId");
   const verifierId = assertIdentifier(independentVerifier.verifierId, "independent verifierId");
   const recorderId = assertIdentifier(forensicRecorder.recorderId, "forensic recorderId");
-  if (providerId === verifierId) {
-    throw new TypeError("containment executor and independent verifier must have distinct identities");
+  if (new Set([providerId, verifierId, recorderId]).size !== 3) {
+    throw new TypeError("A2 provider, independent verifier and forensic recorder must have distinct identities");
   }
   if (enableExecution &&
       ["createPendingRecord", "listPending", "getPendingByClaimId"].some(
