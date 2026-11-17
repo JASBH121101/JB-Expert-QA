@@ -511,10 +511,9 @@ test("A2 evidence reference resolution is bounded and abortable", async () => {
   let aborted = false;
   const result = await verifyA2EvidenceReferences({
     bundle,
-    resolveEvidenceReference: ({ signal }) => new Promise((resolve) => {
+    resolveEvidenceReference: ({ signal }) => new Promise(() => {
       signal.addEventListener("abort", () => {
         aborted = true;
-        resolve(null);
       }, { once: true });
     }),
     clock: () => NOW,
