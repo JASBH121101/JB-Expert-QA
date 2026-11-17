@@ -259,7 +259,7 @@ test("durable record identity mismatch remains held", async () => {
 test("recovery coordinator rejects a recorder sharing the provider identity", () => {
   assert.throws(() => createFixture({
     recorderIdOverride: "provider-lab-01"
-  }), /distinct/);
+  }), /identities must differ/);
 });
 
 test("containment recovery rejects an unrelated prior operation ID", async () => {
