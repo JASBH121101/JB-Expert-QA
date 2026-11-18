@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { Readable, Writable } from "node:stream";
 import { createUploadInspector, UploadInspectionError } from "@jb/security-guard";
 
@@ -325,7 +326,7 @@ test("scanner cannot approve a file without consuming the complete quarantined s
       source: Readable.from([PNG]),
       fileName: "not-fully-scanned.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => error.code === "SCAN_INCOMPLETE"
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -675,3 +676,87 @@ test("a late promotion is cleaned by opaque upload ID and never left in approved
   assert.equal(store.quarantine.has(uploadId), false);
   assert.ok(store.calls.some(([name, id]) => name === "delete" && id === uploadId));
 });
+
+const sharedUploadVectors = JSON.parse(await readFile(
+  new URL("../packages/security-guard-core/tests/fixtures/upload-inspection/conformance-vectors.v1.json", import.meta.url),
+  "utf8"
+));
+
+for (const vector of sharedUploadVectors.fileCases) {
+  test("shared upload contract file vector: " + vector.id, async () => {
+    const store = createMemoryStore();
+    const bytes = Buffer.from(vector.bytesHex, "hex");
+    const scanner = {
+      async scan({ stream }) {
+        for await (const chunk of stream) void chunk;
+        return { verdict: vector.scannerVerdict, engine: "MockAV", version: "1.0" };
+      }
+    };
+
+    let result = null;
+    let error = null;
+    try {
+      result = await inspector(store, scanner).inspect({
+        source: Readable.from([bytes]),
+        fileName: vector.fileName,
+        declaredMimeType: vector.declaredMimeType
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    if (vector.expected.disposition === "approved") {
+      assert.equal(error, null, vector.id);
+      assert.equal(result.mimeType, vector.expected.mimeType);
+      assert.equal(store.approved.get(result.uploadId).bytes.equals(bytes), true);
+      assert.equal(store.quarantine.size, 0);
+    } else {
+      assert.equal(error?.code, vector.expected.errorReason, vector.id);
+      assert.equal(store.approved.size, 0);
+      assert.equal(store.quarantine.size, 0);
+    }
+  });
+}
+
+for (const vector of sharedUploadVectors.scannerCases) {
+  test("shared upload contract scanner vector: " + vector.id, async () => {
+    const store = createMemoryStore();
+    const bytes = PNG;
+    const scanner = {
+      async scan({ stream }) {
+        if (vector.consume === "all") {
+          for await (const chunk of stream) void chunk;
+        }
+        return { verdict: vector.verdict, engine: "MockAV", version: "1.0" };
+      }
+    };
+
+    let result = null;
+    let error = null;
+    try {
+      result = await inspector(store, scanner).inspect({
+        source: Readable.from([bytes]),
+        fileName: "shared-vector.png",
+        declaredMimeType: "image/png"
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    if (vector.expected.disposition === "approved") {
+      assert.equal(error, null, vector.id);
+      assert.equal(result.status, "approved");
+      assert.equal(store.approved.get(result.uploadId).bytes.equals(bytes), true);
+      assert.equal(store.quarantine.size, 0);
+    } else {
+      assert.equal(error?.code, vector.expected.errorReason, vector.id);
+      assert.equal(store.approved.size, 0);
+      assert.equal(
+        store.quarantine.size,
+        vector.expected.disposition === "quarantined" ? 1 : 0,
+        vector.id
+      );
+    }
+  });
+}
+
