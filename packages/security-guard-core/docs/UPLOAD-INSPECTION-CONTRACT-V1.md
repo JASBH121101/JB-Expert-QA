@@ -96,7 +96,7 @@ Each runtime test must consume the same vector file and prove:
 2. filename-extension and declared-MIME mismatches are rejected;
 3. unsupported and truncated signatures are rejected;
 4. only a complete, exact clean scan can reach private promotion;
-5. malicious results are rejected and staging data is removed;
+5. malicious results are rejected for promotion, retained in private quarantine, and never served;
 6. unknown and incomplete results remain private and are never promoted.
 
 ## 8. Host deployment requirements
