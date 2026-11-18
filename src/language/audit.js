@@ -3,12 +3,33 @@ import { comparePlaceholders } from "./placeholders.js";
 import { LanguageLibrary } from "./glossary.js";
 import { resolveTranslationState } from "./review.js";
 
-export function flattenTranslationMap(value, prefix = "", output = {}) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return output;
+function isPlainRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+export function flattenTranslationMap(value, prefix = "", output = Object.create(null), depth = 0) {
+  if (!isPlainRecord(value)) return output;
+  if (typeof prefix !== "string" || !isPlainRecord(output)) {
+    throw new TypeError("translation map prefix and output must be valid plain values");
+  }
+  if (!Number.isInteger(depth) || depth < 0 || depth > 24) {
+    throw new RangeError("translation map exceeds the maximum nesting depth");
+  }
   for (const [key, item] of Object.entries(value)) {
+    if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
+      throw new TypeError("translation map contains a prototype-sensitive key");
+    }
     const path = prefix ? prefix + "." + key : key;
-    if (typeof item === "string") output[path] = item;
-    else if (item && typeof item === "object" && !Array.isArray(item)) flattenTranslationMap(item, path, output);
+    if (typeof item === "string") {
+      if (Object.hasOwn(output, path)) {
+        throw new TypeError("translation map contains a duplicate flattened key: " + path);
+      }
+      output[path] = item;
+    } else if (isPlainRecord(item)) {
+      flattenTranslationMap(item, path, output, depth + 1);
+    }
   }
   return output;
 }
