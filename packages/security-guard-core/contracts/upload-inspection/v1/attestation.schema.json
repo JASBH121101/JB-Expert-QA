@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:upload-inspection:attestation:v1",
+  "title": "JB Security Guard upload inspection attestation v1",
+  "description": "A bounded scanner attestation for the exact quarantined object. A clean verdict alone never authorizes storage promotion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "uploadId",
+    "verdict",
+    "sha256",
+    "size",
+    "mimeType",
+    "engine",
+    "version",
+    "scannedAtMs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.upload-inspection.attestation/v1"
+    },
+    "uploadId": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+    },
+    "verdict": {
+      "enum": ["clean", "malicious", "unknown"]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 104857600
+    },
+    "mimeType": {
+      "enum": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf"
+      ]
+    },
+    "engine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._+-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._+-]*$"
+    },
+    "scannedAtMs": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
