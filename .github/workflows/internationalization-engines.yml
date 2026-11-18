@@ -1,0 +1,57 @@
+name: Internationalization engines validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/localization-engine/**"
+      - "packages/currency-engine/**"
+      - "package.json"
+      - ".github/workflows/internationalization-engines.yml"
+  push:
+    branches: [main, "feature/jb-internationalization-engines-lab-v1"]
+    paths:
+      - "packages/localization-engine/**"
+      - "packages/currency-engine/**"
+      - "package.json"
+      - ".github/workflows/internationalization-engines.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: internationalization-engines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-matrix:
+    name: Intl and exact money / ${{ matrix.os }} / Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Verify package syntax
+        shell: bash
+        run: |
+          node --check packages/localization-engine/src/index.js
+          node --check packages/currency-engine/src/index.js
+          node --check packages/localization-engine/src/catalog.js
+          node --check packages/currency-engine/src/fx.js
+      - name: Run localization tests
+        run: node --test packages/localization-engine/tests/localization-engine.test.js
+      - name: Run currency tests
+        run: node --test packages/currency-engine/tests/currency-engine.test.js
+      - name: Verify workspaces
+        run: node -e "const p=require('./package.json'); for (const n of ['packages/localization-engine','packages/currency-engine']) if (!p.workspaces.includes(n)) process.exit(1)"

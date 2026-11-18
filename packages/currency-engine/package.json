@@ -1,0 +1,16 @@
+{
+  "name": "@jb/currency-engine",
+  "version": "0.1.0",
+  "description": "Exact money arithmetic, ISO 4217 currency metadata and explicitly injected FX conversion for JB engines and Nexora.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": {
+    ".": "./src/index.js",
+    "./registry": "./src/registry.js",
+    "./money": "./src/money.js",
+    "./fx": "./src/fx.js"
+  },
+  "files": ["src/**", "README.md"],
+  "scripts": { "test": "node --test tests/*.test.js" },
+  "license": "UNLICENSED"
+}

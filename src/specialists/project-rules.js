@@ -186,6 +186,18 @@ const SOURCE_EXTENSIONS = new Set([
   ".cs", ".graphql", ".gql"
 ]);
 
+// Dynamic-code sinks are evaluated only in executable source formats.
+// JSON/YAML/TOML/INI remain eligible for TLS configuration checks, but
+// documentation and inert data corpora are not parsed as executable code.
+const EXECUTABLE_CODE_EXTENSIONS = new Set([
+  ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+  ".vue", ".svelte", ".html", ".htm", ".sh", ".ps1", ".py", ".rb",
+  ".php", ".java", ".kt", ".go", ".rs", ".cs"
+]);
+const CONFIGURATION_EXTENSIONS = new Set([
+  ...EXECUTABLE_CODE_EXTENSIONS, ".json", ".yaml", ".yml", ".toml", ".ini"
+]);
+
 export const codeQualityRules = [
   {
     id: "code-quality.scan-completeness",
@@ -300,18 +312,22 @@ export const securityRules = [
     specialist: "security",
     evaluate(context) {
       const patterns = [
-        { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high" },
-        { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high" },
-        { regex: /\brejectUnauthorized\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high" }
+        { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high", codeOnly: true },
+        { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high", codeOnly: true },
+        { regex: /\b["']?rejectUnauthorized["']?\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high", codeOnly: false }
       ];
       const findings = [];
       for (const file of context.projectFiles ?? []) {
+        const extension = typeof file.extension === "string" ? file.extension.toLowerCase() : "";
+        const executableSource = EXECUTABLE_CODE_EXTENSIONS.has(extension);
+        const configurationSource = CONFIGURATION_EXTENSIONS.has(extension);
+        if (!executableSource && !configurationSource) continue;
         const lines = file.content.split(/\r\n|\n|\r/);
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index];
           if (commentLine(line)) continue;
           for (const pattern of patterns) {
-            if (!pattern.regex.test(line)) continue;
+            if ((pattern.codeOnly && !executableSource) || !pattern.regex.test(line)) continue;
             findings.push(finding(
               "SEC-CODE-" + file.path.replace(/[^a-z0-9]+/gi, "-") + "-" + (index + 1) + "-" + pattern.label.replace(/[^a-z0-9]+/gi, "-"),
               pattern.label,
@@ -321,6 +337,7 @@ export const securityRules = [
               { detector: pattern.label, requiresManualReview: true }, index + 1));
           }
         }
+        if (!executableSource) continue;
         for (const sink of collectHtmlSinks(file.content)) {
           const classification = classifyHtmlSink(sink.expression, file.content);
           if (classification.skip) continue;
