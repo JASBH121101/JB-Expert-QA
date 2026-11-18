@@ -358,7 +358,7 @@ async function withFileLock(lockPath, options, signal, operation) {
 
 function ledgerDigest(ledger) {
   return createHash("sha256")
-    .update(JSON.stringify(ledger) + "\\n", "utf8")
+    .update(JSON.stringify(ledger) + "\n", "utf8")
     .digest("hex");
 }
 
@@ -413,7 +413,7 @@ async function writeLedgerGuard(guardPath, ledger) {
   let handle;
   try {
     handle = await open(temporaryPath, "wx", 0o600);
-    await handle.writeFile(JSON.stringify(guard) + "\\n", "utf8");
+    await handle.writeFile(JSON.stringify(guard) + "\n", "utf8");
     await handle.sync();
     await handle.close();
     handle = null;
