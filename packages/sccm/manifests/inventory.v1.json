@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.1",
-  "generatedAt": "2026-11-18T20:28:16Z",
+  "inventoryVersion": "1.0.2",
+  "generatedAt": "2026-11-18T20:50:00Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -14,6 +14,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
       "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00"
+    },
+    {
+      "id": "jb-resilience-certification-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "certify/resilience-a1-a3-component-matrix-v1",
+      "commitSha": "d5db47de8c4092291353a92f2e3931b650c86618"
     }
   ],
   "nodes": [
@@ -994,7 +1000,7 @@
       "name": "Recovery policy",
       "level": "branch",
       "parentId": "jb.resilience-engine",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1004,7 +1010,7 @@
       "name": "A1 policy and authorization gates",
       "level": "subbranch",
       "parentId": "jb.resilience-engine.policy",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1014,7 +1020,7 @@
       "name": "A1 policy gate module",
       "level": "module",
       "parentId": "jb.resilience-engine.policy.a1-gates",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1024,7 +1030,7 @@
       "name": "Owner approval and policy boundaries",
       "level": "component",
       "parentId": "jb.resilience-engine.policy.a1-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1034,7 +1040,7 @@
       "name": "Action eligibility and idempotency",
       "level": "component",
       "parentId": "jb.resilience-engine.policy.a1-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1044,7 +1050,7 @@
       "name": "Containment",
       "level": "branch",
       "parentId": "jb.resilience-engine",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1054,7 +1060,7 @@
       "name": "A2 containment actions",
       "level": "subbranch",
       "parentId": "jb.resilience-engine.containment",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1064,7 +1070,7 @@
       "name": "A2 containment module",
       "level": "module",
       "parentId": "jb.resilience-engine.containment.a2-actions",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1074,17 +1080,17 @@
       "name": "Containment action safety",
       "level": "component",
       "parentId": "jb.resilience-engine.containment.a2-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
     },
     {
       "id": "jb.resilience-engine.containment.operator-verification",
-      "name": "Operator verification",
+      "name": "Independent containment and release verification (laboratory)",
       "level": "component",
       "parentId": "jb.resilience-engine.containment.a2-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1094,7 +1100,7 @@
       "name": "Failover",
       "level": "branch",
       "parentId": "jb.resilience-engine",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1104,7 +1110,7 @@
       "name": "A3 distributed failover",
       "level": "subbranch",
       "parentId": "jb.resilience-engine.failover",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1114,17 +1120,17 @@
       "name": "A3 failover module",
       "level": "module",
       "parentId": "jb.resilience-engine.failover.a3",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
     },
     {
       "id": "jb.resilience-engine.failover.fencing",
-      "name": "Execution fencing",
+      "name": "PostgreSQL target-state fencing (single-primary lab)",
       "level": "component",
       "parentId": "jb.resilience-engine.failover.a3-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1134,17 +1140,17 @@
       "name": "Leader election and split-brain protection",
       "level": "component",
       "parentId": "jb.resilience-engine.failover.a3-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
     },
     {
       "id": "jb.resilience-engine.failover.replay",
-      "name": "Distributed replay protection",
+      "name": "PostgreSQL trusted-signal replay protection (single-primary lab)",
       "level": "component",
       "parentId": "jb.resilience-engine.failover.a3-module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
