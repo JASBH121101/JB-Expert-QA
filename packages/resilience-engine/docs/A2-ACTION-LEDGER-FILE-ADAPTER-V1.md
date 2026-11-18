@@ -50,9 +50,11 @@ The adapter uses:
 - exclusive lock-file creation to serialize local processes;
 - bounded lock acquisition and conservative dead-process lock recovery;
 - private file permissions for lock, temporary and ledger files;
-- rejection of symbolic-link ledger files and malformed/unsupported schemas;
+- descriptor-based no-follow opening (with a conservative metadata comparison fallback on platforms without `O_NOFOLLOW`) and rejection of symbolic-link ledger files;
 - bounded file size and lifetime claim count;
 - write-to-new-temporary-file, file `fsync`, atomic rename and directory sync where supported;
+- a revision/SHA-256 `.guard` sidecar that detects a missing journal or guard, same-revision content tampering and rollback to an older journal revision;
+- guard bootstrap only for a genuinely empty revision-zero journal; a used journal with a missing guard fails closed;
 - strict record, identity, idempotency, timestamp and evidence-reference validation;
 - abort-aware lock waiting and bounded host operations through the controller's `AbortSignal`.
 
@@ -62,17 +64,17 @@ A write can still complete after its caller times out if the filesystem operatio
 
 This adapter is **single-host only**. It is not a distributed lock, consensus system, multi-host lease service or safe shared-network-filesystem journal. Do not share the file across hosts, replicas or eventually consistent mounts.
 
-A multi-host production deployment needs a separately implemented PostgreSQL-backed A2 action ledger using a transactional row/unique constraint, database-side conditional transitions, bounded paging and cross-connection concurrency tests. The existing PostgreSQL orchestration/audit adapter is not automatically an A2 action-ledger implementation.
+A multi-host deployment can inject the separate `createPostgresA2ActionLedger(...)` adapter exported from `@jb/resilience-engine/adapters/postgres-a2-action-ledger`. It stores claims and recovery records in the same PostgreSQL row, uses transactional conditional transitions, unique idempotency, per-asset advisory-lock serialization, bounded transactions and keyset paging. The real PostgreSQL integration suite exercises it using two independently created Pool instances against a disposable PostgreSQL CI service. This is adapter integration evidence, not production database certification.
 
-The adapter's `durable: true` property describes the implemented local-file mechanism; it does not prove the host's filesystem, disk controller, volume configuration, backup/restore path, process supervisor or disaster-recovery behavior. Those require operational testing and independent certification.
+The adapter's `durable: true` property describes the implemented local-file mechanism; it does not prove the host's filesystem, disk controller, volume configuration, backup/restore path, process supervisor or disaster-recovery behavior. Back up and restore the journal and its `.guard` sidecar together. A simultaneous rollback of both files to a matching older copy cannot be detected by this local pair alone and requires an independent off-host or monotonic backup/restore control. Those host operations require fault injection and independent certification.
 
 ## Required host tests before enabling A2
 
 - restart/reopen the same ledger file between every lifecycle boundary;
 - kill a process while it owns the lock and while a temporary write is in progress;
 - run concurrent claims from independent processes, not only independent objects in one process;
-- exercise full capacity, malformed JSON, schema tampering, symlink replacement, permission denial, disk-full and fsync/rename failure;
-- prove that backup restore does not roll back idempotency tombstones or policy revision;
+- exercise full capacity, malformed/truncated JSON, schema tampering, symlink replacement, missing guard, same-revision digest mismatch, stale journal restore, permission denial, disk-full and fsync/rename failure;
+- prove that backup restore does not roll back idempotency tombstones or policy revision, including coordinated journal-and-guard rollback;
 - verify the real provider's read-only reconciliation behavior, independent verifier path, evidence resolver and forensic retention lookup;
 - test provider-specific rollback/fencing, policy revocation and mutation-stop changes.
 
