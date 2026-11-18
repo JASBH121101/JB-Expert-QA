@@ -242,7 +242,7 @@ test("scoring rejects inherited weight and severity policy properties", () => {
   assert.throws(() => calculateScore([], {
     weights: inheritedWeights,
     includedSpecialists: ["responsive"]
-  }), /weights must be an object/);
+  }), /weights must be a plain object/);
 
   const inheritedPenalties = Object.create({ high: 100 });
   assert.throws(() => calculateScore([{
@@ -252,7 +252,7 @@ test("scoring rejects inherited weight and severity policy properties", () => {
     weights: { responsive: 100 },
     severityPenalties: inheritedPenalties,
     includedSpecialists: ["responsive"]
-  }), /severityPenalties must be an object/);
+  }), /severityPenalties must be a plain object/);
 });
 
 test("scoring accepts null-prototype policy maps without inheriting object members", () => {
@@ -277,4 +277,223 @@ test("scoring rejects finite weights whose aggregate overflows numeric bounds", 
     weights: { responsive: Number.MAX_VALUE, "ui-ux": Number.MAX_VALUE },
     includedSpecialists: ["responsive", "ui-ux"]
   }), /total weight must be a finite positive number/);
+});
+test("rule registry rejects accessors without invoking them", () => {
+  let invoked = false;
+  const rule = { id: "test.accessor", specialist: "ui-ux" };
+  Object.defineProperty(rule, "evaluate", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return () => [];
+    }
+  });
+
+  const registry = new RuleRegistry();
+  assert.throws(() => registry.register(rule), /rule\.evaluate must be an enumerable data property/);
+  assert.equal(invoked, false);
+  assert.equal(registry.size, 0);
+});
+
+test("rule registry rejects inherited rule objects and accessor-backed filters", () => {
+  const registry = new RuleRegistry();
+  const inheritedRule = Object.create({
+    id: "test.inherited",
+    specialist: "ui-ux",
+    evaluate: () => []
+  });
+  assert.throws(() => registry.register(inheritedRule), /rule must be a plain object/);
+
+  let invoked = false;
+  const filter = {};
+  Object.defineProperty(filter, "specialist", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "ui-ux";
+    }
+  });
+  assert.throws(() => registry.list(filter), /registry filter\.specialist must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("diagnostic metadata rejects accessors without invoking them", () => {
+  let invoked = false;
+  const metadata = {};
+  Object.defineProperty(metadata, "secret", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "value";
+    }
+  });
+  assert.throws(() => createDiagnostic({
+    id: "CORE-ACCESSOR",
+    specialist: "ui-ux",
+    title: "Accessor metadata",
+    description: "Must not execute metadata getters.",
+    severity: "low",
+    metadata
+  }), /diagnostic\.metadata\.secret must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("engine fails closed on accessor-backed rule findings and freezes execution entries", async () => {
+  let invoked = false;
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.finding-accessor",
+    specialist: "ui-ux",
+    evaluate() {
+      const finding = {
+        id: "CORE-ACCESSOR-FINDING",
+        title: "Accessor finding",
+        severity: "low"
+      };
+      Object.defineProperty(finding, "description", {
+        enumerable: true,
+        get() {
+          invoked = true;
+          return "must not run";
+        }
+      });
+      return finding;
+    }
+  });
+
+  const report = await new ExpertQAEngine({ registry, config }).audit();
+  assert.equal(invoked, false);
+  assert.equal(report.diagnostics.length, 0);
+  assert.equal(report.execution[0].status, "error");
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
+  assert.equal(Object.isFrozen(report.execution[0]), true);
+});
+
+test("scoring rejects accessor-backed policy options and diagnostic inputs without invoking getters", () => {
+  let optionsInvoked = false;
+  const options = {};
+  Object.defineProperty(options, "weights", {
+    enumerable: true,
+    get() {
+      optionsInvoked = true;
+      return { responsive: 100 };
+    }
+  });
+  assert.throws(() => calculateScore([], options), /scoring options\.weights must be an enumerable data property/);
+  assert.equal(optionsInvoked, false);
+
+  let weightInvoked = false;
+  const weights = {};
+  Object.defineProperty(weights, "responsive", {
+    enumerable: true,
+    get() {
+      weightInvoked = true;
+      return 100;
+    }
+  });
+  assert.throws(() => calculateScore([], { weights, includedSpecialists: ["responsive"] }), /weights\.responsive must be an enumerable data property/);
+  assert.equal(weightInvoked, false);
+
+  let diagnosticInvoked = false;
+  const diagnostic = { specialist: "responsive", severity: "low" };
+  Object.defineProperty(diagnostic, "specialist", {
+    enumerable: true,
+    get() {
+      diagnosticInvoked = true;
+      return "responsive";
+    }
+  });
+  assert.throws(() => calculateScore([diagnostic], { weights: { responsive: 100 } }), /diagnostics\[0\]\.specialist must be an enumerable data property/);
+  assert.equal(diagnosticInvoked, false);
+});
+
+test("scoring safely handles prototype-sensitive specialist names", () => {
+  const result = calculateScore([], {
+    weights: { ["__proto__"]: 100 },
+    includedSpecialists: ["__proto__"]
+  });
+  assert.equal(Object.hasOwn(result.specialistScores, "__proto__"), true);
+  assert.equal(result.specialistScores.__proto__, 100);
+  assert.equal(Object.getPrototypeOf(result.specialistScores), Object.prototype);
+});
+
+test("engine constructor and audit options reject accessors without invoking them", async () => {
+  let constructorInvoked = false;
+  const constructorOptions = {};
+  Object.defineProperty(constructorOptions, "registry", {
+    enumerable: true,
+    get() {
+      constructorInvoked = true;
+      return new RuleRegistry();
+    }
+  });
+  assert.throws(() => new ExpertQAEngine(constructorOptions), /engine options\.registry must be an enumerable data property/);
+  assert.equal(constructorInvoked, false);
+
+  let auditInvoked = false;
+  const auditOptions = {};
+  Object.defineProperty(auditOptions, "specialist", {
+    enumerable: true,
+    get() {
+      auditInvoked = true;
+      return "ui-ux";
+    }
+  });
+  const engine = new ExpertQAEngine({ registry: new RuleRegistry(), config });
+  await assert.rejects(() => engine.audit({}, auditOptions), /audit options\.specialist must be an enumerable data property/);
+  assert.equal(auditInvoked, false);
+});
+
+test("scoring rejects accessor-backed array entries without invoking getters", () => {
+  let invoked = false;
+  const specialists = ["responsive"];
+  Object.defineProperty(specialists, "0", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      invoked = true;
+      return "responsive";
+    }
+  });
+  assert.throws(() => calculateScore([], {
+    weights: { responsive: 100 },
+    includedSpecialists: specialists
+  }), /includedSpecialists\[0\] must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("engine rejects accessor-backed findings arrays without invoking index getters", async () => {
+  let invoked = false;
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.finding-array-accessor",
+    specialist: "ui-ux",
+    evaluate() {
+      const findings = [{
+        id: "CORE-ARRAY-ACCESSOR",
+        title: "Array accessor",
+        description: "Must not run.",
+        severity: "low"
+      }];
+      Object.defineProperty(findings, "0", {
+        enumerable: true,
+        configurable: true,
+        get() {
+          invoked = true;
+          return {
+            id: "CORE-ARRAY-ACCESSOR",
+            title: "Array accessor",
+            description: "Must not run.",
+            severity: "low"
+          };
+        }
+      });
+      return findings;
+    }
+  });
+
+  const report = await new ExpertQAEngine({ registry, config }).audit();
+  assert.equal(invoked, false);
+  assert.equal(report.execution[0].status, "error");
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
 });

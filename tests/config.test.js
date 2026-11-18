@@ -84,3 +84,36 @@ test("engine config keeps online advisories opt-in and validates safety limits",
   assert.throws(() => validateEngineConfig({ advisories: { batchSize: 101 } }), /safety limit/);
   assert.throws(() => validateEngineConfig({ advisories: { unknown: true } }), /Unknown advisory option/);
 });
+test("engine config rejects accessor-backed records without invoking getters", () => {
+  let topLevelInvoked = false;
+  const topLevel = {};
+  Object.defineProperty(topLevel, "weights", {
+    enumerable: true,
+    get() {
+      topLevelInvoked = true;
+      return { responsive: 100 };
+    }
+  });
+  assert.throws(() => validateEngineConfig(topLevel), /Engine config\.weights must be an enumerable data property/);
+  assert.equal(topLevelInvoked, false);
+
+  let nestedInvoked = false;
+  const weights = {};
+  Object.defineProperty(weights, "responsive", {
+    enumerable: true,
+    get() {
+      nestedInvoked = true;
+      return 100;
+    }
+  });
+  assert.throws(() => validateEngineConfig({ weights }), /config\.weights\.responsive must be an enumerable data property/);
+  assert.equal(nestedInvoked, false);
+});
+
+test("engine config rejects inherited-prototype policy records", () => {
+  const inherited = Object.create({ weights: { responsive: 100 } });
+  assert.throws(() => validateEngineConfig(inherited), /Engine config must be a plain object/);
+
+  const inheritedWeights = Object.create({ responsive: 100 });
+  assert.throws(() => validateEngineConfig({ weights: inheritedWeights }), /config\.weights must be a plain object/);
+});

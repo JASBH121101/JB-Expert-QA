@@ -1,3 +1,5 @@
+import { snapshotPlainRecord } from "./safe-record.js";
+
 const SPECIALIST_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 export function isValidSpecialistId(value) {
@@ -8,21 +10,22 @@ export class RuleRegistry {
   #rules = new Map();
 
   register(rule) {
-    if (!rule || typeof rule.id !== "string" || !rule.id.trim()) {
+    const safeRule = snapshotPlainRecord(rule, "rule");
+    if (typeof safeRule.id !== "string" || !safeRule.id.trim()) {
       throw new TypeError("A rule must have a non-empty id");
     }
-    if (!isValidSpecialistId(rule.specialist)) {
+    if (!isValidSpecialistId(safeRule.specialist)) {
       throw new TypeError(
         "A rule must use a valid specialist id (lowercase letters, numbers and hyphens)"
       );
     }
-    if (typeof rule.evaluate !== "function") {
-      throw new TypeError("Rule \"" + rule.id + "\" must provide evaluate(context)");
+    if (typeof safeRule.evaluate !== "function") {
+      throw new TypeError("Rule \"" + safeRule.id + "\" must provide evaluate(context)");
     }
-    if (this.#rules.has(rule.id)) {
-      throw new Error("Rule already registered: " + rule.id);
+    if (this.#rules.has(safeRule.id)) {
+      throw new Error("Rule already registered: " + safeRule.id);
     }
-    this.#rules.set(rule.id, Object.freeze({ ...rule }));
+    this.#rules.set(safeRule.id, Object.freeze(safeRule));
     return this;
   }
 
@@ -30,7 +33,9 @@ export class RuleRegistry {
     return this.#rules.get(id) ?? null;
   }
 
-  list({ specialist } = {}) {
+  list(options = {}) {
+    const safeOptions = snapshotPlainRecord(options, "registry filter");
+    const specialist = safeOptions.specialist;
     if (specialist !== undefined && !isValidSpecialistId(specialist)) {
       throw new TypeError("specialist filter must be a valid specialist id");
     }
