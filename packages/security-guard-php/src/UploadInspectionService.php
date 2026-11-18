@@ -188,7 +188,7 @@ final class UploadInspectionService
                 'scannedAtMs' => $scannedAtMs,
             ]);
 
-            if (!$this->storage->promote($uploadId, $sha256, $size)) {
+            if (!$this->storage->promote($uploadId, $sha256, $size, $attestation)) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('PROMOTION_FAILED');
             }
