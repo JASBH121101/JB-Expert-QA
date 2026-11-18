@@ -78,11 +78,17 @@ and only then requests private atomic promotion.
 
 Host adapters must keep quarantine and approved objects private, enforce scanner
 deadlines, consume the complete stream, verify exact bytes during promotion, and
-make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
+make deletion idempotent. The `promote(upload_id, expected_sha256, expected_size,
+attestation)` method must atomically verify that the supplied normalized
+`jb.security.upload-inspection.attestation/v1` binds the same upload ID, SHA-256,
+byte count and `clean` verdict, then persist that attestation with the exact
+approved object. Do not persist the attestation in a later, separate transaction. Unknown verdicts, scanner errors, integrity mismatches
 and uncertain promotion outcomes never produce an approval. Malicious files,
 unknown verdicts and uncertain objects remain quarantined for forensic review. The
 request path never serves a quarantined original; disposal requires a separate,
 authorized retention/disposition process after the required evidence is preserved.
+
+The validated attestation is also returned in the approved result for application-level audit linkage. It is schema-validated scanner evidence, not a cryptographic scanner signature; production trust remains dependent on an authenticated scanner adapter and the atomic storage implementation.
 
 No antivirus engine or production storage implementation is bundled. Signature
 identification is not full format validation or image sanitization. The host
