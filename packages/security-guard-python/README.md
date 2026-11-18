@@ -84,8 +84,10 @@ Unknown verdicts, incomplete scans, scanner errors, integrity mismatches and
 uncertain promotion outcomes never produce an approval. A malicious verdict is
 rejected and the staging object is deleted; any required forensic retention must
 use a separate bounded and access-controlled recorder. A successful clean result
-includes the validated attestation for audit linkage; that attestation is normalized
-scanner evidence, not a cryptographic scanner signature or publication authorization. Unknown and uncertain
+includes the validated attestation in the returned result; a valid malicious/unknown
+attestation is carried on `UploadInspectionError.attestation` for audit linkage only.
+Incomplete scans and digest/size mismatches do not produce attestation. It remains
+normalized scanner evidence, not a cryptographic scanner signature or publication authorization. Unknown and uncertain
 objects remain private in quarantine. The request path never serves a quarantined
 original.
 
