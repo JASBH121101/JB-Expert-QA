@@ -1440,5 +1440,72 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.cldr-catalog-audit.20261118",
+    "nodeId": "jb.expert-qa.language.cldr-catalog-audit",
+    "version": "0.8.0",
+    "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T20:28:16Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900816",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Language QA catalog audit and security regression tests passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900514",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "SCCM hierarchy, historical evidence integrity and certification gates passed on Node 22 and 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900473",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Security Guard multi-runtime package validation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900422",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Security QA deterministic security-profile tests passed on Node 22 and 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900428",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "All JB engine packages packed, installed and smoke-tested on Node 22 and 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900517",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Full Expert QA deterministic core test suite passed on Node 22 and 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900415",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Engine integration contracts and package isolation passed on Ubuntu and Windows, Node 22 and 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44390900451",
+        "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00",
+        "outcome": "success",
+        "summary": "Engine certification matrix passed across available engine, adapter, operating-system and Node-version jobs."
+      }
+    ],
+    "findings": []
   }
 ]
