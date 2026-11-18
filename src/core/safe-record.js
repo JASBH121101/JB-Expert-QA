@@ -27,3 +27,33 @@ export function snapshotPlainRecord(value, label = "value") {
   }
   return snapshot;
 }
+
+export function snapshotArray(value, label = "value") {
+  if (!Array.isArray(value)) {
+    throw new TypeError(label + " must be an array");
+  }
+
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+  const length = lengthDescriptor?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 100_000) {
+    throw new TypeError(label + " has an invalid or excessive length");
+  }
+
+  const snapshot = [];
+  for (let index = 0; index < length; index += 1) {
+    const key = String(index);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError(label + "[" + index + "] must be an enumerable data property");
+    }
+    snapshot.push(descriptor.value);
+  }
+
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === "length") continue;
+    if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/.test(key) || Number(key) >= length) {
+      throw new TypeError(label + " must not contain extra properties");
+    }
+  }
+  return snapshot;
+}
