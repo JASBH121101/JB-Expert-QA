@@ -180,14 +180,16 @@ test("assessment history is append-only, immutable and timestamp-monotonic per n
   assert.throws(() => appendSccmAssessment(inventory, next, older), /cannot move backwards/);
 });
 
-test("Language QA is PASS at component, module, subbranch and branch levels", () => {
+test("Language QA ancestors remain PENDING until the new critical catalog component is certified", () => {
   const branch = evaluateSccmNode(inventory, history, "jb.expert-qa.language");
   const module = evaluateSccmNode(inventory, history, "jb.expert-qa.language.module");
   const components = branch.children[0].children[0].children;
-  assert.equal(branch.status, "PASS");
-  assert.equal(module.status, "PASS");
-  assert.equal(components.length, 8);
-  assert.ok(components.every((component) => component.status === "PASS"));
+  assert.equal(branch.status, "PENDING");
+  assert.equal(branch.children[0].status, "PENDING");
+  assert.equal(module.status, "PENDING");
+  assert.equal(components.length, 9);
+  assert.equal(components.filter((component) => component.status === "PASS").length, 8);
+  assert.equal(components.find((component) => component.id === "jb.expert-qa.language.cldr-catalog-audit").status, "PENDING");
 });
 
 test("green module workflows do not bypass uncertified critical components", () => {
@@ -259,11 +261,11 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
-  assert.equal(report.counts.component.total, 71);
+  assert.equal(report.counts.component.total, 72);
   assert.equal(report.counts.component.PASS, 13);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
-  assert.equal(report.progress.total, 140);
+  assert.equal(report.progress.total, 141);
 });
 
 test("history validation fails closed on malformed entries rather than throwing", () => {
