@@ -464,13 +464,10 @@ async function ensureLedgerGuard(filePath, ledger) {
   if (current.revision > ledger.revision) {
     throw new Error("A2 action ledger appears rolled back behind its durability guard");
   }
-  if (ledger.revision === current.revision + 1) {
-    // Recover the one-step window where the ledger rename completed but the
-    // sidecar update was interrupted. Larger gaps are not auto-repaired.
-    await writeLedgerGuard(guardPath, ledger);
-    return;
-  }
-  throw new Error("A2 action ledger revision diverges from its durability guard");
+  // Never promote an ahead-of-guard journal automatically. It may reflect
+  // an interrupted write, but accepting it would also bless a forged one-step
+  // revision increase. Require operator review for every revision mismatch.
+  throw new Error("A2 action ledger revision diverges from its durability guard; manual review is required");
 }
 
 async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
