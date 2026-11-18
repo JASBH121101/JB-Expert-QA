@@ -44,6 +44,7 @@ jobs:
         working-directory: packages/security-guard-php
         env:
           COMPOSER_DIST: ${{ runner.temp }}/jb-security-guard-composer
+          COMPOSER_ROOT_VERSION: "0.1.0"
         run: |
           mkdir -p "$COMPOSER_DIST"
           composer archive --format=zip --dir="$COMPOSER_DIST" --file=jb-security-guard-php
