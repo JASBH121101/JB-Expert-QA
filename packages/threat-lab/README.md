@@ -127,29 +127,15 @@ The first classification of existing scenarios currently gives these per-engine 
 A missing tier is an explicit testing gap, not a pass. Each four-engine footprint now has at least one real engine-backed scenario in its independent local test suite; this indicates tier presence only, not comprehensive product coverage or absence of defects. Keep all fixtures inert, bounded, local, and non-destructive; do not execute samples or send traffic to production services.
 
 
-## NEXORA profiles — separate certification targets
-
-The NEXORA repository contains two distinct deliverables and they must not be collapsed into one Threat Lab target:
-
-- **NEXORA Configurable Catalog (frontend/catalog studio):** the independently scoped configurable-catalog prototype, including editable business templates, catalog fields, product presentation, responsive behavior, and browser-side demo persistence. Its tests must treat localStorage/demo behavior as prototype-only and must not mistake it for real authentication, server persistence, or secure file upload.
-- **NEXORA Site Engine (Laravel/PHP distributable):** the separate Laravel application and server-side engine. Its profile must validate installation and database setup, owner authentication, role/permission boundaries, product/category CRUD, public-site exposure, export generation, upload validation/storage, and package/deployment safety using disposable local databases and filesystem fixtures.
-
-They are separate registered targets (nexora-configurable-catalog and nexora-site-engine) with independent adapters, scenario IDs, tier coverage, and readiness. A pass in one profile must never certify the other. The Site Engine profile must follow its documented product scope: do not invent ERP, inventory, POS, payment, or SaaS multi-tenant tests unless those capabilities are explicitly brought into scope. The catalog prototype must not be certified as if it already had the Laravel backend.
-
-**Integration status:** these two profiles are now explicitly tracked as separate targets in the Threat Lab test registry and coverage plan. Product-level adapter execution remains pending; placeholder/registry tests do not count as NEXORA security certification. All integration tests remain local, disposable, offline, non-destructive, and non-executing.
-
-
 ## NEXORA product adapters
 
-The Threat Lab validates two independent pinned NEXORA targets through dedicated adapters:
+Threat Lab has two independent, immutable NEXORA product targets:
 
-- **Configurable Catalog prototype:** six registered scenarios covering sample data, setup/templates, local storage/escaping, responsive admin, full demo regression, and a final demo-boundary check. The last scenario confirms the prototype does not collect real passwords or claim server-side persistence.
-- **Site Engine:** six registered scenarios covering installation, public-data boundaries, role/field authorization, export/inventory least privilege, fake DNS/TLS plus published-host handling, and the complete Laravel Feature and Unit suite.
+- **Configurable Catalog:** `JASBH121101/Nexora@63f0608d0b00d633b1ad147ab2318fc099b8a99e`. Six tiers exercise sample data, setup/templates, localStorage/escaping, responsive admin, full demo regression and explicit prototype-only boundaries. It is not real authentication or server persistence.
+- **Laravel Site Engine:** `JASBH121101/Nexora@afa0572d35f94b5c02a40d75001a2b2acd7f8b66`, proposed PR #14 stacked on PR #13. Ten scenarios across six tiers exercise installation, public catalogue, permissions, currency precision, locale/country catalogues, exports, private images, MFA/TOTP, domain/TLS fake-adapter boundaries and the full Laravel suite.
 
-Adapters use fixed allow-listed product test paths, symlink-safe resolution, child processes without a shell, a minimal environment that does not forward CI credentials, bounded execution/output, and disposable test state. Site Engine tests use SQLite in-memory; the dedicated workflow additionally runs the full Laravel suite against ephemeral PostgreSQL 16. DNS/TLS behavior is tested with deterministic fakes and makes no external network request.
+The official runner is `tests/nexora-profiles.integration.test.js`, invoked by `.github/workflows/nexora-product-certification.yml`. It verifies each checked-out Git HEAD against the exact SHA before running; missing checkouts fail in the dedicated workflow rather than being silently skipped.
 
-Pinned revisions:
-- Catalog prototype: \`88c4876c9678b93dadde55f79fe9d04890900741\`
-- Site Engine: \`3f68126ecc58b088c071007c5116bc95426d159b\`
+Targeted Site Engine scenarios use in-memory SQLite. The dedicated workflow also runs the full Laravel Feature and Unit suite against ephemeral PostgreSQL 16. Domain/TLS tests use deterministic fakes. Child processes receive an allow-listed test environment without CI credentials. Separate JSON reports are uploaded for each product.
 
-Readiness means all six registered scenarios passed for the pinned revision only. The Catalog's prototype-only boundary is retained; the tests do not imply real authentication, server persistence or secure image upload. Product changes remain in the corresponding NEXORA branch.
+Readiness applies only to the registered scenarios at the exact pinned revision. The Catalog remains a frontend prototype; the Site Engine pin is an open draft change, not a merged release. This integration does not merge Nexora source, publish, deploy or certify production operation.
