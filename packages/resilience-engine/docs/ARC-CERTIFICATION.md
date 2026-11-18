@@ -10,7 +10,7 @@ ARC certifies the implemented capability envelope, not the aspirational autonomy
 |---|---|---|
 | A0 observe | Read-only observation and incident analysis | Testable |
 | A1 restart-service | Only exact allowlisted stateless, standard-criticality services; signed active policy, trusted fresh signals, durable claims/audit, mutation stop checks and post-action verification required | Candidate for operational lab certification |
-| A2 bounded containment | Readiness evidence plus a provider-neutral laboratory controller for apply/reconcile/verify/forensics/separate release; no concrete provider, production policy grant or restart-recovery worker is bundled; controller defaults to disabled | Not executable; must remain denied |
+| A2 bounded containment | Readiness evidence plus a provider-neutral laboratory controller and a read-only restart reconciliation coordinator; no concrete provider, production policy grant or host-certified durable recovery integration is bundled; controller defaults to disabled and reconciliation findings never grant execution or release authority | Not executable; must remain denied |
 | A3 controlled failover | Readiness evidence only; external monitor/quorum, target-enforced fencing, replication/RPO, cutover and independent verification are not a complete executable control plane | Not executable; must remain denied |
 
 The runtime must continue to report `mode: semi-autonomous` and `targetMode: autonomous-advanced` until advanced capabilities are actually implemented and certified. ARC must never infer capability from a target profile, a risk score, a signed statement alone, or an all-green unit-test suite.

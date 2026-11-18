@@ -12,7 +12,8 @@ import {
   evaluateA2ProviderReadiness,
   verifyA2EvidenceReferences,
   verifyA2ProviderEvidenceBundle,
-  createA2ContainmentController
+  createA2ContainmentController,
+  createA2RecoveryCoordinator
 } from "../src/index.js";
 import {
   createMemoryTrustedSignalStore,
@@ -186,6 +187,7 @@ function createDependencies({
   blockMutationAt = null,
   denyAuthorization = false,
   auditFails = false,
+  auditFailsForOutcome = null,
   forensicValid = true,
   forensicEvidenceIds = null,
   mutationTimeout = false,
@@ -205,6 +207,10 @@ function createDependencies({
   forensicOperationIdOverride = null,
   forensicReferenceDigestOverride = null,
   clockThrowsAfterProviderStart = false,
+  clockThrowsAfterPendingRecord = false,
+  skipRecoveryRecordPersist = false,
+  tamperPendingOperationId = false,
+  tamperPendingState = false,
   clock = () => NOW
 } = {}) {
   const events = [];
@@ -213,7 +219,10 @@ function createDependencies({
   let operationNumber = 0;
   let actionStage = "not-found";
   let budgetStage = "not-found";
+  const claimedIdempotencyKeys = new Set();
   let clockFailed = false;
+  const pendingRecords = new Map();
+  const pendingTransitions = [];
   const effectiveClock = () => {
     if (clockFailed) throw new Error("clock unavailable after provider-start marker");
     return clock();
@@ -412,17 +421,57 @@ function createDependencies({
     },
     actionLedger: {
       durable: true,
+      externalRevisionAnchorConfigured: true,
+      externalRevisionAnchorDurable: true,
+      externalRevisionAnchorAtomic: true,
+      async createPendingRecord(input) {
+        events.push("pending-create:" + input.record.action);
+        if (pendingRecords.has(input.record.claimId)) return { created: false };
+        pendingRecords.set(input.record.claimId, { ...input.record });
+        pendingTransitions.push({ claimId: input.record.claimId, state: "claimed", record: { ...input.record } });
+        if (clockThrowsAfterPendingRecord) clockFailed = true;
+        return { created: true };
+      },
+      async listPending(input) {
+        events.push("pending-list");
+        const claimIds = [...pendingRecords.values()]
+          .filter((record) => ["claimed", "provider-started", "held-for-reconciliation"].includes(record.state))
+          .map((record) => record.claimId);
+        const offset = input.cursor === null ? 0 : Number(input.cursor);
+        const page = claimIds.slice(offset, offset + input.limit);
+        const nextOffset = offset + page.length;
+        return { claimIds: page, nextCursor: nextOffset < claimIds.length ? String(nextOffset) : null };
+      },
+      async getPendingByClaimId(input) {
+        events.push("pending-get:" + input.claimId);
+        const record = pendingRecords.get(input.claimId);
+        return record
+          ? {
+              found: true,
+              record: tamperPendingOperationId && record.action === "apply-containment-profile"
+                ? { ...record, originalOperationId: "unrelated-operation-01" }
+                : tamperPendingState
+                  ? { ...record, state: "succeeded" }
+                  : { ...record }
+            }
+          : { found: false, record: null };
+      },
       async claim(input) {
         events.push("action-claim:" + input.action);
+        if (claimedIdempotencyKeys.has(input.idempotencyKey)) {
+          return { claimed: false, claimId: null };
+        }
         const mode = input.action === "release-containment" ? releaseClaimMode : actionClaimMode;
         if (mode === "hang") {
           actionStage = "claimed";
+          claimedIdempotencyKeys.add(input.idempotencyKey);
           claimNumber += 1;
           return new Promise(() => {});
         }
         if (mode === "deny") return { claimed: false, claimId: null };
         claimNumber += 1;
         actionStage = "claimed";
+        claimedIdempotencyKeys.add(input.idempotencyKey);
         return { claimed: true, claimId: "claim-" + claimNumber };
       },
       async markProviderStarted(input) {
@@ -430,10 +479,24 @@ function createDependencies({
         const mode = input.action === "release-containment" ? releaseStartMode : providerStartMode;
         if (mode === "hang") {
           actionStage = "provider-started";
+          if (!skipRecoveryRecordPersist && input.recoveryRecord) {
+            pendingRecords.set(input.claimId, { ...input.recoveryRecord });
+            pendingTransitions.push({
+              claimId: input.claimId, state: "provider-started",
+              record: { ...input.recoveryRecord }
+            });
+          }
           return new Promise(() => {});
         }
         if (mode === "deny") return { started: false };
         actionStage = "provider-started";
+        if (!skipRecoveryRecordPersist && input.recoveryRecord) {
+          pendingRecords.set(input.claimId, { ...input.recoveryRecord });
+          pendingTransitions.push({
+            claimId: input.claimId, state: "provider-started",
+            record: { ...input.recoveryRecord }
+          });
+        }
         if (clockThrowsAfterProviderStart && input.action === "apply-containment-profile") {
           clockFailed = true;
         }
@@ -449,7 +512,25 @@ function createDependencies({
       },
       async complete(input) {
         events.push("action-complete:" + input.outcome);
-        actionStage = input.outcome === "held-for-reconciliation" ? "completed" : "completed";
+        actionStage = "completed";
+        const pending = pendingRecords.get(input.claimId);
+        if (pending) {
+          if (input.outcome === "held-for-reconciliation") {
+            const heldRecord = {
+              ...pending,
+              state: "held-for-reconciliation",
+              updatedAtMs: input.completedAtMs
+            };
+            pendingRecords.set(input.claimId, heldRecord);
+            pendingTransitions.push({
+              claimId: input.claimId, state: "held-for-reconciliation",
+              record: { ...heldRecord }
+            });
+          } else {
+            pendingRecords.delete(input.claimId);
+            pendingTransitions.push({ claimId: input.claimId, state: "terminal-removed" });
+          }
+        }
         return { completed: true };
       }
     },
@@ -457,7 +538,7 @@ function createDependencies({
       durable: true,
       async append(input) {
         events.push("audit:" + input.outcome);
-        return !auditFails;
+        return !auditFails && input.outcome !== auditFailsForOutcome;
       }
     },
     mutationControl: {
@@ -470,7 +551,23 @@ function createDependencies({
     clock: effectiveClock,
     operationTimeoutMs: 500
   });
-  return { controller, events, profileId };
+  const recoveryJournal = {
+    durable: true,
+    async listPending(input) {
+      const claimIds = [...pendingRecords.values()]
+        .filter((record) => ["claimed", "provider-started", "held-for-reconciliation"].includes(record.state))
+        .map((record) => record.claimId);
+      const offset = input.cursor === null ? 0 : Number(input.cursor);
+      const page = claimIds.slice(offset, offset + input.limit);
+      const nextOffset = offset + page.length;
+      return { claimIds: page, nextCursor: nextOffset < claimIds.length ? String(nextOffset) : null };
+    },
+    async getPendingByClaimId(input) {
+      const record = pendingRecords.get(input.claimId);
+      return record ? { found: true, record: { ...record } } : { found: false, record: null };
+    }
+  };
+  return { controller, events, profileId, actionLedger: recoveryJournal, pendingRecords, pendingTransitions };
 }
 
 test("A2 controller defaults to disabled and never treats readiness as execution permission", async () => {
@@ -490,7 +587,9 @@ test("A2 controller defaults to disabled and never treats readiness as execution
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true,
+      externalRevisionAnchorDurable: true,
+      externalRevisionAnchorAtomic: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   });
@@ -533,7 +632,8 @@ test("A2 controller rejects copied readiness, mismatched scope and invalid evide
 
 test("A2 executes only after policy authorization, budget claim, bounded preflight, independent verification and forensics; release is separate", async () => {
   const { readiness, evidenceRefs } = await createVerifiedReadiness();
-  const { controller, events, profileId } = createDependencies();
+  const deps = createDependencies();
+  const { controller, events, profileId } = deps;
   const contained = await controller.executeContainment({
     readiness, scope: SCOPE, profileId, evidenceRefs
   });
@@ -548,6 +648,10 @@ test("A2 executes only after policy authorization, budget claim, bounded preflig
   const released = await controller.releaseContainment({
     containment: contained, reasonCode: "owner-release-approved"
   });
+  const releaseClaim = deps.pendingTransitions.find((entry) =>
+    entry.state === "claimed" && entry.record.action === "release-containment"
+  );
+  assert.equal(releaseClaim.record.originalOperationId, contained.operationReceipt.operationId);
   assert.equal(released.state, "released");
   assert.equal(released.executed, true);
   assert.equal(released.verified, true);
@@ -559,6 +663,143 @@ test("A2 executes only after policy authorization, budget claim, bounded preflig
     containment: contained, reasonCode: "owner-release-approved"
   });
   assert.equal(repeatedRelease.state, "denied");
+});
+
+test("A2 concurrent duplicate requests with the same idempotency key cannot apply twice", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies();
+  const input = {
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  };
+  const results = await Promise.all([
+    deps.controller.executeContainment(input),
+    deps.controller.executeContainment(input)
+  ]);
+  assert.equal(results.filter((result) => result.state === "contained").length, 1);
+  assert.equal(deps.events.filter((event) => event === "apply").length, 1);
+  assert.equal(deps.events.filter((event) => event === "action-claim:apply-containment-profile").length, 2);
+  assert.equal(results.some((result) => result.state === "held-for-reconciliation"), true);
+});
+
+test("A2 persists exact pending recovery data before provider start and verifies the atomic transition", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies();
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "contained");
+  assert.ok(deps.events.indexOf("pending-create:apply-containment-profile") <
+    deps.events.indexOf("action-mark-provider-started:apply-containment-profile"));
+  assert.ok(deps.events.indexOf("action-mark-provider-started:apply-containment-profile") <
+    deps.events.indexOf("apply"));
+  assert.deepEqual(
+    deps.pendingTransitions.slice(0, 2).map((entry) => entry.state),
+    ["claimed", "provider-started"]
+  );
+  const created = deps.pendingTransitions[0].record;
+  assert.equal(created.schema, "jb.resilience.a2-recovery-record/v1");
+  assert.equal(created.claimId, "claim-1");
+  assert.equal(created.action, "apply-containment-profile");
+  assert.deepEqual({ ...created.scope }, SCOPE);
+  assert.equal(created.profileId, deps.profileId);
+  assert.equal(created.providerId, "containment-provider-01");
+  assert.equal(created.verifierId, "independent-control-plane-02");
+  assert.equal(created.recorderId, "forensic-vault-01");
+  assert.equal(created.state, "claimed");
+  assert.equal(created.evidenceRefs.length, evidenceRefs.length);
+  assert.equal(created.leaseExpiresAtMs, NOW + 4_000);
+});
+
+test("A2 holds when its durable journal returns a prior operation ID for containment", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ tamperPendingOperationId: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 rejects a terminal state returned from its pending recovery index", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ tamperPendingState: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("apply"), false);
+});
+
+test("A2 refuses provider mutation unless the durable provider-start record is confirmed", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ skipRecoveryRecordPersist: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  assert.equal(deps.events.includes("apply"), false);
+  assert.ok(deps.events.includes("action-complete:held-for-reconciliation"));
+});
+
+test("A2 keeps a pre-marker claim held across restart and never queries or retries the provider", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ clockThrowsAfterPendingRecord: true });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(deps.events.includes("apply"), false);
+  const [record] = [...deps.pendingRecords.values()];
+  assert.equal(record.state, "claimed");
+
+  let providerQueries = 0;
+  const coordinator = createA2RecoveryCoordinator({
+    journal: deps.actionLedger,
+    containmentProvider: {
+      providerId: "containment-provider-01",
+      reconciliationReadOnly: true,
+      async reconcile() { providerQueries += 1; return { outcome: "unknown" }; },
+      async reconcileRelease() { providerQueries += 1; return { outcome: "unknown" }; }
+    },
+    independentVerifier: {
+      verifierId: "independent-control-plane-02",
+      async verifyContainment() { return null; },
+      async verifyRelease() { return null; }
+    },
+    forensicRecorder: {
+      recorderId: "forensic-vault-01",
+      async lookupRetention() { return null; }
+    },
+    evidenceResolver: { async resolve() { return null; } },
+    clock: () => NOW
+  });
+  const report = await coordinator.reconcilePending();
+  assert.equal(report.findings[0].state, "held-for-reconciliation");
+  assert.equal(
+    report.findings[0].reason,
+    "provider-start-not-marked-no-provider-call-authorized"
+  );
+  assert.equal(report.findings[0].providerQuerySkipped, true);
+  assert.equal(providerQueries, 0);
+  assert.equal(report.executable, false);
+  assert.equal(report.safeToRetry, false);
+  assert.equal(report.releaseAllowed, false);
+});
+
+test("A2 keeps its pending recovery record when final audit prevents successful finalization", async () => {
+  const { readiness, evidenceRefs } = await createVerifiedReadiness();
+  const deps = createDependencies({ auditFailsForOutcome: "contained" });
+  const result = await deps.controller.executeContainment({
+    readiness, scope: SCOPE, profileId: deps.profileId, evidenceRefs
+  });
+  assert.equal(result.state, "held-for-reconciliation");
+  assert.equal(result.executed, false);
+  const [record] = [...deps.pendingRecords.values()];
+  assert.equal(record.state, "held-for-reconciliation");
+  assert.equal(deps.pendingTransitions.at(-1).state, "held-for-reconciliation");
 });
 
 test("A2 reconciles an ambiguous apply before accepting provider success", async () => {
@@ -618,6 +859,42 @@ test("A2 blocks when mutation control or policy authorization denies the operati
   assert.equal(denied.events.includes("apply"), false);
 });
 
+test("A2 refuses executable controller construction without a durable atomic external anchor", () => {
+  const createWithAnchorCapabilities = (capabilities) => createA2ContainmentController({
+    enableExecution: true,
+    policyAuthority: {
+      authorize() {}, assertAuthorization() {}, completeAuthorization() {}
+    },
+    containmentProvider: {
+      providerId: "p", preflight() {}, apply() {}, reconcile() {}, release() {}, reconcileRelease() {}
+    },
+    independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
+    forensicRecorder: { recorderId: "f", preserveEvidence() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: {
+      durable: true,
+      claim() {}, markProviderStarted() {}, reconcile() {}, complete() {},
+      createPendingRecord() {}, listPending() {}, getPendingByClaimId() {},
+      ...capabilities
+    },
+    auditStore: { durable: true, append() {} },
+    mutationControl: { assertAllowed() {} }
+  });
+
+  const denial = /durable external monotonic revision anchor with atomic compare-and-swap/;
+  assert.throws(() => createWithAnchorCapabilities({}), denial);
+  assert.throws(() => createWithAnchorCapabilities({
+    externalRevisionAnchorConfigured: true,
+    externalRevisionAnchorDurable: false,
+    externalRevisionAnchorAtomic: true
+  }), denial);
+  assert.throws(() => createWithAnchorCapabilities({
+    externalRevisionAnchorConfigured: true,
+    externalRevisionAnchorDurable: true,
+    externalRevisionAnchorAtomic: false
+  }), denial);
+});
+
 test("A2 refuses non-durable ledgers and executor/verifier identity collisions", () => {
   const { controller } = createDependencies();
   assert.equal(controller.enabled, true);
@@ -632,7 +909,9 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: false, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true,
+      externalRevisionAnchorDurable: true,
+      externalRevisionAnchorAtomic: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /must be durable/);
@@ -649,7 +928,26 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true,
+      externalRevisionAnchorDurable: true,
+      externalRevisionAnchorAtomic: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    auditStore: { durable: true, append() {} },
+    mutationControl: { assertAllowed() {} }
+  }), /distinct identities/);
+  assert.throws(() => createA2ContainmentController({
+    enableExecution: true,
+    policyAuthority: {
+      authorize() {}, assertAuthorization() {}, completeAuthorization() {}
+    },
+    containmentProvider: {
+      providerId: "shared", preflight() {}, apply() {}, reconcile() {}, release() {}, reconcileRelease() {}
+    },
+    independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
+    forensicRecorder: { recorderId: "shared", preserveEvidence() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true,
+      externalRevisionAnchorDurable: true,
+      externalRevisionAnchorAtomic: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);

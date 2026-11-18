@@ -21,13 +21,17 @@
     "./response-orchestrator": "./src/response-orchestrator.js",
     "./orchestration-store": "./src/orchestration-store.js",
     "./adapters/postgres-storage": "./src/adapters/postgres-storage.js",
+    "./adapters/postgres-a2-action-ledger": "./src/adapters/postgres-storage.js",
     "./adapters/health-monitor-probes": "./src/adapters/health-monitor-probes.js",
     "./adapters/restricted-host-command-runner": "./src/adapters/restricted-host-command-runner.js",
     "./adapters/identity-policy-bridge": "./src/adapters/identity-policy-bridge.js",
     "./continuity-gates": "./src/continuity-gates.js",
     "./provider-evidence": "./src/provider-evidence.js",
     "./provider-evidence-a3": "./src/provider-evidence-a3.js",
-    "./containment-controller": "./src/containment-controller.js"
+    "./containment-controller": "./src/containment-controller.js",
+    "./a2-recovery-coordinator": "./src/a2-recovery-coordinator.js",
+    "./a2-action-ledger": "./src/a2-action-ledger.js",
+    "./adapters/postgres-a2-revision-anchor": "./src/adapters/postgres-a2-revision-anchor.js"
   },
   "files": [
     "src/**",

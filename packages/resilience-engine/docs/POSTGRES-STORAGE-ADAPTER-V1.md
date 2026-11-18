@@ -7,7 +7,7 @@
 
 ## Scope
 
-This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns five stores:
+This adapter provides PostgreSQL-backed transactional stores for the existing v0.6 orchestration contract and its related audit/coordination primitives. A separate `createPostgresA2ActionLedger({ pool, providerId, verifierId, recorderId })` factory in the same module implements the A2 controller's own durable action-journal contract. It is exported from the package root and the `@jb/resilience-engine/adapters/postgres-a2-action-ledger` subpath. The existing adapter factory returns five stores:
 
 - `orchestrationStore`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
 - `auditStore`: append-only, SHA-256 hash-chained audit events.
@@ -15,7 +15,7 @@ This adapter replaces the single-host JSON-file orchestration ledger with a Post
 - `fencedTargetStore`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.
 - `trustedSignalStore`: a durable, database-unique replay registry shared by processes using the same authoritative PostgreSQL primary.
 
-The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The host owns the Pool and passes it in explicitly.
+The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The A2 action-ledger factory also requires three distinct configured provider/verifier/recorder identities; these are consistency bindings, not proof of operational independence or trust. The host owns the Pool and passes it in explicitly.
 
 ## Initialization
 
@@ -40,6 +40,153 @@ await storage.initialize();
 ```
 
 The package only requires a Pool with `connect()`, and connected clients with `query()` and `release()`. The application must manage Pool lifecycle and close it when its process shuts down.
+
+## Transactional A2 action journal
+
+The A2 controller has a distinct ledger contract from the older v0.6 orchestration action API. Do not inject `orchestrationStore` as an A2 `actionLedger`: their identifiers, claims, lifecycle states, policy scope and finalization rules are not interchangeable.
+
+A host can create the A2 journal on the same injected Pool:
+
+```js
+import pg from "pg";
+import { createPostgresA2ActionLedger } from "@jb/resilience-engine/adapters/postgres-a2-action-ledger";
+
+const pool = new pg.Pool({ connectionString: process.env.JB_RESILIENCE_DATABASE_URL, max: 8 });
+const actionLedger = createPostgresA2ActionLedger({
+  pool,
+  providerId: "host-configured-provider-id",
+  verifierId: "host-configured-independent-verifier-id",
+  recorderId: "host-configured-forensic-recorder-id"
+});
+await actionLedger.initialize();
+
+// Inject actionLedger into the A2 controller composition.
+// The controller still defaults to disabled and ARC keeps A2 denied.
+```
+
+Initialization creates or verifies the namespaced `jb_resilience_a2_action_claims` table, its active-asset unique index and its partial pending-sequence index. It also installs and validates the named terminal-outcome and scope-column integrity constraints on existing tables; invalid existing rows cause initialization to fail closed. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row. The sequence index covers only `claimed`/`provider-started` rows so permanent idempotency tombstones do not make pending scans degrade into full-history scans.
+
+The A2 journal provides:
+
+- **Atomic claim:** a global transaction advisory lock orders A2 identity-sequence allocation through commit so keyset pagination cannot miss a lower sequence that commits late; a second advisory lock serializes contenders for the exact asset/environment pair. A unique idempotency key is retained permanently, and a partial unique index independently prevents a second active claim for that asset/environment.
+- **Exact pending record:** `createPendingRecord` binds the full record to an existing unexpired claim, and `getPendingByClaimId` re-fetches the exact durable record.
+- **Atomic provider start:** `markProviderStarted` locks the claim row, checks the unexpired claim and full original record, and transitions the claim plus recovery JSON in one transaction.
+- **Read-only reconciliation:** `reconcile`, bounded `listPending` keyset pagination and exact lookup expose state without resuming an action. The cursor carries a fixed sequence ceiling and last-seen key; globally ordered claim commits keep that ceiling stable across pages. Held claims stay active; expired claims are not recycled.
+- **Fail-closed completion:** success is allowed only after provider start. A post-start `not-applied` completion requires a proof envelope bound to the provider identity, action, exact scope, profile, idempotency key and observation time. Terminal rows preserve idempotency tombstones.
+
+This is a transactional single-primary PostgreSQL implementation, not a multi-region consensus system. Database backups and point-in-time restore must preserve A2 idempotency tombstones; restoring an older snapshot can reopen old idempotency keys and requires an operator-controlled recovery plan before the ledger is trusted again. The host must use least-privilege roles, protect the database endpoint and backups, and independently test failover/restore semantics. The ledger itself does not authenticate policy approval, perform provider operations, validate independent verification, or grant release authority.
+
+## PostgreSQL external monotonic revision anchor
+
+The package also exports `createPostgresA2RevisionAnchor({ pool })` from
+`@jb/resilience-engine/adapters/postgres-a2-revision-anchor`. It implements
+the file ledger's `revisionAnchor` contract with a separate table,
+`public.jb_resilience_a2_revision_anchors`.
+
+- Each opaque `ledgerId` has one state: schema
+  `jb.resilience.a2-revision-anchor/v1`, non-negative monotonic revision and
+  the SHA-256 digest of the authenticated local journal.
+- Initial creation is compare-and-swap from `expected: null` and revision 0.
+  Later writes must advance exactly one revision and match the full previous
+  schema/revision/digest tuple.
+- SQL `UPDATE ... WHERE ledger_id AND state_schema AND revision AND
+  ledger_sha256` is the atomic compare-and-swap. A competing or stale writer
+  returns `false`; it never silently overwrites the newer anchor.
+- The owner-run `initialize()` serializes DDL, checks the exact column layout
+  and validates the named primary-key, integrity constraints and monotonic
+  tombstone trigger. A malformed/incompatible pre-existing table fails closed.
+  The trigger allows only revision-zero inserts, updates that advance exactly
+  one revision without changing the ledger identity/schema, and no deletes.
+  Anchor rows are permanent tombstones; do not prune them.
+- Pool acquisition and transaction work are bounded with connection,
+  statement, lock and idle-transaction timeouts. The late Pool-client path
+  releases a client that arrives after the bounded acquisition has expired.
+- `verify()` performs a read-only check of the already-provisioned table,
+  constraints and trigger. Run `initialize()` only with a controlled migration
+  role; the runtime Pool can use `verify()` with a restricted database role.
+  Grant runtime only `SELECT`, `INSERT` and `UPDATE` on this table, with no
+  `DELETE`, table ownership or schema/function DDL privileges. The trigger is
+  defense in depth, not a substitute for separate database roles.
+
+Example composition with a local HMAC-protected file ledger:
+
+```js
+import pg from "pg";
+import {
+  createPostgresA2RevisionAnchor
+} from "@jb/resilience-engine/adapters/postgres-a2-revision-anchor";
+import {
+  createFileA2ActionLedger
+} from "@jb/resilience-engine/a2-action-ledger";
+
+const anchorPool = new pg.Pool({
+  connectionString: process.env.JB_A2_REVISION_ANCHOR_DATABASE_URL,
+  max: 4,
+  connectionTimeoutMillis: 3_000
+});
+const migrationAnchor = createPostgresA2RevisionAnchor({ pool: anchorPool });
+await migrationAnchor.initialize();
+
+// The long-running service should use a separate Pool with its restricted role.
+const runtimeAnchorPool = new pg.Pool({
+  connectionString: process.env.JB_A2_REVISION_ANCHOR_RUNTIME_DATABASE_URL,
+  max: 4,
+  connectionTimeoutMillis: 3_000
+});
+const revisionAnchor = createPostgresA2RevisionAnchor({ pool: runtimeAnchorPool });
+await revisionAnchor.verify();
+
+const activeKeyId = process.env.JB_A2_LEDGER_KEY_ID;
+const actionLedger = createFileA2ActionLedger({
+  filePath: "/var/lib/jb-resilience/a2-actions.json",
+  providerId: "host-configured-provider-id",
+  verifierId: "host-configured-independent-verifier-id",
+  recorderId: "host-configured-forensic-recorder-id",
+  integrityKeys: {
+    [activeKeyId]: process.env.JB_A2_LEDGER_HMAC_KEY_HEX
+  },
+  activeIntegrityKeyId: activeKeyId,
+  revisionAnchor,
+  ledgerId: "host-a2-action-ledger-01"
+});
+
+// The controller remains disabled by default and ARC continues to deny A2.
+```
+
+**Failure-domain requirement:** the anchor is useful against restoration of an
+older local journal/guard pair only while its own high-water mark survives.
+The anchor Pool must point to a separately administered PostgreSQL service,
+with independently protected credentials, backups, point-in-time recovery,
+retention and failover controls. Putting the journal and anchor in the same
+PostgreSQL cluster, or restoring both from the same older snapshot, does not
+provide independent rollback protection. A second Pool to the same primary is
+only a concurrency test, not proof of a separate trust/failure domain.
+
+The CI integration deliberately uses two Pools against one disposable
+PostgreSQL 16 primary. It proves transactionally atomic single-primary CAS
+(one concurrent writer wins), stale-write rejection, protection against
+direct revision rollback/deletion, monotonic revision advance and integration
+with the local HMAC file ledger. The test Pools have schema-owner permissions;
+the restricted runtime-role permission matrix is an explicit host deployment
+responsibility. It does **not**
+certify split-brain handling, backup/restore independence, regional failover,
+or production availability. A production host must separately test those
+operational properties before treating the external anchor as a trusted
+rollback boundary.
+
+### A2 PostgreSQL execution bounds
+
+`createPostgresA2ActionLedger` applies transaction-local PostgreSQL limits to every operation, including read-only reconciliation and exact lookup:
+
+- `connectionTimeoutMs`: default 3,000 ms; accepted range 100–60,000 ms. This sits below the A2 controller's default per-dependency timeout. If a Pool client arrives after the wait has timed out or been aborted, the late client is immediately released.
+- `statementTimeoutMs`: default 4,000 ms; accepted range 100–60,000 ms.
+- `lockTimeoutMs`: default 1,500 ms; accepted range 50–30,000 ms.
+- `idleInTransactionTimeoutMs`: default 10,000 ms; accepted range 100–120,000 ms.
+
+The transaction limits are set with transaction-local `set_config(..., true)`; they do not modify the Pool's session defaults. Pool acquisition is bounded by the ledger's `connectionTimeoutMs`, while the host should also configure node-postgres `connectionTimeoutMillis` on its Pool as defense in depth. Abort signals are checked during acquisition, before commit and around read-only reconciliation; node-postgres does not expose a universal AbortSignal cancellation contract, so the server-side statement/lock limits remain the authoritative bound once a query has been sent.
+
+A controller-side timeout can still make the caller uncertain about a query already sent to PostgreSQL. The adapter never converts that uncertainty into success or a retry; the controller keeps the action held and resolves it through exact durable lookup/reconciliation.
+
 
 ## Transaction and concurrency guarantees
 

@@ -72,6 +72,67 @@ function makeIdempotencyKey(action, scope, profileId) {
   }), "utf8").digest("hex");
 }
 
+const RECOVERY_RECORD_KEYS = Object.freeze([
+  "schema", "claimId", "action", "scope", "profileId", "providerId",
+  "verifierId", "recorderId", "idempotencyKey", "state",
+  "originalOperationId", "evidenceRefs", "createdAtMs",
+  "updatedAtMs", "leaseExpiresAtMs"
+]);
+
+function normalizeRecoveryRecord(input, dependencies) {
+  exactKeys(input, RECOVERY_RECORD_KEYS, "A2 durable recovery record");
+  if (input.schema !== "jb.resilience.a2-recovery-record/v1") {
+    throw new TypeError("unsupported A2 recovery record schema");
+  }
+  const claimId = assertIdentifier(input.claimId, "claimId");
+  const action = input.action;
+  if (!["apply-containment-profile", "release-containment"].includes(action)) {
+    throw new TypeError("unsupported A2 recovery action");
+  }
+  const scope = normalizeScope(input.scope);
+  const profileId = assertIdentifier(input.profileId, "profileId");
+  const providerId = assertIdentifier(input.providerId, "providerId");
+  const verifierId = assertIdentifier(input.verifierId, "verifierId");
+  const recorderId = assertIdentifier(input.recorderId, "recorderId");
+  if (providerId !== dependencies.providerId ||
+      verifierId !== dependencies.verifierId ||
+      recorderId !== dependencies.recorderId ||
+      providerId === verifierId) {
+    throw new TypeError("A2 recovery dependency identity mismatch");
+  }
+  const idempotencyKey = input.idempotencyKey;
+  if (typeof idempotencyKey !== "string" || !SHA256.test(idempotencyKey) ||
+      idempotencyKey !== makeIdempotencyKey(action, scope, profileId)) {
+    throw new TypeError("A2 recovery idempotency key mismatch");
+  }
+  const state = input.state;
+  if (!["claimed", "provider-started", "held-for-reconciliation"].includes(state)) {
+    throw new TypeError("A2 recovery record is not pending");
+  }
+  const originalOperationId = input.originalOperationId;
+  if (originalOperationId !== null) {
+    assertIdentifier(originalOperationId, "originalOperationId");
+  }
+  if (action === "release-containment" && originalOperationId === null) {
+    throw new TypeError("release recovery requires the original containment operation ID");
+  }
+  if (action === "apply-containment-profile" && originalOperationId !== null) {
+    throw new TypeError("containment recovery must not include a prior operation ID");
+  }
+  const evidenceRefs = normalizeEvidenceRefs(input.evidenceRefs);
+  const createdAtMs = assertTimestamp(input.createdAtMs, "createdAtMs");
+  const updatedAtMs = assertTimestamp(input.updatedAtMs, "updatedAtMs");
+  const leaseExpiresAtMs = assertTimestamp(input.leaseExpiresAtMs, "leaseExpiresAtMs");
+  if (updatedAtMs < createdAtMs || leaseExpiresAtMs < createdAtMs) {
+    throw new TypeError("A2 recovery record timestamps are inconsistent");
+  }
+  return Object.freeze({
+    schema: input.schema, claimId, action, scope, profileId,
+    providerId, verifierId, recorderId, idempotencyKey, state,
+    originalOperationId, evidenceRefs, createdAtMs, updatedAtMs, leaseExpiresAtMs
+  });
+}
+
 function assertIdentifier(value, label) {
   if (typeof value !== "string" || !IDENTIFIER.test(value)) {
     throw new TypeError(label + " is invalid");
@@ -383,8 +444,23 @@ export function createA2ContainmentController({
   const providerId = assertIdentifier(containmentProvider.providerId, "containment providerId");
   const verifierId = assertIdentifier(independentVerifier.verifierId, "independent verifierId");
   const recorderId = assertIdentifier(forensicRecorder.recorderId, "forensic recorderId");
-  if (providerId === verifierId) {
-    throw new TypeError("containment executor and independent verifier must have distinct identities");
+  if (new Set([providerId, verifierId, recorderId]).size !== 3) {
+    throw new TypeError("A2 provider, independent verifier and forensic recorder must have distinct identities");
+  }
+  if (enableExecution &&
+      ["createPendingRecord", "listPending", "getPendingByClaimId"].some(
+        (method) => typeof actionLedger[method] !== "function"
+      )) {
+    throw new TypeError("actionLedger must implement the durable A2 pending recovery journal");
+  }
+  if (enableExecution && (
+    actionLedger.externalRevisionAnchorConfigured !== true ||
+    actionLedger.externalRevisionAnchorDurable !== true ||
+    actionLedger.externalRevisionAnchorAtomic !== true
+  )) {
+    throw new TypeError(
+      "A2 execution requires a durable external monotonic revision anchor with atomic compare-and-swap"
+    );
   }
 
   async function invokeDependency(owner, method, input, label) {
@@ -395,6 +471,55 @@ export function createA2ContainmentController({
       label,
       clock
     );
+  }
+
+  async function pendingRecordMatches(claimId, expectedRecord) {
+    const call = await invokeDependency(actionLedger, "getPendingByClaimId", {
+      claimId, atMs: assertTimestamp(clock(), "A2 pending record lookup clock")
+    }, "pending-record-exact-lookup");
+    if (call.timedOut || call.error) return false;
+    try {
+      exactKeys(call.value, ["found", "record"], "A2 pending record lookup");
+      if (call.value.found !== true || call.value.record === null) return false;
+      const dependencies = { providerId, verifierId, recorderId };
+      const actual = normalizeRecoveryRecord(call.value.record, dependencies);
+      const expected = normalizeRecoveryRecord(expectedRecord, dependencies);
+      return canonical(actual) === canonical(expected);
+    } catch {
+      return false;
+    }
+  }
+
+  async function persistPendingActionRecord({
+    claimId, action, scope, profileId, idempotencyKey, evidenceRefs,
+    originalOperationId = null
+  }) {
+    const createdAtMs = assertTimestamp(clock(), "A2 pending record creation clock");
+    const leaseExpiresAtMs = createdAtMs + operationTimeoutMs * 8;
+    if (!Number.isSafeInteger(leaseExpiresAtMs)) return { ok: false, record: null };
+    const record = Object.freeze({
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId, action, scope, profileId,
+      providerId, verifierId, recorderId,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId,
+      evidenceRefs: normalizeEvidenceRefs(evidenceRefs),
+      createdAtMs,
+      updatedAtMs: createdAtMs,
+      leaseExpiresAtMs
+    });
+    const call = await invokeDependency(actionLedger, "createPendingRecord", {
+      record, atMs: createdAtMs
+    }, "pending-record-create");
+    // A timeout is ambiguous. Continue only when an exact durable read-back
+    // proves that this invocation's complete record was persisted.
+    const stored = await pendingRecordMatches(claimId, record);
+    return {
+      ok: stored && !call.error && !call.timedOut &&
+        successful(call.value, "created"),
+      record
+    };
   }
 
   async function appendAudit(entry) {
@@ -487,11 +612,12 @@ export function createA2ContainmentController({
     }
   }
 
-  async function completeAction(claimId, outcome, reason) {
+  async function completeAction(claimId, outcome, reason, providerReconciliation = null) {
     try {
       const call = await invokeDependency(actionLedger, "complete", {
         claimId, outcome, reason,
-        completedAtMs: assertTimestamp(clock(), "action completion clock")
+        completedAtMs: assertTimestamp(clock(), "action completion clock"),
+        ...(providerReconciliation === null ? {} : { providerReconciliation })
       }, "action-completion");
       return !call.timedOut && !call.error && successful(call.value, "completed");
     } catch {
@@ -543,22 +669,42 @@ export function createA2ContainmentController({
       ? { state, reservationId } : { state: "unknown", reservationId: null };
   }
 
-  async function markProviderStarted(claimId, action, scope, profileId, idempotencyKey) {
+  async function markProviderStarted(
+    claimId, action, scope, profileId, idempotencyKey, recoveryRecord
+  ) {
+    const startedAtMs = assertTimestamp(clock(), "provider-start marker clock");
+    const startedRecord = Object.freeze({
+      ...recoveryRecord,
+      state: "provider-started",
+      updatedAtMs: startedAtMs
+    });
     const call = await invokeDependency(actionLedger, "markProviderStarted", {
       claimId, action, scope, profileId, idempotencyKey,
-      atMs: assertTimestamp(clock(), "provider-start marker clock")
+      recoveryRecord: startedRecord,
+      atMs: startedAtMs
     }, "provider-start-marker");
     if (!call.timedOut && !call.error) {
       try {
         exactKeys(call.value, ["started"], "A2 provider-start marker");
-        if (call.value.started === true) return { started: true };
+        if (call.value.started === true) {
+          const stored = await pendingRecordMatches(claimId, startedRecord);
+          return stored
+            ? { started: true, recoveryRecord: startedRecord }
+            : { started: false, hold: true, reason: "durable-provider-start-record-not-confirmed" };
+        }
       } catch {
-        // Resolve ambiguous marker responses using the durable claim journal.
+        // Resolve an ambiguous marker through the durable claim journal.
       }
     }
     const journal = await reconcileActionClaim(action, scope, profileId, idempotencyKey);
-    if (journal.state === "claimed") return { started: false, safeNotStarted: true };
-    return { started: false, hold: true, reason: "provider-start-state-unknown-or-already-started" };
+    if (journal.state === "claimed") {
+      const stored = await pendingRecordMatches(claimId, recoveryRecord);
+      if (stored) return { started: false, safeNotStarted: true };
+    }
+    return {
+      started: false, hold: true,
+      reason: "provider-start-state-unknown-or-already-started"
+    };
   }
 
   async function reserveResources(action, scope, profileId, idempotencyKey) {
@@ -653,15 +799,22 @@ export function createA2ContainmentController({
   }
 
   async function finishNotApplied({
-    action, scope, profileId, claimId, reservationId, authorization, reason
+    action, scope, profileId, claimId, reservationId, authorization, reason,
+    providerReconciliation = null
   }) {
     const budgetOkay = await settleBudget(reservationId, "not-applied");
-    const actionOkay = await completeAction(claimId, "not-applied", reason);
     const authOkay = await completeAuthorization(authorization, "failed");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "not-applied", reason
     });
-    return makeResult(budgetOkay && actionOkay && authOkay && auditOkay
+    const priorFinalizationOkay = budgetOkay && authOkay && auditOkay;
+    const actionOkay = await completeAction(
+      claimId,
+      priorFinalizationOkay ? "not-applied" : "held-for-reconciliation",
+      priorFinalizationOkay ? reason : "not-applied-finalization-incomplete",
+      providerReconciliation
+    );
+    return makeResult(priorFinalizationOkay && actionOkay
       ? "not-applied" : "held-for-reconciliation", reason);
   }
 
@@ -780,6 +933,17 @@ export function createA2ContainmentController({
       return makeResult("denied", reserved.reason);
     }
     const { claimId, reservationId } = reserved;
+    const pendingRecovery = await persistPendingActionRecord({
+      claimId, action, scope, profileId, idempotencyKey,
+      evidenceRefs: refs
+    });
+    if (!pendingRecovery.ok) {
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "durable-pending-action-record-unavailable"
+      });
+    }
+    const recoveryRecord = pendingRecovery.record;
 
     if (!await appendAudit({
       action, scope, profileId, outcome: "resources-reserved", idempotencyKey
@@ -823,7 +987,7 @@ export function createA2ContainmentController({
       });
     }
     const startMarker = await markProviderStarted(
-      claimId, action, scope, profileId, idempotencyKey
+      claimId, action, scope, profileId, idempotencyKey, recoveryRecord
     );
     if (!startMarker.started) {
       if (startMarker.safeNotStarted) {
@@ -877,7 +1041,13 @@ export function createA2ContainmentController({
       if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
-          reason: "provider-confirmed-not-applied"
+          reason: "provider-confirmed-not-applied",
+          providerReconciliation: {
+            schema: "jb.resilience.a2-provider-non-application/v1",
+            providerId, action, scope, profileId, idempotencyKey,
+            outcome: "not-applied",
+            observedAtMs: assertTimestamp(clock(), "provider non-application observation clock")
+          }
         });
       }
       if (!exactOutcome(reconcile.value, "applied", true) ||
@@ -915,7 +1085,6 @@ export function createA2ContainmentController({
     }
 
     const budgetOkay = await settleBudget(reservationId, "succeeded");
-    const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "contained",
@@ -923,6 +1092,11 @@ export function createA2ContainmentController({
       verifierId,
       forensicEvidenceCount: verified.forensicReceipt.evidenceIds.length
     });
+    const actionOkay = await completeAction(
+      claimId,
+      budgetOkay && authorizationOkay && auditOkay ? "succeeded" : "held-for-reconciliation",
+      budgetOkay && authorizationOkay && auditOkay ? null : "success-finalization-incomplete"
+    );
     if (!budgetOkay || !actionOkay || !authorizationOkay || !auditOkay) {
       return makeResult("held-for-reconciliation", "success-finalization-incomplete", {
         operationReceipt
@@ -997,6 +1171,18 @@ export function createA2ContainmentController({
       return makeResult("denied", reserved.reason);
     }
     const { claimId, reservationId } = reserved;
+    const pendingRecovery = await persistPendingActionRecord({
+      claimId, action, scope, profileId, idempotencyKey,
+      evidenceRefs, originalOperationId: operationReceipt.operationId
+    });
+    if (!pendingRecovery.ok) {
+      return finishUnknown({
+        action, scope, profileId, claimId, reservationId, authorization,
+        reason: "durable-pending-action-record-unavailable",
+        operationReceipt
+      });
+    }
+    const recoveryRecord = pendingRecovery.record;
 
     const current = await invokeBounded(
       independentVerifier.verifyContainment.bind(independentVerifier),
@@ -1057,7 +1243,7 @@ export function createA2ContainmentController({
       });
     }
     const releaseStartMarker = await markProviderStarted(
-      claimId, action, scope, profileId, idempotencyKey
+      claimId, action, scope, profileId, idempotencyKey, recoveryRecord
     );
     if (!releaseStartMarker.started) {
       if (releaseStartMarker.safeNotStarted) {
@@ -1108,7 +1294,13 @@ export function createA2ContainmentController({
       if (exactOutcome(reconcile.value, "not-applied")) {
         return finishNotApplied({
           action, scope, profileId, claimId, reservationId, authorization,
-          reason: "provider-confirmed-release-not-applied"
+          reason: "provider-confirmed-release-not-applied",
+          providerReconciliation: {
+            schema: "jb.resilience.a2-provider-non-application/v1",
+            providerId, action, scope, profileId, idempotencyKey,
+            outcome: "not-applied",
+            observedAtMs: assertTimestamp(clock(), "provider release non-application observation clock")
+          }
         });
       }
       if (!exactOutcome(reconcile.value, "released", true) ||
@@ -1158,12 +1350,16 @@ export function createA2ContainmentController({
     }
 
     const budgetOkay = await settleBudget(reservationId, "succeeded");
-    const actionOkay = await completeAction(claimId, "succeeded", null);
     const authorizationOkay = await completeAuthorization(authorization, "succeeded");
     const auditOkay = await appendAudit({
       action, scope, profileId, outcome: "released",
       operationId: releaseReceipt.operationId, verifierId
     });
+    const actionOkay = await completeAction(
+      claimId,
+      budgetOkay && authorizationOkay && auditOkay ? "succeeded" : "held-for-reconciliation",
+      budgetOkay && authorizationOkay && auditOkay ? null : "release-finalization-incomplete"
+    );
     if (!budgetOkay || !actionOkay || !authorizationOkay || !auditOkay) {
       return makeResult("held-for-reconciliation", "release-finalization-incomplete", {
         operationReceipt: releaseReceipt

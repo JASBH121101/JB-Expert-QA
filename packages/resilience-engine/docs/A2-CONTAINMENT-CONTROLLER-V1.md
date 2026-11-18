@@ -16,11 +16,13 @@ The host must inject all of the following:
 The independent verification receipt must carry the exact provider operationId and SHA-256 digest of the exact evidence-reference set it verified. The forensic preservation receipt must carry that same operationId and evidence-reference digest, in addition to its durable retention IDs. Receipts for a different operation, asset scope or evidence set are rejected.
 - **Forensic recorder:** recorderId and preserveEvidence, returning durable evidence IDs and a retention receipt.
 - **Budget ledger:** durable atomic reserve, reconcile-by-idempotency-key and settle methods.
-- **Action ledger:** durable atomic claim, provider-start marker, reconcile-by-idempotency-key and complete methods with uniqueness enforced for the supplied idempotency key.
+- **Action ledger:** durable atomic claim, provider-start marker, reconcile-by-idempotency-key and complete methods with uniqueness enforced for the supplied idempotency key. When the controller is executable, the action ledger must additionally expose `externalRevisionAnchorConfigured`, `externalRevisionAnchorDurable` and `externalRevisionAnchorAtomic` as explicit `true` assertions. The built-in file ledger sets these only after a supplied anchor adapter declares both `durable: true` and `atomicCompareAndSwap: true`; this does not prove that the host's database is separately administered or operationally independent.
 - **Audit store:** durable append-only append.
 - **Mutation control:** host-owned assertAllowed, rechecked before the provider side effect and before finalization.
 
 All store durability markers are host integration assertions. The controller cannot prove that a custom adapter or database is truly durable; the host must certify its implementation and operational configuration.
+
+**External rollback-anchor execution gate:** when `enableExecution: true`, the controller requires the action ledger to assert `externalRevisionAnchorConfigured === true`, `externalRevisionAnchorDurable === true` and `externalRevisionAnchorAtomic === true`. The built-in file ledger accepts only an adapter that declares `durable: true` and `atomicCompareAndSwap: true`, plus a stable `ledgerId`; without those declarations it refuses to initialize an anchored journal. This blocks an accidental memory-only or non-CAS adapter. The flags are still host assertions, not proof that the adapter is linearizable, separately administered, correctly backed up or resistant to coordinated cluster rollback. The read-only recovery coordinator remains available without enabling A2 execution, and its findings never grant retry or release authority.
 
 ### Durable action journal semantics
 
@@ -85,4 +87,8 @@ This laboratory tests orchestration contracts with controlled test doubles. It d
 
 ## Restart and recovery boundary
 
-The successful containment result handle is held in a process-local WeakMap and is intentionally not reconstructible from caller-supplied JSON. A process restart therefore invalidates that in-memory handle; release through this controller is denied after restart. This increment also does not include a startup recovery worker that scans the durable action journal and resumes provider reconciliation. A host integration must provide a durable recovery workflow, bind it to the exact action/scope/authorization, reconcile provider state and forensics, and obtain a separate owner-approved release authorization before resuming. Until that capability exists and passes crash/restart fault injection, A2 remains laboratory-only and is not production-certified.
+The successful containment result handle is held in a process-local WeakMap and is intentionally not reconstructible from caller-supplied JSON. A process restart therefore invalidates that in-memory handle; release through this controller is denied after restart.
+
+The package now includes a read-only startup reconciliation coordinator and `createFileA2ActionLedger`. The coordinator scans the host-owned durable journal, verifies exact records, observes provider state by the original idempotency key, re-fetches evidence, checks independent verification and looks up existing forensic retention. It only emits findings: it never completes a ledger claim, resumes an operation, retries the provider, applies containment or releases it.
+
+The file ledger serializes one host's processes with an exclusive lock and atomic file replacement. It is not a multi-host store; clustered deployments need a transactional database implementation. A host must also provide and certify the provider, evidence resolver, verifier and forensic adapters. No restart path reconstructs release authority from a previous result handle. Any release after restart remains a distinct operation requiring fresh policy authorization and mutation-stop checks. Until the real host integration passes crash/restart and adversarial fault injection, A2 remains laboratory-only and is not production-certified.

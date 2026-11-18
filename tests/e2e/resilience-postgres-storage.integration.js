@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
-import { createPostgresResilienceStorageAdapter } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
+import {
+  createPostgresResilienceStorageAdapter,
+  createPostgresA2ActionLedger
+} from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
+import {
+  createPostgresA2RevisionAnchor
+} from "../../packages/resilience-engine/src/adapters/postgres-a2-revision-anchor.js";
+import { createFileA2ActionLedger } from "../../packages/resilience-engine/src/a2-action-ledger.js";
 import {
   createTrustedSignalGateway,
   signTrustedSignalEnvelope
@@ -12,6 +22,7 @@ const connectionString = process.env.QA_DATABASE_URL;
 if (!connectionString) throw new Error("QA_DATABASE_URL is required for the PostgreSQL resilience adapter integration test");
 
 const pool = new Pool({ connectionString, max: 8, connectionTimeoutMillis: 5_000 });
+const a2SecondaryPool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 });
 const storage = createPostgresResilienceStorageAdapter({ pool });
 const secondStorage = createPostgresResilienceStorageAdapter({ pool });
 
@@ -45,6 +56,32 @@ function claim(overrides = {}) {
   return { ...values, idempotencyKey: idempotencyKey(values) };
 }
 
+function canonicalA2(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonicalA2).join(",") + "]";
+  return "{" + Object.keys(value).sort().map((key) =>
+    JSON.stringify(key) + ":" + canonicalA2(value[key])
+  ).join(",") + "}";
+}
+
+function a2Scope(assetId, incidentId) {
+  return {
+    assetId,
+    environment: "lab",
+    incidentId,
+    policyId: "a2-policy-lab",
+    policyRevision: 3,
+    policyHash: "a".repeat(64)
+  };
+}
+
+function a2Key(action, scope, profileId) {
+  return createHash("sha256").update(canonicalA2({
+    schema: "jb.resilience.a2-operation-key/v1",
+    action, scope, profileId
+  }), "utf8").digest("hex");
+}
+
 function incident(state, overrides = {}) {
   return {
     incidentId: "incident-postgres-001",
@@ -75,6 +112,777 @@ async function main() {
   assert.deepEqual(initialized, { initialized: true, dialect: "postgresql", schemaVersion: 4 });
   await secondStorage.initialize();
   process.stdout.write("PASS: injected Pool and explicit initialization\n");
+
+  const a2Identities = {
+    providerId: "pg-a2-provider",
+    verifierId: "pg-a2-independent-verifier",
+    recorderId: "pg-a2-forensic-recorder"
+  };
+  const a2First = createPostgresA2ActionLedger({ pool, ...a2Identities });
+  const a2Second = createPostgresA2ActionLedger({ pool: a2SecondaryPool, ...a2Identities });
+  assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, connectionTimeoutMs: 50
+  }), /connectionTimeoutMs is invalid/);
+  assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, statementTimeoutMs: 50
+  }), /statementTimeoutMs is invalid/);
+  assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, lockTimeoutMs: 0
+  }), /lockTimeoutMs is invalid/);
+  await assert.rejects(
+    a2Second.listPending({ cursor: null, limit: 10, atMs: 1_800_000_000_000 }),
+    /not initialized/
+  );
+  const a2Initialization = await Promise.all([
+    a2First.initialize(),
+    a2Second.initialize()
+  ]);
+  assert.deepEqual(a2Initialization, [
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 },
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 }
+  ]);
+
+  const revisionAnchorFirst = createPostgresA2RevisionAnchor({ pool });
+  const revisionAnchorSecond = createPostgresA2RevisionAnchor({ pool: a2SecondaryPool });
+  assert.throws(() => createPostgresA2RevisionAnchor({ pool, connectionTimeoutMs: 50 }),
+    /connectionTimeoutMs is invalid/);
+  await assert.rejects(
+    revisionAnchorFirst.read({ ledgerId: "a2-anchor-before-init" }),
+    /not initialized/
+  );
+  const revisionAnchorInitialization = await revisionAnchorFirst.initialize();
+  const revisionAnchorVerification = await revisionAnchorSecond.verify();
+  assert.deepEqual(revisionAnchorInitialization, {
+    initialized: true,
+    dialect: "postgresql",
+    schemaVersion: 1,
+    table: "public.jb_resilience_a2_revision_anchors"
+  });
+  assert.deepEqual(revisionAnchorVerification, {
+    verified: true,
+    dialect: "postgresql",
+    schemaVersion: 1,
+    table: "public.jb_resilience_a2_revision_anchors"
+  });
+  assert.equal(revisionAnchorFirst.durable, true);
+  assert.equal(revisionAnchorFirst.atomicCompareAndSwap, true);
+
+  await runCase("PostgreSQL A2 revision anchor rejects a replaced monotonicity trigger function", async () => {
+    await pool.query(
+      "CREATE OR REPLACE FUNCTION public.jb_resilience_a2_anchor_guard_mutation() " +
+      "RETURNS trigger LANGUAGE plpgsql AS $a2tamper$ BEGIN RETURN NEW; END; $a2tamper$"
+    );
+    await assert.rejects(
+      revisionAnchorSecond.verify(),
+      /trigger function is missing or incompatible/,
+      "an enabled trigger pointing to a no-op body must not be accepted"
+    );
+
+    // initialize() owns the canonical function definition and repairs it before
+    // subsequent cases continue; verify() must then accept the restored body.
+    await revisionAnchorFirst.initialize();
+    const restored = await revisionAnchorSecond.verify();
+    assert.equal(restored.verified, true);
+  });
+
+  await runCase("PostgreSQL A2 external revision anchor uses atomic cross-Pool compare-and-swap", async () => {
+    const ledgerId = "a2-anchor-" + randomUUID();
+    const firstInitial = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 0,
+      ledgerSha256: "a".repeat(64)
+    };
+    const secondInitial = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 0,
+      ledgerSha256: "b".repeat(64)
+    };
+    assert.equal(await revisionAnchorFirst.read({ ledgerId }), null);
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: null,
+        next: { ...firstInitial, revision: 1 }
+      }),
+      /start at revision zero/
+    );
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: null,
+        next: { ...firstInitial, ledgerSha256: "invalid" }
+      }),
+      /malformed/
+    );
+    await assert.rejects(
+      revisionAnchorFirst.read({ ledgerId: "../escape" }),
+      /invalid/
+    );
+
+    const initialResults = await Promise.all([
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId, expected: null, next: firstInitial
+      }),
+      revisionAnchorSecond.compareAndSwap({
+        ledgerId, expected: null, next: secondInitial
+      })
+    ]);
+    assert.equal(initialResults.filter(Boolean).length, 1,
+      "only one concurrent initializer may create a revision-zero anchor");
+    const initialState = await revisionAnchorSecond.read({ ledgerId });
+    assert.ok(canonicalA2(initialState) === canonicalA2(firstInitial) ||
+      canonicalA2(initialState) === canonicalA2(secondInitial));
+
+    const nextA = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 1,
+      ledgerSha256: "c".repeat(64)
+    };
+    const nextB = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 1,
+      ledgerSha256: "d".repeat(64)
+    };
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: initialState,
+        next: { ...nextA, revision: 2 }
+      }),
+      /advance exactly one revision/
+    );
+    const updateResults = await Promise.all([
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId, expected: initialState, next: nextA
+      }),
+      revisionAnchorSecond.compareAndSwap({
+        ledgerId, expected: initialState, next: nextB
+      })
+    ]);
+    assert.equal(updateResults.filter(Boolean).length, 1,
+      "only one concurrent writer may advance a matching anchor revision");
+    const finalState = await revisionAnchorFirst.read({ ledgerId });
+    assert.equal(finalState.revision, 1);
+    assert.ok(canonicalA2(finalState) === canonicalA2(nextA) ||
+      canonicalA2(finalState) === canonicalA2(nextB));
+    assert.equal(await revisionAnchorSecond.compareAndSwap({
+      ledgerId, expected: initialState, next: {
+        schema: "jb.resilience.a2-revision-anchor/v1",
+        revision: 1,
+        ledgerSha256: "e".repeat(64)
+      }
+    }), false, "a stale expected state must not advance the anchor");
+    assert.deepEqual(await revisionAnchorSecond.read({ ledgerId }), finalState);
+    await assert.rejects(
+      pool.query(
+        "UPDATE public.jb_resilience_a2_revision_anchors SET revision=revision-1 WHERE ledger_id=$1",
+        [ledgerId]
+      ),
+      /advance exactly one revision/
+    );
+    await assert.rejects(
+      pool.query(
+        "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
+        [ledgerId]
+      ),
+      /permanent tombstones/
+    );
+    assert.deepEqual(await revisionAnchorFirst.read({ ledgerId }), finalState,
+      "direct rollback or deletion must leave the accepted external high-water mark intact");
+  });
+
+
+  await runCase("PostgreSQL external revision anchor is enforced by the local HMAC file ledger", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jb-a2-postgres-anchor-"));
+    const ledgerId = "a2-file-anchor-" + randomUUID();
+    try {
+      const fileLedger = createFileA2ActionLedger({
+        filePath: join(directory, "a2-actions.json"),
+        providerId: "file-anchor-provider",
+        verifierId: "file-anchor-verifier",
+        recorderId: "file-anchor-recorder",
+        integrityKeys: { "ci-key-1": "a".repeat(64) },
+        activeIntegrityKeyId: "ci-key-1",
+        revisionAnchor: revisionAnchorFirst,
+        ledgerId
+      });
+      assert.equal(fileLedger.externalRevisionAnchorConfigured, true);
+      assert.equal(fileLedger.externalRevisionAnchorDurable, true);
+      assert.equal(fileLedger.externalRevisionAnchorAtomic, true);
+      const emptyPage = await fileLedger.listPending({
+        cursor: null,
+        limit: 10,
+        atMs: 1_800_000_500_000
+      });
+      assert.deepEqual(emptyPage, { claimIds: [], nextCursor: null });
+
+      const initialAnchor = await revisionAnchorSecond.read({ ledgerId });
+      assert.equal(initialAnchor.schema, "jb.resilience.a2-revision-anchor/v1");
+      assert.equal(initialAnchor.revision, 0);
+
+      const action = "apply-containment-profile";
+      const scope = a2Scope("pg-anchor-file-host", "pg-anchor-file-incident");
+      const profileId = "profile-anchor-lab";
+      const claim = await fileLedger.claim({
+        action,
+        scope,
+        profileId,
+        idempotencyKey: a2Key(action, scope, profileId),
+        claimedAtMs: 1_800_000_500_001,
+        expiresAtMs: 1_800_000_530_001
+      });
+      assert.equal(claim.claimed, true);
+
+      const advancedAnchor = await revisionAnchorSecond.read({ ledgerId });
+      assert.equal(advancedAnchor.revision, 1,
+        "a committed file-ledger mutation must advance the external PostgreSQL anchor");
+      assert.notEqual(advancedAnchor.ledgerSha256, initialAnchor.ledgerSha256,
+        "the external anchor digest must bind the changed HMAC-protected ledger");
+      const pending = await revisionAnchorFirst.read({ ledgerId });
+      assert.deepEqual(pending, advancedAnchor);
+    } finally {
+      // Anchor rows are permanent idempotency/rollback tombstones by design.
+      // The test journal is local and can be removed after the assertion.
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  await runCase("PostgreSQL A2 Pool connection wait timeout releases a late client", async () => {
+    let lateClientReleased = 0;
+    const lateConnectionPool = {
+      query: async () => { throw new Error("late Pool client should not execute SQL"); },
+      connect: () => new Promise((resolve) => setTimeout(() => resolve({
+        query: async () => { throw new Error("late Pool client should not execute SQL"); },
+        release: () => { lateClientReleased += 1; }
+      }), 150))
+    };
+    const boundedConnectionLedger = createPostgresA2ActionLedger({
+      pool: lateConnectionPool,
+      ...a2Identities,
+      connectionTimeoutMs: 100
+    });
+    await assert.rejects(
+      boundedConnectionLedger.initialize(),
+      /Pool connection wait timed out/
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(lateClientReleased, 1);
+  });
+
+  await runCase("PostgreSQL A2 ledger serializes unique claims across adapter instances", async () => {
+    const scope = a2Scope("pg-a2-claim-race", "pg-a2-incident-race");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotency = a2Key(action, scope, profileId);
+    const input = {
+      action, scope, profileId, idempotencyKey: idempotency,
+      claimedAtMs: 1_800_000_000_000,
+      expiresAtMs: 1_800_000_030_000
+    };
+    const [left, right] = await Promise.all([
+      a2First.claim(input),
+      a2Second.claim(input)
+    ]);
+    assert.equal([left, right].filter((value) => value.claimed).length, 1);
+    assert.equal([left, right].filter((value) => !value.claimed).length, 1);
+    const winner = left.claimed ? left : right;
+    const competingScope = { ...scope, incidentId: "pg-a2-incident-race-2" };
+    const competingKey = a2Key(action, competingScope, profileId);
+    assert.deepEqual(await a2Second.claim({
+      action, scope: competingScope, profileId, idempotencyKey: competingKey,
+      claimedAtMs: input.claimedAtMs + 1,
+      expiresAtMs: input.expiresAtMs + 1
+    }), { claimed: false, claimId: null });
+    assert.deepEqual(await a2Second.getPendingByClaimId({
+      claimId: winner.claimId, atMs: input.claimedAtMs + 1
+    }), { found: false, record: null });
+    const orphanPage = await a2Second.listPending({
+      cursor: null, limit: 10, atMs: input.claimedAtMs + 1
+    });
+    assert.ok(orphanPage.claimIds.includes(winner.claimId));
+    assert.deepEqual(await a2First.reconcile({
+      action, scope, profileId, idempotencyKey: idempotency,
+      atMs: input.claimedAtMs + 1
+    }), { state: "claimed", claimId: winner.claimId });
+  });
+
+  await runCase("PostgreSQL A2 accepts slash-delimited identifiers supported by the controller", async () => {
+    const scope = {
+      assetId: "endpoint/01",
+      environment: "lab/prod",
+      incidentId: "incident/01",
+      policyId: "policy/containment",
+      policyRevision: 3,
+      policyHash: "a".repeat(64)
+    };
+    const profileId = "approved/profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_050_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "evidence/ref-01",
+        sha256: createHash("sha256").update("slash identifier evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    assert.deepEqual(await a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: record.createdAtMs + 1
+    }), { found: true, record });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "no-provider-call-made",
+      completedAtMs: record.createdAtMs + 2
+    }), { completed: true });
+  });
+
+  await runCase("PostgreSQL A2 pending record and provider-start transition survive another adapter instance", async () => {
+    const scope = a2Scope("pg-a2-lifecycle", "pg-a2-incident-lifecycle");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_100_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const evidenceRefs = [{
+      refId: "pg-a2-evidence-01",
+      sha256: createHash("sha256").update("postgres A2 evidence").digest("hex")
+    }];
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs,
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const pendingPage = await a2Second.listPending({
+      cursor: null, limit: 10, atMs: record.createdAtMs + 1
+    });
+    assert.ok(pendingPage.claimIds.includes(claim.claimId));
+    assert.equal(pendingPage.nextCursor, null);
+    assert.deepEqual(await a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: record.createdAtMs + 1
+    }), { found: true, record });
+
+    const startedAtMs = record.createdAtMs + 1;
+    const startedRecord = {
+      ...record, state: "provider-started", updatedAtMs: startedAtMs
+    };
+    assert.deepEqual(await a2Second.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: startedRecord, atMs: startedAtMs
+    }), { started: true });
+    const observed = await a2First.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 1
+    });
+    assert.deepEqual(observed, { found: true, record: startedRecord });
+    assert.deepEqual(await a2First.reconcile({
+      action, scope, profileId, idempotencyKey, atMs: startedAtMs + 1
+    }), { state: "provider-started", claimId: claim.claimId });
+
+    assert.deepEqual(await a2First.complete({
+      claimId: claim.claimId, outcome: "held-for-reconciliation",
+      reason: "restart-lab-hold", completedAtMs: startedAtMs + 2
+    }), { completed: true });
+    const held = await a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 3
+    });
+    assert.equal(held.found, true);
+    assert.equal(held.record.state, "held-for-reconciliation");
+
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "provider-confirmed-not-applied",
+      completedAtMs: startedAtMs + 5
+    }), { completed: false });
+    const wrongProviderProof = {
+      schema: "jb.resilience.a2-provider-non-application/v1",
+      providerId: "spoofed-pg-provider",
+      action, scope, profileId, idempotencyKey,
+      outcome: "not-applied",
+      observedAtMs: startedAtMs + 4
+    };
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "provider-confirmed-not-applied",
+      completedAtMs: startedAtMs + 5,
+      providerReconciliation: wrongProviderProof
+    }), { completed: false });
+    const proof = {
+      schema: "jb.resilience.a2-provider-non-application/v1",
+      providerId: a2Identities.providerId,
+      action, scope, profileId, idempotencyKey,
+      outcome: "not-applied",
+      observedAtMs: startedAtMs + 4
+    };
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "provider-confirmed-not-applied",
+      completedAtMs: startedAtMs + 5,
+      providerReconciliation: proof
+    }), { completed: true });
+    assert.deepEqual(await a2First.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 6
+    }), { found: false, record: null });
+    assert.deepEqual(await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs: startedAtMs + 7, expiresAtMs: startedAtMs + 30_000
+    }), { claimed: false, claimId: null });
+  });
+
+  await runCase("PostgreSQL A2 pending journal uses bounded stable keyset pagination under concurrent claims", async () => {
+    const inputs = Array.from({ length: 3 }, (_, index) => {
+      const scope = a2Scope(
+        "pg-a2-page-" + String(index + 1),
+        "pg-a2-page-incident-" + String(index + 1)
+      );
+      const profileId = "approved-a2-profile";
+      const action = "apply-containment-profile";
+      return {
+        action, scope, profileId,
+        idempotencyKey: a2Key(action, scope, profileId),
+        claimedAtMs: 1_800_000_250_000 + index,
+        expiresAtMs: 1_800_000_280_000 + index
+      };
+    });
+    const claimResults = await Promise.all(inputs.map((input, index) =>
+      (index % 2 === 0 ? a2First : a2Second).claim(input)
+    ));
+    assert.equal(claimResults.every((result) => result.claimed), true);
+    const created = claimResults.map((result) => result.claimId);
+    const first = await a2First.listPending({
+      cursor: null, limit: 2, atMs: 1_800_000_250_100
+    });
+    assert.equal(first.claimIds.length, 2);
+    assert.ok(first.nextCursor);
+    const second = await a2Second.listPending({
+      cursor: first.nextCursor, limit: 2, atMs: 1_800_000_250_100
+    });
+    assert.ok(second.claimIds.length >= 1);
+    const all = [...first.claimIds, ...second.claimIds];
+    assert.equal(new Set(all).size, all.length);
+    for (const claimId of created) assert.ok(all.includes(claimId));
+    assert.equal(second.nextCursor, null);
+  });
+
+  await runCase("PostgreSQL A2 lock timeout releases a contended asset claim", async () => {
+    const scope = a2Scope("pg-a2-lock-timeout", "pg-a2-incident-lock-timeout");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_325_000;
+    const input = {
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    };
+    const boundedLedger = createPostgresA2ActionLedger({
+      pool: a2SecondaryPool,
+      ...a2Identities,
+      statementTimeoutMs: 2_000,
+      lockTimeoutMs: 100,
+      idleInTransactionTimeoutMs: 2_000
+    });
+    await boundedLedger.initialize();
+    const locker = await pool.connect();
+    let locked = false;
+    try {
+      await locker.query("BEGIN");
+      locked = true;
+      await locker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [canonicalA2([scope.environment, scope.assetId])]
+      );
+      await assert.rejects(
+        boundedLedger.claim(input),
+        (error) => error && error.code === "55P03"
+      );
+    } finally {
+      if (locked) await locker.query("ROLLBACK").catch(() => {});
+      locker.release();
+    }
+    const retriedAfterLockRelease = await a2First.claim(input);
+    assert.equal(retriedAfterLockRelease.claimed, true);
+    assert.deepEqual(await a2Second.complete({
+      claimId: retriedAfterLockRelease.claimId,
+      outcome: "not-applied",
+      reason: "no-provider-call-made",
+      completedAtMs: claimedAtMs + 1
+    }), { completed: true });
+  });
+
+  await runCase("PostgreSQL A2 server statement timeout releases a blocked row lock", async () => {
+    const scope = a2Scope("pg-a2-timeout", "pg-a2-incident-timeout");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_350_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "pg-a2-timeout-evidence",
+        sha256: createHash("sha256").update("timeout evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const startedAtMs = record.createdAtMs + 1;
+    assert.deepEqual(await a2First.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: { ...record, state: "provider-started", updatedAtMs: startedAtMs },
+      atMs: startedAtMs
+    }), { started: true });
+
+    const boundedLedger = createPostgresA2ActionLedger({
+      pool: a2SecondaryPool,
+      ...a2Identities,
+      statementTimeoutMs: 100,
+      lockTimeoutMs: 1_000,
+      idleInTransactionTimeoutMs: 2_000
+    });
+    await boundedLedger.initialize();
+    const locker = await pool.connect();
+    let locked = false;
+    try {
+      await locker.query("BEGIN");
+      locked = true;
+      await locker.query(
+        "SELECT claim_id FROM jb_resilience_a2_action_claims WHERE claim_id=$1 FOR UPDATE",
+        [claim.claimId]
+      );
+      await assert.rejects(
+        boundedLedger.complete({
+          claimId: claim.claimId,
+          outcome: "held-for-reconciliation",
+          reason: "timeout-lab",
+          completedAtMs: startedAtMs + 2
+        }),
+        (error) => error && error.code === "57014"
+      );
+    } finally {
+      if (locked) await locker.query("ROLLBACK").catch(() => {});
+      locker.release();
+    }
+    const stillPending = await a2First.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 3
+    });
+    assert.equal(stillPending.found, true);
+    assert.equal(stillPending.record.state, "provider-started");
+  });
+
+  await runCase("PostgreSQL A2 initialization migrates and validates existing row constraints", async () => {
+    await pool.query(
+      "ALTER TABLE jb_resilience_a2_action_claims " +
+      "DROP CONSTRAINT IF EXISTS jb_resilience_a2_terminal_outcome_required"
+    );
+    await pool.query(
+      "ALTER TABLE jb_resilience_a2_action_claims " +
+      "DROP CONSTRAINT IF EXISTS jb_resilience_a2_scope_columns_match"
+    );
+    const migrated = await a2First.initialize();
+    assert.deepEqual(migrated, {
+      initialized: true, dialect: "postgresql", schemaVersion: 1
+    });
+    const result = await pool.query(
+      "SELECT conname, convalidated FROM pg_constraint " +
+      "WHERE conrelid='jb_resilience_a2_action_claims'::regclass " +
+      "AND conname IN ('jb_resilience_a2_terminal_outcome_required','jb_resilience_a2_scope_columns_match')"
+    );
+    assert.equal(result.rowCount, 2);
+    assert.equal(result.rows.every((row) => row.convalidated === true), true);
+  });
+
+  await runCase("PostgreSQL A2 database constraints reject scope-column and terminal-outcome tampering", async () => {
+    const scope = a2Scope("pg-a2-db-checks", "pg-a2-incident-db-checks");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_375_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    await assert.rejects(
+      pool.query(
+        "UPDATE jb_resilience_a2_action_claims SET asset_id=$2 WHERE claim_id=$1",
+        [claim.claimId, "different-asset"]
+      ),
+      (error) => error && error.code === "23514"
+    );
+    await assert.rejects(
+      pool.query(
+        "UPDATE jb_resilience_a2_action_claims " +
+        "SET status='completed', outcome=NULL, completed_at_ms=$2, recovery_record=NULL " +
+        "WHERE claim_id=$1",
+        [claim.claimId, claimedAtMs + 1]
+      ),
+      (error) => error && error.code === "23514"
+    );
+    assert.deepEqual(await a2Second.reconcile({
+      action, scope, profileId, idempotencyKey, atMs: claimedAtMs + 2
+    }), { state: "claimed", claimId: claim.claimId });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId, outcome: "not-applied",
+      reason: "no-provider-call-made", completedAtMs: claimedAtMs + 3
+    }), { completed: true });
+  });
+
+  await runCase("PostgreSQL A2 altered recovery JSONB fails closed on exact read and finalization", async () => {
+    const scope = a2Scope("pg-a2-tamper", "pg-a2-incident-tamper");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_300_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "pg-a2-tamper-evidence",
+        sha256: createHash("sha256").update("integrity evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const startedAtMs = record.createdAtMs + 1;
+    assert.deepEqual(await a2First.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: { ...record, state: "provider-started", updatedAtMs: startedAtMs },
+      atMs: startedAtMs
+    }), { started: true });
+    await pool.query(
+      "UPDATE jb_resilience_a2_action_claims SET recovery_record=jsonb_set(recovery_record, '{providerId}', to_jsonb($2::text)) WHERE claim_id=$1",
+      [claim.claimId, "tampered-provider"]
+    );
+    await assert.rejects(a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 1
+    }), /identities do not match/);
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "succeeded",
+      reason: null,
+      completedAtMs: startedAtMs + 2
+    }), { completed: false });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "held-for-reconciliation",
+      reason: "tampered-record",
+      completedAtMs: startedAtMs + 2
+    }), { completed: false });
+  });
+
+  await runCase("PostgreSQL A2 pre-provider claims remain held and expiry blocks provider start", async () => {
+    const scope = a2Scope("pg-a2-expiry", "pg-a2-incident-expiry");
+    const profileId = "approved-a2-profile";
+    const action = "release-containment";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_200_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 5
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: "pg-original-containment-op",
+      evidenceRefs: [{
+        refId: "pg-a2-release-evidence",
+        sha256: createHash("sha256").update("release evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const staleMarker = {
+      ...record, state: "provider-started", updatedAtMs: claimedAtMs + 6
+    };
+    assert.deepEqual(await a2Second.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: staleMarker, atMs: claimedAtMs + 6
+    }), { started: false });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId, outcome: "held-for-reconciliation",
+      reason: "pre-marker-restart", completedAtMs: claimedAtMs + 7
+    }), { completed: true });
+    const page = await a2First.listPending({
+      cursor: null, limit: 10, atMs: claimedAtMs + 8
+    });
+    assert.ok(page.claimIds.includes(claim.claimId));
+    const held = await a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: claimedAtMs + 8
+    });
+    assert.equal(held.found, true);
+    assert.equal(held.record.state, "claimed");
+  });
 
   await runCase("concurrent lease acquisition, renewal, release and monotonic fencing", async () => {
     const scopeId = "cluster-lab-scope";
@@ -503,5 +1311,5 @@ async function main() {
 try {
   await main();
 } finally {
-  await pool.end();
+  await Promise.all([pool.end(), a2SecondaryPool.end()]);
 }

@@ -355,3 +355,8 @@ export {
 } from "./provider-evidence-a3.js";
 
 export { evaluateA3ProviderReadiness } from "./provider-evidence-a3.js";
+
+export { createA2RecoveryCoordinator } from "./a2-recovery-coordinator.js";
+export { createFileA2ActionLedger } from "./a2-action-ledger.js";
+export { createPostgresA2ActionLedger } from "./adapters/postgres-storage.js";
+export { createPostgresA2RevisionAnchor } from "./adapters/postgres-a2-revision-anchor.js";
