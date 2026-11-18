@@ -1616,7 +1616,7 @@ export function createPostgresA2ActionLedger({
     }
     return runA2Transaction(input.signal, async (client) => {
       const result = await client.query(
-        "SELECT claim_id, action, scope, profile_id, idempotency_key, status " +
+        "SELECT claim_id, action, scope, asset_id, environment, profile_id, idempotency_key, status " +
         "FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
         [idempotencyKey]
       );
