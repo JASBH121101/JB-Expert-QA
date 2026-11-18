@@ -1257,6 +1257,12 @@ function a2SameAction(entry, action, scope, profileId, idempotencyKey) {
     canonicalJson(entry.scope) === canonicalJson(scope);
 }
 
+function a2RecordMatchesEntry(record, entry, allowedStates) {
+  return record.claimId === entry.claim_id &&
+    a2SameAction(entry, record.action, record.scope, record.profileId, record.idempotencyKey) &&
+    allowedStates.includes(record.state);
+}
+
 function a2ParseCursor(cursor) {
   if (cursor === null || cursor === undefined) return { snapshot: null, last: 0 };
   if (typeof cursor !== "string" || !/^a2pg1:[0-9]+:[0-9]+$/.test(cursor)) {
@@ -1338,7 +1344,8 @@ export function createPostgresA2ActionLedger({
         "completed_at_ms BIGINT NULL," +
         "recovery_record JSONB NULL," +
         "CHECK ((status='completed' AND outcome IN ('succeeded','not-applied') AND completed_at_ms IS NOT NULL AND recovery_record IS NULL) OR " +
-        "(status IN ('claimed','provider-started') AND outcome IS NULL AND completed_at_ms IS NULL))" +
+        "(status IN ('claimed','provider-started') AND outcome IS NULL AND completed_at_ms IS NULL))," +
+        "CHECK (status <> 'provider-started' OR recovery_record IS NOT NULL)" +
         ")"
       );
       await client.query(
@@ -1536,11 +1543,21 @@ export function createPostgresA2ActionLedger({
       if (!["claimed", "provider-started"].includes(status) || completedAtMs < claimedAt) {
         return Object.freeze({ completed: false });
       }
-      if (input.outcome === "succeeded") {
-        if (status !== "provider-started" || entry.recovery_record === null ||
-            a2NormalizeRecord(entry.recovery_record, identities).state !== "provider-started") {
+      let durableRecovery = null;
+      if (status === "provider-started") {
+        if (entry.recovery_record === null) return Object.freeze({ completed: false });
+        try {
+          durableRecovery = a2NormalizeRecord(entry.recovery_record, identities);
+          if (!a2RecordMatchesEntry(
+            durableRecovery, entry, ["provider-started", "held-for-reconciliation"]
+          )) return Object.freeze({ completed: false });
+        } catch {
           return Object.freeze({ completed: false });
         }
+      }
+      if (input.outcome === "succeeded" &&
+          (status !== "provider-started" || durableRecovery?.state !== "provider-started")) {
+        return Object.freeze({ completed: false });
       }
       if (input.outcome === "not-applied" && status === "provider-started") {
         try {
@@ -1565,8 +1582,8 @@ export function createPostgresA2ActionLedger({
         }
       }
       if (input.outcome === "held-for-reconciliation") {
-        if (status === "provider-started" && entry.recovery_record !== null) {
-          const record = a2NormalizeRecord(entry.recovery_record, identities);
+        if (status === "provider-started") {
+          const record = durableRecovery;
           const updatedAtMs = Math.max(record.updatedAtMs, completedAtMs);
           await client.query(
             "UPDATE jb_resilience_a2_action_claims SET reason=$2, recovery_record=$3::jsonb WHERE claim_id=$1",
@@ -1631,14 +1648,20 @@ export function createPostgresA2ActionLedger({
     assertTimestamp(input.atMs, "A2 exact lookup timestamp");
     assertInitialized();
     const result = await pool.query(
-      "SELECT status, recovery_record FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
+      "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
       [claimId]
     );
     if (result.rowCount !== 1 || !["claimed", "provider-started"].includes(result.rows[0].status) ||
         result.rows[0].recovery_record === null) {
       return Object.freeze({ found: false, record: null });
     }
-    const record = a2NormalizeRecord(result.rows[0].recovery_record, identities);
+    const entry = result.rows[0];
+    const record = a2NormalizeRecord(entry.recovery_record, identities);
+    const allowedStates = entry.status === "claimed"
+      ? ["claimed"] : ["provider-started", "held-for-reconciliation"];
+    if (!a2RecordMatchesEntry(record, entry, allowedStates)) {
+      throw new Error("A2 PostgreSQL recovery record does not match its durable claim row");
+    }
     return Object.freeze({ found: true, record: Object.freeze(a2RecordCopy(record)) });
   }
 
