@@ -1514,11 +1514,13 @@ export function createPostgresA2ActionLedger({
         idempotencyKey !== a2OperationKey(action, scope, profileId)) {
       return Object.freeze({ state: "unknown", claimId: null });
     }
+    a2AssertSignal(input.signal);
     const result = await pool.query(
       "SELECT claim_id, action, scope, profile_id, idempotency_key, status " +
       "FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
       [idempotencyKey]
     );
+    a2AssertSignal(input.signal);
     if (result.rowCount === 0) return Object.freeze({ state: "not-found", claimId: null });
     const row = result.rows[0];
     if (!a2SameAction(row, action, scope, profileId, idempotencyKey)) {
@@ -1659,10 +1661,12 @@ export function createPostgresA2ActionLedger({
     const claimId = assertIdentifier(input.claimId, "A2 claimId");
     assertTimestamp(input.atMs, "A2 exact lookup timestamp");
     assertInitialized();
+    a2AssertSignal(input.signal);
     const result = await pool.query(
       "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
       [claimId]
     );
+    a2AssertSignal(input.signal);
     if (result.rowCount !== 1 || !["claimed", "provider-started"].includes(result.rows[0].status) ||
         result.rows[0].recovery_record === null) {
       return Object.freeze({ found: false, record: null });
