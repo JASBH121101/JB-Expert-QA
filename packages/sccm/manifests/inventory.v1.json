@@ -195,7 +195,9 @@
       "sourceId": "jb-expert-qa-language-qa-pr167",
       "version": "0.8.0",
       "critical": true,
-      "dependencies": []
+      "dependencies": [
+        "jb.localization-engine.runtime.plurals"
+      ]
     },
     {
       "id": "jb.expert-qa.language.semantic-integrity",
