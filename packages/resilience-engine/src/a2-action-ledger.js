@@ -577,7 +577,7 @@ function normalizeRevisionAnchorAdapter(adapter, ledgerId) {
   return Object.freeze({ adapter, ledgerId: normalizedLedgerId });
 }
 
-async function readLedgerFile(filePath, maxBytes, identities, maxClaims, integrityKeys) {
+async function readLedgerFile(filePath, maxBytes, identities, maxClaims, integrityKeys, revisionAnchorConfig) {
   let handle;
   try {
     const noFollow = typeof fsConstants.O_NOFOLLOW === "number"
@@ -603,6 +603,14 @@ async function readLedgerFile(filePath, maxBytes, identities, maxClaims, integri
     return ledger;
   } catch (error) {
     if (error?.code === "ENOENT") {
+      if (revisionAnchorConfig) {
+        const anchorState = await revisionAnchorConfig.adapter.read({
+          ledgerId: revisionAnchorConfig.ledgerId
+        });
+        if (anchorState !== null) {
+          throw new Error("A2 journal and guard are missing while the external revision anchor exists; refusing empty reinitialization");
+        }
+      }
       await ensureLedgerGuard(filePath, null, integrityKeys);
       const initial = emptyLedger();
       await writeLedgerFile(filePath, initial, maxBytes);
@@ -775,7 +783,7 @@ export function createFileA2ActionLedger({
   async function read(signal, operation) {
     assertSignal(signal);
     return withFileLock(lockPath, lockOptions, signal, async () => {
-      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys);
+      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys, normalizedRevisionAnchor);
       await verifyExternalRevisionAnchor(ledger);
       return operation(ledger);
     });
@@ -784,7 +792,7 @@ export function createFileA2ActionLedger({
   async function mutate(signal, operation) {
     assertSignal(signal);
     return withFileLock(lockPath, lockOptions, signal, async () => {
-      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys);
+      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys, normalizedRevisionAnchor);
       const priorAnchor = await verifyExternalRevisionAnchor(ledger);
       const result = await operation(ledger);
       if (result.changed) {
