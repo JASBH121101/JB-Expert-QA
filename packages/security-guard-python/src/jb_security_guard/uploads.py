@@ -35,7 +35,7 @@ class UploadQuarantineStorage(Protocol):
 
     def create_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
     def open_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
-    def promote(self, upload_id: str, expected_sha256: str, expected_size: int) -> bool: ...
+    def promote(self, upload_id: str, expected_sha256: str, expected_size: int, attestation: dict[str, Any]) -> bool: ...
     def delete(self, upload_id: str) -> None: ...
 
 
@@ -250,7 +250,7 @@ class UploadInspectionService:
             except (TypeError, ValueError) as exc:
                 raise UploadInspectionError("INVALID_SCAN_RESULT") from exc
             try:
-                promotion_result = self._storage.promote(upload_id, sha256, size)
+                promotion_result = self._storage.promote(upload_id, sha256, size, attestation)
             except Exception as exc:
                 raise UploadInspectionError("PROMOTION_FAILED") from exc
             if promotion_result is not True:
