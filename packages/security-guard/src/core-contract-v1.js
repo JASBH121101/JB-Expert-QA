@@ -703,7 +703,7 @@ export function createCoreRateLimitCounterKey(input) {
 }
 
 
-const UPLOAD_ATTESTATION_ID = /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+const UPLOAD_ATTESTATION_ID = /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
 const UPLOAD_SHA256 = /^[a-f0-9]{64}$/;
 const UPLOAD_MIME_TYPES = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
