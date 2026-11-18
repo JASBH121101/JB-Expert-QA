@@ -114,6 +114,15 @@ function runUploadInspectionServiceTests(): void
         $approved = $service->inspect($source, 'product.png', 'image/png');
         expect($approved['status'] === 'approved', 'PHP upload inspector must approve a clean scanned object');
         expect($approved['sha256'] === hash('sha256', $png), 'PHP upload inspector must preserve the exact SHA-256');
+        $attestation = $approved['attestation'];
+        expect($attestation['schema'] === 'jb.security.upload-inspection.attestation/v1', 'PHP upload inspector must emit the shared attestation schema');
+        expect($attestation['uploadId'] === $approved['uploadId'], 'PHP attestation must bind the exact upload ID');
+        expect($attestation['verdict'] === 'clean', 'PHP attestation must preserve the scanner verdict');
+        expect($attestation['sha256'] === $approved['sha256'], 'PHP attestation must bind the exact content digest');
+        expect($attestation['size'] === strlen($png), 'PHP attestation must bind the exact byte count');
+        expect($attestation['mimeType'] === 'image/png', 'PHP attestation must bind detected MIME');
+        expect($attestation['engine'] === 'JB-Test-Scanner' && $attestation['version'] === '1.0', 'PHP attestation must preserve scanner identity and version');
+        expect(is_int($attestation['scannedAtMs']) && $attestation['scannedAtMs'] >= 0, 'PHP attestation must include a numeric scan timestamp');
         expect($store->quarantineCount() === 0 && $store->approvedCount() === 1,
             'Only the atomically promoted private object may remain after a clean scan');
 
