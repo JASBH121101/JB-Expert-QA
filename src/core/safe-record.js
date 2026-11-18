@@ -51,7 +51,7 @@ export function snapshotArray(value, label = "value") {
 
   for (const key of Reflect.ownKeys(value)) {
     if (key === "length") continue;
-    if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/.test(key) || Number(key) >= length) {
+    if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= length) {
       throw new TypeError(label + " must not contain extra properties");
     }
   }
