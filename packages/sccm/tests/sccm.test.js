@@ -133,11 +133,15 @@ test("inventory rejects accessor properties without executing them", () => {
   assert.equal(invoked, false);
 });
 
-test("the initial evidence ledger contains only valid exact-SHA assessments", () => {
+test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 42);
-  assert.ok(history.every((entry) => entry.commitSha === sourceSha));
+  assert.equal(history.length, 44);
+  assert.ok(history.every((entry) => {
+    const node = inventory.nodes.find((item) => item.id === entry.nodeId);
+    const source = node && inventory.sources.find((item) => item.id === node.sourceId);
+    return Boolean(source && entry.commitSha === source.commitSha);
+  }));
 });
 
 test("PASS requires success evidence bound to the exact source commit", () => {
@@ -190,6 +194,16 @@ test("Language QA is PASS at component, module, subbranch and branch levels", ()
   assert.equal(components.length, 9);
   assert.ok(components.every((component) => component.status === "PASS"));
   assert.equal(components.find((component) => component.id === "jb.expert-qa.language.cldr-catalog-audit").ownStatus, "PASS");
+});
+
+
+test("the Language QA dependency is certified without certifying all of Localization Engine", () => {
+  const pluralRules = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime.plurals");
+  const localizationEngine = evaluateSccmNode(inventory, history, "jb.localization-engine");
+  assert.equal(pluralRules.status, "PASS");
+  assert.equal(pluralRules.ownStatus, "PASS");
+  assert.equal(localizationEngine.status, "PENDING");
+  assert.ok(localizationEngine.blockingChildren.length > 0);
 });
 
 test("green module workflows do not bypass uncertified critical components", () => {
@@ -262,7 +276,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 14);
+  assert.equal(report.counts.component.PASS, 15);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
