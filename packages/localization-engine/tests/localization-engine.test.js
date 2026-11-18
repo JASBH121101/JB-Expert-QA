@@ -132,3 +132,16 @@ test("catalog audit reports leaf-versus-object structural mismatches", () => {
   assert.equal(result.findings.some((item) => item.code === "translation-missing"), false);
   assert.equal(result.findings.some((item) => item.code === "obsolete-translation"), false);
 });
+
+
+test("unsupported locales fall back to the configured default regardless of catalog insertion order", () => {
+  const i18n = createLocalization({
+    catalogs: {
+      "en-US": { greeting: "Hello" },
+      "es-419": { greeting: "Hola" }
+    },
+    defaultLocale: "es-419"
+  });
+  assert.equal(i18n.t("greeting", { locale: "fr-FR" }), "Hola");
+  assert.equal(i18n.t("greeting", { locale: "not a locale" }), "Hola");
+});
