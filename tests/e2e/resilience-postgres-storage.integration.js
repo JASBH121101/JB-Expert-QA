@@ -126,12 +126,14 @@ async function main() {
     a2Second.listPending({ cursor: null, limit: 10, atMs: 1_800_000_000_000 }),
     /not initialized/
   );
-  assert.deepEqual(await a2First.initialize(), {
-    initialized: true, dialect: "postgresql", schemaVersion: 1
-  });
-  assert.deepEqual(await a2Second.initialize(), {
-    initialized: true, dialect: "postgresql", schemaVersion: 1
-  });
+  const a2Initialization = await Promise.all([
+    a2First.initialize(),
+    a2Second.initialize()
+  ]);
+  assert.deepEqual(a2Initialization, [
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 },
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 }
+  ]);
 
   await runCase("PostgreSQL A2 Pool connection wait timeout releases a late client", async () => {
     let lateClientReleased = 0;
