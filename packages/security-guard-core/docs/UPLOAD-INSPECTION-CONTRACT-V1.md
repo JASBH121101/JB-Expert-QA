@@ -65,7 +65,7 @@ The native scanner response shapes remain runtime-specific (engine/version in al
 
 Schema: contracts/upload-inspection/v1/attestation.schema.json
 
-After and only after a runtime has observed complete sequential scanner consumption, verified the exact ingested byte count and SHA-256, and received an explicit `clean` result, it constructs a normalized attestation with:
+After and only after a runtime has observed complete sequential scanner consumption, verified the exact ingested byte count and SHA-256, and received a structurally valid `clean`, `malicious` or `unknown` result, it constructs a normalized attestation with:
 
 - `schema`: exact value `jb.security.upload-inspection.attestation/v1`.
 - `uploadId`: the exact server-generated ID used for quarantine and scanner handoff.
