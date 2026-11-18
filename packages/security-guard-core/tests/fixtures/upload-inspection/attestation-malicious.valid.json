@@ -1,0 +1,11 @@
+{
+  "schema": "jb.security.upload-inspection.attestation/v1",
+  "uploadId": "d47a5d9e-40c4-4d3b-bf9c-62d79ecf9f3a",
+  "verdict": "malicious",
+  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "size": 8192,
+  "mimeType": "application/pdf",
+  "engine": "JB-Test-Scanner",
+  "version": "1.0.0",
+  "scannedAtMs": 1795000000001
+}
