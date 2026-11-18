@@ -132,8 +132,8 @@ test("malformed or unsupported source report schemas are rejected", () => {
 test("structural target-scope skips remain visible but do not reduce applicable coverage", () => {
   const complete = sourceReport("complete");
   complete.report.results.push({
-    target: { id: "jb-security-guard", kind: "runtime-security", version: "0.1.0" },
-    scenario: { id: "malware-only-scenario", category: "malware", difficulty: "basic" },
+    target: { id: "jb-malware-engine", kind: "security-engine", version: "0.6.2" },
+    scenario: { id: "security-guard-only-scenario", category: "security-guard", difficulty: "basic" },
     status: "skip",
     skipReason: "target_scope",
     summary: "Scenario is not assigned to this target",
