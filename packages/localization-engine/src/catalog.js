@@ -82,7 +82,11 @@ export function validateCatalog(catalog, locale) {
   const canonical = canonicalizeLocale(locale);
   if (!canonical) throw new TypeError("catalog locale must be a valid BCP 47 locale");
   assertPlainCatalog(catalog, canonical);
-  return Object.freeze({ locale: canonical, entries: Object.freeze(flattenCatalog(catalog)) });
+  const entries = Object.fromEntries(Object.entries(flattenCatalog(catalog)).map(([key, item]) => [
+    key,
+    isPluralEntry(item) ? Object.freeze({ ...item }) : item
+  ]));
+  return Object.freeze({ locale: canonical, entries: Object.freeze(entries) });
 }
 
 export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } = {}) {
@@ -107,16 +111,31 @@ export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } =
       }
       const sourceValue = source[key];
       const targetValue = target[key];
-      const sourceTexts = typeof sourceValue === "string" ? [sourceValue] : Object.values(sourceValue);
-      const targetTexts = typeof targetValue === "string" ? [targetValue] : Object.values(targetValue);
-      if (typeof sourceValue === "object" !== (typeof targetValue === "object")) {
+      if ((typeof sourceValue === "object") !== (typeof targetValue === "object")) {
         findings.push({ locale, key, code: "message-shape-mismatch", severity: "high" });
         continue;
       }
-      const expected = new Set(sourceTexts.flatMap((item) => [...placeholders(item)]));
-      const actual = new Set(targetTexts.flatMap((item) => [...placeholders(item)]));
-      if (expected.size !== actual.size || [...expected].some((item) => !actual.has(item))) {
-        findings.push({ locale, key, code: "placeholder-mismatch", severity: "high" });
+      const sourceIsPlural = typeof sourceValue === "object";
+      if (!sourceIsPlural) {
+        const expected = placeholders(sourceValue);
+        const actual = placeholders(targetValue);
+        if (expected.size !== actual.size || [...expected].some((item) => !actual.has(item))) {
+          findings.push({ locale, key, code: "placeholder-mismatch", severity: "high" });
+        }
+      } else {
+        // Plural languages may legitimately omit a count in grammatical
+        // forms such as Arabic one/two. Compare the mandatory "other" form
+        // and reject any target-only placeholder names in other forms.
+        const expected = placeholders(sourceValue.other);
+        const actual = placeholders(targetValue.other);
+        const allowed = new Set(Object.values(sourceValue).flatMap((item) => [...placeholders(item)]));
+        const targetForms = Object.values(targetValue);
+        const targetOnly = targetForms.some((item) =>
+          [...placeholders(item)].some((name) => !allowed.has(name))
+        );
+        if (expected.size !== actual.size || [...expected].some((item) => !actual.has(item)) || targetOnly) {
+          findings.push({ locale, key, code: "placeholder-mismatch", severity: "high" });
+        }
       }
     }
     for (const key of Object.keys(target)) {
