@@ -105,7 +105,7 @@ jobs:
           }
           EOF
           composer install --working-dir="$RUNNER_TEMP/php-consumer" --no-interaction --no-scripts --no-progress
-          php -r 'require $argv[1]; if (!class_exists("JB\\\\SecurityGuard\\\\UploadInspectionService")) { fwrite(STDERR, "Composer archive autoload failed.\n"); exit(1); }' "$RUNNER_TEMP/php-consumer/vendor/autoload.php"
+          php -r 'require $argv[1]; if (!class_exists("JB\\SecurityGuard\\UploadInspectionService")) { fwrite(STDERR, "Composer archive autoload failed.\n"); exit(1); }' "$RUNNER_TEMP/php-consumer/vendor/autoload.php"
 
   python-wheel-sdist-distribution:
     name: Python wheel and sdist / clean consumers (Python 3.11)
