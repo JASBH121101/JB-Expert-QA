@@ -235,6 +235,30 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
 
+    def test_scanner_cannot_close_reader_early_and_still_approve(self):
+        class EarlyCloseScanner(Scanner):
+            def scan(self, stream, metadata):
+                data = stream.read()
+                stream.close()
+                return {
+                    "verdict": "clean",
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "size": len(data),
+                    "engine": "test-scanner",
+                    "version": "1.0",
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, EarlyCloseScanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "SCAN_INCOMPLETE")
+            self.assertEqual(storage.approved, {})
+            self.assertTrue(storage.quarantine)
+
     def test_scanner_reader_cannot_be_wrapped_in_a_prefetching_buffer(self):
         reader = UploadInspectionReadOnlyStream(
             io.BytesIO(PNG),
