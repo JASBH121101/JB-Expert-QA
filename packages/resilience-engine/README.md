@@ -170,3 +170,10 @@ The optional `./adapters/identity-policy-bridge` entry point verifies owner-sign
 The host owns the authoritative trust registry. Its synchronous resolver must return the current durable key status/version for every check and enforce monotonic versions and revocation. The bridge's in-process rollback tracker is defense in depth only; it is not durable across restarts or processes. No trust registry, private key, signing service, production credential or key vault is provisioned by this package. See [Identity & Policy Bridge v1](./docs/IDENTITY-POLICY-BRIDGE-V1.md).
 
 The bridge does not expand the capability matrix: A2 containment and A3 failover remain denied pending their separate certification gates.
+
+## A1 disposable service-manager evidence
+
+The Engine Certification workflow now retains a platform-specific JSON report from the real systemd/Windows SCM lab. The report binds the run to the commit SHA, Node runtime, platform, disposable service identity, PID change and verified post-restart state. It is explicitly scoped to a disposable GitHub-hosted runner; it is not customer-host or production certification.
+
+See [A1 Operational Lab Evidence v1](./docs/A1-OPERATIONAL-LAB-EVIDENCE-V1.md) for the report schema boundary and interpretation. A2 containment and A3 failover remain denied and non-executable.
+
