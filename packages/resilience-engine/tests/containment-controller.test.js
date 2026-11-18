@@ -421,6 +421,7 @@ function createDependencies({
     },
     actionLedger: {
       durable: true,
+      externalRevisionAnchorConfigured: true,
       async createPendingRecord(input) {
         events.push("pending-create:" + input.record.action);
         if (pendingRecords.has(input.record.claimId)) return { created: false };
@@ -584,7 +585,7 @@ test("A2 controller defaults to disabled and never treats readiness as execution
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   });
@@ -854,6 +855,28 @@ test("A2 blocks when mutation control or policy authorization denies the operati
   assert.equal(denied.events.includes("apply"), false);
 });
 
+test("A2 refuses executable controller construction without an external monotonic revision anchor", () => {
+  assert.throws(() => createA2ContainmentController({
+    enableExecution: true,
+    policyAuthority: {
+      authorize() {}, assertAuthorization() {}, completeAuthorization() {}
+    },
+    containmentProvider: {
+      providerId: "p", preflight() {}, apply() {}, reconcile() {}, release() {}, reconcileRelease() {}
+    },
+    independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
+    forensicRecorder: { recorderId: "f", preserveEvidence() {} },
+    budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
+    actionLedger: {
+      durable: true,
+      claim() {}, markProviderStarted() {}, reconcile() {}, complete() {},
+      createPendingRecord() {}, listPending() {}, getPendingByClaimId() {}
+    },
+    auditStore: { durable: true, append() {} },
+    mutationControl: { assertAllowed() {} }
+  }), /external monotonic revision anchor/);
+});
+
 test("A2 refuses non-durable ledgers and executor/verifier identity collisions", () => {
   const { controller } = createDependencies();
   assert.equal(controller.enabled, true);
@@ -868,7 +891,7 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: false, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /must be durable/);
@@ -885,7 +908,7 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     },
     forensicRecorder: { recorderId: "f", preserveEvidence() {} },
     budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);
@@ -900,7 +923,7 @@ test("A2 refuses non-durable ledgers and executor/verifier identity collisions",
     independentVerifier: { verifierId: "v", verifyContainment() {}, verifyRelease() {} },
     forensicRecorder: { recorderId: "shared", preserveEvidence() {} },
     budgetLedger: { durable: true, reserve() {}, reconcile() {}, settle() {} },
-    actionLedger: { durable: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
+    actionLedger: { durable: true, externalRevisionAnchorConfigured: true, claim() {}, markProviderStarted() {}, reconcile() {}, complete() {} },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
   }), /distinct identities/);
