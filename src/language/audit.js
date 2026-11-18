@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { comparePlaceholders } from "./placeholders.js";
 import { LanguageLibrary } from "./glossary.js";
 import { resolveTranslationState } from "./review.js";
+import { auditTranslationSemantics } from "./semantic-audit.js";
 
 function isPlainTranslationRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
@@ -78,7 +79,13 @@ function findShapeMismatchPath(path, otherKeys) {
   return null;
 }
 
-export function auditTranslationMaps(sourceMap, targetMap, { sourceLocale = "es-419", targetLocale = "en", library = new LanguageLibrary(), humanApproval = null } = {}) {
+export function auditTranslationMaps(sourceMap, targetMap, {
+  sourceLocale = "es-419",
+  targetLocale = "en",
+  library = new LanguageLibrary(),
+  humanApproval = null,
+  allowUntranslatedKeys = []
+} = {}) {
   const source = flattenTranslationMap(sourceMap);
   const target = flattenTranslationMap(targetMap);
   const sourceKeys = Object.keys(source).sort();
@@ -88,6 +95,13 @@ export function auditTranslationMaps(sourceMap, targetMap, { sourceLocale = "es-
   const findings = [];
   const reportedShapeMismatches = new Set();
   let missingKeys = 0, emptyValues = 0, placeholderMismatches = 0, obsoleteKeys = 0, messageShapeMismatches = 0;
+
+  const semanticFindings = auditTranslationSemantics(source, target, {
+    sourceLocale,
+    targetLocale,
+    allowUntranslatedKeys
+  });
+  findings.push(...semanticFindings);
 
   const reportShapeMismatch = (key) => {
     if (reportedShapeMismatches.has(key)) return;
@@ -159,7 +173,9 @@ export function auditTranslationMaps(sourceMap, targetMap, { sourceLocale = "es-
       placeholderMismatches,
       obsoleteKeys,
       messageShapeMismatches,
-      glossaryReview: findings.filter((item) => item.id === "glossary-review").length
+      glossaryReview: findings.filter((item) => item.id === "glossary-review").length,
+      unchangedSourceText: semanticFindings.filter((item) => item.id === "unchanged-source-text").length,
+      protectedTokenMismatches: semanticFindings.filter((item) => item.id.startsWith("protected-")).length
     }),
     sourceHash: stableTranslationHash(source),
     targetHash: stableTranslationHash(target),
