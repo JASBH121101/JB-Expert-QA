@@ -836,3 +836,28 @@ test("external revision-anchor CAS failure holds the journal after local commit"
     );
   });
 });
+
+
+test("A2 does not bootstrap an empty journal when the external anchor survives loss of both local files", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const anchor = createMemoryRevisionAnchor();
+    const options = {
+      revisionAnchor: anchor,
+      ledgerId: "a2-lost-local-files"
+    };
+    const store = createStore(filePath, options);
+    await store.listPending({ cursor: null, limit: 10, atMs: NOW });
+    await claimAndCreateRecord(store);
+
+    await unlink(filePath);
+    await unlink(filePath + ".guard");
+    const restarted = createStore(filePath, options);
+    await assert.rejects(
+      restarted.listPending({ cursor: null, limit: 10, atMs: NOW + 3 }),
+      /journal and guard are missing while the external revision anchor exists/
+    );
+    await assert.rejects(readFile(filePath, "utf8"), { code: "ENOENT" });
+    await assert.rejects(readFile(filePath + ".guard", "utf8"), { code: "ENOENT" });
+  });
+});
