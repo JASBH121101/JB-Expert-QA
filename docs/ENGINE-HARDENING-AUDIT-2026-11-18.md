@@ -16,7 +16,7 @@ No changes were made to `main`; the temporary validation PR #144 and obsolete va
 
 | PR | Area | Inspected head | CI evidence | Result |
 |---|---|---|---:|---|
-| #125 | Resilience A2 restart reconciliation | 95faf095ed575d62dc042433701ce909e00b0362 | 49/49 workflow jobs | PASS — latest inspected head |
+| #125 | Resilience A2 restart reconciliation | 70e26eab24b2f5127e038955399b641c3be9a513 | New exact-head CI matrix launched; prior 49/49 belongs to superseded head `95faf095ed575d62dc042433701ce909e00b0362` | CONDITIONAL — timeout-race fix awaiting full revalidation |
 | #135 | Malware Engine calibration + contextual PowerShell lexer hardening | 603da7e26a43635faa35bc4fe79baf223b29333d | 42/42 workflow jobs on exact head, validated via #144 | PASS — LAB-CERTIFIED, synthetic corpus only |
 | #136 | Security Guard upload inspection + attestation | c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5 | 61/61 | PASS |
 | #138 | PHP scanner byte-stream integrity (superseded/overlapping proposal) | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS (stale base; not combined evidence) |
@@ -66,9 +66,9 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 | Engine / subsystem | Laboratory evidence | Current decision |
 |---|---|---|
 | Resilience A1 | 49/49 CI checks | LAB-CERTIFIED |
-| Resilience A2 | 49/49 workflow jobs on head `95faf095ed575d62dc042433701ce909e00b0362` | LAB-CERTIFIED — read-only reconciliation only |
-| Security Guard core | 61/61 CI checks on #136 | LAB-CERTIFIED — integration pending |
-| Security Guard PHP stream + malicious quarantine lifecycle | #145 exact combined tree `44109341a508bc3412b649658ff89845baff7fa2`; 8 full workflows pending | PASS — exact combined CI passed; source review still lab-scoped |
+| Resilience A2 | Prior head `95faf095ed575d62dc042433701ce909e00b0362`: 49/49; new head `70e26eab24b2f5127e038955399b641c3be9a513`: full matrix pending | CONDITIONAL — timeout/abort race correction awaiting exact-head validation; read-only only |
+| Security Guard core | 61/61 CI checks on #136; canonical integrated #145 passed 8/8 workflows (30/30 jobs) | LAB-CERTIFIED — integrated candidate validated in CI; production adapters remain host obligations |
+| Security Guard PHP stream + malicious quarantine lifecycle | #145 exact combined tree `44109341a508bc3412b649658ff89845baff7fa2`; 8/8 workflows (30/30 jobs) passed | PASS — source review remains lab-scoped |
 | Security Guard distribution | 48/48 CI checks on #128 | LAB-CERTIFIED |
 | Malware Engine calibration + contextual PowerShell lexical triage | 42/42 workflow jobs on exact head `603da7e26a43635faa35bc4fe79baf223b29333d`; 204 tests per platform, Windows 204/204, Linux 200/200 plus four Windows-only skips | LAB-CERTIFIED — synthetic/fixture corpus only; not antivirus efficacy certification |
 | Threat Lab report | 50/50 CI checks | LAB-CERTIFIED — reporting/aggregation only |
@@ -84,7 +84,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 
 ## Final status
 
-**Laboratory evidence: PASS for individually inspected components, including Malware Engine candidate `603da7e...` (42/42 workflow jobs); integrated Security Guard #145 remains pending fresh CI.**  
+**Laboratory evidence: PASS for individually inspected components, including Malware Engine candidate `603da7e...` (42/42 workflow jobs) and integrated Security Guard #145 (30/30 CI jobs). Resilience A2's updated candidate is pending fresh exact-head CI after the timeout-race fix.**  
 **Production certification: NOT GRANTED.**  
 **Release readiness: BLOCKED on production host-adapter, access-control, retention, and operational integration gates.**
 
@@ -143,3 +143,16 @@ This follow-up supersedes any earlier statement in this report that #145 CI was 
 | Threat Lab | LAB PASS on #132 exact head | Signed/provenanced artifacts and governance for product-level certification |
 
 All five workstreams remain unmerged. No production deployment or paid service was used. Green CI is evidence for the tested commit and workflows only; it is not a universal compatibility guarantee or a security warranty.
+
+
+### Resilience A2 exact-head correction — 2026-11-18
+
+The earlier A2 entry above records the historical result for head `95faf095ed575d62dc042433701ce909e00b0362`. A subsequent source review found a deadline race in `invokeBounded()`: an adapter resolving while handling the timeout-triggered abort could win the promise race even though the deadline had fired. This was corrected on PR #125's lab branch.
+
+- Current candidate: `70e26eab24b2f5127e038955399b641c3be9a513`.
+- Source change: after the race settles, the coordinator now checks the timeout flag and discards any value if the timeout callback has fired.
+- Adversarial regression: the provider fixture receives the abort signal and resolves with a valid-looking provider receipt; the test requires a held result and verifies no evidence resolution, independent verification or retention lookup follows.
+- Scope of change: only `packages/resilience-engine/src/a2-recovery-coordinator.js` and its targeted tests changed relative to the original 49/49 head. The compare is exactly three commits ahead, zero behind.
+- Current validation state: the full required workflow matrix has been triggered for `70e26e...`; **no 49/49 result is attributed to this new head until that exact matrix passes**.
+
+Therefore the old #125 LAB PASS is superseded for release-gating purposes. The A2 source review remains positive, but its new candidate is **CONDITIONAL / REVALIDATION PENDING**. A2 remains read-only at restart reconciliation, and production execution remains unapproved.
