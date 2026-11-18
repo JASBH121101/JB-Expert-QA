@@ -111,8 +111,20 @@ class UploadInspectionReadOnlyStream:
         self._digest = hashlib.sha256()
         self._consumed = 0
         self._eof = False
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        # Close only the scanner-facing capability. The service owns the
+        # underlying quarantine resource and closes it separately.
+        self._closed = True
 
     def read(self, size: int = CHUNK_SIZE) -> bytes:
+        if self._closed:
+            raise UploadInspectionError("SCAN_INCOMPLETE")
         if type(size) is not int or size < 1 or size > MAX_SCANNER_READ_BYTES:
             raise UploadInspectionError("INVALID_SCAN_RESULT")
         if self._eof:
@@ -138,6 +150,8 @@ class UploadInspectionReadOnlyStream:
         return chunk
 
     def verify_complete(self) -> str:
+        if self._closed:
+            return "incomplete"
         if self._consumed != self._expected_size:
             return "incomplete"
 
