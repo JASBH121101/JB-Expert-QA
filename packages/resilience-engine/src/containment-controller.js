@@ -453,6 +453,11 @@ export function createA2ContainmentController({
       )) {
     throw new TypeError("actionLedger must implement the durable A2 pending recovery journal");
   }
+  if (enableExecution && actionLedger.externalRevisionAnchorConfigured !== true) {
+    throw new TypeError(
+      "A2 execution requires an action ledger configured with an external monotonic revision anchor"
+    );
+  }
 
   async function invokeDependency(owner, method, input, label) {
     return invokeBounded(
