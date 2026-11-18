@@ -66,6 +66,7 @@ const ERROR_MESSAGES = Object.freeze({
   SCANNER_UNAVAILABLE: "Malware scanner is unavailable",
   SCANNER_TIMEOUT: "Malware scan exceeded its time limit",
   SCAN_NOT_CLEAN: "File did not receive an explicit clean verdict",
+  SCAN_INCOMPLETE: "Malware scanner did not consume the complete verified stream",
   INVALID_SCAN_RESULT: "Malware scanner returned an invalid result",
   MALWARE_DETECTED: "File was rejected by malware scanning",
   APPROVAL_FAILED: "File could not be promoted to approved storage",
@@ -586,7 +587,7 @@ export function createUploadInspector(options = {}) {
         }, scannerTimeoutMs);
 
         if (verifiedScanStream.readableEnded !== true) {
-          throw new UploadInspectionError("INVALID_SCAN_RESULT");
+          throw new UploadInspectionError("SCAN_INCOMPLETE");
         }
         await scanPipeline;
       } catch (error) {
