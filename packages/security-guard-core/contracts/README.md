@@ -11,3 +11,16 @@ All v1 contracts use JSON Schema Draft 2020-12.
 - Contract changes that alter meaning require a new schema version. Do not change v1 to accept raw identities, free-form metadata, or new decision semantics.
 
 The v1 schemas define message shapes, not a database protocol, transaction algorithm, authentication protocol, or security guarantee. Those require separately specified adapter contracts and tests.
+
+## Upload inspection attestation v1
+
+The `jb.security.upload-inspection.attestation/v1` message binds a scanner verdict to one exact quarantined object using its upload ID, SHA-256 and byte count. It also records the detected MIME type, scanner engine/version and scan timestamp.
+
+- Only `clean`, `malicious` and `unknown` are valid scanner verdicts. Values such as `no_match`, `suspicious`, `not_scanned` or a missing verdict must be mapped to `unknown` or rejected by the adapter; they must never be mapped to `clean`.
+- `clean` is a scanner statement, not an approval decision. The host must independently verify the complete stream, digest and size, enforce policy, and atomically promote from private quarantine. Only the storage adapter can establish that promotion committed.
+- `malicious` and `unknown` must never be promoted. Scanner errors, timeouts, malformed attestations, digest/size mismatches and uncertain promotion outcomes remain fail-closed.
+- Upload IDs may be 32 lowercase hexadecimal characters or a UUID to accommodate the existing native runtime ID generators. They are opaque correlation identifiers, not authorization tokens.
+- The contract deliberately excludes original filenames, local paths, raw file content, credentials, customer identifiers, scanner free-form diagnostics and arbitrary metadata.
+- The maximum object size is 100 MiB and the MIME allowlist is JPEG, PNG, GIF, WebP and PDF. Runtime policies may impose a lower size limit or a narrower MIME allowlist, but may not expand this shared v1 contract.
+
+The shared fixtures are in `tests/fixtures/upload-inspection`. Runtime adapters must validate the same positive vectors and reject malformed/unknown fields before this contract can be called cross-runtime conformant.
