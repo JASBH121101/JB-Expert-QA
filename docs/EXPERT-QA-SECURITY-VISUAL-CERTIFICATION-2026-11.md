@@ -26,6 +26,8 @@ This certifies the tested visual/browser-analysis scope. It does not claim that 
 
 The branch, static-analysis subbranch, module and components are PASS for the declared local security profile:
 
+The Security QA module's pre-existing PASS assessment remains bound to its original source snapshot `bb74c2215bef9e8dd7cd138c108dc7b4510cd50c` and workflow run https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377161100. That historical record was preserved unchanged; the new branch, subbranch and three component assessments use the current `cce6ac9` snapshot.
+
 - **Rule integrity:** positive and negative fixtures, dangerous-pattern detection, safe-pattern handling, comment exclusion and production-only scanning.
 - **Dependency audit:** the exact workflow ran `npm audit --audit-level=high` and generated CycloneDX SBOMs on Node.js 22 and 24. This is a snapshot of the repository dependency tree.
 - **Finding evidence and severity:** diagnostics preserve detector ID, severity, file/line location and remediation guidance; secret values are redacted; incomplete scans cannot pass.
