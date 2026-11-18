@@ -95,7 +95,7 @@ test("the versioned hierarchy inventory validates with all six certification lev
     [...new Set(inventory.nodes.map((node) => node.level))].sort(),
     ["branch", "component", "ecosystem", "engine", "module", "subbranch"]
   );
-  assert.equal(inventory.nodes.length, 140);
+  assert.equal(inventory.nodes.length, 141);
   assert.equal(inventory.nodes.filter((node) => node.level === "engine").length, 8);
 });
 
