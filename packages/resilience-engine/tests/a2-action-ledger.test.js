@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileA2ActionLedger } from "../src/index.js";
@@ -552,5 +552,29 @@ test("malformed ledger data fails closed and is never overwritten", async () => 
       idempotencyKey: makeIdempotencyKey(), claimedAtMs: NOW + 5, expiresAtMs: NOW + 20_000
     }));
     assert.equal(await readFile(filePath, "utf8"), tampered);
+  });
+});
+
+test("file ledger refuses symbolic-link journal paths without reading their targets", async (t) => {
+  await withTempDirectory(async (directory) => {
+    const targetPath = join(directory, "external.json");
+    const filePath = join(directory, "a2-actions.json");
+    const externalContent = "{\\\"external\\\":\\\"must-not-be-read\\\"}";
+    await writeFile(targetPath, externalContent, "utf8");
+    try {
+      await symlink(targetPath, filePath);
+    } catch (error) {
+      if (["EPERM", "EACCES", "ENOTSUP"].includes(error?.code)) {
+        t.skip("The current operating system does not permit creating a test symbolic link");
+        return;
+      }
+      throw error;
+    }
+    const store = createStore(filePath);
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW }),
+      /regular file|symbolic link/
+    );
+    assert.equal(await readFile(targetPath, "utf8"), externalContent);
   });
 });
