@@ -24,19 +24,21 @@ function evidence(outcome = "success", commitSha = sourceSha) {
   }];
 }
 
-function assessment(nodeId, {
-  assessmentId = "asmt.test." + nodeId.split(".").at(-1),
-  status = "PASS",
-  assessedAt = "2026-11-18T19:11:00Z",
-  ev = evidence(status === "FAIL" ? "failure" : "success"),
-  findings = []
-} = {}) {
+function assessment(nodeId, options = {}) {
   const node = inventory.nodes.find((entry) => entry.id === nodeId);
+  const source = inventory.sources.find((entry) => entry.id === node.sourceId);
+  const {
+    assessmentId = "asmt.test." + nodeId.split(".").at(-1),
+    status = "PASS",
+    assessedAt = "2026-11-18T19:11:00Z",
+    ev = evidence(status === "FAIL" ? "failure" : "success", source.commitSha),
+    findings = []
+  } = options;
   return {
     assessmentId,
     nodeId,
     version: node.version,
-    commitSha: sourceSha,
+    commitSha: source.commitSha,
     status,
     assessedAt,
     evidence: ev,
@@ -136,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 44);
+  assert.equal(history.length, 48);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -171,7 +173,7 @@ test("assessment history is append-only, immutable and timestamp-monotonic per n
   const first = assessment("jb.expert-qa.visual.screenshot-diff", {
     status: "PENDING",
     assessmentId: "asmt.visual.pending",
-    assessedAt: "2026-11-18T19:11:00Z",
+    assessedAt: "2026-11-18T20:57:00Z",
     ev: []
   });
   const next = appendSccmAssessment(inventory, existing, first);
@@ -180,7 +182,7 @@ test("assessment history is append-only, immutable and timestamp-monotonic per n
   assert.equal(Object.isFrozen(next.at(-1)), true);
   assert.equal(existing.length, history.length);
   assert.throws(() => appendSccmAssessment(inventory, next, first), /already exists/);
-  const older = { ...first, assessmentId: "asmt.visual.older", assessedAt: "2026-11-18T19:09:00Z" };
+  const older = { ...first, assessmentId: "asmt.visual.older", assessedAt: "2026-11-18T20:56:00Z" };
   assert.throws(() => appendSccmAssessment(inventory, next, older), /cannot move backwards/);
 });
 
@@ -206,12 +208,14 @@ test("the Language QA dependency is certified without certifying all of Localiza
   assert.ok(localizationEngine.blockingChildren.length > 0);
 });
 
-test("green module workflows do not bypass uncertified critical components", () => {
+test("visual QA module passes while uncertified sibling components keep Expert QA pending", () => {
   const visual = evaluateSccmNode(inventory, history, "jb.expert-qa.visual.module");
+  const visualBranch = evaluateSccmNode(inventory, history, "jb.expert-qa.visual");
   const expert = evaluateSccmNode(inventory, history, "jb.expert-qa");
   assert.equal(visual.ownStatus, "PASS");
-  assert.equal(visual.status, "PENDING");
-  assert.ok(visual.blockingChildren.length > 0);
+  assert.equal(visual.status, "PASS");
+  assert.equal(visualBranch.status, "PENDING");
+  assert.equal(visual.blockingChildren.length, 0);
   assert.equal(expert.ownStatus, "PASS");
   assert.equal(expert.status, "PENDING");
   assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
@@ -276,7 +280,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 15);
+  assert.equal(report.counts.component.PASS, 19);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
