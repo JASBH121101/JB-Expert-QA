@@ -12,6 +12,7 @@ from jb_security_guard import (
     normalize_rate_limit_check,
     normalize_rate_limit_decision,
     normalize_rate_limit_policy,
+    validate_upload_inspection_attestation_v1,
 )
 from jb_security_guard.fastapi import SecurityGuardRateLimitMiddleware
 
@@ -26,6 +27,36 @@ DIGEST = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 
 class CoreV1Tests(unittest.TestCase):
+    def test_upload_inspection_attestation_shared_vectors_and_invalid_fields(self):
+        fixture_root = (
+            ROOT
+            / "packages"
+            / "security-guard-core"
+            / "tests"
+            / "fixtures"
+            / "upload-inspection"
+        )
+        for filename, verdict in (
+            ("attestation-clean.valid.json", "clean"),
+            ("attestation-malicious.valid.json", "malicious"),
+            ("attestation-unknown.valid.json", "unknown"),
+        ):
+            fixture = json.loads((fixture_root / filename).read_text(encoding="utf-8"))
+            self.assertEqual(validate_upload_inspection_attestation_v1(fixture)["verdict"], verdict)
+
+        clean = json.loads((fixture_root / "attestation-clean.valid.json").read_text(encoding="utf-8"))
+        for mutation in (
+            {"sha256": "A" * 64},
+            {"size": 0},
+            {"size": 104857601},
+            {"mimeType": "application/x-msdownload"},
+            {"verdict": "no_match"},
+            {"engine": ""},
+            {"originalFileName": "customer-secret.png"},
+        ):
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                validate_upload_inspection_attestation_v1({**clean, **mutation})
+
     def test_hmac_matches_shared_node_known_answer_vector(self):
         actual = derive_identity_key(
             secret=bytes.fromhex(FIXTURE["secretHex"]),
