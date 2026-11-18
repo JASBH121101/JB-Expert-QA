@@ -439,9 +439,6 @@ async function ensureLedgerGuard(filePath, ledger) {
     if (current) {
       throw new Error("A2 action ledger is missing while its durability guard exists; refusing empty reinitialization");
     }
-    // Establish a revision-zero guard before the first journal mutation. This
-    // gives subsequent missing-sidecar checks a durable baseline.
-    await writeLedgerGuard(guardPath, emptyLedger());
     return;
   }
 
@@ -506,8 +503,13 @@ async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
     return ledger;
   } catch (error) {
     if (error?.code === "ENOENT") {
+      // Materialize the empty journal before its guard so a read-only first
+      // access cannot leave a guard pointing at a file that does not exist.
       await ensureLedgerGuard(filePath, null);
-      return emptyLedger();
+      const initial = emptyLedger();
+      await writeLedgerFile(filePath, initial, maxBytes);
+      await ensureLedgerGuard(filePath, initial);
+      return initial;
     }
     if (error?.code === "ELOOP" || error?.code === "EMLINK") {
       throw new Error("A2 action ledger path must be a regular file, not a symbolic link", { cause: error });
