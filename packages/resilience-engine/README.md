@@ -4,26 +4,21 @@ Independent, policy-bounded service health and recovery engine for Linux and Win
 
 ## Target autonomy profile
 
-The selected target profile is **autonomous-advanced**. The runtime descriptor reports `mode: "semi-autonomous"` and `targetMode: "autonomous-advanced"` so integrations can distinguish active behavior from the target design. Its architecture and policy are specified in [ADVANCED-AUTONOMY-ARCHITECTURE.md](./docs/ADVANCED-AUTONOMY-ARCHITECTURE.md). This is a design target, not a runtime capability yet: the current implementation remains `semi-autonomous`, with bounded allowlisted restarts and the existing approval boundary for critical services. Do not configure or advertise advanced autonomy as enabled until the implementation roadmap and certification gates in that specification are complete.
+The selected target profile is **autonomous-advanced**. Its architecture and policy are specified in [ADVANCED-AUTONOMY-ARCHITECTURE.md](./docs/ADVANCED-AUTONOMY-ARCHITECTURE.md). This is a design target, not a runtime capability yet: the current implementation remains `semi-autonomous`, with bounded allowlisted restarts and the existing approval boundary for critical services. Do not configure or advertise advanced autonomy as enabled until the implementation roadmap and certification gates in that specification are complete.
 
 ## v0.2 laboratory scope
 
 - Validated, server-owned service allowlist.
 - Bounded recovery policy: failure threshold, restart limit and cooldown. The health monitor continues recording observations at its own attempt cap while suppressing further recovery proposals.
-- Recovery proposals contain random IDs/nonces and expire after 60 seconds. Expiry is checked after asynchronous approval, before the durable claim, and again immediately before adapter invocation. OS restart and service-verification adapter calls are bounded by `adapterTimeoutMs` (100–60,000 ms) and receive an `AbortSignal`; a timeout or ambiguous adapter exception is recorded as `unverified`, consumes the claimed attempt and is never retried automatically.
+- Recovery proposals contain random IDs/nonces and expire after 60 seconds. Expiry is checked after asynchronous approval, before the durable claim, and again immediately before adapter invocation.
 - Atomic recovery claims prevent reuse of the same proposal and enforce the policy restart limit across engine instances when a shared durable store is configured.
 - Built-in JSON file ledger uses exclusive lock creation, bounded lock waits, dead-process lock recovery, restrictive file modes, write-to-temp + fsync + atomic rename, bounded history, and fail-closed validation. It is a single-host store, not a distributed database.
-- A2 containment has a separate `createFileA2ActionLedger()` adapter. Claims and restart-recovery records share one single-host lock-protected JSON journal with atomic provider-start and terminal transitions. Its versioned `.guard` sidecar authenticates the revision and journal digest with HMAC-SHA-256 and supports dual-key rotation. Keys are injected from a host secret store and never persisted beside the journal. The file adapter exposes a revisionAnchor/ledgerId contract to compare the local revision and digest against an external monotonic store; executable A2 controller construction refuses an action ledger unless the configured anchor declares `durable: true` and `atomicCompareAndSwap: true`. The repository now includes a PostgreSQL reference CAS adapter, `createPostgresA2RevisionAnchor()`, with schema validation, atomic revision/digest compare-and-swap, a no-delete/monotonic-update trigger, and cross-Pool CI tests. The owner-run `initialize()` provisions DDL; the restricted runtime role uses read-only `verify()` and should receive only SELECT/INSERT/UPDATE on the anchor table (no DELETE or DDL). This is still a laboratory implementation: its CI tests use two Pools against one PostgreSQL primary. A production host must point it at a separately administered database failure domain and certify independent credentials, backups, point-in-time restore, failover and split-brain behavior. Capability flags are host assertions, not proof of those operational properties. Without an independently surviving anchor, replay of a previously valid local journal/guard pair remains possible. Missing keys, MAC mismatches, anchor mismatches and state divergence fail closed. The adapter is laboratory-only and not a multi-host database.
-- Multi-host A2 hosts can inject `createPostgresA2ActionLedger()` from the PostgreSQL storage adapter. It persists claims and recovery records in one transactional PostgreSQL row, with cross-instance idempotency, per-asset serialization, bounded transactions and stable pending pagination. The real PostgreSQL CI E2E exercises this adapter; the existing v0.6 `orchestrationStore` remains a different contract.
-- The file-ledger external rollback anchor can use `createPostgresA2RevisionAnchor()`. Its atomic CAS is exercised against two pools in PostgreSQL CI and integrated with the file HMAC ledger. For real rollback resistance, configure it against a separately administered database failure domain; sharing the action ledger's PostgreSQL cluster does not protect against a coordinated cluster restore.
-- `createA2RecoveryCoordinator()` provides explicit read-only restart reconciliation: it observes provider state, re-hashes evidence, checks independent verification and existing forensic retention, and emits non-executable findings. It never retries, applies or releases. There is no automatic startup worker and no reconstructed release handle.
-- Both ledgers and the read-only coordinator are laboratory capabilities. ARC continues to deny A2 until production providers, database operations, independent verification, forensic retention, rollback and end-to-end fault-injection are separately certified.
 - A memory-only ledger remains available for tests and development. Production configurations should set \`requireDurableStore: true\` and inject \`createFileRecoveryStore(...)\` or a host-provided transactional store.
 - Automatic execution is limited to explicitly allowlisted, non-critical services.
 - Critical services require an injected human-approval verifier. The host verifier must validate a signed approval bound to the exact proposal ID, nonce, service, action, issue/expiry times and authorized human subject; it must also enforce durable one-time replay protection.
 - Linux systemd and Windows Service Control Manager adapters use fixed executables, fixed argument shapes, shell disabled, and caller-injected command runners. Windows recovery waits for SCM \`STOPPED\` before issuing \`start\`, then confirms \`RUNNING\` with a bounded timeout.
-- Built-in adapters expose `verifyService()`; the engine can also run a host-owned application health check. Set `requireHealthVerification: true` to refuse configurations without at least one verifier. Adapter timeouts, thrown errors and malformed health responses remain `unverified`; only an explicit unhealthy result is recorded as `verification-failed`.
-- Execution and recovery outcome are reported separately: a restart command may execute successfully while the service remains unhealthy. An adapter timeout means the OS operation may have started but was not confirmed; the durable attempt remains consumed for reconciliation instead of risking a duplicate restart.
+- Built-in adapters expose \`verifyService()\`; the engine can also run a host-owned application health check. Set \`requireHealthVerification: true\` to refuse configurations without at least one verifier.
+- Execution and recovery outcome are reported separately: a restart command may execute successfully while the service remains unhealthy. A failed post-recovery check is recorded as \`verification-failed\`.
 - A host-provided active Security Guard/Malware Engine threat or tamper signal suspends recovery. Resilience never overwrites binaries or attempts file repair.
 
 ## Durable recovery ledger
@@ -59,49 +54,6 @@ The host application provides health observations and a command runner with appr
 
 The health monitor's observation counters are still in-memory by default, but `restoreState()` lets the host hydrate the monitor before its first observation. Use `await recoveryStore.getServiceState(serviceId)` and pass its `attemptCount` and `lastAttemptAt` as `restartCount` and `lastRestartAt`. The durable ledger independently enforces the actual number of claimed recovery attempts across engine restarts. Hosts that need to restore failure trends should persist those observations in their monitoring system.
 
-
-## Transactional PostgreSQL storage adapter (v3 laboratory)
-
-The optional `./adapters/postgres-storage` entry point provides the v0.6 orchestration store, hash-chained audit store, PostgreSQL lease coordinator, fenced PostgreSQL state target, and durable trusted-signal replay store. The host injects a node-postgres-compatible Pool and explicitly calls `initialize()`; no driver, credential, network endpoint or hosted database is bundled.
-
-`fencedTargetStore.applyState(...)` serializes application-state mutations against the authoritative lease row and target fencing high-water mark in one PostgreSQL transaction. It rejects expired/stale lease epochs, owner mismatches and conflicting mutation IDs. Its guarantee applies only to state stored through this PostgreSQL target; it does not fence systemd, Windows SCM, files or external APIs.
-
-`trustedSignalStore.recordSignal(...)` and `listSignals(...)` back the existing Trusted Signal Gateway with a shared PostgreSQL replay registry. The database enforces uniqueness of `(sourceId,eventId)` across processes using the same primary. Signal-envelope validation and signature/source-scope verification remain the gateway's responsibility; the store recomputes and checks the envelope digest when reading. It does not grant action authorization, and the gateway continues to return `authorizationGranted: false`. Replay admission is bounded by a persistent database capacity row (`maxTrustedSignals`, default 10,000, maximum 10,000); all instances must use the same value. At capacity, the gateway fails closed and no old replay IDs are silently removed.
-
-Neither this store nor the single PostgreSQL primary provides quorum, consensus, an independent external monitor, OS-level fencing or A3 failover. A2 containment and A3 failover remain disabled until their separate enforcement, policy and lab certification gates pass. See [PostgreSQL Storage Adapter v3](./docs/POSTGRES-STORAGE-ADAPTER-V1.md).
-
-## Bounded Health Monitor Probe Adapter (v1 laboratory)
-
-The optional `./adapters/health-monitor-probes` entry point converts host-configured, read-only HTTP(S), TCP and custom checks into observations for the existing Health Monitor. It uses exact origin and host/port allowlists, GET/HEAD only, manual redirects, loopback-only cleartext HTTP, bounded timeouts and a global concurrency limit across services. Required probe failures mark a service unhealthy; optional probe failures remain advisory. The adapter never executes recovery or operating-system actions. The host owns scheduling and security-state input. See [Health Monitor Probe Adapter v1](./docs/HEALTH-MONITOR-PROBES-V1.md).
-
-
-## Restricted Host Command Runner (v1 laboratory)
-
-The optional `./adapters/restricted-host-command-runner` entry point supplies a constrained `execFile` runner for the existing systemd and Windows SCM adapters. It uses fixed absolute executable paths, exact service allowlists, a fixed verb/argument grammar, `shell: false`, minimal child-process environment, timeouts and bounded output. It cannot execute arbitrary shell commands, elevate privileges, install services or expand the policy engine's authority. The runner must be injected into the existing typed adapter and executes with the host process identity. See [Restricted Host Command Runner v1](./docs/RESTRICTED-HOST-COMMAND-RUNNER-V1.md).
-
-## Signed A2 Provider Evidence (v1 laboratory)
-
-The optional `./provider-evidence` entry point verifies short-lived Ed25519 attestations for the owner-approved containment profile, reversible provider adapter and rollback plan, independent containment verification, forensic preservation and budget availability. Each attestation is bound to the exact asset, environment, incident and signed policy revision/hash. Five separately scoped provider roles are required, and the containment verifier must be a different provider identity from the containment executor.
-
-The host owns provider enrollment, authoritative key/revocation records and evidence retrieval. A valid signature proves which enrolled key signed the statement; it does not prove that an external action actually occurred. The host must fetch and validate referenced evidence against authoritative provider APIs. This package performs no containment, traffic change, OS command or authorization. A2 remains disabled until a concrete typed provider adapter, independently verified provider state, rollback testing, durable host policy and end-to-end fault-injection certification are complete. See [A2 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-V1.md).
-
-
-## Signed A3 Provider Evidence (v1 laboratory)
-
-The optional `./provider-evidence-a3` entry point verifies nine Ed25519 provider roles for one exact failover source, target, lease, fencing epoch, policy revision/hash and RPO. It checks independent identities for traffic execution versus failover verification, source fencing versus target fencing verification, and coordination versus failover verification. Its second-stage evidence resolver checks scope and SHA-256 with bounded timeouts and size limits.
-
-These are signed evidence contracts, not a failover controller. They do not supply quorum, source-fence operations, target-enforced fencing, replication, target promotion, traffic cutover or rollback. A3 remains denied by the policy engine. See [A3 Provider Evidence v1](./docs/PROVIDER-EVIDENCE-A3-V1.md).
-
-### A2 provider evidence to ARC readiness
-
-The read-only `evaluateA2ProviderReadiness({ bundle, references, securityState, clock })` function combines the verified A2 provider bundle and byte-integrity result with an exact Trusted Signal Gateway result. It rejects copied/fabricated Gateway outputs, non-durable replay stores, missing evidence, non-confirmed states and stale signals. It maps only authenticated Gateway provenance and signed provider facts into the existing A2 readiness gate. Its result always has `executable: false` and does not grant containment authorization.
-
-
-### A2 provider-neutral containment controller (laboratory)
-
-The opt-in `./containment-controller` entry point defines a generic A2 apply/reconcile/independent-verify/forensics/release lifecycle. It requires an exact branded A2 readiness result, an injected host policy authority, distinct provider/verifier/recorder identities, durable host action/budget/audit stores, mutation control and a typed provider implementation. The controller defaults to disabled and does not ship a firewall, cloud, endpoint or hypervisor adapter. The existing Policy Engine continues to deny A2 actions; this controller does not change that decision or grant authorization. The process-local success handle is not reconstructed after restart. The separate `./a2-recovery-coordinator` is read-only and must be explicitly invoked; it does not create a release handle or automatically resume work. Passing the controller, file-ledger and PostgreSQL E2E suites validates laboratory contracts, not production provider readiness. See [A2 Containment Controller v1](./docs/A2-CONTAINMENT-CONTROLLER-V1.md) and [A2 Restart Reconciliation v1](./docs/A2-RESTART-RECONCILIATION-V1.md).
-
-
 ## Not included
 
 Cross-host failover, database restore, infrastructure provisioning, autonomous firewall changes, AI-driven shell commands, telemetry upload, and production service installation are out of scope. A fully unavailable host cannot recover itself; cross-host failover requires an independent external monitor and a separately provisioned healthy destination.
@@ -120,7 +72,7 @@ The policy gate uses exact service IDs, exact environments and explicit action c
 
 The included `createMemoryPolicyRevisionStore()` and `createMemoryCapabilityLedger()` are test/development fixtures only. They have `durable: false` and are rejected unless `allowInMemoryStores: true` is explicitly set. They are not suitable for production or multiple processes.
 
-**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. The Trusted Signal Gateway, replay protection, producer adapters and signed A2 provider-attestation verifier exist as laboratory components. A2 containment remains blocked until authoritative evidence-reference retrieval/semantic validation, a concrete typed containment provider, independent out-of-band verification, tested rollback, durable budget/action authorization and end-to-end fault-injection certification are complete. A3 failover remains blocked until an independent external monitor/quorum, source and target-enforced fencing, replication/RPO validation, a traffic-cutover provider, rollback and post-failover verification are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
+**Runtime boundary:** v2 authorization is a policy-control API, not an operating-system executor. v0.3 certifies only the A1 `restart-service` capability for exact, stateless, standard-criticality assets with application health verification. A2 containment remains blocked until the trusted signal gateway is certified. A3 failover remains blocked until external monitoring, transactional coordination, quorum and fencing are certified. Other declared capabilities are denied until their typed adapters and verification paths are certified. Existing v1 `semi-autonomous` execution remains unchanged; v2 does not silently switch the runtime or deploy any key material.
 
 See [POLICY-V2-CONTROL.md](./docs/POLICY-V2-CONTROL.md) for the schema, injected-store contracts and integration boundary.
 
@@ -155,30 +107,12 @@ laboratory increment, the only executable capability is A1
 service, with clear trusted security state, durable budgets and both
 service-manager and application-level health verification.
 
-A2 containment and A3 failover remain denied by the existing policy gate.
-A2 now has a second-stage authoritative evidence-reference integrity check, but
-still lacks a concrete containment provider and independently verified execution.
-A3 has a single-PostgreSQL-primary lease/fencing primitive, not external quorum
-or target-enforced fencing for unrelated resources. Both capabilities remain
-non-executable until provider-specific end-to-end certification is complete. No arbitrary shell
+A2 containment and A3 failover remain denied by the existing policy gate until
+their independent signal, containment, external monitoring, quorum, fencing
+and consistency certification requirements are complete. No arbitrary shell
 commands, self-modifying policy, evidence deletion, binary restoration or
 destructive data actions are permitted.
 
 Production activation is not part of this branch. The implementation must pass
 the full laboratory, fault-injection, concurrency, regression and platform
 certification gates before any merge or operational enablement.
-
-## Identity & Policy Bridge v1 (laboratory)
-
-The optional `./adapters/identity-policy-bridge` entry point verifies owner-signed v2 policy payloads with Ed25519 using an exact trusted-key record resolved by the host. It delegates policy evaluation, authorization, pre-execution assertions and completion to the existing Policy Engine; it does not duplicate that engine, its capability ledger, or PostgreSQL persistence.
-
-The host owns the authoritative trust registry. Its synchronous resolver must return the current durable key status/version for every check and enforce monotonic versions and revocation. The bridge's in-process rollback tracker is defense in depth only; it is not durable across restarts or processes. No trust registry, private key, signing service, production credential or key vault is provisioned by this package. See [Identity & Policy Bridge v1](./docs/IDENTITY-POLICY-BRIDGE-V1.md).
-
-The bridge does not expand the capability matrix: A2 containment and A3 failover remain denied pending their separate certification gates.
-
-## A1 disposable service-manager evidence
-
-The Engine Certification workflow now retains a platform-specific JSON report from the real systemd/Windows SCM lab. The report binds the run to the commit SHA, Node runtime, platform, disposable service identity, PID change and verified post-restart state. It is explicitly scoped to a disposable GitHub-hosted runner; it is not customer-host or production certification.
-
-See [A1 Operational Lab Evidence v1](./docs/A1-OPERATIONAL-LAB-EVIDENCE-V1.md) for the report schema boundary and interpretation. A2 containment and A3 failover remain denied and non-executable.
-

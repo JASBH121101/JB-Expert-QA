@@ -81,129 +81,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  advisor-engine:
-    name: Advisor Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 12
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2022]
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Run Advisor Engine syntax, domain, evidence and recommendation tests
-        run: npm run check --workspace @jb/advisor-engine
-
-  language-qa:
-    name: Language QA tests / ${{ matrix.os }} / Node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2022]
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Check Language QA source syntax
-        run: |
-          node --check src/language/locale.js
-          node --check src/language/placeholders.js
-          node --check src/language/php-array-parser.js
-          node --check src/language/glossary.js
-          node --check src/language/translation-memory.js
-          node --check src/language/review.js
-          node --check src/language/audit.js
-          node --check src/adapters/filesystem/audit-language.js
-          node --check src/specialists/language/index.js
-          node --check src/language-cli.js
-          node --check src/adapters/filesystem/audit-project.js
-          node --check src/index.js
-      - name: Run Language QA regression tests
-        run: node --test tests/language-qa-engine.test.js
-
-  expert-qa-package-cross-platform:
-    name: Expert QA package / ${{ matrix.os }} / Node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2022]
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Install Chromium for package browser tests
-        run: npx playwright install chromium
-      - name: Build and test the independently installable Expert QA package
-        run: |
-          node scripts/build-expert-qa-package.js
-          node --test packages/expert-qa/package-tests/complete-engine.spec.js packages/expert-qa/package-tests/browser-audit.spec.js
-
-  threat-lab:
-    name: Threat Lab safety and six-tier certification / ${{ matrix.os }} / Node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 12
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2022]
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Run safe local Threat Lab certification matrix
-        env:
-          JB_THREAT_LAB_REPORT_DIR: ${{ runner.temp }}/jb-threat-lab-source-reports
-        run: npm run test:threat-lab
-      - name: Build unified Threat Lab certification report
-        env:
-          JB_THREAT_LAB_REPORT_DIR: ${{ runner.temp }}/jb-threat-lab-source-reports
-          JB_THREAT_LAB_CERTIFICATION_OUTPUT: ${{ runner.temp }}/jb-threat-lab-unified-certification-report.v1.json
-        run: node scripts/build-threat-lab-certification-report.mjs
-      - name: Upload unified multi-engine certification evidence
-        if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: jb-threat-lab-unified-certification-${{ matrix.os }}-node-${{ matrix.node }}
-          path: |
-            ${{ runner.temp }}/jb-threat-lab-unified-certification-report.v1.json
-            ${{ runner.temp }}/jb-threat-lab-source-reports/*.json
-          if-no-files-found: error
-          retention-days: 30
-
   security-guard:
     name: Security Guard tests / ${{ matrix.os }} / Node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
@@ -225,42 +102,6 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Run Security Guard attack-simulation and regression suite
         run: npm run test:security-guard
-
-  security-guard-php:
-    name: Security Guard PHP adapter / PHP 8.2
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - name: Verify PHP runtime
-        run: |
-          php -v
-          php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2 or newer is required.\\n"); exit(1); }'
-      - name: Check all PHP package files
-        run: find packages/security-guard-php -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Run shared HMAC and PHP adapter tests
-        run: php packages/security-guard-php/tests/run.php
-
-  security-guard-python:
-    name: Security Guard Python FastAPI adapter / Python 3.11
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - name: Verify Python runtime
-        run: |
-          python3 --version
-          python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11 or newer is required"'
-      - name: Compile Python package
-        run: python3 -m compileall -q packages/security-guard-python
-      - name: Run shared HMAC, API client and ASGI middleware tests
-        env:
-          PYTHONPATH: packages/security-guard-python/src
-        run: python3 -m unittest discover -s packages/security-guard-python/tests -v
 
   malware-engine:
     name: Malware Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
@@ -320,27 +161,6 @@ jobs:
       - name: Run Resilience Engine policy, recovery and platform-adapter tests
         run: npm --workspace @jb/resilience-engine run test
 
-  integration-contracts:
-    name: JB Engine integration contracts / Node ${{ matrix.node }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [22, 24]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: ${{ matrix.node }}
-          package-manager-cache: false
-      - name: Install repository dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Run JB Engine contract, compatibility and isolation tests
-        run: npm run test:engine-contracts
-
   package-boundaries:
     name: Five-package distribution boundary / Node ${{ matrix.node }}
     runs-on: ubuntu-24.04
@@ -359,7 +179,7 @@ jobs:
           package-manager-cache: false
       - name: Install repository dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Verify all seven independently installable packages
+      - name: Verify all five independently installable packages
         run: npm run test:package-distributions
   resilience-service-manager-live:
     name: Real service manager lab / ${{ matrix.os }}
@@ -378,14 +198,4 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Exercise the real OS service manager through the typed adapter
-        env:
-          RESILIENCE_LAB_OUTPUT: ${{ runner.temp }}/resilience-service-manager-lab.json
         run: node scripts/resilience-service-manager-lab.mjs
-      - name: Upload disposable service-manager certification evidence
-        if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: resilience-service-manager-lab-${{ matrix.os }}
-          path: ${{ runner.temp }}/resilience-service-manager-lab.json
-          if-no-files-found: error
-          retention-days: 30

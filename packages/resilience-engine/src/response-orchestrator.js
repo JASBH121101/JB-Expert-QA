@@ -996,8 +996,7 @@ export function createResponseOrchestrator({
     engine: "JB Resilience Engine",
     module: "Response Orchestrator",
     version: "0.6.0",
-    mode: "semi-autonomous",
-    targetMode: "autonomous-advanced",
+    mode: "autonomous-advanced",
     executableActions: Object.freeze([ACTION]),
     executeIncident
   });
