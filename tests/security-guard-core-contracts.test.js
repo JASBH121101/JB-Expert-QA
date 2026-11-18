@@ -278,7 +278,7 @@ test("shared upload inspection vectors remain deterministic and bounded", async 
   }
 });
 
-\ntest("upload inspection attestation schema and runtime validator bind exact object evidence", async () => {
+test("upload inspection attestation schema and runtime validator bind exact object evidence", async () => {
   const schema = schemasById.get("urn:jb:security-guard:upload-inspection:attestation:v1");
   assert.ok(schema);
   const fixtureRoot = path.join(coreRoot, "tests", "fixtures", "upload-inspection");
