@@ -341,3 +341,43 @@ test("Language QA catalog bridge rejects invalid required locale sets", () => {
     en: { title: "Hello" }
   }, { sourceLocale: "es-419", requiredLocales: ["es-NI"] }), /must not include the source locale|duplicate/);
 });
+
+test("Language QA catalog bridge rejects accessors without executing them", () => {
+  let invoked = false;
+  const source = { title: "Hola" };
+  Object.defineProperty(source, "danger", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "should not run";
+    }
+  });
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": source,
+    en: { title: "Hello", danger: "safe" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /accessor properties/);
+  assert.equal(invoked, false);
+});
+
+test("Language QA catalog bridge rejects symbols, prototype keys and excessive nesting", () => {
+  const symbolCatalog = { title: "Hola" };
+  symbolCatalog[Symbol("unsafe")] = "hidden";
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": symbolCatalog,
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /symbol keys/);
+
+  const polluted = JSON.parse('{"__proto__":{"polluted":"yes"},"title":"Hola"}');
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": polluted,
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /prototype-sensitive key/);
+  assert.equal({}.polluted, undefined);
+
+  let deep = { title: "Hola" };
+  for (let index = 0; index < 26; index += 1) deep = { nested: deep };
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": deep,
+    en: { nested: { title: "Hello" } }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /nested plain object/);
+});
