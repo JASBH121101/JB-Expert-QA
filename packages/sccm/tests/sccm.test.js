@@ -141,7 +141,8 @@ test("the append-only evidence ledger contains valid per-source exact-SHA assess
   assert.equal(history.length, 91);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
-    const source = node && inventory.sources.find((item) => item.id === node.sourceId);
+    const sourceId = node && (entry.sourceId ?? node.sourceId);
+    const source = inventory.sources.find((item) => item.id === sourceId);
     return Boolean(source && entry.commitSha === source.commitSha);
   }));
 });
