@@ -8,16 +8,16 @@
 
 ## Executive decision
 
-The reviewed changes show strong automated regression and distribution evidence. The listed CI suites are green on the exact inspected heads where stated. The updated Malware Engine PowerShell lexer commit is an explicit exception: only focused local lexer checks have run, and its full CI validation remains pending. This supports **laboratory / CI certification only** for the previously tested scope. It does not establish production readiness, antivirus effectiveness, exploit resistance, or independent third-party certification.
+The reviewed changes show strong automated regression and distribution evidence. The current Malware Engine PowerShell lexer head `603da7e26a43635faa35bc4fe79baf223b29333d` has now passed its complete targeted package workflow and the full repository integration matrix: **42/42 workflow jobs** through validation PR #144. This supports **laboratory / CI certification only**. It does not establish production readiness, real-world antivirus effectiveness, exploit resistance, or independent third-party certification.
 
-No changes were made to main, no PR was merged, and no paid service or production environment was accessed.
+No changes were made to `main`; the temporary validation PR #144 and obsolete validation requests #142/#143 were closed without merge. No paid service or production environment was accessed.
 
 ## Verified CI evidence
 
 | PR | Area | Inspected head | Check runs | Result |
 |---|---|---|---:|---|
 | #125 | Resilience A2 restart reconciliation | 95faf095ed575d62dc042433701ce909e00b0362 | 49/49 workflow jobs | PASS — latest inspected head |
-| #135 | Malware Engine calibration + PowerShell string-context hardening | 665699bd6aab2d747ff94cad2e5af350a4c682d7 | 40/40 jobs on predecessor `04aef0251b1ef0bc7e36f43078dfcae0baf8ac29`; 5 focused local lexer cases PASS | CONDITIONAL — current lexer commit has no recorded full CI run |
+| #135 | Malware Engine calibration + contextual PowerShell lexer hardening | 603da7e26a43635faa35bc4fe79baf223b29333d | 42/42 workflow jobs on exact head, validated via #144 | PASS — LAB-CERTIFIED, synthetic corpus only |
 | #136 | Security Guard upload inspection + attestation | c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5 | 61/61 | PASS |
 | #138 | PHP scanner byte-stream integrity (superseded/overlapping proposal) | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS (stale base; not combined evidence) |
 | #139 | Cross-runtime malicious-upload quarantine retention + PHP sequential reader | bc1b3ab438fbdd01a1bb25131df3fd23884455cc | 43/43 jobs | PASS (code head; later commits are documentation-only) |
@@ -26,7 +26,7 @@ No changes were made to main, no PR was merged, and no paid service or productio
 | #130 | Malware Engine fixture-only calibration evidence | 02738c75ec1dd4b531177030a7cac32177e0c0ff | 54/54 | PASS |
 | #128 | Security Guard package distribution | 4f36ec9792e8b9e733e1a25e3948cd1a0d0e48a8 | 48/48 | PASS |
 
-All totals above were queried from commit-specific GitHub check-runs, not inferred from PR summaries. Earlier cancelled/failed attempts were excluded when the inspected final head had a complete successful check set.
+All totals above were queried from commit-specific GitHub Actions runs/jobs, not inferred from PR summaries. Malware head `603da7e...` was validated by six workflows on the exact same commit: JB Engines Certification 30/30; Malware Engine 4/4; Core Validation 2/2; NPM distribution 2/2; Security QA 2/2; NEXORA Threat Lab 2/2. The four Malware Engine matrix jobs each ran 204 tests: Windows Node 22/24 passed 204/204; Ubuntu Node 22/24 passed 200/200 with four Windows-only tests skipped on each Linux lane. No test failed.
 
 ## Findings and required hardening
 
@@ -55,7 +55,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 - Security Guard defines versioned JSON schemas and conformance vectors for scan requests, results, and attestations.
 - PHP #139 now carries a sequential bounded reader, counts and hashes the exact bytes delivered to the scanner, and rejects incomplete, transient-empty, trailing or altered content. #139 also verifies malicious verdicts remain in private quarantine across Node, PHP and Python, are never promoted, and emit quarantine telemetry.
 - Python and PHP distribution paths have clean-consumer/package validation in the CI matrix.
-- Resilience A2 validates strict record shapes, identity bindings, idempotency keys, evidence digests, independent verification, and forensic retention receipts; unresolved outcomes remain held.
+- Resilience A2 validates strict record shapes, identity bindings, idempotency keys, evidence digests, independent verification, and forensic retention receipts; unresolved outcomes remain held. The execution-capable controller also requires the external revision anchor to be explicitly configured, durable and atomic, plus the pending-record APIs; the coordinator remains read-only.
 - Threat Lab aggregation rejects duplicate target/scenario pairs and conflicting target definitions, and preserves source outcomes.
 - Malware calibration uses synthetic evidence; this is useful for deterministic regression but intentionally insufficient for claims about live malware detection.
 
@@ -68,13 +68,13 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 | Security Guard core | 61/61 CI checks on #136 | LAB-CERTIFIED — integration pending |
 | Security Guard PHP stream + malicious quarantine lifecycle | 43/43 workflow jobs on #139 code head | LAB-CERTIFIED — host storage/scanner integration pending |
 | Security Guard distribution | 48/48 CI checks on #128 | LAB-CERTIFIED |
-| Malware Engine calibration | 40/40 workflow jobs on predecessor `04aef0251b1ef0bc7e36f43078dfcae0baf8ac29`; 5 focused local PowerShell lexer cases on current head | CONDITIONAL — synthetic corpus only; latest lexer hardening still needs full CI |
+| Malware Engine calibration + contextual PowerShell lexical triage | 42/42 workflow jobs on exact head `603da7e26a43635faa35bc4fe79baf223b29333d`; 204 tests per platform, Windows 204/204, Linux 200/200 plus four Windows-only skips | LAB-CERTIFIED — synthetic/fixture corpus only; not antivirus efficacy certification |
 | Threat Lab report | 50/50 CI checks | LAB-CERTIFIED — reporting/aggregation only |
 
 ## Release gates
 
 1. Keep #139 as the canonical child of #136; do not merge the stale/overlapping #138 branch independently. Verify CI on the final code head and re-run after any further code changes.
-2. Re-run the complete Malware Engine workflows on exact head `665699bd6aab2d747ff94cad2e5af350a4c682d7`; focused lexer tests passed locally, but no full CI run is recorded for the new PowerShell preprocessing yet.
+2. Preserve the exact Malware Engine evidence at head `603da7e26a43635faa35bc4fe79baf223b29333d`; any later code change must trigger the complete cross-platform and integration matrix again.
 3. Review the full diffs and adversarial tests for each PR, not just the green status.
 4. Keep all draft PRs unmerged until dependency order and combined CI are proven.
 5. For production adoption, require a real host integration review covering storage isolation, atomic promotion, authorization, secrets, observability, backups, and incident response.
@@ -82,7 +82,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 
 ## Final status
 
-**Laboratory evidence: PASS for the inspected commit heads.**  
+**Laboratory evidence: PASS for the inspected commit heads, including the final Malware Engine candidate `603da7e...` (42/42 workflow jobs).**  
 **Production certification: NOT GRANTED.**  
 **Release readiness: BLOCKED on production host-adapter, access-control, retention, and operational integration gates.**
 
