@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 64);
+  assert.equal(history.length, 75);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -199,13 +199,18 @@ test("Language QA is PASS at component, module, subbranch and branch levels", ()
 });
 
 
-test("the Language QA dependency is certified without certifying all of Localization Engine", () => {
+test("Localization Engine branch and subbranch are PASS with historical CLDR dependency intact", () => {
   const pluralRules = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime.plurals");
-  const localizationEngine = evaluateSccmNode(inventory, history, "jb.localization-engine");
+  const branch = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime");
+  const subbranch = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime.intl");
+  const module = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime.module");
+  const engine = evaluateSccmNode(inventory, history, "jb.localization-engine");
   assert.equal(pluralRules.status, "PASS");
   assert.equal(pluralRules.ownStatus, "PASS");
-  assert.equal(localizationEngine.status, "PENDING");
-  assert.ok(localizationEngine.blockingChildren.length > 0);
+  assert.equal(module.status, "PASS");
+  assert.equal(branch.status, "PASS");
+  assert.equal(subbranch.status, "PASS");
+  assert.equal(engine.status, "PASS");
 });
 
 test("Visual QA branch and module pass while uncertified sibling branches keep Expert QA pending", () => {
@@ -241,6 +246,19 @@ test("Resilience A2 subbranch passes while the whole engine remains pending for 
   assert.ok(a2.children[0].children.every((component) => component.status === "PASS"));
   assert.equal(engine.status, "PENDING");
   assert.ok(engine.blockingChildren.some((child) => child.status === "PENDING"));
+});
+
+test("Currency Engine branch, precision subbranch and curated components are PASS", () => {
+  const branch = evaluateSccmNode(inventory, history, "jb.currency-engine.money");
+  const subbranch = evaluateSccmNode(inventory, history, "jb.currency-engine.money.precision");
+  const module = evaluateSccmNode(inventory, history, "jb.currency-engine.money.module");
+  const engine = evaluateSccmNode(inventory, history, "jb.currency-engine");
+  assert.equal(module.status, "PASS");
+  assert.equal(subbranch.status, "PASS");
+  assert.equal(branch.status, "PASS");
+  assert.equal(engine.status, "PASS");
+  assert.ok(module.children.every((component) => component.status === "PASS"));
+  assert.equal(module.children.find((component) => component.id === "jb.currency-engine.money.fx").ownStatus, "PASS");
 });
 
 test("Resilience A1 is certified while A2 and A3 stay bounded to laboratory components", () => {
@@ -316,7 +334,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 28);
+  assert.equal(report.counts.component.PASS, 35);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
