@@ -20,7 +20,7 @@ The host must inject:
 - **Containment provider:** `providerId`, `reconciliationReadOnly: true`, `reconcile`, and `reconcileRelease`. Both reconciliation methods must query authoritative provider state and must never submit, retry, reverse, or otherwise mutate a provider operation.
 - **Independent verifier:** a verifier identity distinct from the provider, with `verifyContainment` and `verifyRelease`. It must use an observation path independent of the executor.
 - **Forensic recorder:** `recorderId` and read-only `lookupRetention`. It must return the previously stored retention receipt; it must not create a new preservation record during this scan.
-- **Evidence resolver:** read-only `resolve`, returning the requested reference ID and its actual UTF-8 or binary content. The coordinator calculates SHA-256 locally and compares it with the durable reference.
+- **Evidence resolver:** read-only `resolve`, returning the requested reference ID and its actual UTF-8 or binary content. The coordinator calculates SHA-256 locally and compares it with the durable reference. It enforces a cumulative per-record byte budget of 16 MiB by default (configurable from 1 byte to 64 MiB); any payload that exceeds the remaining budget is held before buffer allocation, hashing, independent verification or forensic success.
 
 The host-provided `durable` and `reconciliationReadOnly` markers are integration assertions, not cryptographic proof. The host remains responsible for demonstrating durable storage, provider read-only behavior, verifier independence and evidence-source integrity.
 
@@ -47,7 +47,7 @@ The pending index contains claim IDs only. Each ID is re-fetched from the journa
 2. Re-fetch one exact pending record by claim ID. Never trust scope or provider identifiers supplied only by the page index.
 3. Query provider state using the exact action, scope, profile and deterministic idempotency key. Release reconciliation also binds the original containment operation ID.
 4. Accept only a typed provider receipt matching provider identity, operation identity, action, profile, idempotency key, exact scope, expected state and bounded timestamp.
-5. Resolve every evidence reference again. Hash the returned bytes locally and compare the exact SHA-256 digest. A missing, stale, mismatched or malformed reference holds the record.
+5. Resolve every evidence reference again within the cumulative `maxEvidenceBytes` budget. Measure UTF-8/binary length before allocating a snapshot buffer, then hash the bounded byte snapshot and compare the exact SHA-256 digest. A missing, oversized, stale, mismatched or malformed reference holds the record and cannot reach independent verification or forensic success.
 6. Obtain fresh independent state verification bound to the exact operation ID and evidence-reference digest.
 7. Look up the existing forensic retention receipt and validate its recorder identity, scope, operation ID, evidence digest, retention identifiers and validity window.
 8. Emit a read-only finding. Never mutate the journal, budget, policy authorization, provider, containment state or release state.

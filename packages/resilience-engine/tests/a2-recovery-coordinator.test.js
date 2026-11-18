@@ -36,7 +36,7 @@ function operationKey(action) {
   }), "utf8").digest("hex");
 }
 
-function makeRecord(action = "apply-containment-profile") {
+function makeRecord(action = "apply-containment-profile", evidenceRefs = EVIDENCE_REFS) {
   return {
     schema: "jb.resilience.a2-recovery-record/v1",
     claimId: "claim-01",
@@ -49,7 +49,7 @@ function makeRecord(action = "apply-containment-profile") {
     idempotencyKey: operationKey(action),
     state: "provider-started",
     originalOperationId: action === "release-containment" ? "contain-op-01" : null,
-    evidenceRefs: EVIDENCE_REFS,
+    evidenceRefs,
     createdAtMs: NOW - 10_000,
     updatedAtMs: NOW - 5_000,
     leaseExpiresAtMs: NOW - 1_000
@@ -78,7 +78,7 @@ function makeVerification(record, receipt, state) {
     state,
     profileId: record.profileId,
     operationId: receipt.operationId,
-    referencesSha256: createHash("sha256").update(canonical(EVIDENCE_REFS), "utf8").digest("hex"),
+    referencesSha256: createHash("sha256").update(canonical(record.evidenceRefs), "utf8").digest("hex"),
     ...record.scope,
     observedAtMs: NOW - 1_000,
     expiresAtMs: NOW + 60_000
@@ -95,7 +95,7 @@ function makeForensicReceipt(record, receipt) {
     retentionPolicyId: "owner-retention-30d",
     preservedAtMs: NOW - 1_000,
     expiresAtMs: NOW + 86_400_000,
-    referencesSha256: createHash("sha256").update(canonical(EVIDENCE_REFS), "utf8").digest("hex"),
+    referencesSha256: createHash("sha256").update(canonical(record.evidenceRefs), "utf8").digest("hex"),
     operationId: receipt.operationId
   };
 }
@@ -104,12 +104,15 @@ function createFixture({
   action = "apply-containment-profile",
   providerOutcome = null,
   resolvedContent = CONTENT,
+  resolvedContentByRef = null,
+  evidenceRefs = EVIDENCE_REFS,
   malformedRecord = false,
   recorderIdOverride = "recorder-lab-01",
   listPending = null,
-  operationTimeoutMs = 1_000
+  operationTimeoutMs = 1_000,
+  maxEvidenceBytes = 16 * 1024 * 1024
 } = {}) {
-  const record = makeRecord(action);
+  const record = makeRecord(action, evidenceRefs);
   record.recorderId = recorderIdOverride;
   const events = [];
   const receipt = makeOperationReceipt(
@@ -196,7 +199,7 @@ function createFixture({
   const resolver = {
     async resolve({ refId }) {
       events.push("resolve-evidence");
-      return { refId, content: resolvedContent };
+      return { refId, content: resolvedContentByRef?.[refId] ?? resolvedContent };
     }
   };
   const coordinator = createA2RecoveryCoordinator({
@@ -206,7 +209,8 @@ function createFixture({
     forensicRecorder: recorder,
     evidenceResolver: resolver,
     clock: () => NOW,
-    operationTimeoutMs
+    operationTimeoutMs,
+    maxEvidenceBytes
   });
   return { coordinator, events, record };
 }
@@ -349,4 +353,77 @@ test("an adapter resolving while handling abort cannot override the reconciliati
   assert.equal(events.includes("resolve-evidence"), false);
   assert.equal(events.includes("verify-containment"), false);
   assert.equal(events.includes("lookup-retention"), false);
+});
+
+
+test("evidence resolver payloads are bounded before hashing or verification", async () => {
+  const { coordinator, events } = createFixture({
+    resolvedContent: "x".repeat(17),
+    maxEvidenceBytes: 16
+  });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, false);
+  assert.equal(report.findings[0].state, "held-for-reconciliation");
+  assert.equal(report.findings[0].reason, "evidence-byte-budget-exceeded");
+  assert.equal(report.findings[0].maxEvidenceBytes, 16);
+  assert.equal(report.findings[0].resolvedEvidenceBytes, 0);
+  assert.equal(report.findings[0].rejectedEvidenceBytes, 17);
+  assert.equal(report.findings[0].safeToRetry, false);
+  assert.equal(report.findings[0].executable, false);
+  assert.equal(events.includes("verify-containment"), false);
+  assert.equal(events.includes("lookup-retention"), false);
+});
+
+test("cumulative evidence bytes are bounded across all references in a record", async () => {
+  const first = "first evidence";
+  const second = "second evidence";
+  const evidenceRefs = [
+    {
+      refId: "evidence-first",
+      sha256: createHash("sha256").update(first, "utf8").digest("hex")
+    },
+    {
+      refId: "evidence-second",
+      sha256: createHash("sha256").update(second, "utf8").digest("hex")
+    }
+  ];
+  const firstBytes = Buffer.byteLength(first, "utf8");
+  const secondBytes = Buffer.byteLength(second, "utf8");
+  const { coordinator, events } = createFixture({
+    evidenceRefs,
+    resolvedContentByRef: {
+      "evidence-first": first,
+      "evidence-second": second
+    },
+    maxEvidenceBytes: firstBytes + secondBytes - 1
+  });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, false);
+  assert.equal(report.findings[0].reason, "evidence-byte-budget-exceeded");
+  assert.equal(report.findings[0].resolvedEvidenceBytes, firstBytes);
+  assert.equal(report.findings[0].rejectedEvidenceBytes, secondBytes);
+  assert.equal(events.filter((event) => event === "resolve-evidence").length, 2);
+  assert.equal(events.includes("verify-containment"), false);
+  assert.equal(events.includes("lookup-retention"), false);
+});
+
+test("A2 recovery coordinator rejects unbounded evidence budget configuration", () => {
+  assert.throws(() => createFixture({
+    maxEvidenceBytes: 64 * 1024 * 1024 + 1
+  }), /A2 recovery bounds are invalid/);
+});
+
+test("binary evidence hashing respects the exact typed-array view boundaries", async () => {
+  const wrapped = Buffer.from("prefix" + CONTENT + "suffix", "utf8");
+  const view = wrapped.subarray(
+    Buffer.byteLength("prefix", "utf8"),
+    Buffer.byteLength("prefix" + CONTENT, "utf8")
+  );
+  const { coordinator } = createFixture({ resolvedContent: view });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, true);
+  assert.equal(report.findings[0].state, "contained-observed-and-verified");
 });
