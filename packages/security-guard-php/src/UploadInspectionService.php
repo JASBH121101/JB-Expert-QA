@@ -297,15 +297,6 @@ final class UploadInspectionService
                 throw new UploadInspectionException('INVALID_SCAN_RESULT');
             }
 
-            if ($scanResult['verdict'] === 'malicious') {
-                throw new UploadInspectionException('MALWARE_DETECTED');
-            }
-
-            if ($scanResult['verdict'] !== 'clean') {
-                $retainQuarantine = true;
-                throw new UploadInspectionException('SCAN_NOT_CLEAN');
-            }
-
             if ($scanResult['sha256'] !== $sha256 || $scanResult['size'] !== $size) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
@@ -317,7 +308,6 @@ final class UploadInspectionService
                 throw new UploadInspectionException('INVALID_SCAN_RESULT');
             }
 
-            $retainQuarantine = true;
             $scannedAtMs = (int) floor(microtime(true) * 1000);
             $attestation = CoreV1::validateUploadInspectionAttestationV1([
                 'schema' => 'jb.security.upload-inspection.attestation/v1',
@@ -331,9 +321,25 @@ final class UploadInspectionService
                 'scannedAtMs' => $scannedAtMs,
             ]);
 
-            if (!$this->storage->promote($uploadId, $sha256, $size, $attestation)) {
+            if ($scanResult['verdict'] === 'malicious') {
+                throw new UploadInspectionException('MALWARE_DETECTED', attestation: $attestation);
+            }
+
+            if ($scanResult['verdict'] !== 'clean') {
                 $retainQuarantine = true;
-                throw new UploadInspectionException('PROMOTION_FAILED');
+                throw new UploadInspectionException('SCAN_NOT_CLEAN', attestation: $attestation);
+            }
+
+            $retainQuarantine = true;
+
+            try {
+                $promoted = $this->storage->promote($uploadId, $sha256, $size, $attestation);
+            } catch (Throwable) {
+                throw new UploadInspectionException('PROMOTION_FAILED', attestation: $attestation);
+            }
+            if (!$promoted) {
+                $retainQuarantine = true;
+                throw new UploadInspectionException('PROMOTION_FAILED', attestation: $attestation);
             }
 
             $this->emit('approved', 'clean_scan', $uploadId);
