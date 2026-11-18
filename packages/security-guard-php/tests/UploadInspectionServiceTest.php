@@ -112,13 +112,14 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     ) {
     }
 
-    public function scan(mixed $stream, array $metadata): array
+    public function scan(UploadInspectionReadOnlyStream $stream, array $metadata): array
     {
         if ($this->unavailable) {
             throw new RuntimeException('Synthetic scanner outage');
         }
         if ($this->seekToEnd) {
-            fseek($stream, 0, SEEK_END);
+            // The reader exposes no seek operation; return without reading to
+            // prove that a scanner cannot fabricate complete consumption.
             return [
                 'verdict' => $this->verdict,
                 'sha256' => $metadata['sha256'],
@@ -128,7 +129,7 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
             ];
         }
         if ($this->consumeBytes > 0) {
-            fread($stream, $this->consumeBytes);
+            $stream->read($this->consumeBytes);
             return [
                 'verdict' => $this->verdict,
                 'sha256' => $metadata['sha256'],
@@ -148,9 +149,8 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         }
         $hash = hash_init('sha256');
         $size = 0;
-        while (!feof($stream)) {
-            $chunk = fread($stream, 65536);
-            if ($chunk === false) throw new RuntimeException('Could not read quarantine stream');
+        while (true) {
+            $chunk = $stream->read(65536);
             if ($chunk === '') break;
             $size += strlen($chunk);
             hash_update($hash, $chunk);
