@@ -1377,6 +1377,13 @@ export function createPostgresA2ActionLedger({
     assertInitialized();
     try {
       return await runA2Transaction(input.signal, async (client) => {
+        // Serialize claim-sequence allocation through commit. Without this
+        // global transaction lock, a lower identity sequence could commit after
+        // a higher one and be missed by a later keyset page using a fixed ceiling.
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          ["jb-resilience-a2-claim-sequence-v1"]
+        );
         const lockKey = canonicalJson([scope.environment, scope.assetId]);
         await client.query(
           "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey]
