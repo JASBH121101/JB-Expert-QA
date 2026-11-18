@@ -123,8 +123,9 @@ test("unsupported signatures are rejected and never promoted", async () => {
     (error) => error instanceof UploadInspectionError && error.code === "UNSUPPORTED_TYPE"
   );
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
-  assert.ok(store.calls.some(([name]) => name === "delete"));
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
 });
 
 test("declared MIME type and filename extension must agree with detected bytes", async () => {
@@ -238,8 +239,9 @@ test("promotion adapter must verify the exact scanned object before approval", a
   assert.equal(promotionCall[3], PNG.length);
 });
 
-test("malware verdicts are rejected and the quarantined object is deleted", async () => {
+test("malware verdicts are rejected and the quarantined object is retained privately", async () => {
   const store = createMemoryStore();
+  const events = [];
   const scanner = {
     async scan({ stream }) {
       for await (const chunk of stream) void chunk;
@@ -247,7 +249,7 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
     }
   };
   await assert.rejects(
-    inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
+    inspector(store, scanner, { onEvent: (event) => events.push(event) }).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
     (error) => {
       assert.equal(error.code, "MALWARE_DETECTED");
       assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
@@ -258,7 +260,11 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
     }
   );
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
+  assert.equal(events.at(-1)?.action, "quarantined");
 });
 
 test("unknown scan verdicts remain quarantined and cannot be promoted", async () => {
@@ -559,7 +565,7 @@ test("upload Core v1 distinguishes malware rejection from a quarantined unknown 
   assert.equal(maliciousEvents.length, 1);
   assert.equal(maliciousEvents[0].ruleId, "JBG-MALWARE-001");
   assert.equal(maliciousEvents[0].severity, "critical");
-  assert.equal(maliciousEvents[0].action, "rejected");
+  assert.equal(maliciousEvents[0].action, "quarantined");
   assert.equal(maliciousEvents[0].outcome, "denied");
 
   const unknownStore = createMemoryStore();
