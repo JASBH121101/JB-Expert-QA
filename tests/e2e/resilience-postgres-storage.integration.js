@@ -250,10 +250,22 @@ async function main() {
       }
     }), false, "a stale expected state must not advance the anchor");
     assert.deepEqual(await revisionAnchorSecond.read({ ledgerId }), finalState);
-    await pool.query(
-      "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
-      [ledgerId]
+    await assert.rejects(
+      pool.query(
+        "UPDATE public.jb_resilience_a2_revision_anchors SET revision=revision-1 WHERE ledger_id=$1",
+        [ledgerId]
+      ),
+      /advance exactly one revision/
     );
+    await assert.rejects(
+      pool.query(
+        "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
+        [ledgerId]
+      ),
+      /permanent tombstones/
+    );
+    assert.deepEqual(await revisionAnchorFirst.read({ ledgerId }), finalState,
+      "direct rollback or deletion must leave the accepted external high-water mark intact");
   });
 
 
@@ -304,10 +316,8 @@ async function main() {
       const pending = await revisionAnchorFirst.read({ ledgerId });
       assert.deepEqual(pending, advancedAnchor);
     } finally {
-      await pool.query(
-        "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
-        [ledgerId]
-      );
+      // Anchor rows are permanent idempotency/rollback tombstones by design.
+      // The test journal is local and can be removed after the assertion.
       await rm(directory, { recursive: true, force: true });
     }
   });
