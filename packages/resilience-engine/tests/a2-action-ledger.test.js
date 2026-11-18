@@ -628,6 +628,19 @@ test("file ledger detects loss, rollback, same-revision tampering and guard dele
     const restored = await store.listPending({ cursor: null, limit: 10, atMs: NOW + 5 });
     assert.deepEqual(restored.claimIds, [claim.claimId]);
 
+    // An ahead-of-guard single-revision change is ambiguous and must not be
+    // auto-promoted, even though a crash after ledger rename could cause it.
+    const trustedGuard = await readFile(guardPath, "utf8");
+    const oneStepAhead = JSON.parse(latestLedger);
+    oneStepAhead.revision += 1;
+    await writeFile(filePath, JSON.stringify(oneStepAhead) + "\\n", "utf8");
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 6 }),
+      /revision diverges.*manual review/
+    );
+    assert.equal(await readFile(guardPath, "utf8"), trustedGuard);
+    await writeFile(filePath, latestLedger, "utf8");
+
     await unlink(filePath);
     await assert.rejects(
       store.listPending({ cursor: null, limit: 10, atMs: NOW + 6 }),
