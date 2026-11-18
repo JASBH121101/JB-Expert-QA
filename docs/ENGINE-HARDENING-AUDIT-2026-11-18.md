@@ -19,7 +19,8 @@ No changes were made to main, no PR was merged, and no paid service or productio
 | #125 | Resilience A2 restart reconciliation | cb200af6f6df8edf6cb3abd198b495a68f512011 | 59/59 | PASS |
 | #135 | Malware Engine synthetic calibration | 04aef0251b1ef0bc7e36f43078dfcae0baf8ac29 | 48/48 | PASS |
 | #136 | Security Guard upload inspection + attestation | c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5 | 61/61 | PASS |
-| #138 | PHP scanner byte-stream integrity | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS |
+| #138 | PHP scanner byte-stream integrity (superseded/overlapping proposal) | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS (stale base; not combined evidence) |
+| #139 | Cross-runtime malicious-upload quarantine retention + PHP sequential reader | bc1b3ab438fbdd01a1bb25131df3fd23884455cc | 43/43 jobs | PASS (code head; later commits are documentation-only) |
 | #132 | Threat Lab unified certification report | b8073677f581089e43548b5ce138c829e8e2c34c | 50/50 | PASS |
 | #131 | Resilience A1 operational evidence | e49edba95a3bc409911730e1d2755590c539cfa2 | 49/49 | PASS |
 | #130 | Malware Engine fixture-only calibration evidence | 02738c75ec1dd4b531177030a7cac32177e0c0ff | 54/54 | PASS |
@@ -29,10 +30,10 @@ All totals above were queried from commit-specific GitHub check-runs, not inferr
 
 ## Findings and required hardening
 
-### F-01 — Stacked Security Guard PHP PR is based on a stale parent commit
+### F-01 — Stale PHP integration proposal is superseded by the current Security Guard quarantine branch
 **Severity:** High (integration / release integrity)  
-PR #138 targets integration/security-guard-scan-attestation-v1, but its recorded base SHA is 1d050e1dad0c22f9cb855b585029b8dc92f61384; PR #136's current head is c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5. Therefore the 48 green checks on #138 do not prove the current combined #136 + #138 tree.  
-**Required action:** after #136's final changes are settled, update/rebase the #138 branch onto the exact current #136 head and rerun all required workflows on the combined tree. Keep both PRs draft until that evidence exists. Do not merge #138 independently into main.
+PR #138 still records stale base SHA `1d050e1dad0c22f9cb855b585029b8dc92f61384`, not #136's current head `c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5`. Its 48 green checks therefore do not validate a combined current tree. The newer PR #139 is based on the exact #136 head and includes the sequential bounded PHP reader, byte-integrity checks, transient-empty/trailing-byte regressions, and the cross-runtime malicious-quarantine lifecycle. PR #139's code-bearing head `bc1b3ab438fbdd01a1bb25131df3fd23884455cc` passed 43/43 workflow jobs. Its seven subsequent commits change documentation only; latest head is `6780eb7fc2fed0ed580bbe9ea8dce4a15359101d`.
+**Required action:** use #139 as the canonical Security Guard continuation from #136. Do not merge #138 independently; it now overlaps the PHP reader implemented in #139. A review note was added to #138 asking that it be treated as superseded or rebased only if a unique change remains. Keep #136/#139 draft until host integration evidence and final release review are complete.
 
 ### F-02 — CI certification is not production malware-scanning certification
 **Severity:** High (assurance boundary)  
@@ -52,7 +53,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 ## Positive controls observed
 
 - Security Guard defines versioned JSON schemas and conformance vectors for scan requests, results, and attestations.
-- PHP #138 uses a sequential bounded reader, counts and hashes the exact bytes delivered to the scanner, and rejects incomplete or altered content.
+- PHP #139 now carries a sequential bounded reader, counts and hashes the exact bytes delivered to the scanner, and rejects incomplete, transient-empty, trailing or altered content. #139 also verifies malicious verdicts remain in private quarantine across Node, PHP and Python, are never promoted, and emit quarantine telemetry.
 - Python and PHP distribution paths have clean-consumer/package validation in the CI matrix.
 - Resilience A2 validates strict record shapes, identity bindings, idempotency keys, evidence digests, independent verification, and forensic retention receipts; unresolved outcomes remain held.
 - Threat Lab aggregation rejects duplicate target/scenario pairs and conflicting target definitions, and preserves source outcomes.
@@ -65,14 +66,14 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 | Resilience A1 | 49/49 CI checks | LAB-CERTIFIED |
 | Resilience A2 | 59/59 CI checks | LAB-CERTIFIED — read-only reconciliation only |
 | Security Guard core | 61/61 CI checks on #136 | LAB-CERTIFIED — integration pending |
-| Security Guard PHP stream integrity | 48/48 CI checks on #138 | CONDITIONAL — stacked-parent refresh required |
+| Security Guard PHP stream + malicious quarantine lifecycle | 43/43 workflow jobs on #139 code head | LAB-CERTIFIED — host storage/scanner integration pending |
 | Security Guard distribution | 48/48 CI checks on #128 | LAB-CERTIFIED |
 | Malware Engine calibration | 48/48 CI checks on #135; 54/54 on #130 | LAB-CERTIFIED — synthetic corpus only |
 | Threat Lab report | 50/50 CI checks | LAB-CERTIFIED — reporting/aggregation only |
 
 ## Release gates
 
-1. Refresh #138 onto the exact final #136 head; rerun all workflows on the combined result.
+1. Keep #139 as the canonical child of #136; do not merge the stale/overlapping #138 branch independently. Verify CI on the final code head and re-run after any further code changes.
 2. Review the full diffs and adversarial tests for each PR, not just the green status.
 3. Keep all draft PRs unmerged until dependency order and combined CI are proven.
 4. For production adoption, require a real host integration review covering storage isolation, atomic promotion, authorization, secrets, observability, backups, and incident response.
@@ -82,6 +83,6 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 
 **Laboratory evidence: PASS for the inspected commit heads.**  
 **Production certification: NOT GRANTED.**  
-**Release readiness: BLOCKED on F-01 and the remaining human/host integration gates.**
+**Release readiness: BLOCKED on production host-adapter, access-control, retention, and operational integration gates.**
 
 This report is an engineering audit record, not a guarantee that the engines are invulnerable or that all defects have been found.
