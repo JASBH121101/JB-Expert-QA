@@ -348,7 +348,7 @@ final class UploadInspectionService
                     'engine' => $scanResult['engine'],
                     'version' => $scanResult['version'],
                 ],
-                'scannedAt' => gmdate('Y-m-d\\TH:i:s\\Z', (int) floor($scannedAtMs / 1000)),
+                'scannedAt' => gmdate('c', (int) floor($scannedAtMs / 1000)),
                 'attestation' => $attestation,
             ];
         } catch (UploadInspectionException $exception) {
