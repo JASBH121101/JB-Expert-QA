@@ -649,8 +649,11 @@ export function createFileA2ActionLedger({
       if (result.changed) {
         ledger.revision += 1;
         validateLedger(ledger, maxClaims, identities);
+        // Advance the guard first. If the subsequent journal replacement is
+        // interrupted, the guard will be ahead and every read fails closed
+        // for operator review instead of silently accepting ambiguous state.
+        await writeLedgerGuard(target + ".guard", ledger);
         await writeLedgerFile(target, ledger, maxLedgerBytes);
-        await ensureLedgerGuard(target, ledger);
       }
       return result.value;
     });
