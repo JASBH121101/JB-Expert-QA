@@ -6,6 +6,8 @@ const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageRoot = resolve(repositoryRoot, "packages/expert-qa");
 const sourceRoot = resolve(repositoryRoot, "src");
 const configRoot = resolve(repositoryRoot, "config");
+const localizationSourceRoot = resolve(repositoryRoot, "packages/localization-engine/src");
+const packageLocalizationRoot = resolve(packageRoot, "packages/localization-engine/src");
 const packageSourceRoot = resolve(packageRoot, "src");
 const packageConfigRoot = resolve(packageRoot, "config");
 
@@ -13,10 +15,15 @@ const manifest = JSON.parse(await readFile(resolve(packageRoot, "package.json"),
 
 await rm(packageSourceRoot, { recursive: true, force: true });
 await rm(packageConfigRoot, { recursive: true, force: true });
+await rm(resolve(packageRoot, "packages/localization-engine"), { recursive: true, force: true });
 await mkdir(packageRoot, { recursive: true });
 
 await cp(sourceRoot, packageSourceRoot, { recursive: true, force: true });
 await cp(configRoot, packageConfigRoot, { recursive: true, force: true });
+// Language QA shares the canonical CLDR catalog auditor with Localization Engine.
+// Copy its source into the standalone package so relative imports remain valid after npm pack.
+await mkdir(packageLocalizationRoot, { recursive: true });
+await cp(localizationSourceRoot, packageLocalizationRoot, { recursive: true, force: true });
 
 await writeFile(
   resolve(packageRoot, "package-version.js"),
@@ -46,6 +53,8 @@ const requiredFiles = [
   "src/ai/visual-review.js",
   "src/agent/autopilot.js",
   "src/security-bridge/index.js",
+  "packages/localization-engine/src/catalog.js",
+  "packages/localization-engine/src/locale.js",
   "config/default.config.json",
   "config/project-audit.config.json",
   "config/security-audit.config.json",
