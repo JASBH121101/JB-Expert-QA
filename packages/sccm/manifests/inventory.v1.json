@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.4",
-  "generatedAt": "2026-11-18T22:22:00Z",
+  "inventoryVersion": "1.0.5",
+  "generatedAt": "2026-11-18T22:31:00Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -38,6 +38,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "certify/currency-qa-engine-v1",
       "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d"
+    },
+    {
+      "id": "jb-expert-qa-package-distribution-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "certify/currency-qa-engine-v1",
+      "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97"
     }
   ],
   "nodes": [
@@ -568,7 +574,7 @@
       "name": "Package QA",
       "level": "branch",
       "parentId": "jb.expert-qa",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-package-distribution-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -578,7 +584,7 @@
       "name": "Package distribution",
       "level": "subbranch",
       "parentId": "jb.expert-qa.package",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-package-distribution-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -598,7 +604,7 @@
       "name": "Clean consumer installation",
       "level": "component",
       "parentId": "jb.expert-qa.package.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-package-distribution-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -608,7 +614,7 @@
       "name": "Public exports and entrypoints",
       "level": "component",
       "parentId": "jb.expert-qa.package.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-package-distribution-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -618,7 +624,7 @@
       "name": "Dependency and package boundaries",
       "level": "component",
       "parentId": "jb.expert-qa.package.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-package-distribution-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
