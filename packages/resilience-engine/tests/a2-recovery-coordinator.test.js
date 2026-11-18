@@ -378,3 +378,16 @@ test("A2 recovery coordinator rejects unbounded evidence budget configuration", 
     maxEvidenceBytes: 64 * 1024 * 1024 + 1
   }), /A2 recovery bounds are invalid/);
 });
+
+test("binary evidence hashing respects the exact typed-array view boundaries", async () => {
+  const wrapped = Buffer.from("prefix" + CONTENT + "suffix", "utf8");
+  const view = wrapped.subarray(
+    Buffer.byteLength("prefix", "utf8"),
+    Buffer.byteLength("prefix" + CONTENT, "utf8")
+  );
+  const { coordinator } = createFixture({ resolvedContent: view });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, true);
+  assert.equal(report.findings[0].state, "contained-observed-and-verified");
+});
