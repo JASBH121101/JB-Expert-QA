@@ -136,7 +136,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 44);
+  assert.equal(history.length, 48);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -206,11 +206,13 @@ test("the Language QA dependency is certified without certifying all of Localiza
   assert.ok(localizationEngine.blockingChildren.length > 0);
 });
 
-test("green module workflows do not bypass uncertified critical components", () => {
+test("visual QA module passes while uncertified sibling components keep Expert QA pending", () => {
   const visual = evaluateSccmNode(inventory, history, "jb.expert-qa.visual.module");
+  const visualBranch = evaluateSccmNode(inventory, history, "jb.expert-qa.visual");
   const expert = evaluateSccmNode(inventory, history, "jb.expert-qa");
   assert.equal(visual.ownStatus, "PASS");
-  assert.equal(visual.status, "PENDING");
+  assert.equal(visual.status, "PASS");
+  assert.equal(visualBranch.status, "PENDING");
   assert.ok(visual.blockingChildren.length > 0);
   assert.equal(expert.ownStatus, "PASS");
   assert.equal(expert.status, "PENDING");
