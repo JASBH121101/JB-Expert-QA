@@ -36,6 +36,11 @@ function titleFor(id) {
     "placeholder-mismatch": "Translation placeholders do not match",
     "obsolete-key": "Target locale contains an obsolete key",
     "glossary-review": "Glossary terminology requires review",
+    "unchanged-source-text": "Source text may be untranslated",
+    "protected-url-mismatch": "Translation link differs from source",
+    "protected-email-mismatch": "Translation email differs from source",
+    "protected-markup-mismatch": "Translation markup structure differs",
+    "protected-number-mismatch": "Translation numeric literal differs",
     "missing-locale-file": "Translation resource is missing",
     "target-file-without-source": "Target resource has no source file",
     "resource-parse-error": "Translation resource could not be parsed safely"
