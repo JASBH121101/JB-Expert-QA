@@ -86,6 +86,17 @@ class UploadInspectionTests(unittest.TestCase):
     def test_clean_upload_is_scanned_and_promoted_privately(self):
         result, storage = self.inspect_fixture()
         self.assertEqual(result["status"], "approved")
+        attestation = result["attestation"]
+        self.assertEqual(attestation["schema"], "jb.security.upload-inspection.attestation/v1")
+        self.assertEqual(attestation["uploadId"], result["uploadId"])
+        self.assertEqual(attestation["verdict"], "clean")
+        self.assertEqual(attestation["sha256"], result["sha256"])
+        self.assertEqual(attestation["size"], result["size"])
+        self.assertEqual(attestation["mimeType"], result["mimeType"])
+        self.assertEqual(attestation["engine"], "test-scanner")
+        self.assertEqual(attestation["version"], "1.0")
+        self.assertIs(type(attestation["scannedAtMs"]), int)
+        self.assertGreaterEqual(attestation["scannedAtMs"], 0)
         self.assertRegex(result["scannedAt"], r"^\d{4}-\d{2}-\d{2}T.*Z$")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
         self.assertEqual(storage.quarantine, {})
