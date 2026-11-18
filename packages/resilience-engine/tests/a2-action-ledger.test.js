@@ -579,7 +579,7 @@ test("file ledger refuses symbolic-link journal paths without reading their targ
   });
 });
 
-test("file ledger detects missing and rolled-back journals through its revision guard", async () => {
+test("file ledger detects loss, rollback, same-revision tampering and guard deletion", async () => {
   await withTempDirectory(async (directory) => {
     const filePath = join(directory, "a2-actions.json");
     const guardPath = filePath + ".guard";
@@ -615,5 +615,23 @@ test("file ledger detects missing and rolled-back journals through its revision 
     await writeFile(filePath, latestLedger, "utf8");
     const recovered = await store.listPending({ cursor: null, limit: 10, atMs: NOW + 7 });
     assert.deepEqual(recovered.claimIds, [claim.claimId]);
+
+    // Same-revision tampering must fail even when the modified JSON remains valid.
+    const alteredLedger = latestLedger.replace("backup-guard-test", "tampered-guard-test");
+    assert.notEqual(alteredLedger, latestLedger);
+    await writeFile(filePath, alteredLedger, "utf8");
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 8 }),
+      /digest does not match/
+    );
+    await writeFile(filePath, latestLedger, "utf8");
+
+    // Removing only the guard must never establish a new trust baseline for
+    // an already-used journal.
+    await unlink(guardPath);
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 9 }),
+      /durability guard is missing/
+    );
   });
 });
