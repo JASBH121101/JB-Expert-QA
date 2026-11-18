@@ -1075,6 +1075,7 @@ export function createFileA2ActionLedger({
 
   return Object.freeze({
     durable: true,
+    externalRevisionAnchorConfigured: normalizedRevisionAnchor !== null,
     filePath: target,
     claim,
     createPendingRecord,
