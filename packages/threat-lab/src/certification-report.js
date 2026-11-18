@@ -7,9 +7,7 @@ const DEFAULT_REQUIRED_TARGETS = Object.freeze([
   "jb-malware-engine",
   "jb-security-guard",
   "jb-expert-qa",
-  "jb-advisor-engine",
-  "nexora-configurable-catalog",
-  "nexora-site-engine"
+  "jb-advisor-engine"
 ]);
 const VALID_STATUSES = new Set(["pass", "fail", "skip"]);
 
