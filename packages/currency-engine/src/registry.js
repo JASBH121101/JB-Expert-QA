@@ -52,14 +52,20 @@ export function normalizeCurrencyCode(value) {
   return /^[A-Z]{3}$/.test(code) ? code : null;
 }
 
+function isPlainRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 export function createCurrencyRegistry(customCurrencies = {}) {
-  if (customCurrencies === null || typeof customCurrencies !== "object" || Array.isArray(customCurrencies)) {
+  if (!isPlainRecord(customCurrencies)) {
     throw new TypeError("customCurrencies must be a plain object");
   }
   const currencies = { ...DEFAULT_CURRENCIES };
   for (const [rawCode, metadata] of Object.entries(customCurrencies)) {
     const code = normalizeCurrencyCode(rawCode);
-    if (!code || metadata === null || typeof metadata !== "object" || Array.isArray(metadata) ||
+    if (!code || !isPlainRecord(metadata) ||
         metadata.code !== code || typeof metadata.name !== "string" || metadata.name.trim() === "" ||
         !Number.isInteger(metadata.minorUnit) || metadata.minorUnit < 0 || metadata.minorUnit > 4) {
       throw new TypeError("currency metadata is invalid for " + rawCode);
@@ -70,8 +76,14 @@ export function createCurrencyRegistry(customCurrencies = {}) {
 }
 
 export function getCurrency(code, registry = DEFAULT_CURRENCIES) {
+  if (!isPlainRecord(registry)) throw new TypeError("currency registry must be a plain object");
   const normalized = normalizeCurrencyCode(code);
-  const metadata = normalized ? registry[normalized] : undefined;
+  const metadata = normalized && Object.hasOwn(registry, normalized) ? registry[normalized] : undefined;
   if (!metadata) throw new RangeError("currency code is not registered: " + String(code));
+  if (!isPlainRecord(metadata) || metadata.code !== normalized ||
+      typeof metadata.name !== "string" || metadata.name.trim() === "" ||
+      !Number.isInteger(metadata.minorUnit) || metadata.minorUnit < 0 || metadata.minorUnit > 4) {
+    throw new TypeError("currency registry metadata is invalid for " + normalized);
+  }
   return metadata;
 }
