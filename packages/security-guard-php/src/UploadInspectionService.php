@@ -64,6 +64,11 @@ final class UploadInspectionReadOnlyStream
             throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
         }
         if ($bytes === '') {
+            if (!feof($this->source)) {
+                // Non-blocking/custom streams may temporarily return no bytes
+                // while more content is still available. Never treat that as EOF.
+                throw new UploadInspectionException('SCAN_INCOMPLETE');
+            }
             $this->eof = true;
             return '';
         }
@@ -91,6 +96,9 @@ final class UploadInspectionReadOnlyStream
             $extra = fread($this->source, 1);
             if ($extra === false || $extra !== '') {
                 return 'content_mismatch';
+            }
+            if (!feof($this->source)) {
+                return 'incomplete';
             }
             $this->eof = true;
         }
