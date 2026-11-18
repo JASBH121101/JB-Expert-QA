@@ -368,3 +368,78 @@ test("engine fails closed on accessor-backed rule findings and freezes execution
   assert.equal(report.scoring.blockedByExecutionErrors, true);
   assert.equal(Object.isFrozen(report.execution[0]), true);
 });
+
+test("scoring rejects accessor-backed policy options and diagnostic inputs without invoking getters", () => {
+  let optionsInvoked = false;
+  const options = {};
+  Object.defineProperty(options, "weights", {
+    enumerable: true,
+    get() {
+      optionsInvoked = true;
+      return { responsive: 100 };
+    }
+  });
+  assert.throws(() => calculateScore([], options), /scoring options\.weights must be an enumerable data property/);
+  assert.equal(optionsInvoked, false);
+
+  let weightInvoked = false;
+  const weights = {};
+  Object.defineProperty(weights, "responsive", {
+    enumerable: true,
+    get() {
+      weightInvoked = true;
+      return 100;
+    }
+  });
+  assert.throws(() => calculateScore([], { weights, includedSpecialists: ["responsive"] }), /weights\.responsive must be an enumerable data property/);
+  assert.equal(weightInvoked, false);
+
+  let diagnosticInvoked = false;
+  const diagnostic = { specialist: "responsive", severity: "low" };
+  Object.defineProperty(diagnostic, "specialist", {
+    enumerable: true,
+    get() {
+      diagnosticInvoked = true;
+      return "responsive";
+    }
+  });
+  assert.throws(() => calculateScore([diagnostic], { weights: { responsive: 100 } }), /diagnostics\[0\]\.specialist must be an enumerable data property/);
+  assert.equal(diagnosticInvoked, false);
+});
+
+test("scoring safely handles prototype-sensitive specialist names", () => {
+  const result = calculateScore([], {
+    weights: { "__proto__": 100 },
+    includedSpecialists: ["__proto__"]
+  });
+  assert.equal(Object.hasOwn(result.specialistScores, "__proto__"), true);
+  assert.equal(result.specialistScores.__proto__, 100);
+  assert.equal(Object.getPrototypeOf(result.specialistScores), Object.prototype);
+});
+
+test("engine constructor and audit options reject accessors without invoking them", async () => {
+  let constructorInvoked = false;
+  const constructorOptions = {};
+  Object.defineProperty(constructorOptions, "registry", {
+    enumerable: true,
+    get() {
+      constructorInvoked = true;
+      return new RuleRegistry();
+    }
+  });
+  assert.throws(() => new ExpertQAEngine(constructorOptions), /engine options\.registry must be an enumerable data property/);
+  assert.equal(constructorInvoked, false);
+
+  let auditInvoked = false;
+  const auditOptions = {};
+  Object.defineProperty(auditOptions, "specialist", {
+    enumerable: true,
+    get() {
+      auditInvoked = true;
+      return "ui-ux";
+    }
+  });
+  const engine = new ExpertQAEngine({ registry: new RuleRegistry(), config });
+  await assert.rejects(() => engine.audit({}, auditOptions), /audit options\.specialist must be an enumerable data property/);
+  assert.equal(auditInvoked, false);
+});
