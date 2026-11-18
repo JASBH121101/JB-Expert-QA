@@ -1418,9 +1418,35 @@ export function createPostgresA2ActionLedger({
         "CHECK ((status='completed' AND outcome IN ('succeeded','not-applied') AND completed_at_ms IS NOT NULL AND recovery_record IS NULL) OR " +
         "(status IN ('claimed','provider-started') AND outcome IS NULL AND completed_at_ms IS NULL))," +
         "CHECK (status <> 'provider-started' OR recovery_record IS NOT NULL)," +
+        "CONSTRAINT jb_resilience_a2_terminal_outcome_required " +
         "CHECK (status <> 'completed' OR outcome IS NOT NULL)," +
+        "CONSTRAINT jb_resilience_a2_scope_columns_match " +
         "CHECK (scope->>'assetId'=asset_id AND scope->>'environment'=environment)" +
         ")"
+      );
+      await client.query(
+        "DO $a2$ BEGIN " +
+        "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='jb_resilience_a2_action_claims'::regclass " +
+        "AND conname='jb_resilience_a2_terminal_outcome_required') THEN " +
+        "ALTER TABLE jb_resilience_a2_action_claims ADD CONSTRAINT jb_resilience_a2_terminal_outcome_required " +
+        "CHECK (status <> 'completed' OR outcome IS NOT NULL) NOT VALID; " +
+        "END IF; END $a2$"
+      );
+      await client.query(
+        "ALTER TABLE jb_resilience_a2_action_claims " +
+        "VALIDATE CONSTRAINT jb_resilience_a2_terminal_outcome_required"
+      );
+      await client.query(
+        "DO $a2$ BEGIN " +
+        "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='jb_resilience_a2_action_claims'::regclass " +
+        "AND conname='jb_resilience_a2_scope_columns_match') THEN " +
+        "ALTER TABLE jb_resilience_a2_action_claims ADD CONSTRAINT jb_resilience_a2_scope_columns_match " +
+        "CHECK (scope->>'assetId'=asset_id AND scope->>'environment'=environment) NOT VALID; " +
+        "END IF; END $a2$"
+      );
+      await client.query(
+        "ALTER TABLE jb_resilience_a2_action_claims " +
+        "VALIDATE CONSTRAINT jb_resilience_a2_scope_columns_match"
       );
       await client.query(
         "CREATE UNIQUE INDEX IF NOT EXISTS jb_resilience_a2_one_active_asset_idx " +
