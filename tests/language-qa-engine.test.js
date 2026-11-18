@@ -7,7 +7,7 @@ import {
   DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, resolveLocale,
   comparePlaceholders, parsePhpTranslationArray, LanguageLibrary,
   TranslationMemory, recordTranslationReview, resolveTranslationState,
-  auditTranslationMaps
+  auditTranslationMaps, flattenTranslationMap
 } from "../src/language/index.js";
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
