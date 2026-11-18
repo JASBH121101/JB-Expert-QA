@@ -17,156 +17,98 @@ use Throwable;
  */
 final class UploadInspectionReadOnlyStream
 {
-    private const SCHEME = 'jbsg-upload-scan-v1';
-
-    /** @var array<string, resource> */
-    private static array $sources = [];
-    /** @var array<string, int> */
-    private static array $positions = [];
-    /** @var array<string, \HashContext> */
-    private static array $hashes = [];
-    private static bool $registered = false;
-
     /** @var resource|null */
-    private $source = null;
-    private string $uploadId = '';
+    private $source;
     private int $position = 0;
-    public mixed $context;
+    private bool $eof = false;
+    private bool $closed = false;
+    private mixed $hash;
 
-    public static function open(string $uploadId, mixed $source): mixed
-    {
-        if (!is_resource($source)) {
-            return false;
+    public function __construct(
+        mixed $source,
+        private readonly int $expectedSize,
+        private readonly string $expectedSha256
+    ) {
+        if (!is_resource($source) || $expectedSize < 1 ||
+            !preg_match('/^[a-f0-9]{64}$/', $expectedSha256)) {
+            throw new RuntimeException('Invalid upload scanner reader configuration');
         }
 
-        if (!self::$registered) {
-            if (in_array(self::SCHEME, stream_get_wrappers(), true)) {
-                throw new RuntimeException('Upload scan stream scheme is already registered');
-            }
-            if (!stream_wrapper_register(self::SCHEME, self::class)) {
-                throw new RuntimeException('Could not register the read-only upload scan stream');
-            }
-            self::$registered = true;
-        }
-
-        self::$sources[$uploadId] = $source;
-        $stream = @fopen(self::SCHEME . '://' . $uploadId, 'rb');
-        if (!is_resource($stream)) {
-            unset(self::$sources[$uploadId]);
-            return false;
-        }
-
-        return $stream;
+        $this->source = $source;
+        $this->hash = hash_init('sha256');
     }
 
-    public static function verifyComplete(
-        string $uploadId,
-        int $expectedSize,
-        string $expectedSha256
-    ): string {
-        if (!isset(self::$sources[$uploadId], self::$positions[$uploadId], self::$hashes[$uploadId])) {
-            return 'incomplete';
-        }
-
-        $source = self::$sources[$uploadId];
-        if (!is_resource($source) ||
-            self::$positions[$uploadId] !== $expectedSize ||
-            !feof($source)) {
-            return 'incomplete';
-        }
-
-        $actualSha256 = hash_final(hash_copy(self::$hashes[$uploadId]));
-        return hash_equals($expectedSha256, $actualSha256) ? 'complete' : 'content_mismatch';
-    }
-
-    public static function forget(string $uploadId): void
+    /**
+     * Return up to $count bytes actually delivered to the scanner.
+     * An empty string means EOF. There is intentionally no seek operation.
+     */
+    public function read(int $count): string
     {
-        unset(self::$sources[$uploadId], self::$positions[$uploadId], self::$hashes[$uploadId]);
-    }
-
-    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
-    {
-        if ($mode !== 'rb') {
-            return false;
+        if ($this->closed || !is_resource($this->source)) {
+            throw new UploadInspectionException('SCAN_INCOMPLETE');
+        }
+        if ($count < 1 || $count > 1048576) {
+            throw new UploadInspectionException('INVALID_SCAN_RESULT');
+        }
+        if ($this->eof) {
+            return '';
         }
 
-        $uploadId = parse_url($path, PHP_URL_HOST);
-        if (!is_string($uploadId) || !isset(self::$sources[$uploadId]) ||
-            !is_resource(self::$sources[$uploadId])) {
-            return false;
+        $remaining = $this->expectedSize - $this->position;
+        if ($remaining < 0) {
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
         }
 
-        $this->source = self::$sources[$uploadId];
-        $this->uploadId = $uploadId;
-        $this->position = 0;
-        self::$positions[$uploadId] = 0;
-        self::$hashes[$uploadId] = hash_init('sha256');
-        return true;
-    }
-
-    public function stream_read(int $count): string|false
-    {
-        if (!is_resource($this->source) || $count < 1) {
-            return false;
-        }
-
-        $bytes = fread($this->source, $count);
+        $bytes = fread($this->source, min($count, $remaining + 1));
         if ($bytes === false) {
-            return false;
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
+        }
+        if ($bytes === '') {
+            $this->eof = true;
+            return '';
+        }
+        if (strlen($bytes) > $remaining) {
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
         }
 
-        if ($bytes !== '') {
-            hash_update(self::$hashes[$this->uploadId], $bytes);
-        }
+        hash_update($this->hash, $bytes);
         $this->position += strlen($bytes);
-        self::$positions[$this->uploadId] = $this->position;
         return $bytes;
     }
 
-    public function stream_eof(): bool
+    /**
+     * Verify that the scanner requested every byte and that those bytes match
+     * the digest of the exact quarantined object.
+     */
+    public function verifyComplete(): string
     {
-        return !is_resource($this->source) || feof($this->source);
+        if ($this->closed || !is_resource($this->source) ||
+            $this->position !== $this->expectedSize) {
+            return 'incomplete';
+        }
+
+        if (!$this->eof) {
+            $extra = fread($this->source, 1);
+            if ($extra === false || $extra !== '') {
+                return 'content_mismatch';
+            }
+            $this->eof = true;
+        }
+
+        $actualSha256 = hash_final(hash_copy($this->hash));
+        return hash_equals($this->expectedSha256, $actualSha256)
+            ? 'complete'
+            : 'content_mismatch';
     }
 
-    public function stream_tell(): int
+    public function bytesRead(): int
     {
         return $this->position;
     }
 
-    public function stream_seek(int $offset, int $whence = SEEK_SET): bool
+    public function close(): void
     {
-        return false;
-    }
-
-    public function stream_stat(): array|false
-    {
-        return is_resource($this->source) ? fstat($this->source) : false;
-    }
-
-    public function url_stat(string $path, int $flags): array|false
-    {
-        return false;
-    }
-
-    public function stream_set_option(int $option, int $arg1, int $arg2): bool
-    {
-        if ($option === STREAM_OPTION_READ_BUFFER) {
-            // The wrapper is sequential-only; acknowledge the caller's explicit
-            // request to disable PHP's user-space read-ahead buffer.
-            return true;
-        }
-
-        return false;
-    }
-
-    public function stream_flush(): bool
-    {
-        return true;
-    }
-
-    public function stream_close(): void
-    {
-        $this->source = null;
+        $this->closed = true;
     }
 }
 
@@ -302,20 +244,10 @@ final class UploadInspectionService
 
             $scanSource = $this->storage->openQuarantineStream($uploadId);
             $this->assertStream($scanSource, false);
-            $scanStream = UploadInspectionReadOnlyStream::open($uploadId, $scanSource);
-            if (!is_resource($scanStream)) {
-                fclose($scanSource);
-                throw new UploadInspectionException('STORAGE_UNAVAILABLE');
-            }
-            $this->assertStream($scanStream, false);
+            $scanStream = new UploadInspectionReadOnlyStream($scanSource, $size, $sha256);
             try {
-                if (stream_set_read_buffer($scanStream, 0) !== 0) {
-                    throw new UploadInspectionException('STORAGE_UNAVAILABLE');
-                }
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
-                $scanDisposition = is_resource($scanStream)
-                    ? UploadInspectionReadOnlyStream::verifyComplete($uploadId, $size, $sha256)
-                    : 'incomplete';
+                $scanDisposition = $scanStream->verifyComplete();
                 if ($scanDisposition !== 'complete') {
                     $retainQuarantine = true;
                     throw new UploadInspectionException(
@@ -325,15 +257,15 @@ final class UploadInspectionService
                     );
                 }
             } catch (UploadInspectionException $exception) {
+                if (in_array($exception->reason, ['SCAN_INCOMPLETE', 'SCAN_CONTENT_MISMATCH'], true)) {
+                    $retainQuarantine = true;
+                }
                 throw $exception;
             } catch (Throwable) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCANNER_UNAVAILABLE');
             } finally {
-                if (is_resource($scanStream)) {
-                    fclose($scanStream);
-                }
-                UploadInspectionReadOnlyStream::forget($uploadId);
+                $scanStream->close();
                 if (is_resource($scanSource)) {
                     fclose($scanSource);
                 }
