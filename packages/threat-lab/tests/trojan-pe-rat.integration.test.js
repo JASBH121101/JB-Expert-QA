@@ -1,4 +1,5 @@
 import test from "node:test";
+import { persistThreatLabReport } from "./helpers/persist-report.js";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -284,6 +285,7 @@ test("JB Threat Lab validates PE-based RAT and Trojan capability correlation", a
       productionTargets: false
     }
   });
+  await persistThreatLabReport(report, "trojan-pe-rat");
 
   assert.equal(report.totals.fail, 0, JSON.stringify(report.results.filter((item) => item.status === "fail"), null, 2));
   assert.equal(report.totals.pass, scenarios.length);
