@@ -7,13 +7,13 @@
       "id": "jb-expert-qa-main",
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "main",
-      "commitSha": "77b4ea4dab2823099cc8de6f1441e69c5b6c4328"
+      "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c"
     },
     {
       "id": "jb-expert-qa-language-qa-pr167",
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
-      "commitSha": "631470cf6a2cdbe03b54bbe428a235883de1ac90"
+      "commitSha": "62b9440f151c6f881b46f92529c0f92d82b2ae35"
     }
   ],
   "nodes": [
