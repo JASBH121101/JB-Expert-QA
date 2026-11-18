@@ -25,13 +25,28 @@ const actionLedger = createFileA2ActionLedger({
   recorderId: "forensic-recorder",
   // Load this secret from a protected host secret store; never from the ledger directory.
   integrityKeys: { "a2-2026-11": process.env.JB_RESILIENCE_A2_HMAC_KEY_HEX },
-  activeIntegrityKeyId: "a2-2026-11"
+  activeIntegrityKeyId: "a2-2026-11",
+  ledgerId: "production-a2-actions",
+  // Host supplies a separately administered, durable, linearizable anchor.
+  revisionAnchor: hostMonotonicRevisionAnchor
 });
 ```
 
 The example path and identifiers are illustrative. integrityKeys is a keyring of 32-4096-byte keys (or lowercase hex encodings); activeIntegrityKeyId selects the key used for new guard writes. Obtain keys from a host-managed secret store or HSM/TPM-backed provider, keep them outside the journal directory, and never commit them. Keep the write-capable ledger object inside the trusted controller composition. Do not expose claim, createPendingRecord, markProviderStarted or complete to untrusted callers.
 
-The default bounds are a 5-second lock wait, 120-second dead-process lock threshold, 25-millisecond lock polling interval, 20,000 lifetime claims and a 16 MiB ledger file. Limits can be lowered or raised within validated bounds. Capacity exhaustion is fail-closed: old idempotency keys are not silently evicted to make room.
+The default bounds are a 5-second lock wait, 120-second dead-process lock threshold, 25-millisecond lock polling interval, 20,000 lifetime claims and a 16 MiB ledger file. Limits can be lowered or raised within validated bounds. Capacity exhaustion is fail-closed: old idempotency keys are not silently evicted to make room. The optional revisionAnchor and ledgerId must be supplied together when the host requires coordinated journal/guard rollback detection.
+
+## External monotonic revision anchor
+
+For rollback resistance against restoring both local files to an older, previously valid snapshot, the host can inject a separate revisionAnchor adapter and stable ledgerId. The adapter contract is:
+
+- read({ ledgerId }) returns null only before the first anchor commit, or { schema: jb.resilience.a2-revision-anchor/v1, revision, ledgerSha256 }.
+- compareAndSwap({ ledgerId, expected, next }) atomically and durably replaces the exact expected state with next; expected is null only during empty-ledger bootstrap. It returns true only when the requested transition is committed.
+- The anchor service must provide linearizable compare-and-swap, authenticate its callers, retain monotonic state independently of the ledger directory, and have a backup/restore policy that cannot be rolled back together with the local journal. A second file beside the journal is not an independent anchor.
+
+Every ledger read verifies that anchor revision and digest exactly match the authenticated local journal. A mutation first fsyncs the HMAC guard and journal, then advances the external anchor with compare-and-swap. If that CAS is lost or uncertain, the call fails and every later read holds because local and external state diverge; it never assumes success. A coordinated restoration of an older journal/guard pair is rejected while the external anchor retains the newer revision/digest.
+
+This package implements the adapter boundary and lab test doubles only. It does not provide or host an off-host anchor service. Without revisionAnchor, HMAC still prevents a writer without the key from forging a new guard, but replay of both old local files remains possible. Production A2 must require a host-owned anchor appropriate to the threat model and fault-test its durability, access controls, failover and restore behavior.
 
 ## Atomic lifecycle
 
@@ -71,7 +86,7 @@ A multi-host deployment can inject the separate `createPostgresA2ActionLedger(..
 
 The adapter's `durable: true` property describes the implemented local-file mechanism; it does not prove the host's filesystem, disk controller, volume configuration, backup/restore path, process supervisor or disaster-recovery behavior. Back up and restore the journal and its `.guard` sidecar together. A simultaneous rollback of both files to a matching older copy cannot be detected by this local pair alone and requires an independent off-host or monotonic backup/restore control. Those host operations require fault injection and independent certification.
 
-**Cryptographic threat-model boundary:** guard schema v2 authenticates the journal revision and SHA-256 digest with HMAC-SHA-256. A writer who can modify the journal and guard but does not possess an accepted key cannot forge a new valid guard. Key rotation requires the host to dual-load the old and new key IDs, set the new ID as active, verify/re-sign, and only then retire the old key. HMAC does not by itself prevent replay of a previously valid journal/guard pair: a coordinated restore of both files to an older signed snapshot can still pass local authentication. Production anti-rollback therefore requires an independently administered monotonic revision/digest anchor or equivalent off-host append-only control. This file adapter does not implement that external anchor. Do not enable A2 against a hostile-local-writer or rollback threat model until the host supplies and fault-tests that independent control.
+**Cryptographic threat-model boundary:** guard schema v2 authenticates the journal revision and SHA-256 digest with HMAC-SHA-256. A writer who can modify the journal and guard but does not possess an accepted key cannot forge a new valid guard. Key rotation requires the host to dual-load the old and new key IDs, set the new ID as active, verify/re-sign, and only then retire the old key. HMAC alone does not prevent replay of a previously valid journal/guard pair. The optional revisionAnchor contract allows a host to bind the monotonic revision and digest to an independently administered anchor; this repository contains only the adapter contract and a deterministic test double, not a production anchor service. Do not enable A2 against a hostile rollback threat model until a real independent anchor is configured and fault-tested.
 
 ## Required host tests before enabling A2
 
