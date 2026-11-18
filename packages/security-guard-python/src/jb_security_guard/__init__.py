@@ -2,6 +2,7 @@ from .client import UniversalRateLimitClient
 from .uploads import (
     UploadInspectionError,
     UploadInspectionService,
+    UploadInspectionReadOnlyStream,
     UploadMalwareScanner,
     UploadQuarantineStorage,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "UniversalRateLimitClient",
     "UploadInspectionError",
     "UploadInspectionService",
+    "UploadInspectionReadOnlyStream",
     "UploadMalwareScanner",
     "UploadQuarantineStorage",
     "create_rate_limit_counter_key",
