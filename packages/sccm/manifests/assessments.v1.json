@@ -3187,5 +3187,245 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.iso-registry.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency.iso-registry",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA ISO registry metadata, allowed minor-unit declarations and prototype-sensitive registry boundaries tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA ISO registry metadata, allowed minor-unit declarations and prototype-sensitive registry boundaries tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA ISO registry metadata, allowed minor-unit declarations and prototype-sensitive registry boundaries tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA ISO registry metadata, allowed minor-unit declarations and prototype-sensitive registry boundaries tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.decimal-precision.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency.decimal-precision",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA canonical decimal parsing, bounded input and zero-, two- and four-minor-unit precision tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA canonical decimal parsing, bounded input and zero-, two- and four-minor-unit precision tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA canonical decimal parsing, bounded input and zero-, two- and four-minor-unit precision tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA canonical decimal parsing, bounded input and zero-, two- and four-minor-unit precision tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.formatting.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency.formatting",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Intl amount formatting for zero-, two- and four-minor-unit currencies without mutating stored values tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Intl amount formatting for zero-, two- and four-minor-unit currencies without mutating stored values tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Intl amount formatting for zero-, two- and four-minor-unit currencies without mutating stored values tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Intl amount formatting for zero-, two- and four-minor-unit currencies without mutating stored values tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.module.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency.module",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA complete Currency QA module: registry integrity, decimal precision and locale formatting tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA complete Currency QA module: registry integrity, decimal precision and locale formatting tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA complete Currency QA module: registry integrity, decimal precision and locale formatting tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA complete Currency QA module: registry integrity, decimal precision and locale formatting tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.locale-validation.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency.locale-validation",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency and locale validation subbranch: all module components passed in the four-platform runtime matrix tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency and locale validation subbranch: all module components passed in the four-platform runtime matrix tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency and locale validation subbranch: all module components passed in the four-platform runtime matrix tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency and locale validation subbranch: all module components passed in the four-platform runtime matrix tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.20261118.pr175",
+    "nodeId": "jb.expert-qa.currency",
+    "version": "0.8.0",
+    "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T23:45:57Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726121",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency QA branch: the locale-validation subbranch and all three critical components passed tests passed on Ubuntu 24.04 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726696",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency QA branch: the locale-validation subbranch and all three critical components passed tests passed on Ubuntu 24.04 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726669",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency QA branch: the locale-validation subbranch and all three critical components passed tests passed on Windows Server 2022 / Node.js 24; the workflow ran the complete currency-engine test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44421602988/job/135215726755",
+        "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01",
+        "outcome": "success",
+        "summary": "Currency QA Currency QA branch: the locale-validation subbranch and all three critical components passed tests passed on Windows Server 2022 / Node.js 22; the workflow ran the complete currency-engine test suite."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-currency-pr175"
   }
 ]
