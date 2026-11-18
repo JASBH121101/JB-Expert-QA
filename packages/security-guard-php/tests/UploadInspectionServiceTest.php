@@ -91,7 +91,8 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     public function __construct(
         string $root,
         private readonly bool $alterScanContent = false,
-        private readonly bool $transientEmptyAtEof = false
+        private readonly bool $transientEmptyAtEof = false,
+        private readonly bool $appendScanContent = false
     ) {
         $this->quarantine = $root . '/quarantine';
         $this->approved = $root . '/approved';
@@ -116,7 +117,7 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
                 ? UploadInspectionTransientEmptyStream::open($uploadId, $bytes)
                 : false;
         }
-        if (!$this->alterScanContent) {
+        if (!$this->alterScanContent && !$this->appendScanContent) {
             return fopen($path, 'rb');
         }
 
@@ -124,7 +125,12 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
         if (!is_string($bytes) || $bytes === '') {
             return false;
         }
-        $bytes[0] = $bytes[0] === "\\0" ? "\\1" : "\\0";
+        if ($this->alterScanContent) {
+            $bytes[0] = $bytes[0] === "\\0" ? "\\1" : "\\0";
+        }
+        if ($this->appendScanContent) {
+            $bytes .= 'TRAILING';
+        }
         $stream = fopen('php://temp', 'w+b');
         if (!is_resource($stream) || fwrite($stream, $bytes) !== strlen($bytes)) {
             return false;
@@ -397,6 +403,23 @@ function runUploadInspectionServiceTests(): void
             'A transient empty read before trailing bytes must never be treated as true EOF');
         expect($transientEmptyStore->quarantineCount() === 1 && $transientEmptyStore->approvedCount() === 0,
             'A non-EOF empty read must remain quarantined and never be promoted');
+
+        $extendedStore = new UploadInspectionTestStorage(
+            $root . '/extended-scan-content',
+            false,
+            false,
+            true
+        );
+        $extended = new UploadInspectionService($extendedStore, new UploadInspectionTestScanner());
+        $extendedRejected = false;
+        try {
+            $extended->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $extendedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+        }
+        expect($extendedRejected, 'PHP must reject trailing bytes beyond the ingested object');
+        expect($extendedStore->quarantineCount() === 1 && $extendedStore->approvedCount() === 0,
+            'A scan stream with trailing bytes must remain private and never be promoted');
 
         $changedStore = new UploadInspectionTestStorage($root . '/changed-scan-content', true);
         $changed = new UploadInspectionService(
