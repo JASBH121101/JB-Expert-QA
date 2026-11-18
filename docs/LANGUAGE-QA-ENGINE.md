@@ -79,3 +79,5 @@ Nested leaf-versus-object changes are reported as `message-shape-mismatch` rathe
 `auditTranslationCatalogs` validates complete locale catalogs through the shared Localization Engine while enforcing Language QA's supported locale policy (`es-419` and `en`). It detects missing CLDR plural categories, message-shape changes and plural placeholder inconsistencies. Locale aliases are normalized before validation and duplicate aliases are rejected.
 
 This bridge is an audit integration, not a translation provider. Findings remain review-required and are never auto-approved. The runtime relies on Node's built-in `Intl`/ICU data; it adds no third-party dependency or network call.
+
+The bridge snapshots input catalogs using own-property descriptors before delegation. Accessors, symbol keys, prototype-sensitive keys, unsupported object types, excessive nesting and catalogs above 10,000 entries are rejected without executing getters. This protects the shared Localization Engine from unsafe caller-supplied objects.
