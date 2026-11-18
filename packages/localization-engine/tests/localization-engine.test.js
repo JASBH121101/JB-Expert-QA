@@ -80,3 +80,19 @@ test("missing keys do not silently become empty strings", () => {
   const i18n = createLocalization({ catalogs: { "en-US": { ok: "OK" } }, defaultLocale: "en-US" });
   assert.throws(() => i18n.t("missing.key"), /translation key is missing/);
 });
+
+test("plural placeholder audit respects locale-specific grammatical forms", () => {
+  const result = auditCatalogs({
+    "es-419": { items: { one: "{count} artículo", other: "{count} artículos" } },
+    ar: { items: { zero: "لا عناصر", one: "عنصر واحد", two: "عنصران", few: "{count} عناصر", many: "{count} عنصرًا", other: "{count} عنصر" } }
+  }, { sourceLocale: "es-419", requiredLocales: ["ar"] });
+  assert.equal(result.findings.some((item) => item.code === "placeholder-mismatch"), false);
+});
+
+test("runtime catalog snapshots are immutable after construction", () => {
+  const mutable = { "en-US": { plural: { one: "{count} item", other: "{count} items" } } };
+  const i18n = createLocalization({ catalogs: mutable, defaultLocale: "en-US" });
+  mutable["en-US"].plural.one = "mutated";
+  mutable["en-US"].plural.other = "mutated";
+  assert.equal(i18n.t("plural", { count: 1, params: { count: 1 } }), "1 item");
+});
