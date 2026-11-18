@@ -79,11 +79,13 @@ and counts the bytes actually delivered to the scanner; a clean result returned
 without complete sequential consumption fails closed as SCAN_INCOMPLETE.
 
 Host adapters must keep quarantine and approved objects private, enforce scanner
-deadlines, verify exact bytes during atomic promotion, and make deletion idempotent.
+deadlines, verify exact bytes during atomic promotion, and make deletion idempotent. The `promote(upload_id, expected_sha256, expected_size, attestation)` method must also verify that the shared `jb.security.upload-inspection.attestation/v1` binds the same upload ID, digest, byte count and `clean` verdict, then persist the attestation and approved bytes together in the same atomic commit. Do not persist the attestation after a separate object-promotion transaction.
 Unknown verdicts, incomplete scans, scanner errors, integrity mismatches and
 uncertain promotion outcomes never produce an approval. A malicious verdict is
 rejected and the staging object is deleted; any required forensic retention must
-use a separate bounded and access-controlled recorder. Unknown and uncertain
+use a separate bounded and access-controlled recorder. A successful clean result
+includes the validated attestation for audit linkage; that attestation is normalized
+scanner evidence, not a cryptographic scanner signature or publication authorization. Unknown and uncertain
 objects remain private in quarantine. The request path never serves a quarantined
 original.
 
