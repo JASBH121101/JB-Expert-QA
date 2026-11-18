@@ -192,6 +192,54 @@ async function main() {
     }), { state: "claimed", claimId: winner.claimId });
   });
 
+  await runCase("PostgreSQL A2 accepts slash-delimited identifiers supported by the controller", async () => {
+    const scope = {
+      assetId: "endpoint/01",
+      environment: "lab/prod",
+      incidentId: "incident/01",
+      policyId: "policy/containment",
+      policyRevision: 3,
+      policyHash: "a".repeat(64)
+    };
+    const profileId = "approved/profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_050_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "evidence/ref-01",
+        sha256: createHash("sha256").update("slash identifier evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    assert.deepEqual(await a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: record.createdAtMs + 1
+    }), { found: true, record });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "no-provider-call-made",
+      completedAtMs: record.createdAtMs + 2
+    }), { completed: true });
+  });
+
   await runCase("PostgreSQL A2 pending record and provider-start transition survive another adapter instance", async () => {
     const scope = a2Scope("pg-a2-lifecycle", "pg-a2-incident-lifecycle");
     const profileId = "approved-a2-profile";
