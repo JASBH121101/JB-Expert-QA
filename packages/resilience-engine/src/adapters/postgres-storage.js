@@ -1353,6 +1353,11 @@ export function createPostgresA2ActionLedger({
         "ON jb_resilience_a2_action_claims (environment, asset_id) " +
         "WHERE status IN ('claimed','provider-started')"
       );
+      await client.query(
+        "CREATE INDEX IF NOT EXISTS jb_resilience_a2_pending_sequence_idx " +
+        "ON jb_resilience_a2_action_claims (sequence) " +
+        "WHERE status IN ('claimed','provider-started')"
+      );
     });
     initialized = true;
     return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 1 });
