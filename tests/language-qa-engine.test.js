@@ -7,7 +7,7 @@ import {
   DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, resolveLocale,
   comparePlaceholders, parsePhpTranslationArray, LanguageLibrary,
   TranslationMemory, recordTranslationReview, resolveTranslationState,
-  auditTranslationMaps
+  auditTranslationMaps, flattenTranslationMap
 } from "../src/language/index.js";
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -174,4 +174,52 @@ test("translation audit distinguishes nested message shape changes from missing 
   assert.equal(result.counts.obsoleteKeys, 0);
   assert.equal(result.reviewStatus, "review-required");
   assert.ok(result.findings.some((item) => item.id === "message-shape-mismatch" && item.key === "setup"));
+});
+
+
+test("translation flattening rejects prototype-sensitive keys without mutating prototypes", () => {
+  const malicious = JSON.parse('{"__proto__":{"polluted":"yes"}}');
+  assert.throws(() => flattenTranslationMap(malicious), /prototype-sensitive key/);
+  assert.equal({}.polluted, undefined);
+
+  const flattened = flattenTranslationMap({ setup: { title: "Welcome" } });
+  assert.equal(Object.getPrototypeOf(flattened), null);
+  assert.equal(flattened["setup.title"], "Welcome");
+  assert.throws(() => flattenTranslationMap({ constructor: "unsafe" }), /prototype-sensitive key/);
+});
+
+test("translation flattening rejects accessors without executing them", () => {
+  let invoked = false;
+  const malicious = {};
+  Object.defineProperty(malicious, "title", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "unexpected";
+    }
+  });
+
+  assert.throws(() => flattenTranslationMap(malicious), /accessor properties/);
+  assert.equal(invoked, false);
+});
+
+test("translation flattening safely handles caller output and rejects Object.prototype", () => {
+  const output = {};
+  assert.equal(flattenTranslationMap({ title: "Safe" }, "", output), output);
+  assert.equal(output.title, "Safe");
+  assert.throws(
+    () => flattenTranslationMap({ polluted: "no" }, "", Object.prototype),
+    /plain record/
+  );
+  assert.equal(Object.hasOwn(Object.prototype, "polluted"), false);
+});
+
+test("translation flattening bounds recursion and rejects ambiguous duplicate paths", () => {
+  assert.throws(
+    () => flattenTranslationMap({ a: { b: "nested" }, "a.b": "flat" }),
+    /duplicate flattened key/
+  );
+  let deep = { value: "end" };
+  for (let index = 0; index < 26; index += 1) deep = { child: deep };
+  assert.throws(() => flattenTranslationMap(deep), /maximum nesting depth/);
 });
