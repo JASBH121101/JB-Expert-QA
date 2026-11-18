@@ -115,6 +115,7 @@ The store must atomically implement:
 - `claimAction({ idempotencyKey, incidentId, assetId, environment, serviceId, action, claimedAt, expiresAt })` — enforce a unique idempotency claim and one active mutation per asset/incident.
 - `completeAction({ actionId, outcome, completedAt, reasonCode })` — finalize a claimed action exactly once.
 - `recordActionOutcome({ assetId, environment, action, outcome, at, failureThreshold, cooldownMs })` — atomically update the circuit breaker and last-action state for the exact asset/environment pair.
+- `listReconciliationCandidates({ now, limit })` — optional read-only A2 inspection of expired claims that remain unresolved. It returns bounded incident/service context, never changes the ledger, never releases an idempotency claim and never authorizes a retry. An expired claim means execution outcome is uncertain; an operator must verify the actual service state independently before any separate approved action.
 
 The included file stores are suitable only for a single host with a protected local volume. They are not a cross-host database, consensus service or distributed fencing system. Multi-host deployments require a transactional backend. The hash chain detects local record alteration but does not prevent an attacker with write access from rewriting the complete file; ship independently signed audit checkpoints for stronger tamper resistance.
 

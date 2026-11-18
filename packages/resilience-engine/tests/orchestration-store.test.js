@@ -405,3 +405,53 @@ test("a process terminated immediately after a durable claim cannot replay the a
     });
   });
 });
+
+
+test("expired action claims are exposed as read-only reconciliation candidates", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "orchestration.json");
+    const store = createFileOrchestrationStore({ filePath });
+    const expiredInput = claimAction();
+    const expiredClaim = await store.claimAction(expiredInput);
+    assert.equal(expiredClaim.claimed, true);
+
+    const liveInput = claimAction({
+      assetId: "host-erp-02",
+      incidentId: "incident-live",
+      claimedAt: expiredInput.claimedAt,
+      expiresAt: expiredInput.expiresAt + 60_000
+    });
+    assert.equal((await store.claimAction(liveInput)).claimed, true);
+
+    const before = await readFile(filePath, "utf8");
+    const candidates = await store.listReconciliationCandidates({
+      now: expiredInput.expiresAt + 5_000
+    });
+    const after = await readFile(filePath, "utf8");
+
+    assert.equal(after, before, "read-only reconciliation must not mutate the durable ledger");
+    assert.equal(candidates.length, 1);
+    assert.deepEqual(candidates[0], {
+      actionId: expiredClaim.actionId,
+      incidentId: expiredInput.incidentId,
+      assetId: expiredInput.assetId,
+      environment: expiredInput.environment,
+      serviceId: expiredInput.serviceId,
+      action: expiredInput.action,
+      claimedAt: expiredInput.claimedAt,
+      expiresAt: expiredInput.expiresAt,
+      expiredByMs: 5_000,
+      incidentState: "unknown",
+      incidentUpdatedAt: null,
+      lastActionAt: null,
+      lastOutcome: "unknown",
+      consecutiveFailures: 0,
+      status: "reconciliation-required",
+      automaticResolutionAllowed: false
+    });
+    await assert.rejects(
+      store.listReconciliationCandidates({ now: expiredInput.expiresAt, limit: 0 }),
+      /between 1 and 500/
+    );
+  });
+});
