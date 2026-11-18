@@ -248,7 +248,14 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
   };
   await assert.rejects(
     inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
-    (error) => error.code === "MALWARE_DETECTED"
+    (error) => {
+      assert.equal(error.code, "MALWARE_DETECTED");
+      assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+      assert.equal(error.attestation.verdict, "malicious");
+      assert.equal(error.attestation.sha256, createHash("sha256").update(PNG).digest("hex"));
+      assert.equal(error.attestation.size, PNG.length);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 0);
@@ -264,7 +271,14 @@ test("unknown scan verdicts remain quarantined and cannot be promoted", async ()
   };
   await assert.rejects(
     inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "unknown.png" }),
-    (error) => error.code === "SCAN_NOT_CLEAN"
+    (error) => {
+      assert.equal(error.code, "SCAN_NOT_CLEAN");
+      assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+      assert.equal(error.attestation.verdict, "unknown");
+      assert.equal(error.attestation.sha256, createHash("sha256").update(PNG).digest("hex"));
+      assert.equal(error.attestation.size, PNG.length);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -336,7 +350,11 @@ test("scanner cannot approve a file without consuming the complete quarantined s
       source: Readable.from([PNG]),
       fileName: "not-fully-scanned.png"
     }),
-    (error) => error.code === "SCAN_INCOMPLETE"
+    (error) => {
+      assert.equal(error.code, "SCAN_INCOMPLETE");
+      assert.equal(Object.hasOwn(error, "attestation"), false);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
