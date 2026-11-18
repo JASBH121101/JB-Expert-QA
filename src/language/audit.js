@@ -24,7 +24,9 @@ function findShapeMismatchPath(path, otherKeys) {
     const ancestor = segments.slice(0, length).join(".");
     if (otherSet.has(ancestor)) return ancestor;
   }
-  if (otherKeys.some((key) => key.startsWith(path + "."))) return path;
+  for (const key of otherSet) {
+    if (key.startsWith(path + ".")) return path;
+  }
   return null;
 }
 
