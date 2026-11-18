@@ -144,7 +144,7 @@ export function validateSccmInventory(inventory) {
 
   const graph = new Map([...nodeById.keys()].map((id) => [id, []]));
   for (const node of nodeById.values()) {
-    for (const dependency of node.dependencies ?? []) {
+    for (const dependency of (Array.isArray(node.dependencies) ? node.dependencies : [])) {
       if (!nodeById.has(dependency)) addError(errors, node.id + " references missing dependency " + dependency);
       else graph.get(node.id).push(dependency);
       if (dependency === node.id) addError(errors, node.id + " cannot depend on itself");
@@ -236,13 +236,17 @@ export function validateSccmAssessment(inventory, assessment) {
     addError(errors, "findings must be an array of non-empty strings");
   }
   if (assessment.status === "PASS") {
-    if (!assessment.evidence?.length) addError(errors, "PASS requires reproducible evidence");
-    if (assessment.evidence?.some((item) => item.outcome !== "success")) {
+    if (!Array.isArray(assessment.evidence) || assessment.evidence.length === 0) {
+      addError(errors, "PASS requires reproducible evidence");
+    } else if (assessment.evidence.some((item) => !isRecord(item) || item.outcome !== "success")) {
       addError(errors, "PASS evidence must all have success outcome");
     }
-    if (assessment.findings?.length) addError(errors, "PASS cannot contain unresolved findings");
+    if (Array.isArray(assessment.findings) && assessment.findings.length > 0) {
+      addError(errors, "PASS cannot contain unresolved findings");
+    }
   }
-  if (assessment.status === "FAIL" && !assessment.evidence?.some((item) => item.outcome === "failure")) {
+  if (assessment.status === "FAIL" &&
+      (!Array.isArray(assessment.evidence) || !assessment.evidence.some((item) => isRecord(item) && item.outcome === "failure"))) {
     addError(errors, "FAIL requires at least one failure evidence item");
   }
   return Object.freeze({ valid: errors.length === 0, errors: Object.freeze(errors) });
@@ -275,7 +279,7 @@ export function validateSccmHistory(inventory, history) {
   for (const [index, assessment] of history.entries()) {
     const result = validateSccmAssessment(inventory, assessment);
     if (!result.valid) errors.push(...result.errors.map((error) => "history[" + index + "]: " + error));
-    if (!isRecord(assessment)) continue;
+    if (!exactKeys(assessment, ASSESSMENT_KEYS)) continue;
     if (typeof assessment.assessmentId === "string") {
       if (seen.has(assessment.assessmentId)) errors.push("history contains duplicate assessmentId " + assessment.assessmentId);
       seen.add(assessment.assessmentId);
