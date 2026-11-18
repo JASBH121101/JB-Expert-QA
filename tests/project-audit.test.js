@@ -491,3 +491,34 @@ test("end-to-end project audit returns a safe report and exports Markdown/HTML",
 test("project audit rejects an empty path", async () => {
   await assert.rejects(auditProject(" "), /directory path is required/);
 });
+
+test("dynamic-code analysis scans executable sources but ignores documentation and inert JSON corpora", async () => {
+  const report = await runRules({
+    projectFiles: [
+      {
+        path: "src/app.js", extension: ".js", lineCount: 1,
+        content: "const output = eval(untrustedInput);"
+      },
+      {
+        path: "docs/README.md", extension: ".md", lineCount: 1,
+        content: "Documentation example: eval(userInput);"
+      },
+      {
+        path: "bench/corpus.json", extension: ".json", lineCount: 1,
+        content: JSON.stringify({ sample: "eval(userInput)" })
+      },
+      {
+        path: "config/tls.json", extension: ".json", lineCount: 1,
+        content: '{"rejectUnauthorized": false}'
+      }
+    ],
+    projectScan: { environmentFiles: [], sensitiveFiles: [] },
+    packageManifests: []
+  });
+  const dynamicFindings = report.diagnostics.filter((item) => item.title === "Dynamic eval execution");
+  const tlsFindings = report.diagnostics.filter((item) => item.title === "TLS certificate verification disabled");
+  assert.equal(dynamicFindings.length, 1);
+  assert.equal(dynamicFindings[0].location, "src/app.js:1");
+  assert.equal(tlsFindings.length, 1);
+  assert.equal(tlsFindings[0].location, "config/tls.json:1");
+});
