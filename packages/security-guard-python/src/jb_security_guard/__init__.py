@@ -2,6 +2,7 @@ from .client import UniversalRateLimitClient
 from .uploads import (
     UploadInspectionError,
     UploadInspectionService,
+    UploadInspectionReadOnlyStream,
     UploadMalwareScanner,
     UploadQuarantineStorage,
 )
@@ -11,12 +12,14 @@ from .core_v1 import (
     normalize_rate_limit_check,
     normalize_rate_limit_decision,
     normalize_rate_limit_policy,
+    validate_upload_inspection_attestation_v1,
 )
 
 __all__ = [
     "UniversalRateLimitClient",
     "UploadInspectionError",
     "UploadInspectionService",
+    "UploadInspectionReadOnlyStream",
     "UploadMalwareScanner",
     "UploadQuarantineStorage",
     "create_rate_limit_counter_key",
@@ -24,4 +27,5 @@ __all__ = [
     "normalize_rate_limit_check",
     "normalize_rate_limit_decision",
     "normalize_rate_limit_policy",
+    "validate_upload_inspection_attestation_v1",
 ]

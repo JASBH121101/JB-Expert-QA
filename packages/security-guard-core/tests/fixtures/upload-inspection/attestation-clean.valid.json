@@ -1,0 +1,11 @@
+{
+  "schema": "jb.security.upload-inspection.attestation/v1",
+  "uploadId": "d47a5d9e40c44d3bbf9c62d79ecf9f3a",
+  "verdict": "clean",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "size": 4096,
+  "mimeType": "image/png",
+  "engine": "JB-Test-Scanner",
+  "version": "1.0.0",
+  "scannedAtMs": 1795000000000
+}

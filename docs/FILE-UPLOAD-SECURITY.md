@@ -59,7 +59,7 @@ Guard defaults to a 5 MiB file limit and a 15-second scan timeout. Storage write
 
 ## Fail-closed requirements
 
-- A scanner timeout, unreachable scanner, malformed scanner response, unsupported file type, or unknown verdict must leave the object quarantined or delete it; it must never be publicly approved.
+- A scanner timeout, unreachable scanner, malformed scanner response, unsupported file type, or unknown verdict must never result in public approval. Uncertain and malicious results remain private in quarantine for the host's bounded, audited disposition policy; disposable pre-scan staging data may be deleted only through explicit cleanup.
 - A retry must be idempotent; do not create multiple public copies for one upload.
 - Deletion and retention jobs must operate on opaque server-generated IDs, not user-controlled paths.
 - A rejected object must never be accessible through the normal download or preview route.
@@ -84,7 +84,7 @@ A Content-Length check alone is not enough: chunked uploads do not declare the f
 
 ## Quarantine retention and cleanup
 
-Keep unknown, timed-out, malformed, or unavailable scan results private for investigation/retry. The host application must define a short, bounded quarantine retention period, retry budget, cleanup schedule, and storage quota. A failed deletion must generate an operational alert without exposing object paths or scanner internals.
+Keep malicious, unknown, timed-out, malformed, incomplete, or unavailable scan results private for controlled investigation/disposition; they must never enter the approved namespace or normal download/preview routes. Malicious verdicts are rejected for promotion but their exact quarantined bytes are retained under this policy. The host application must define a short, bounded quarantine retention period, retry budget, cleanup schedule, storage quota, and restricted audited access. A failed deletion must generate an operational alert without exposing object paths or scanner internals.
 
 ## Scanner integration acceptance tests
 

@@ -12,7 +12,8 @@ import {
   validateRateLimitPolicyV1,
   validateThreatSignalV1,
   validateThreatAssessmentV1,
-  validateThreatAssessmentPolicyV1
+  validateThreatAssessmentPolicyV1,
+  validateUploadInspectionAttestationV1
 } from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
@@ -204,4 +205,108 @@ test("rate-limit decision rejects an incoherent enforced 429", async () => {
   fixture.unavailable = true;
   const schema = schemasById.get("urn:jb:security-guard:rate-limit:decision:v1");
   assert.ok(validateSchema(schema, fixture).length > 0);
+});
+
+test("Upload Scan v1 request/result schemas enforce exact identity, digest, bounds and complete consumption", async () => {
+  const requestSchema = schemasById.get("urn:jb:security-guard:upload-scan-request:v1");
+  const resultSchema = schemasById.get("urn:jb:security-guard:upload-scan-result:v1");
+  assert.ok(requestSchema);
+  assert.ok(resultSchema);
+
+  const fixtureRoot = path.join(coreRoot, "tests", "fixtures", "upload-inspection");
+  const request = JSON.parse(await readFile(path.join(fixtureRoot, "scan-request.valid.json"), "utf8"));
+  const cleanResult = JSON.parse(await readFile(path.join(fixtureRoot, "scan-result-clean.valid.json"), "utf8"));
+  const incompleteResult = JSON.parse(await readFile(path.join(fixtureRoot, "scan-result-incomplete.invalid.json"), "utf8"));
+
+  assert.deepEqual(validateSchema(requestSchema, request), []);
+  assert.deepEqual(validateSchema(resultSchema, cleanResult), []);
+  assert.ok(
+    validateSchema(resultSchema, incompleteResult).some((issue) => issue.includes("const mismatch")),
+    "a result cannot claim complete conformance unless streamConsumed is true"
+  );
+
+  const mismatched = { ...cleanResult, sha256: "b".repeat(64) };
+  assert.deepEqual(validateSchema(resultSchema, mismatched), []);
+  assert.notEqual(mismatched.sha256, request.sha256);
+  assert.equal(mismatched.uploadId, request.uploadId);
+  assert.equal(mismatched.size, request.size);
+
+  for (const invalid of [
+    { ...request, size: 0 },
+    { ...request, sha256: "not-a-digest" },
+    { ...request, detectedMimeType: "image/svg+xml" },
+    { ...request, rawBody: "not-allowed" }
+  ]) {
+    assert.notDeepEqual(validateSchema(requestSchema, invalid), []);
+  }
+
+  for (const invalid of [
+    { ...cleanResult, verdict: "maybe-clean" },
+    { ...cleanResult, uploadId: "../outside" },
+    { ...cleanResult, scanner: { id: "scanner" } },
+    { ...cleanResult, untrustedMetadata: { rawName: "customer.pdf" } }
+  ]) {
+    assert.notDeepEqual(validateSchema(resultSchema, invalid), []);
+  }
+});
+
+test("shared upload inspection vectors remain deterministic and bounded", async () => {
+  const fixturePath = path.join(
+    coreRoot,
+    "tests",
+    "fixtures",
+    "upload-inspection",
+    "conformance-vectors.v1.json"
+  );
+  const vectors = JSON.parse(await readFile(fixturePath, "utf8"));
+  assert.equal(vectors.schema, "jb.security.upload-inspection.conformance/v1");
+  assert.equal(vectors.fileCases.length, 9);
+  assert.equal(vectors.scannerCases.length, 4);
+
+  for (const item of [...vectors.fileCases, ...vectors.scannerCases]) {
+    assert.match(item.id, /^[a-z0-9-]{1,80}$/);
+  }
+  for (const item of vectors.fileCases) {
+    assert.match(item.bytesHex, /^(?:[0-9a-f]{2})+$/);
+    assert.ok(Buffer.from(item.bytesHex, "hex").length <= 4096);
+    assert.ok(["approved", "rejected"].includes(item.expected.disposition));
+  }
+  for (const item of vectors.scannerCases) {
+    assert.ok(["clean", "malicious", "unknown"].includes(item.verdict));
+    assert.ok(["all", "none"].includes(item.consume));
+    assert.ok(["approved", "rejected", "quarantined"].includes(item.expected.disposition));
+  }
+});
+
+test("upload inspection attestation schema and runtime validator bind exact object evidence", async () => {
+  const schema = schemasById.get("urn:jb:security-guard:upload-inspection:attestation:v1");
+  assert.ok(schema);
+  const fixtureRoot = path.join(coreRoot, "tests", "fixtures", "upload-inspection");
+  for (const [name, verdict] of [
+    ["attestation-clean.valid.json", "clean"],
+    ["attestation-malicious.valid.json", "malicious"],
+    ["attestation-unknown.valid.json", "unknown"]
+  ]) {
+    const fixture = JSON.parse(await readFile(path.join(fixtureRoot, name), "utf8"));
+    assert.deepEqual(validateSchema(schema, fixture), []);
+    assert.equal(validateUploadInspectionAttestationV1(fixture).verdict, verdict);
+  }
+
+  const clean = JSON.parse(await readFile(path.join(fixtureRoot, "attestation-clean.valid.json"), "utf8"));
+  for (const invalid of [
+    { ...clean, sha256: "A".repeat(64) },
+    { ...clean, size: 0 },
+    { ...clean, size: 104857601 },
+    { ...clean, mimeType: "application/x-msdownload" },
+    { ...clean, verdict: "no_match" },
+    { ...clean, engine: "" },
+    { ...clean, originalFileName: "customer-secret.png" }
+  ]) {
+    assert.notDeepEqual(validateSchema(schema, invalid), []);
+    assert.throws(() => validateUploadInspectionAttestationV1(invalid));
+  }
+
+  const evidence = validateUploadInspectionAttestationV1(clean);
+  assert.equal(Object.hasOwn(evidence, "approved"), false);
+  assert.equal(Object.hasOwn(evidence, "promoted"), false);
 });

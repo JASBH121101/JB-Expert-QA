@@ -701,3 +701,44 @@ export function createCoreRateLimitCounterKey(input) {
   values.push(input.identityKey);
   return values.map((value) => CORE_V1_TEXT_ENCODER.encode(value).byteLength + ":" + value).join("");
 }
+
+
+const UPLOAD_ATTESTATION_ID = /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
+const UPLOAD_SHA256 = /^[a-f0-9]{64}$/;
+const UPLOAD_MIME_TYPES = new Set([
+  "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
+]);
+
+/**
+ * Validate scanner evidence for one exact quarantined upload.
+ * A clean scanner verdict is not an approval decision or a cryptographic signature.
+ */
+export function validateUploadInspectionAttestationV1(value) {
+  if (!record(value)) throw new TypeError("upload inspection attestation must be an object");
+  exactKeys(value, new Set([
+    "schema", "uploadId", "verdict", "sha256", "size", "mimeType",
+    "engine", "version", "scannedAtMs"
+  ]), "upload inspection attestation");
+  requireFields(value, [
+    "schema", "uploadId", "verdict", "sha256", "size", "mimeType",
+    "engine", "version", "scannedAtMs"
+  ], "upload inspection attestation");
+  if (value.schema !== "jb.security.upload-inspection.attestation/v1") {
+    throw new TypeError("unsupported upload inspection attestation schema");
+  }
+  if (typeof value.uploadId !== "string" || !UPLOAD_ATTESTATION_ID.test(value.uploadId)) {
+    throw new TypeError("uploadId must be a 32-character hex ID or UUID");
+  }
+  if (!["clean", "malicious", "unknown"].includes(value.verdict)) {
+    throw new TypeError("unsupported upload scanner verdict");
+  }
+  if (typeof value.sha256 !== "string" || !UPLOAD_SHA256.test(value.sha256)) {
+    throw new TypeError("sha256 must be a lowercase SHA-256 digest");
+  }
+  contractInteger(value.size, "size", 1, 104857600);
+  if (!UPLOAD_MIME_TYPES.has(value.mimeType)) throw new TypeError("unsupported detected MIME type");
+  contractString(value.engine, "engine", /^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/, 128);
+  contractString(value.version, "version", /^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/, 64);
+  contractInteger(value.scannedAtMs, "scannedAtMs", 0);
+  return freezeContract(value);
+}

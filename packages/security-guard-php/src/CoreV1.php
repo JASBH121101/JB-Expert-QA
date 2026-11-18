@@ -189,6 +189,44 @@ final class CoreV1
         return $input;
     }
 
+
+    public static function validateUploadInspectionAttestationV1(array $input): array
+    {
+        self::assertExactKeys($input, [
+            'schema', 'uploadId', 'verdict', 'sha256', 'size', 'mimeType',
+            'engine', 'version', 'scannedAtMs'
+        ], 'uploadInspectionAttestation');
+        if (($input['schema'] ?? null) !== 'jb.security.upload-inspection.attestation/v1') {
+            throw new InvalidArgumentException('uploadInspectionAttestation.schema is unsupported');
+        }
+        $uploadIdPattern = '/^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/D';
+        self::assertMatch($input['uploadId'] ?? null, $uploadIdPattern, 'uploadInspectionAttestation.uploadId');
+        if (!in_array($input['verdict'] ?? null, ['clean', 'malicious', 'unknown'], true)) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.verdict is unsupported');
+        }
+        self::assertMatch($input['sha256'] ?? null, self::SHA256_HEX, 'uploadInspectionAttestation.sha256');
+        if (!is_int($input['size'] ?? null) || $input['size'] < 1 || $input['size'] > 104857600) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.size is out of bounds');
+        }
+        $mimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        if (!in_array($input['mimeType'] ?? null, $mimeTypes, true)) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.mimeType is unsupported');
+        }
+        $scannerLabel = '/^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/D';
+        if (!is_string($input['engine'] ?? null) || strlen($input['engine']) > 128 ||
+            preg_match($scannerLabel, $input['engine']) !== 1) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.engine is invalid');
+        }
+        if (!is_string($input['version'] ?? null) || strlen($input['version']) > 64 ||
+            preg_match($scannerLabel, $input['version']) !== 1) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.version is invalid');
+        }
+        if (!is_int($input['scannedAtMs'] ?? null) || $input['scannedAtMs'] < 0) {
+            throw new InvalidArgumentException('uploadInspectionAttestation.scannedAtMs must be a non-negative integer');
+        }
+        return $input;
+    }
+
     public static function createRateLimitCounterKey(array $input): string
     {
         self::assertExactKeys($input, [

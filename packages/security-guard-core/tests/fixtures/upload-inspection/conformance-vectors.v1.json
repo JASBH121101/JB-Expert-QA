@@ -1,0 +1,142 @@
+{
+  "schema": "jb.security.upload-inspection.conformance/v1",
+  "description": "Synthetic magic-byte vectors for deterministic signature and quarantine-contract tests. These byte sequences validate only bounded type identification; they are not complete or structurally valid sample files.",
+  "fileCases": [
+    {
+      "id": "jpeg-clean",
+      "fileName": "sample.jpg",
+      "declaredMimeType": "image/jpeg",
+      "bytesHex": "ffd8ffe000104a46494600010100000100010000",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "approved",
+        "mimeType": "image/jpeg"
+      }
+    },
+    {
+      "id": "png-clean",
+      "fileName": "sample.png",
+      "declaredMimeType": "image/png",
+      "bytesHex": "89504e470d0a1a0a00",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "approved",
+        "mimeType": "image/png"
+      }
+    },
+    {
+      "id": "gif-clean",
+      "fileName": "sample.gif",
+      "declaredMimeType": "image/gif",
+      "bytesHex": "47494638396101000001",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "approved",
+        "mimeType": "image/gif"
+      }
+    },
+    {
+      "id": "webp-clean",
+      "fileName": "sample.webp",
+      "declaredMimeType": "image/webp",
+      "bytesHex": "524946460c00000057454250",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "approved",
+        "mimeType": "image/webp"
+      }
+    },
+    {
+      "id": "pdf-clean",
+      "fileName": "sample.pdf",
+      "declaredMimeType": "application/pdf",
+      "bytesHex": "255044462d312e370a",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "approved",
+        "mimeType": "application/pdf"
+      }
+    },
+    {
+      "id": "jpeg-extension-mismatch",
+      "fileName": "sample.png",
+      "declaredMimeType": "image/jpeg",
+      "bytesHex": "ffd8ffe000104a46494600010100000100010000",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "rejected",
+        "errorReason": "EXTENSION_MISMATCH"
+      }
+    },
+    {
+      "id": "png-mime-mismatch",
+      "fileName": "sample.png",
+      "declaredMimeType": "application/pdf",
+      "bytesHex": "89504e470d0a1a0a00",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "rejected",
+        "errorReason": "MIME_MISMATCH"
+      }
+    },
+    {
+      "id": "truncated-png",
+      "fileName": "sample.png",
+      "declaredMimeType": "image/png",
+      "bytesHex": "89504e47",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "rejected",
+        "errorReason": "UNSUPPORTED_TYPE"
+      }
+    },
+    {
+      "id": "unsupported-active-content",
+      "fileName": "sample.svg",
+      "declaredMimeType": "image/svg+xml",
+      "bytesHex": "3c737667206f6e6c6f61643d616c6572742831293e",
+      "scannerVerdict": "clean",
+      "expected": {
+        "disposition": "rejected",
+        "errorReason": "UNSUPPORTED_TYPE"
+      }
+    }
+  ],
+  "scannerCases": [
+    {
+      "id": "clean-complete",
+      "verdict": "clean",
+      "consume": "all",
+      "expected": {
+        "disposition": "approved"
+      }
+    },
+    {
+      "id": "clean-not-consumed",
+      "verdict": "clean",
+      "consume": "none",
+      "expected": {
+        "disposition": "quarantined",
+        "errorReason": "SCAN_INCOMPLETE"
+      }
+    },
+    {
+      "id": "unknown-complete",
+      "verdict": "unknown",
+      "consume": "all",
+      "expected": {
+        "disposition": "quarantined",
+        "errorReason": "SCAN_NOT_CLEAN"
+      }
+    },
+    {
+      "id": "malicious-complete",
+      "verdict": "malicious",
+      "consume": "all",
+      "expected": {
+        "disposition": "quarantined",
+        "errorReason": "MALWARE_DETECTED"
+      }
+    }
+  ]
+}

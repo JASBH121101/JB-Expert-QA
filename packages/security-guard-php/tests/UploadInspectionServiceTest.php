@@ -6,17 +6,94 @@ namespace JB\SecurityGuard\Tests;
 
 use JB\SecurityGuard\UploadInspectionException;
 use JB\SecurityGuard\UploadInspectionService;
+use JB\SecurityGuard\UploadInspectionReadOnlyStream;
 use JB\SecurityGuard\UploadMalwareScanner;
 use JB\SecurityGuard\UploadQuarantineStorage;
 use RuntimeException;
+
+final class UploadInspectionTransientEmptyStream
+{
+    /** @var array<string, array{prefix:string, payload:string}> */
+    private static array $payloads = [];
+    private string $prefix = '';
+    private string $payload = '';
+    private int $position = 0;
+    private bool $paused = false;
+    public mixed $context;
+
+    public static function open(string $uploadId, string $bytes): mixed
+    {
+        $scheme = 'jbsg-transient-empty-test';
+        if (!in_array($scheme, stream_get_wrappers(), true)) {
+            if (!stream_wrapper_register($scheme, self::class)) {
+                return false;
+            }
+        }
+        self::$payloads[$uploadId] = [
+            'prefix' => $bytes,
+            'payload' => $bytes . 'TRAILING',
+        ];
+        return fopen($scheme . '://' . $uploadId, 'rb');
+    }
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        if ($mode !== 'rb') {
+            return false;
+        }
+        $uploadId = parse_url($path, PHP_URL_HOST);
+        if (!is_string($uploadId) || !isset(self::$payloads[$uploadId])) {
+            return false;
+        }
+        $this->prefix = self::$payloads[$uploadId]['prefix'];
+        $this->payload = self::$payloads[$uploadId]['payload'];
+        return true;
+    }
+
+    public function stream_read(int $count): string
+    {
+        if ($this->position === strlen($this->prefix) && !$this->paused) {
+            $this->paused = true;
+            return '';
+        }
+        $chunk = substr($this->payload, $this->position, $count);
+        $this->position += strlen($chunk);
+        return $chunk;
+    }
+
+    public function stream_eof(): bool
+    {
+        return $this->position >= strlen($this->payload);
+    }
+
+    public function stream_stat(): array
+    {
+        return [];
+    }
+
+    public function url_stat(string $path, int $flags): array|false
+    {
+        return false;
+    }
+
+    public function stream_set_option(int $option, int $arg1, int $arg2): bool
+    {
+        return false;
+    }
+}
 
 final class UploadInspectionTestStorage implements UploadQuarantineStorage
 {
     private string $quarantine;
     private string $approved;
+    private array $approvedAttestations = [];
 
-    public function __construct(string $root)
-    {
+    public function __construct(
+        string $root,
+        private readonly bool $alterScanContent = false,
+        private readonly bool $transientEmptyAtEof = false,
+        private readonly bool $appendScanContent = false
+    ) {
         $this->quarantine = $root . '/quarantine';
         $this->approved = $root . '/approved';
         mkdir($this->quarantine, 0700, true);
@@ -31,18 +108,54 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     public function openQuarantineStream(string $uploadId): mixed
     {
         $path = $this->quarantine . '/' . $uploadId;
-        return is_file($path) ? fopen($path, 'rb') : false;
+        if (!is_file($path)) {
+            return false;
+        }
+        if ($this->transientEmptyAtEof) {
+            $bytes = file_get_contents($path);
+            return is_string($bytes)
+                ? UploadInspectionTransientEmptyStream::open($uploadId, $bytes)
+                : false;
+        }
+        if (!$this->alterScanContent && !$this->appendScanContent) {
+            return fopen($path, 'rb');
+        }
+
+        $bytes = file_get_contents($path);
+        if (!is_string($bytes) || $bytes === '') {
+            return false;
+        }
+        if ($this->alterScanContent) {
+            $bytes[0] = chr(ord($bytes[0]) ^ 1);
+        }
+        if ($this->appendScanContent) {
+            $bytes .= 'TRAILING';
+        }
+        $stream = fopen('php://temp', 'w+b');
+        if (!is_resource($stream) || fwrite($stream, $bytes) !== strlen($bytes)) {
+            return false;
+        }
+        rewind($stream);
+        return $stream;
     }
 
-    public function promote(string $uploadId, string $expectedSha256, int $expectedSize): bool
+    public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool
     {
         $source = $this->quarantine . '/' . $uploadId;
         if (!is_file($source) ||
             filesize($source) !== $expectedSize ||
-            hash_file('sha256', $source) !== $expectedSha256) {
+            hash_file('sha256', $source) !== $expectedSha256 ||
+            ($attestation['uploadId'] ?? null) !== $uploadId ||
+            ($attestation['sha256'] ?? null) !== $expectedSha256 ||
+            ($attestation['size'] ?? null) !== $expectedSize ||
+            ($attestation['verdict'] ?? null) !== 'clean') {
             return false;
         }
-        return rename($source, $this->approved . '/' . $uploadId);
+        if (!rename($source, $this->approved . '/' . $uploadId)) {
+            return false;
+        }
+        $this->approvedAttestations[$uploadId] = $attestation;
+        return true;
     }
 
     public function delete(string $uploadId): void
@@ -52,6 +165,12 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
                 throw new RuntimeException('Test store could not delete upload');
             }
         }
+        unset($this->approvedAttestations[$uploadId]);
+    }
+
+    public function approvedAttestation(string $uploadId): ?array
+    {
+        return $this->approvedAttestations[$uploadId] ?? null;
     }
 
     public function quarantineCount(): int
@@ -70,26 +189,60 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     public function __construct(
         private readonly string $verdict = 'clean',
         private readonly bool $tamperDigest = false,
-        private readonly bool $unavailable = false
+        private readonly bool $unavailable = false,
+        private readonly bool $consume = true,
+        private readonly bool $returnWithoutReading = false,
+        private readonly int $consumeBytes = 0,
+        private readonly bool $reportExpectedDigest = false
     ) {
     }
 
-    public function scan(mixed $stream, array $metadata): array
+    public function scan(UploadInspectionReadOnlyStream $stream, array $metadata): array
     {
         if ($this->unavailable) {
             throw new RuntimeException('Synthetic scanner outage');
         }
+        if ($this->returnWithoutReading) {
+            // The reader exposes no seek operation; return without reading to
+            // prove that a scanner cannot fabricate complete consumption.
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
+        }
+        if ($this->consumeBytes > 0) {
+            $stream->read($this->consumeBytes);
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
+        }
+        if (!$this->consume) {
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
+        }
         $hash = hash_init('sha256');
         $size = 0;
-        while (!feof($stream)) {
-            $chunk = fread($stream, 65536);
-            if ($chunk === false) throw new RuntimeException('Could not read quarantine stream');
+        while (true) {
+            $chunk = $stream->read(65536);
             if ($chunk === '') break;
             $size += strlen($chunk);
             hash_update($hash, $chunk);
         }
         $sha256 = hash_final($hash);
         if ($this->tamperDigest) $sha256 = str_repeat('0', 64);
+        if ($this->reportExpectedDigest) $sha256 = $metadata['sha256'];
         return [
             'verdict' => $this->verdict,
             'sha256' => $sha256,
@@ -114,6 +267,16 @@ function runUploadInspectionServiceTests(): void
         $approved = $service->inspect($source, 'product.png', 'image/png');
         expect($approved['status'] === 'approved', 'PHP upload inspector must approve a clean scanned object');
         expect($approved['sha256'] === hash('sha256', $png), 'PHP upload inspector must preserve the exact SHA-256');
+        $attestation = $approved['attestation'];
+        expect($attestation['schema'] === 'jb.security.upload-inspection.attestation/v1', 'PHP upload must emit the shared attestation schema');
+        expect($attestation['uploadId'] === $approved['uploadId'], 'PHP attestation must bind the exact upload ID');
+        expect($attestation['verdict'] === 'clean', 'PHP attestation must preserve the scanner verdict');
+        expect($attestation['sha256'] === $approved['sha256'], 'PHP attestation must bind the exact content digest');
+        expect($attestation['size'] === strlen($png), 'PHP attestation must bind the exact byte count');
+        expect($attestation['mimeType'] === 'image/png', 'PHP attestation must bind the detected MIME type');
+        expect($attestation['engine'] === 'JB-Test-Scanner' && $attestation['version'] === '1.0', 'PHP attestation must bind scanner identity and version');
+        expect(is_int($attestation['scannedAtMs']) && $attestation['scannedAtMs'] >= 0, 'PHP attestation must include a non-negative scan timestamp');
+        expect($store->approvedAttestation($approved['uploadId']) === $attestation, 'PHP promotion must persist the exact attestation with the approved object');
         expect($store->quarantineCount() === 0 && $store->approvedCount() === 1,
             'Only the atomically promoted private object may remain after a clean scan');
 
@@ -143,36 +306,60 @@ function runUploadInspectionServiceTests(): void
         $unknownStore = new UploadInspectionTestStorage($root . '/unknown');
         $unknown = new UploadInspectionService($unknownStore, new UploadInspectionTestScanner('unknown'));
         $unknownRejected = false;
+        $unknownAttestation = null;
         try {
             $unknown->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $unknownRejected = $exception->reason === 'SCAN_NOT_CLEAN';
+            $unknownAttestation = $exception->attestation;
         }
         expect($unknownRejected, 'Unknown scanner verdict must not be treated as clean');
+        expect(is_array($unknownAttestation) && $unknownAttestation['verdict'] === 'unknown',
+            'PHP unknown result must expose its validated scanner attestation');
+        expect($unknownAttestation['sha256'] === hash('sha256', $png) && $unknownAttestation['size'] === strlen($png),
+            'PHP unknown attestation must bind the exact scanned bytes');
         expect($unknownStore->quarantineCount() === 1 && $unknownStore->approvedCount() === 0,
             'Unknown verdict must remain in private quarantine and never be promoted');
 
         $maliciousStore = new UploadInspectionTestStorage($root . '/malicious');
-        $malicious = new UploadInspectionService($maliciousStore, new UploadInspectionTestScanner('malicious'));
+        $maliciousEvents = [];
+        $malicious = new UploadInspectionService(
+            $maliciousStore,
+            new UploadInspectionTestScanner('malicious'),
+            onEvent: static function (array $event) use (&$maliciousEvents): void {
+                $maliciousEvents[] = $event;
+            }
+        );
         $malwareRejected = false;
+        $malwareAttestation = null;
         try {
             $malicious->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $malwareRejected = $exception->reason === 'MALWARE_DETECTED';
+            $malwareAttestation = $exception->attestation;
         }
         expect($malwareRejected, 'Malicious scanner verdict must be rejected');
-        expect($maliciousStore->quarantineCount() === 0 && $maliciousStore->approvedCount() === 0,
-            'Malicious upload must not remain available in approved storage');
+        expect(is_array($malwareAttestation) && $malwareAttestation['verdict'] === 'malicious',
+            'PHP malicious result must expose its validated scanner attestation');
+        expect($malwareAttestation['sha256'] === hash('sha256', $png) && $malwareAttestation['size'] === strlen($png),
+            'PHP malicious attestation must bind the exact scanned bytes');
+        expect($maliciousStore->quarantineCount() === 1 && $maliciousStore->approvedCount() === 0,
+            'Malicious upload must remain isolated in private quarantine and never be promoted');
+        expect(($maliciousEvents[count($maliciousEvents) - 1]['action'] ?? null) === 'quarantined',
+            'Malicious upload telemetry must report quarantine rather than ordinary rejection');
 
         $tamperedStore = new UploadInspectionTestStorage($root . '/tampered');
         $tampered = new UploadInspectionService($tamperedStore, new UploadInspectionTestScanner('clean', true));
         $tamperedRejected = false;
+        $tamperedAttestation = null;
         try {
             $tampered->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $tamperedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+            $tamperedAttestation = $exception->attestation;
         }
         expect($tamperedRejected, 'Scanner digest mismatch must fail closed');
+        expect($tamperedAttestation === null, 'Digest mismatch must not expose trusted scanner attestation');
         expect($tamperedStore->approvedCount() === 0, 'Digest mismatch must never be promoted');
 
         $unavailableStore = new UploadInspectionTestStorage($root . '/unavailable');
@@ -186,6 +373,170 @@ function runUploadInspectionServiceTests(): void
         expect($scannerUnavailable, 'Scanner outage must fail closed');
         expect($unavailableStore->quarantineCount() === 1 && $unavailableStore->approvedCount() === 0,
             'Scanner outage must leave the object private in quarantine');
+
+        $partialStore = new UploadInspectionTestStorage($root . '/partial-scan');
+        $partial = new UploadInspectionService(
+            $partialStore,
+            new UploadInspectionTestScanner('clean', false, false, true, false, 1)
+        );
+        $partialRejected = false;
+        try {
+            $partial->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $partialRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($partialRejected, 'A scanner that reads only one byte must not satisfy complete consumption');
+        expect($partialStore->quarantineCount() === 1 && $partialStore->approvedCount() === 0,
+            'A partial one-byte scan must remain private in quarantine');
+
+        $transientEmptyStore = new UploadInspectionTestStorage(
+            $root . '/transient-empty-before-trailing-bytes',
+            false,
+            true
+        );
+        $transientEmpty = new UploadInspectionService(
+            $transientEmptyStore,
+            new UploadInspectionTestScanner()
+        );
+        $transientEmptyRejected = false;
+        try {
+            $transientEmpty->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $transientEmptyRejected = in_array(
+                $exception->reason,
+                ['SCAN_INCOMPLETE', 'SCAN_CONTENT_MISMATCH'],
+                true
+            );
+        }
+        expect($transientEmptyRejected,
+            'A transient empty read before trailing bytes must never be treated as true EOF');
+        expect($transientEmptyStore->quarantineCount() === 1 && $transientEmptyStore->approvedCount() === 0,
+            'A non-EOF empty read must remain quarantined and never be promoted');
+
+        $extendedStore = new UploadInspectionTestStorage(
+            $root . '/extended-scan-content',
+            false,
+            false,
+            true
+        );
+        $extended = new UploadInspectionService($extendedStore, new UploadInspectionTestScanner());
+        $extendedRejected = false;
+        try {
+            $extended->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $extendedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+        }
+        expect($extendedRejected, 'PHP must reject trailing bytes beyond the ingested object');
+        expect($extendedStore->quarantineCount() === 1 && $extendedStore->approvedCount() === 0,
+            'A scan stream with trailing bytes must remain private and never be promoted');
+
+        $changedStore = new UploadInspectionTestStorage($root . '/changed-scan-content', true);
+        $changed = new UploadInspectionService(
+            $changedStore,
+            new UploadInspectionTestScanner('clean', false, false, true, false, 0, true)
+        );
+        $changedRejected = false;
+        try {
+            $changed->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $changedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+        }
+        expect($changedRejected, 'PHP must independently hash the exact bytes delivered to the scanner');
+        expect($changedStore->quarantineCount() === 1 && $changedStore->approvedCount() === 0,
+            'A changed scan stream must remain private and never be promoted');
+
+        $incompleteStore = new UploadInspectionTestStorage($root . '/incomplete-scan');
+        $incomplete = new UploadInspectionService(
+            $incompleteStore,
+            new UploadInspectionTestScanner('clean', false, false, false)
+        );
+        $incompleteRejected = false;
+        try {
+            $incomplete->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $incompleteRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($incompleteRejected, 'A scanner that returns without consuming the complete stream must fail closed');
+        expect($incompleteStore->quarantineCount() === 1 && $incompleteStore->approvedCount() === 0,
+            'An incomplete scan must remain private in quarantine');
+
+        $seekStore = new UploadInspectionTestStorage($root . '/seek-scan');
+        $seekScanner = new UploadInspectionService(
+            $seekStore,
+            new UploadInspectionTestScanner('clean', false, false, true, true)
+        );
+        $seekRejected = false;
+        try {
+            $seekScanner->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $seekRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($seekRejected, 'A scanner that returns without reading must not satisfy complete-consumption checks');
+        expect($seekStore->quarantineCount() === 1 && $seekStore->approvedCount() === 0,
+            'A seek-only scan must remain private in quarantine');
+
+        $vectorPath = dirname(__DIR__, 2) . '/security-guard-core/tests/fixtures/upload-inspection/conformance-vectors.v1.json';
+        $vectors = json_decode((string) file_get_contents($vectorPath), true, 16, JSON_THROW_ON_ERROR);
+        foreach ($vectors['fileCases'] as $vector) {
+            $vectorSource = $root . '/vector-' . $vector['id'] . '.bin';
+            file_put_contents($vectorSource, hex2bin($vector['bytesHex']));
+            $vectorStore = new UploadInspectionTestStorage($root . '/vector-store-' . $vector['id']);
+            $vectorService = new UploadInspectionService(
+                $vectorStore,
+                new UploadInspectionTestScanner($vector['scannerVerdict'])
+            );
+            $actual = null;
+            $actualReason = null;
+            try {
+                $actual = $vectorService->inspect(
+                    $vectorSource,
+                    $vector['fileName'],
+                    $vector['declaredMimeType']
+                );
+            } catch (UploadInspectionException $exception) {
+                $actualReason = $exception->reason;
+            }
+            if ($vector['expected']['disposition'] === 'approved') {
+                expect($actual !== null && $actual['mimeType'] === $vector['expected']['mimeType'],
+                    'Shared file vector must be approved with the expected MIME type: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 1 && $vectorStore->quarantineCount() === 0,
+                    'Shared clean file vector must be privately promoted: ' . $vector['id']);
+            } else {
+                expect($actualReason === $vector['expected']['errorReason'],
+                    'Shared file vector must return the expected error: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 0 && $vectorStore->quarantineCount() === 0,
+                    'Invalid file-type vectors must never be promoted or retained as clean: ' . $vector['id']);
+            }
+        }
+
+        foreach ($vectors['scannerCases'] as $vector) {
+            $vectorStore = new UploadInspectionTestStorage($root . '/scanner-vector-' . $vector['id']);
+            $consume = $vector['consume'] === 'all';
+            $vectorService = new UploadInspectionService(
+                $vectorStore,
+                new UploadInspectionTestScanner($vector['verdict'], false, false, $consume)
+            );
+            $actual = null;
+            $actualReason = null;
+            try {
+                $actual = $vectorService->inspect($source, 'product.png', 'image/png');
+            } catch (UploadInspectionException $exception) {
+                $actualReason = $exception->reason;
+            }
+            if ($vector['expected']['disposition'] === 'approved') {
+                expect($actual !== null, 'Complete clean scanner vector must be approved: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 1 && $vectorStore->quarantineCount() === 0,
+                    'Complete clean scanner vector must be privately promoted: ' . $vector['id']);
+            } else {
+                expect($actualReason === $vector['expected']['errorReason'],
+                    'Scanner vector must return the expected error: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 0,
+                    'Rejected scanner vector must never be promoted: ' . $vector['id']);
+                $expectedQuarantine = $vector['expected']['disposition'] === 'quarantined' ? 1 : 0;
+                expect($vectorStore->quarantineCount() === $expectedQuarantine,
+                    'Scanner vector quarantine disposition must match contract: ' . $vector['id']);
+            }
+        }
     } finally {
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),

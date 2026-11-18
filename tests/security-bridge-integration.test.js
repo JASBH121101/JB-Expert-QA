@@ -229,7 +229,10 @@ test("malware findings are sent to the coordinator as critical blocks", async ()
     }), (error) => error.code === "MALWARE_DETECTED");
     assert.equal(bridge.coordinator.getDecision(bridge.correlationId).action, "block");
     assert.equal(store.approved.size, 0);
-    assert.equal(store.quarantine.size, 0);
+    assert.equal(store.quarantine.size, 1);
+    assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+    assert.equal(store.calls.includes("deleted"), false);
+    assert.equal(store.calls.includes("promoted"), false);
   } finally {
     await bridge.server.close();
   }

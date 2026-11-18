@@ -6,6 +6,7 @@ import {
   normalizeSecurityEventCoreContract,
   safelyEmitSecurityEventCore
 } from "./security-event-core-v1.js";
+import { validateUploadInspectionAttestationV1 } from "./core-contract-v1.js";
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
@@ -66,6 +67,8 @@ const ERROR_MESSAGES = Object.freeze({
   SCANNER_UNAVAILABLE: "Malware scanner is unavailable",
   SCANNER_TIMEOUT: "Malware scan exceeded its time limit",
   SCAN_NOT_CLEAN: "File did not receive an explicit clean verdict",
+  SCAN_INCOMPLETE: "Malware scanner did not consume the complete verified stream",
+  SCAN_CONTENT_MISMATCH: "Quarantined bytes differ from the ingested upload",
   INVALID_SCAN_RESULT: "Malware scanner returned an invalid result",
   MALWARE_DETECTED: "File was rejected by malware scanning",
   APPROVAL_FAILED: "File could not be promoted to approved storage",
@@ -77,10 +80,11 @@ const ERROR_MESSAGES = Object.freeze({
 });
 
 export class UploadInspectionError extends Error {
-  constructor(code) {
+  constructor(code, attestation = null) {
     super(ERROR_MESSAGES[code] ?? ERROR_MESSAGES.PROCESSING_FAILED);
     this.name = "UploadInspectionError";
     this.code = ERROR_MESSAGES[code] ? code : "PROCESSING_FAILED";
+    if (attestation !== null) this.attestation = attestation;
   }
 }
 
@@ -130,7 +134,7 @@ function emitUploadCoreEvent(core, callback, action, reason, uploadId) {
         : "JBG-UPLOAD-QUARANTINE-001",
       severity: normalizedReason === "malware_detected" ? "critical" : "high",
       action: "quarantined",
-      outcome: "observed",
+      outcome: normalizedReason === "malware_detected" ? "denied" : "observed",
       scope: "upload_quarantine"
     };
   } else if (action === "cleanup_failed") {
@@ -252,7 +256,7 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
       }
 
       if (size + bytes.length > expectedSize) {
-        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
         return;
       }
 
@@ -263,7 +267,7 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
     flush(callback) {
       const actualSha256 = hash.digest("hex");
       if (size !== expectedSize || actualSha256 !== expectedSha256) {
-        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
         return;
       }
       callback();
@@ -271,10 +275,10 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
   });
 }
 
-function validScannerLabel(value) {
+function validScannerLabel(value, maximumLength = 128) {
   return typeof value === "string" &&
     value.length >= 1 &&
-    value.length <= 80 &&
+    value.length <= maximumLength &&
     /^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/.test(value);
 }
 
@@ -586,7 +590,7 @@ export function createUploadInspector(options = {}) {
         }, scannerTimeoutMs);
 
         if (verifiedScanStream.readableEnded !== true) {
-          throw new UploadInspectionError("INVALID_SCAN_RESULT");
+          throw new UploadInspectionError("SCAN_INCOMPLETE");
         }
         await scanPipeline;
       } catch (error) {
@@ -602,7 +606,27 @@ export function createUploadInspector(options = {}) {
         retainQuarantine = true;
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
       }
+      if (!validScannerLabel(scanResult.engine, 128) || !validScannerLabel(scanResult.version, 64)) {
+        retainQuarantine = true;
+        throw new UploadInspectionError("INVALID_SCAN_RESULT");
+      }
+
+      const scannedAtMs = Date.now();
+      const attestation = validateUploadInspectionAttestationV1({
+        schema: "jb.security.upload-inspection.attestation/v1",
+        uploadId,
+        verdict: scanResult.verdict,
+        sha256,
+        size: inspector.size,
+        mimeType: detectedMimeType,
+        engine: scanResult.engine,
+        version: scanResult.version,
+        scannedAtMs
+      });
+
       if (scanResult.verdict === "malicious") {
+        // Preserve malicious evidence in private quarantine for response and forensics.
+        retainQuarantine = true;
         if (securityBridge) {
           try {
             await submitBridgeAssessment({
@@ -616,7 +640,7 @@ export function createUploadInspector(options = {}) {
             // Local malware rejection remains effective if telemetry is unavailable.
           }
         }
-        throw new UploadInspectionError("MALWARE_DETECTED");
+        throw new UploadInspectionError("MALWARE_DETECTED", attestation);
       }
       if (scanResult.verdict !== "clean") {
         retainQuarantine = true;
@@ -633,11 +657,7 @@ export function createUploadInspector(options = {}) {
             // The object remains quarantined even when the bridge is unavailable.
           }
         }
-        throw new UploadInspectionError("SCAN_NOT_CLEAN");
-      }
-      if (!validScannerLabel(scanResult.engine) || !validScannerLabel(scanResult.version)) {
-        retainQuarantine = true;
-        throw new UploadInspectionError("INVALID_SCAN_RESULT");
+        throw new UploadInspectionError("SCAN_NOT_CLEAN", attestation);
       }
 
       if (securityBridge) {
@@ -652,13 +672,13 @@ export function createUploadInspector(options = {}) {
           });
         } catch {
           retainQuarantine = true;
-          throw new UploadInspectionError("BRIDGE_UNAVAILABLE");
+          throw new UploadInspectionError("BRIDGE_UNAVAILABLE", attestation);
         }
         if (!decision || decision.action !== "allow" || decision.status !== "complete") {
           retainQuarantine = true;
           throw new UploadInspectionError(decision?.action === "block"
             ? "BRIDGE_BLOCKED"
-            : "BRIDGE_REVIEW_REQUIRED");
+            : "BRIDGE_REVIEW_REQUIRED", attestation);
         }
       }
 
@@ -670,7 +690,8 @@ export function createUploadInspector(options = {}) {
           engine: scanResult.engine,
           version: scanResult.version
         }),
-        scannedAt: new Date().toISOString()
+        scannedAt: new Date(scannedAtMs).toISOString(),
+        attestation
       });
 
       let promotion;
@@ -694,12 +715,14 @@ export function createUploadInspector(options = {}) {
         );
       } catch (error) {
         retainQuarantine = true;
-        if (error instanceof UploadInspectionError) throw error;
-        throw new UploadInspectionError("APPROVAL_FAILED");
+        if (error instanceof UploadInspectionError) {
+          throw error.attestation ? error : new UploadInspectionError(error.code, attestation);
+        }
+        throw new UploadInspectionError("APPROVAL_FAILED", attestation);
       }
       if (!isRecord(promotion) || promotion.promoted !== true) {
         retainQuarantine = true;
-        throw new UploadInspectionError("APPROVAL_FAILED");
+        throw new UploadInspectionError("APPROVAL_FAILED", attestation);
       }
 
       notify("approved", "clean_scan");
@@ -714,7 +737,7 @@ export function createUploadInspector(options = {}) {
       }
       const code = error instanceof UploadInspectionError ? error.code : "PROCESSING_FAILED";
       notify(retainQuarantine ? "quarantined" : "rejected", code.toLowerCase());
-      throw new UploadInspectionError(code);
+      throw new UploadInspectionError(code, error instanceof UploadInspectionError ? error.attestation ?? null : null);
     }
   }
 

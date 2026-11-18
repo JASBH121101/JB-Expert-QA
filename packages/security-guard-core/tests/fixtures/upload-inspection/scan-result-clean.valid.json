@@ -1,0 +1,12 @@
+{
+  "uploadId": "aabbccddeeff00112233445566778899",
+  "verdict": "clean",
+  "size": 9,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scanner": {
+    "id": "JB-Test-Scanner",
+    "version": "1.0"
+  },
+  "streamConsumed": true,
+  "schema": "jb.security.upload-scan-result/v1"
+}

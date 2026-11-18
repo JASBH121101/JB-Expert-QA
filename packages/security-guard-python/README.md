@@ -73,16 +73,34 @@ The Python package now exposes `UploadInspectionService`, `UploadInspectionError
 
 The service streams a bounded source file into host-provided quarantine storage,
 calculates SHA-256, checks a narrow JPEG/PNG/GIF/WebP/PDF signature allowlist,
-verifies the scanner's explicit verdict, engine/version, byte count and digest,
-and only then requests private atomic promotion.
+and binds the scanner handoff to the opaque upload ID, exact byte count, SHA-256
+and detected MIME type. A public `UploadInspectionReadOnlyStream` reader independently hashes and counts
+the exact bytes returned by bounded `read(max_bytes)` calls (maximum 1 MiB).
+It deliberately does not inherit from `io.RawIOBase`, expose `readinto` or
+support seeking, so scanners cannot wrap it in a prefetching
+`io.BufferedReader` and have buffered bytes counted as consumed. The scanner
+must loop until `read()` returns `b""`; a clean result returned without
+complete sequential consumption fails closed as `SCAN_INCOMPLETE`.
 
 Host adapters must keep quarantine and approved objects private, enforce scanner
-deadlines, consume the complete stream, verify exact bytes during promotion, and
-make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
-and uncertain promotion outcomes never produce an approval. Malicious files,
-unknown verdicts and uncertain objects remain quarantined for forensic review. The
-request path never serves a quarantined original; disposal requires a separate,
-authorized retention/disposition process after the required evidence is preserved.
+deadlines, verify exact bytes during atomic promotion, and make deletion idempotent. The `promote(upload_id, expected_sha256, expected_size, attestation)` method must also verify that the shared `jb.security.upload-inspection.attestation/v1` binds the same upload ID, digest, byte count and `clean` verdict, then persist the attestation and approved bytes together in the same atomic commit. Do not persist the attestation after a separate object-promotion transaction.
+Unknown verdicts, incomplete scans, scanner errors, integrity mismatches and
+uncertain promotion outcomes never produce an approval. A malicious verdict is
+rejected for promotion, but the exact quarantined bytes remain in private quarantine
+for controlled response and forensic review. The host must enforce a bounded
+retention period, storage quotas, restricted and audited access, and an explicit
+deletion workflow. Retained objects must never be exposed through normal download
+or preview routes. A successful clean result
+includes the validated attestation in the returned result; a valid malicious/unknown
+attestation is carried on `UploadInspectionError.attestation` for audit linkage only.
+Incomplete scans and digest/size mismatches do not produce attestation. It remains
+normalized scanner evidence, not a cryptographic scanner signature or publication authorization. Unknown and uncertain
+objects remain private in quarantine. The request path never serves a quarantined
+original.
+
+The normalized request/result contract and shared cross-runtime vectors are
+documented in packages/security-guard-core/docs/UPLOAD-INSPECTION-CONTRACT-V1.md
+and packages/security-guard-core/tests/fixtures/upload-inspection/.
 
 No antivirus engine or production storage implementation is bundled. Signature
 identification is not full format validation or image sanitization. The host

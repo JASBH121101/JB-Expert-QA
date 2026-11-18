@@ -8,6 +8,118 @@ use Closure;
 use RuntimeException;
 use Throwable;
 
+
+
+/**
+ * Sequential reader over one quarantined object.
+ * Only bounded read() calls are exposed; the underlying resource and seek APIs
+ * are never passed to the scanner, so accounting reflects bytes actually delivered.
+ */
+final class UploadInspectionReadOnlyStream
+{
+    /** @var resource|null */
+    private $source;
+    private int $position = 0;
+    private bool $eof = false;
+    private bool $closed = false;
+    private mixed $hash;
+
+    public function __construct(
+        mixed $source,
+        private readonly int $expectedSize,
+        private readonly string $expectedSha256
+    ) {
+        if (!is_resource($source) || $expectedSize < 1 ||
+            !preg_match('/^[a-f0-9]{64}$/', $expectedSha256)) {
+            throw new RuntimeException('Invalid upload scanner reader configuration');
+        }
+
+        $this->source = $source;
+        $this->hash = hash_init('sha256');
+    }
+
+    /**
+     * Return up to $count bytes actually delivered to the scanner.
+     * An empty string means EOF. There is intentionally no seek operation.
+     */
+    public function read(int $count): string
+    {
+        if ($this->closed || !is_resource($this->source)) {
+            throw new UploadInspectionException('SCAN_INCOMPLETE');
+        }
+        if ($count < 1 || $count > 1048576) {
+            throw new UploadInspectionException('INVALID_SCAN_RESULT');
+        }
+        if ($this->eof) {
+            return '';
+        }
+
+        $remaining = $this->expectedSize - $this->position;
+        if ($remaining < 0) {
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
+        }
+
+        $bytes = fread($this->source, min($count, $remaining + 1));
+        if ($bytes === false) {
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
+        }
+        if ($bytes === '') {
+            if (!feof($this->source)) {
+                // Non-blocking/custom streams may temporarily return no bytes
+                // while more content is still available. Never treat that as EOF.
+                throw new UploadInspectionException('SCAN_INCOMPLETE');
+            }
+            $this->eof = true;
+            return '';
+        }
+        if (strlen($bytes) > $remaining) {
+            throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
+        }
+
+        hash_update($this->hash, $bytes);
+        $this->position += strlen($bytes);
+        return $bytes;
+    }
+
+    /**
+     * Verify that the scanner requested every byte and that those bytes match
+     * the digest of the exact quarantined object.
+     */
+    public function verifyComplete(): string
+    {
+        if ($this->closed || !is_resource($this->source) ||
+            $this->position !== $this->expectedSize) {
+            return 'incomplete';
+        }
+
+        if (!$this->eof) {
+            $extra = fread($this->source, 1);
+            if ($extra === false || $extra !== '') {
+                return 'content_mismatch';
+            }
+            if (!feof($this->source)) {
+                return 'incomplete';
+            }
+            $this->eof = true;
+        }
+
+        $actualSha256 = hash_final(hash_copy($this->hash));
+        return hash_equals($this->expectedSha256, $actualSha256)
+            ? 'complete'
+            : 'content_mismatch';
+    }
+
+    public function bytesRead(): int
+    {
+        return $this->position;
+    }
+
+    public function close(): void
+    {
+        $this->closed = true;
+    }
+}
+
 /**
  * Runtime-native PHP upload inspection contract.
  *
@@ -131,21 +243,39 @@ final class UploadInspectionService
 
             $sha256 = hash_final($hash);
             $metadata = [
+                'uploadId' => $uploadId,
                 'size' => $size,
                 'sha256' => $sha256,
+                'detectedMimeType' => $detectedType,
                 'mimeType' => $detectedType,
             ];
 
-            $scanStream = $this->storage->openQuarantineStream($uploadId);
-            $this->assertStream($scanStream, false);
+            $scanSource = $this->storage->openQuarantineStream($uploadId);
+            $this->assertStream($scanSource, false);
+            $scanStream = new UploadInspectionReadOnlyStream($scanSource, $size, $sha256);
             try {
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
+                $scanDisposition = $scanStream->verifyComplete();
+                if ($scanDisposition !== 'complete') {
+                    $retainQuarantine = true;
+                    throw new UploadInspectionException(
+                        $scanDisposition === 'content_mismatch'
+                            ? 'SCAN_CONTENT_MISMATCH'
+                            : 'SCAN_INCOMPLETE'
+                    );
+                }
+            } catch (UploadInspectionException $exception) {
+                if (in_array($exception->reason, ['SCAN_INCOMPLETE', 'SCAN_CONTENT_MISMATCH'], true)) {
+                    $retainQuarantine = true;
+                }
+                throw $exception;
             } catch (Throwable) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCANNER_UNAVAILABLE');
             } finally {
-                if (is_resource($scanStream)) {
-                    fclose($scanStream);
+                $scanStream->close();
+                if (is_resource($scanSource)) {
+                    fclose($scanSource);
                 }
             }
 
@@ -154,29 +284,51 @@ final class UploadInspectionService
                 throw new UploadInspectionException('INVALID_SCAN_RESULT');
             }
 
-            if ($scanResult['verdict'] === 'malicious') {
-                throw new UploadInspectionException('MALWARE_DETECTED');
-            }
-
-            if ($scanResult['verdict'] !== 'clean') {
-                $retainQuarantine = true;
-                throw new UploadInspectionException('SCAN_NOT_CLEAN');
-            }
-
             if ($scanResult['sha256'] !== $sha256 || $scanResult['size'] !== $size) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
             }
 
-            if (!$this->validScannerLabel($scanResult['engine']) ||
-                !$this->validScannerLabel($scanResult['version'])) {
+            if (!$this->validScannerLabel($scanResult['engine'], 128) ||
+                !$this->validScannerLabel($scanResult['version'], 64)) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('INVALID_SCAN_RESULT');
             }
 
-            if (!$this->storage->promote($uploadId, $sha256, $size)) {
+            $scannedAtMs = (int) floor(microtime(true) * 1000);
+            $attestation = CoreV1::validateUploadInspectionAttestationV1([
+                'schema' => 'jb.security.upload-inspection.attestation/v1',
+                'uploadId' => $uploadId,
+                'verdict' => $scanResult['verdict'],
+                'sha256' => $sha256,
+                'size' => $size,
+                'mimeType' => $detectedType,
+                'engine' => $scanResult['engine'],
+                'version' => $scanResult['version'],
+                'scannedAtMs' => $scannedAtMs,
+            ]);
+
+            if ($scanResult['verdict'] === 'malicious') {
+                // Preserve malicious evidence in private quarantine for response and forensics.
                 $retainQuarantine = true;
-                throw new UploadInspectionException('PROMOTION_FAILED');
+                throw new UploadInspectionException('MALWARE_DETECTED', attestation: $attestation);
+            }
+
+            if ($scanResult['verdict'] !== 'clean') {
+                $retainQuarantine = true;
+                throw new UploadInspectionException('SCAN_NOT_CLEAN', attestation: $attestation);
+            }
+
+            $retainQuarantine = true;
+
+            try {
+                $promoted = $this->storage->promote($uploadId, $sha256, $size, $attestation);
+            } catch (Throwable) {
+                throw new UploadInspectionException('PROMOTION_FAILED', attestation: $attestation);
+            }
+            if (!$promoted) {
+                $retainQuarantine = true;
+                throw new UploadInspectionException('PROMOTION_FAILED', attestation: $attestation);
             }
 
             $this->emit('approved', 'clean_scan', $uploadId);
@@ -191,7 +343,8 @@ final class UploadInspectionService
                     'engine' => $scanResult['engine'],
                     'version' => $scanResult['version'],
                 ],
-                'scannedAt' => gmdate('c'),
+                'scannedAt' => gmdate('c', (int) floor($scannedAtMs / 1000)),
+                'attestation' => $attestation,
             ];
         } catch (UploadInspectionException $exception) {
             if ($quarantineAttempted && !$retainQuarantine) {
@@ -328,9 +481,9 @@ final class UploadInspectionService
             is_string($result['version'] ?? null);
     }
 
-    private function validScannerLabel(string $value): bool
+    private function validScannerLabel(string $value, int $maximumLength): bool
     {
-        return $value !== '' && strlen($value) <= 80 &&
+        return $value !== '' && strlen($value) <= $maximumLength &&
             preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/D', $value) === 1;
     }
 }

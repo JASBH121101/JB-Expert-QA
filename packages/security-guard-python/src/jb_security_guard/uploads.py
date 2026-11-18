@@ -7,11 +7,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO, Callable, Protocol, Any
 
+from .core_v1 import validate_upload_inspection_attestation_v1
+
 
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 MAX_BYTES = 100 * 1024 * 1024
 CHUNK_SIZE = 64 * 1024
 MAX_SIGNATURE_BYTES = 8192
+MAX_SCANNER_READ_BYTES = 1024 * 1024
 
 _TYPES: dict[str, tuple[str, ...]] = {
     "image/jpeg": ("jpg", "jpeg"),
@@ -23,9 +26,16 @@ _TYPES: dict[str, tuple[str, ...]] = {
 
 
 class UploadInspectionError(RuntimeError):
-    def __init__(self, reason: str, message: str = "Upload could not be safely approved") -> None:
+    def __init__(
+        self,
+        reason: str,
+        message: str = "Upload could not be safely approved",
+        attestation: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
+        if attestation is not None:
+            self.attestation = dict(attestation)
 
 
 class UploadQuarantineStorage(Protocol):
@@ -33,14 +43,14 @@ class UploadQuarantineStorage(Protocol):
 
     def create_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
     def open_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
-    def promote(self, upload_id: str, expected_sha256: str, expected_size: int) -> bool: ...
+    def promote(self, upload_id: str, expected_sha256: str, expected_size: int, attestation: dict[str, Any]) -> bool: ...
     def delete(self, upload_id: str) -> None: ...
 
 
 class UploadMalwareScanner(Protocol):
     """Host adapter backed by a real, versioned scanner with its own hard deadline."""
 
-    def scan(self, stream: BinaryIO, metadata: dict[str, Any]) -> dict[str, Any]: ...
+    def scan(self, stream: UploadInspectionReadOnlyStream, metadata: dict[str, Any]) -> dict[str, Any]: ...
 
 
 def _extension(filename: str) -> str | None:
@@ -64,9 +74,9 @@ def _normalize_mime(value: str | None) -> str | None:
 
 
 def _detect_type(prefix: bytes) -> str | None:
-    if prefix.startswith(b"\\xff\\xd8\\xff"):
+    if prefix.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
-    if prefix.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+    if prefix.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if prefix.startswith((b"GIF87a", b"GIF89a")):
         return "image/gif"
@@ -85,6 +95,78 @@ def _write_all(stream: BinaryIO, chunk: bytes) -> None:
         if not isinstance(written, int) or written <= 0:
             raise UploadInspectionError("QUARANTINE_WRITE_FAILED")
         offset += written
+
+
+class UploadInspectionReadOnlyStream:
+    """Unbuffered, sequential scanner reader with independent byte accounting.
+
+    This is intentionally not an io.RawIOBase: a scanner cannot wrap it in
+    io.BufferedReader and make a small read appear to consume prefetched bytes.
+    """
+
+    def __init__(self, source: BinaryIO, expected_size: int, expected_sha256: str) -> None:
+        self._source = source
+        self._expected_size = expected_size
+        self._expected_sha256 = expected_sha256
+        self._digest = hashlib.sha256()
+        self._consumed = 0
+        self._eof = False
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        # Close only the scanner-facing capability. The service owns the
+        # underlying quarantine resource and closes it separately.
+        self._closed = True
+
+    def read(self, size: int = CHUNK_SIZE) -> bytes:
+        if self._closed:
+            raise UploadInspectionError("SCAN_INCOMPLETE")
+        if type(size) is not int or size < 1 or size > MAX_SCANNER_READ_BYTES:
+            raise UploadInspectionError("INVALID_SCAN_RESULT")
+        if self._eof:
+            return b""
+
+        remaining = self._expected_size - self._consumed
+        if remaining < 0:
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
+
+        chunk = self._source.read(min(size, remaining + 1))
+        if chunk is None:
+            raise UploadInspectionError("SCAN_INCOMPLETE")
+        if not isinstance(chunk, bytes):
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
+        if len(chunk) > remaining:
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
+        if chunk == b"":
+            self._eof = True
+            return b""
+
+        self._digest.update(chunk)
+        self._consumed += len(chunk)
+        return chunk
+
+    def verify_complete(self) -> str:
+        if self._closed:
+            return "incomplete"
+        if self._consumed != self._expected_size:
+            return "incomplete"
+
+        # Probe the underlying source after the scanner returns. The reader
+        # itself never exposes this resource or a buffered/readinto interface.
+        extra = self._source.read(1)
+        if extra is None:
+            return "incomplete"
+        if not isinstance(extra, bytes) or extra != b"":
+            return "content_mismatch"
+        self._eof = True
+
+        if self._digest.hexdigest() != self._expected_sha256:
+            return "content_mismatch"
+        return "complete"
 
 
 class UploadInspectionService:
@@ -192,14 +274,33 @@ class UploadInspectionService:
                 raise UploadInspectionError("MIME_MISMATCH")
 
             sha256 = digest.hexdigest()
-            metadata = {"size": size, "sha256": sha256, "mimeType": detected_type}
+            metadata = {
+                "uploadId": upload_id,
+                "size": size,
+                "sha256": sha256,
+                "detectedMimeType": detected_type,
+                "mimeType": detected_type,
+            }
             scan_stream = self._storage.open_quarantine_stream(upload_id)
+            verified_scan_stream = UploadInspectionReadOnlyStream(scan_stream, size, sha256)
             try:
-                scan_result = self._scanner.scan(scan_stream, metadata)
+                scan_result = self._scanner.scan(verified_scan_stream, metadata)
+                scan_disposition = verified_scan_stream.verify_complete()
+                if scan_disposition != "complete":
+                    retain_quarantine = True
+                    raise UploadInspectionError(
+                        "SCAN_CONTENT_MISMATCH"
+                        if scan_disposition == "content_mismatch"
+                        else "SCAN_INCOMPLETE"
+                    )
+            except UploadInspectionError:
+                retain_quarantine = True
+                raise
             except Exception as exc:
                 retain_quarantine = True
                 raise UploadInspectionError("SCANNER_UNAVAILABLE") from exc
             finally:
+                verified_scan_stream.close()
                 scan_stream.close()
 
             if not isinstance(scan_result, dict) or set(scan_result) != {
@@ -224,20 +325,37 @@ class UploadInspectionService:
             ):
                 retain_quarantine = True
                 raise UploadInspectionError("SCAN_INTEGRITY_MISMATCH")
+            scanned_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            try:
+                attestation = validate_upload_inspection_attestation_v1({
+                    "schema": "jb.security.upload-inspection.attestation/v1",
+                    "uploadId": upload_id,
+                    "verdict": scan_result["verdict"],
+                    "sha256": sha256,
+                    "size": size,
+                    "mimeType": detected_type,
+                    "engine": scan_result["engine"],
+                    "version": scan_result["version"],
+                    "scannedAtMs": scanned_at_ms,
+                })
+            except (TypeError, ValueError) as exc:
+                raise UploadInspectionError("INVALID_SCAN_RESULT") from exc
+
             if scan_result["verdict"] == "malicious":
+                # Preserve malicious evidence in private quarantine for response and forensics.
                 retain_quarantine = True
-                raise UploadInspectionError("MALWARE_DETECTED")
+                raise UploadInspectionError("MALWARE_DETECTED", attestation=attestation)
             if scan_result["verdict"] != "clean":
                 retain_quarantine = True
-                raise UploadInspectionError("SCAN_NOT_CLEAN")
+                raise UploadInspectionError("SCAN_NOT_CLEAN", attestation=attestation)
 
             retain_quarantine = True
             try:
-                promotion_result = self._storage.promote(upload_id, sha256, size)
+                promotion_result = self._storage.promote(upload_id, sha256, size, attestation)
             except Exception as exc:
-                raise UploadInspectionError("PROMOTION_FAILED") from exc
+                raise UploadInspectionError("PROMOTION_FAILED", attestation=attestation) from exc
             if promotion_result is not True:
-                raise UploadInspectionError("PROMOTION_FAILED")
+                raise UploadInspectionError("PROMOTION_FAILED", attestation=attestation)
             promoted = True
             retain_quarantine = False
             self._emit("upload-approved")
@@ -248,10 +366,11 @@ class UploadInspectionService:
                 "size": size,
                 "mimeType": detected_type,
                 "scanner": {"engine": scan_result["engine"], "version": scan_result["version"]},
-                "scannedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "scannedAt": datetime.fromtimestamp(scanned_at_ms / 1000, timezone.utc).isoformat().replace("+00:00", "Z"),
+                "attestation": attestation,
             }
         except UploadInspectionError as exc:
-            self._emit("upload-rejected", exc.reason)
+            self._emit("upload-quarantined" if retain_quarantine else "upload-rejected", exc.reason)
             if writer is not None:
                 try:
                     writer.close()
@@ -271,7 +390,7 @@ class UploadInspectionService:
                     raise UploadInspectionError("QUARANTINE_CLEANUP_FAILED") from cleanup_error
             raise
         except Exception as exc:
-            self._emit("upload-rejected", "INSPECTION_FAILED")
+            self._emit("upload-quarantined" if retain_quarantine else "upload-rejected", "INSPECTION_FAILED")
             if writer is not None:
                 try:
                     writer.close()

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jb:security-guard:upload-scan-request:v1",
+  "title": "JB Security Guard upload scan request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "uploadId",
+    "size",
+    "sha256",
+    "detectedMimeType"
+  ],
+  "properties": {
+    "schema": {
+      "const": "jb.security.upload-scan-request/v1"
+    },
+    "uploadId": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 104857600
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "detectedMimeType": {
+      "type": "string",
+      "enum": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf"
+      ]
+    }
+  }
+}

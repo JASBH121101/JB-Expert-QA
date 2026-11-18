@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { Readable, Writable } from "node:stream";
 import { createUploadInspector, UploadInspectionError } from "@jb/security-guard";
 
@@ -91,6 +92,16 @@ test("clean signature-validated uploads are scanned from quarantine before promo
   assert.equal(result.size, PNG.length);
   assert.equal(result.sha256, createHash("sha256").update(PNG).digest("hex"));
   assert.equal(result.scanner.engine, "MockAV");
+  assert.equal(result.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+  assert.equal(result.attestation.uploadId, result.uploadId);
+  assert.equal(result.attestation.verdict, "clean");
+  assert.equal(result.attestation.sha256, result.sha256);
+  assert.equal(result.attestation.size, result.size);
+  assert.equal(result.attestation.mimeType, result.mimeType);
+  assert.equal(result.attestation.engine, "MockAV");
+  assert.equal(result.attestation.version, "1.0");
+  assert.ok(Number.isSafeInteger(result.attestation.scannedAtMs));
+  assert.deepEqual(store.approved.get(result.uploadId).metadata.attestation, result.attestation);
   assert.equal(store.approved.get(result.uploadId).bytes.equals(PNG), true);
   assert.equal(store.quarantine.has(result.uploadId), false);
   assert.deepEqual(store.calls.map(([name]) => name), [
@@ -177,7 +188,7 @@ test("scanner stream digest must match even when tampered content has the same s
       source: Readable.from([PNG]),
       fileName: "tampered-in-quarantine.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => error.code === "SCAN_CONTENT_MISMATCH"
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -196,7 +207,7 @@ test("scanner stream cannot contain more bytes than the original upload", async 
       source: Readable.from([PNG]),
       fileName: "extended-in-quarantine.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => error.code === "SCAN_CONTENT_MISMATCH"
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -227,8 +238,9 @@ test("promotion adapter must verify the exact scanned object before approval", a
   assert.equal(promotionCall[3], PNG.length);
 });
 
-test("malware verdicts are rejected and the quarantined object is deleted", async () => {
+test("malware verdicts are rejected and the quarantined object is retained privately", async () => {
   const store = createMemoryStore();
+  const events = [];
   const scanner = {
     async scan({ stream }) {
       for await (const chunk of stream) void chunk;
@@ -236,11 +248,22 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
     }
   };
   await assert.rejects(
-    inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
-    (error) => error.code === "MALWARE_DETECTED"
+    inspector(store, scanner, { onEvent: (event) => events.push(event) }).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
+    (error) => {
+      assert.equal(error.code, "MALWARE_DETECTED");
+      assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+      assert.equal(error.attestation.verdict, "malicious");
+      assert.equal(error.attestation.sha256, createHash("sha256").update(PNG).digest("hex"));
+      assert.equal(error.attestation.size, PNG.length);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
+  assert.equal(events.at(-1)?.action, "quarantined");
 });
 
 test("unknown scan verdicts remain quarantined and cannot be promoted", async () => {
@@ -253,7 +276,14 @@ test("unknown scan verdicts remain quarantined and cannot be promoted", async ()
   };
   await assert.rejects(
     inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "unknown.png" }),
-    (error) => error.code === "SCAN_NOT_CLEAN"
+    (error) => {
+      assert.equal(error.code, "SCAN_NOT_CLEAN");
+      assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+      assert.equal(error.attestation.verdict, "unknown");
+      assert.equal(error.attestation.sha256, createHash("sha256").update(PNG).digest("hex"));
+      assert.equal(error.attestation.size, PNG.length);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -325,7 +355,11 @@ test("scanner cannot approve a file without consuming the complete quarantined s
       source: Readable.from([PNG]),
       fileName: "not-fully-scanned.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => {
+      assert.equal(error.code, "SCAN_INCOMPLETE");
+      assert.equal(Object.hasOwn(error, "attestation"), false);
+      return true;
+    }
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -530,7 +564,7 @@ test("upload Core v1 distinguishes malware rejection from a quarantined unknown 
   assert.equal(maliciousEvents.length, 1);
   assert.equal(maliciousEvents[0].ruleId, "JBG-MALWARE-001");
   assert.equal(maliciousEvents[0].severity, "critical");
-  assert.equal(maliciousEvents[0].action, "rejected");
+  assert.equal(maliciousEvents[0].action, "quarantined");
   assert.equal(maliciousEvents[0].outcome, "denied");
 
   const unknownStore = createMemoryStore();
@@ -614,8 +648,9 @@ test("a stalled security bridge cannot delay local rejection of a malicious uplo
   );
 
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
-  assert.ok(store.calls.some(([name]) => name === "delete"));
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
 });
 
 
@@ -675,3 +710,87 @@ test("a late promotion is cleaned by opaque upload ID and never left in approved
   assert.equal(store.quarantine.has(uploadId), false);
   assert.ok(store.calls.some(([name, id]) => name === "delete" && id === uploadId));
 });
+
+const sharedUploadVectors = JSON.parse(await readFile(
+  new URL("../packages/security-guard-core/tests/fixtures/upload-inspection/conformance-vectors.v1.json", import.meta.url),
+  "utf8"
+));
+
+for (const vector of sharedUploadVectors.fileCases) {
+  test("shared upload contract file vector: " + vector.id, async () => {
+    const store = createMemoryStore();
+    const bytes = Buffer.from(vector.bytesHex, "hex");
+    const scanner = {
+      async scan({ stream }) {
+        for await (const chunk of stream) void chunk;
+        return { verdict: vector.scannerVerdict, engine: "MockAV", version: "1.0" };
+      }
+    };
+
+    let result = null;
+    let error = null;
+    try {
+      result = await inspector(store, scanner).inspect({
+        source: Readable.from([bytes]),
+        fileName: vector.fileName,
+        declaredMimeType: vector.declaredMimeType
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    if (vector.expected.disposition === "approved") {
+      assert.equal(error, null, vector.id);
+      assert.equal(result.mimeType, vector.expected.mimeType);
+      assert.equal(store.approved.get(result.uploadId).bytes.equals(bytes), true);
+      assert.equal(store.quarantine.size, 0);
+    } else {
+      assert.equal(error?.code, vector.expected.errorReason, vector.id);
+      assert.equal(store.approved.size, 0);
+      assert.equal(store.quarantine.size, 0);
+    }
+  });
+}
+
+for (const vector of sharedUploadVectors.scannerCases) {
+  test("shared upload contract scanner vector: " + vector.id, async () => {
+    const store = createMemoryStore();
+    const bytes = PNG;
+    const scanner = {
+      async scan({ stream }) {
+        if (vector.consume === "all") {
+          for await (const chunk of stream) void chunk;
+        }
+        return { verdict: vector.verdict, engine: "MockAV", version: "1.0" };
+      }
+    };
+
+    let result = null;
+    let error = null;
+    try {
+      result = await inspector(store, scanner).inspect({
+        source: Readable.from([bytes]),
+        fileName: "shared-vector.png",
+        declaredMimeType: "image/png"
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    if (vector.expected.disposition === "approved") {
+      assert.equal(error, null, vector.id);
+      assert.equal(result.status, "approved");
+      assert.equal(store.approved.get(result.uploadId).bytes.equals(bytes), true);
+      assert.equal(store.quarantine.size, 0);
+    } else {
+      assert.equal(error?.code, vector.expected.errorReason, vector.id);
+      assert.equal(store.approved.size, 0);
+      assert.equal(
+        store.quarantine.size,
+        vector.expected.disposition === "quarantined" ? 1 : 0,
+        vector.id
+      );
+    }
+  });
+}
+
