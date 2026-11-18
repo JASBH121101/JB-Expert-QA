@@ -1,3 +1,4 @@
+import { snapshotPlainRecord } from "./safe-record.js";
 import { createDiagnostic } from "./diagnostic.js";
 import { validateEngineConfig } from "./config.js";
 import { ENGINE_VERSION } from "./version.js";
@@ -50,8 +51,9 @@ export class ExpertQAEngine {
 
         for (const finding of findings) {
           if (finding) {
+            const safeFinding = snapshotPlainRecord(finding, "rule finding");
             diagnostics.push(createDiagnostic({
-              ...finding,
+              ...safeFinding,
               ruleId: rule.id,
               specialist: rule.specialist
             }));
@@ -98,7 +100,7 @@ export class ExpertQAEngine {
       }),
       scoring,
       diagnostics: Object.freeze(diagnostics),
-      execution: Object.freeze(execution)
+      execution: Object.freeze(execution.map((entry) => Object.freeze(entry)))
     });
   }
 }
