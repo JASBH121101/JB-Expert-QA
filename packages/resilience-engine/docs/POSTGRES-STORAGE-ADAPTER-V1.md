@@ -76,6 +76,83 @@ The A2 journal provides:
 
 This is a transactional single-primary PostgreSQL implementation, not a multi-region consensus system. Database backups and point-in-time restore must preserve A2 idempotency tombstones; restoring an older snapshot can reopen old idempotency keys and requires an operator-controlled recovery plan before the ledger is trusted again. The host must use least-privilege roles, protect the database endpoint and backups, and independently test failover/restore semantics. The ledger itself does not authenticate policy approval, perform provider operations, validate independent verification, or grant release authority.
 
+## PostgreSQL external monotonic revision anchor
+
+The package also exports `createPostgresA2RevisionAnchor({ pool })` from
+`@jb/resilience-engine/adapters/postgres-a2-revision-anchor`. It implements
+the file ledger's `revisionAnchor` contract with a separate table,
+`public.jb_resilience_a2_revision_anchors`.
+
+- Each opaque `ledgerId` has one state: schema
+  `jb.resilience.a2-revision-anchor/v1`, non-negative monotonic revision and
+  the SHA-256 digest of the authenticated local journal.
+- Initial creation is compare-and-swap from `expected: null` and revision 0.
+  Later writes must advance exactly one revision and match the full previous
+  schema/revision/digest tuple.
+- SQL `UPDATE ... WHERE ledger_id AND state_schema AND revision AND
+  ledger_sha256` is the atomic compare-and-swap. A competing or stale writer
+  returns `false`; it never silently overwrites the newer anchor.
+- The initializer serializes DDL, checks the exact column layout and validates
+  the named primary-key and integrity constraints. A malformed/incompatible
+  pre-existing table fails closed.
+- Pool acquisition and transaction work are bounded with connection,
+  statement, lock and idle-transaction timeouts. The late Pool-client path
+  releases a client that arrives after the bounded acquisition has expired.
+
+Example composition with a local HMAC-protected file ledger:
+
+```js
+import pg from "pg";
+import {
+  createPostgresA2RevisionAnchor
+} from "@jb/resilience-engine/adapters/postgres-a2-revision-anchor";
+import {
+  createFileA2ActionLedger
+} from "@jb/resilience-engine/a2-action-ledger";
+
+const anchorPool = new pg.Pool({
+  connectionString: process.env.JB_A2_REVISION_ANCHOR_DATABASE_URL,
+  max: 4,
+  connectionTimeoutMillis: 3_000
+});
+const revisionAnchor = createPostgresA2RevisionAnchor({ pool: anchorPool });
+await revisionAnchor.initialize();
+
+const activeKeyId = process.env.JB_A2_LEDGER_KEY_ID;
+const actionLedger = createFileA2ActionLedger({
+  filePath: "/var/lib/jb-resilience/a2-actions.json",
+  providerId: "host-configured-provider-id",
+  verifierId: "host-configured-independent-verifier-id",
+  recorderId: "host-configured-forensic-recorder-id",
+  integrityKeys: {
+    [activeKeyId]: process.env.JB_A2_LEDGER_HMAC_KEY_HEX
+  },
+  activeIntegrityKeyId: activeKeyId,
+  revisionAnchor,
+  ledgerId: "host-a2-action-ledger-01"
+});
+
+// The controller remains disabled by default and ARC continues to deny A2.
+```
+
+**Failure-domain requirement:** the anchor is useful against restoration of an
+older local journal/guard pair only while its own high-water mark survives.
+The anchor Pool must point to a separately administered PostgreSQL service,
+with independently protected credentials, backups, point-in-time recovery,
+retention and failover controls. Putting the journal and anchor in the same
+PostgreSQL cluster, or restoring both from the same older snapshot, does not
+provide independent rollback protection. A second Pool to the same primary is
+only a concurrency test, not proof of a separate trust/failure domain.
+
+The CI integration deliberately uses two Pools against one disposable
+PostgreSQL 16 primary. It proves transactionally atomic single-primary CAS
+(one concurrent writer wins), stale-write rejection, monotonic revision
+advance and integration with the local HMAC file ledger. It does **not**
+certify split-brain handling, backup/restore independence, regional failover,
+or production availability. A production host must separately test those
+operational properties before treating the external anchor as a trusted
+rollback boundary.
+
 ### A2 PostgreSQL execution bounds
 
 `createPostgresA2ActionLedger` applies transaction-local PostgreSQL limits to every operation, including read-only reconciliation and exact lookup:
