@@ -156,6 +156,71 @@ test("PASS requires success evidence bound to the exact source commit", () => {
   assert.ok(mismatchResult.errors.some((error) => error.includes("must match the assessed commit")));
 });
 
+test("versioned assessments preserve immutable evidence across source revisions", () => {
+  const fixture = fixtureInventory();
+  const original = {
+    assessmentId: "asmt.fixture.original",
+    nodeId: "fixture.component",
+    version: "1.0.0",
+    commitSha: sourceSha,
+    status: "PASS",
+    assessedAt: "2026-11-18T19:11:00Z",
+    evidence: evidence("success", sourceSha),
+    findings: []
+  };
+  const nextSha = "a".repeat(40);
+  fixture.sources.push({
+    id: "fixture-next",
+    repository: "example/repo",
+    ref: "main",
+    commitSha: nextSha
+  });
+  const revised = {
+    assessmentId: "asmt.fixture.revised",
+    nodeId: "fixture.component",
+    version: "1.0.0",
+    commitSha: nextSha,
+    status: "PASS",
+    assessedAt: "2026-11-18T19:12:00Z",
+    evidence: evidence("success", nextSha),
+    findings: [],
+    sourceId: "fixture-next"
+  };
+  const appended = appendSccmAssessment(fixture, [original], revised);
+  assert.equal(appended.length, 2);
+  assert.equal(appended[0].commitSha, sourceSha);
+  assert.equal(appended[1].commitSha, nextSha);
+  assert.equal(validateSccmHistory(fixture, appended).valid, true);
+  const latest = evaluateSccmNode(fixture, appended, "fixture.component");
+  assert.equal(latest.status, "PASS");
+  assert.equal(latest.commitSha, nextSha);
+});
+
+test("versioned assessments cannot cite a source snapshot from another repository", () => {
+  const fixture = fixtureInventory();
+  const nextSha = "b".repeat(40);
+  fixture.sources.push({
+    id: "fixture-foreign",
+    repository: "other/repo",
+    ref: "main",
+    commitSha: nextSha
+  });
+  const invalid = {
+    assessmentId: "asmt.fixture.foreign",
+    nodeId: "fixture.component",
+    version: "1.0.0",
+    commitSha: nextSha,
+    status: "PASS",
+    assessedAt: "2026-11-18T19:11:00Z",
+    evidence: evidence("success", nextSha),
+    findings: [],
+    sourceId: "fixture-foreign"
+  };
+  const result = validateSccmAssessment(fixture, invalid);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some((error) => error.includes("node's registered repository")));
+});
+
 test("PASS cannot include unresolved findings and FAIL requires failure evidence", () => {
   const passWithFinding = assessment("jb.expert-qa.language.semantic-integrity", {
     findings: ["Unresolved semantic drift"]
