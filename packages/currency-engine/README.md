@@ -12,7 +12,7 @@
 - Validate source/target pair, positive decimal rate, source label, asOf, validUntil and maximum rate age.
 - Record rate provenance and the selected rounding mode with each conversion result.
 
-The initial registry includes NIO, USD, MXN, CRC, HNL, GTQ, PAB, COP, BRL, EUR, GBP, JPY and KWD. The registry is intentionally extensible. The included minor-unit metadata is a small operational subset, not a claim to contain every ISO 4217 entry.
+The curated initial registry includes NIO, USD, MXN, CRC, HNL, GTQ, PAB, COP, BRL, EUR, GBP, JPY, KWD, AUD, CAD, CHF, CNY, INR, AED, SAR, SGD, SEK, NOK, DKK, NZD, ZAR, PLN, CZK, THB, KRW, CLP, PEN, DOP, ARS, PHP, MYR, HKD, ISK, EGP, MAD, NGN, KES, UAH and CLF. This is a broader operational subset, not a complete or automatically refreshed ISO 4217 registry. Verify active status and minor-unit metadata against the current official ISO list before production use.
 
 ## Exact amount model
 

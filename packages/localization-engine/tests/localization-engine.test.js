@@ -96,3 +96,17 @@ test("runtime catalog snapshots are immutable after construction", () => {
   mutable["en-US"].plural.other = "mutated";
   assert.equal(i18n.t("plural", { count: 1, params: { count: 1 } }), "1 item");
 });
+
+
+test("plural audit flags missing CLDR categories required by the target locale", () => {
+  const result = auditCatalogs({
+    "es-419": { items: { one: "{count} artículo", other: "{count} artículos" } },
+    ar: { items: { one: "عنصر واحد", other: "{count} عنصر" } }
+  }, { sourceLocale: "es-419", requiredLocales: ["ar"] });
+  const missing = result.findings
+    .filter((item) => item.code === "plural-category-missing")
+    .map((item) => item.category)
+    .sort();
+  assert.deepEqual(missing, ["few", "many", "two", "zero"]);
+  assert.equal(result.status, "review-required");
+});

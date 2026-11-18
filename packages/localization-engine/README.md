@@ -10,7 +10,7 @@
 - Support locale-specific cardinal plurals through Intl.PluralRules.
 - Format numbers and dates through Intl.NumberFormat and Intl.DateTimeFormat.
 - Expose text direction metadata for RTL languages.
-- Audit missing catalogs, missing or obsolete keys, message-shape changes and placeholder parity.
+- Audit missing catalogs, missing or obsolete keys, message-shape changes, placeholder parity and missing CLDR plural categories required by each target locale.
 
 The initial locale set is es-NI, es-419, es-MX, es-ES, en-US, en-GB, pt-BR, pt-PT, fr-FR, de-DE, it-IT and ar. A product must ship reviewed catalog content for each locale it claims to support. Registering a locale is not the same as translating the product.
 
