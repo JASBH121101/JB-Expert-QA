@@ -8,6 +8,123 @@ use Closure;
 use RuntimeException;
 use Throwable;
 
+final class UploadInspectionReadOnlyStream
+{
+    private const SCHEME = 'jbsg-upload-scan-v1';
+
+    /** @var array<string, resource> */
+    private static array $sources = [];
+    private static bool $registered = false;
+
+    /** @var resource|null */
+    private $source = null;
+    private int $position = 0;
+    public mixed $context;
+
+    public static function open(string $uploadId, mixed $source): mixed
+    {
+        if (!is_resource($source)) {
+            return false;
+        }
+
+        if (!self::$registered) {
+            if (in_array(self::SCHEME, stream_get_wrappers(), true)) {
+                throw new RuntimeException('Upload scan stream scheme is already registered');
+            }
+            if (!stream_wrapper_register(self::SCHEME, self::class)) {
+                throw new RuntimeException('Could not register the read-only upload scan stream');
+            }
+            self::$registered = true;
+        }
+
+        self::$sources[$uploadId] = $source;
+        $stream = @fopen(self::SCHEME . '://' . $uploadId, 'rb');
+        if (!is_resource($stream)) {
+            unset(self::$sources[$uploadId]);
+            return false;
+        }
+
+        return $stream;
+    }
+
+    public static function forget(string $uploadId): void
+    {
+        unset(self::$sources[$uploadId]);
+    }
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        if ($mode !== 'rb') {
+            return false;
+        }
+
+        $uploadId = parse_url($path, PHP_URL_HOST);
+        if (!is_string($uploadId) || !isset(self::$sources[$uploadId]) ||
+            !is_resource(self::$sources[$uploadId])) {
+            return false;
+        }
+
+        $this->source = self::$sources[$uploadId];
+        $this->position = 0;
+        return true;
+    }
+
+    public function stream_read(int $count): string|false
+    {
+        if (!is_resource($this->source) || $count < 1) {
+            return false;
+        }
+
+        $bytes = fread($this->source, $count);
+        if ($bytes === false) {
+            return false;
+        }
+
+        $this->position += strlen($bytes);
+        return $bytes;
+    }
+
+    public function stream_eof(): bool
+    {
+        return !is_resource($this->source) || feof($this->source);
+    }
+
+    public function stream_tell(): int
+    {
+        return $this->position;
+    }
+
+    public function stream_seek(int $offset, int $whence = SEEK_SET): bool
+    {
+        return false;
+    }
+
+    public function stream_stat(): array|false
+    {
+        return is_resource($this->source) ? fstat($this->source) : false;
+    }
+
+    public function url_stat(string $path, int $flags): array|false
+    {
+        return false;
+    }
+
+    public function stream_set_option(int $option, int $arg1, int $arg2): bool
+    {
+        return false;
+    }
+
+    public function stream_flush(): bool
+    {
+        return true;
+    }
+
+    public function stream_close(): void
+    {
+        $this->source = null;
+    }
+}
+
 /**
  * Runtime-native PHP upload inspection contract.
  *
@@ -136,16 +253,33 @@ final class UploadInspectionService
                 'mimeType' => $detectedType,
             ];
 
-            $scanStream = $this->storage->openQuarantineStream($uploadId);
+            $scanSource = $this->storage->openQuarantineStream($uploadId);
+            $this->assertStream($scanSource, false);
+            $scanStream = UploadInspectionReadOnlyStream::open($uploadId, $scanSource);
+            if (!is_resource($scanStream)) {
+                fclose($scanSource);
+                throw new UploadInspectionException('STORAGE_UNAVAILABLE');
+            }
             $this->assertStream($scanStream, false);
             try {
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
+                $scanPosition = ftell($scanStream);
+                if ($scanPosition === false || $scanPosition !== $size || !feof($scanStream)) {
+                    $retainQuarantine = true;
+                    throw new UploadInspectionException('SCAN_INCOMPLETE');
+                }
+            } catch (UploadInspectionException $exception) {
+                throw $exception;
             } catch (Throwable) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCANNER_UNAVAILABLE');
             } finally {
                 if (is_resource($scanStream)) {
                     fclose($scanStream);
+                }
+                UploadInspectionReadOnlyStream::forget($uploadId);
+                if (is_resource($scanSource)) {
+                    fclose($scanSource);
                 }
             }
 
