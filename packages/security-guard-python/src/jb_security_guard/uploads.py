@@ -297,14 +297,7 @@ class UploadInspectionService:
             ):
                 retain_quarantine = True
                 raise UploadInspectionError("SCAN_INTEGRITY_MISMATCH")
-            if scan_result["verdict"] == "malicious":
-                raise UploadInspectionError("MALWARE_DETECTED")
-            if scan_result["verdict"] != "clean":
-                retain_quarantine = True
-                raise UploadInspectionError("SCAN_NOT_CLEAN")
-
             scanned_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-            retain_quarantine = True
             try:
                 attestation = validate_upload_inspection_attestation_v1({
                     "schema": "jb.security.upload-inspection.attestation/v1",
@@ -319,12 +312,20 @@ class UploadInspectionService:
                 })
             except (TypeError, ValueError) as exc:
                 raise UploadInspectionError("INVALID_SCAN_RESULT") from exc
+
+            if scan_result["verdict"] == "malicious":
+                raise UploadInspectionError("MALWARE_DETECTED", attestation=attestation)
+            if scan_result["verdict"] != "clean":
+                retain_quarantine = True
+                raise UploadInspectionError("SCAN_NOT_CLEAN", attestation=attestation)
+
+            retain_quarantine = True
             try:
                 promotion_result = self._storage.promote(upload_id, sha256, size, attestation)
             except Exception as exc:
-                raise UploadInspectionError("PROMOTION_FAILED") from exc
+                raise UploadInspectionError("PROMOTION_FAILED", attestation=attestation) from exc
             if promotion_result is not True:
-                raise UploadInspectionError("PROMOTION_FAILED")
+                raise UploadInspectionError("PROMOTION_FAILED", attestation=attestation)
             promoted = True
             retain_quarantine = False
             self._emit("upload-approved")
