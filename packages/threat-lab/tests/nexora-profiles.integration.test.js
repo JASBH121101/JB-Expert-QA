@@ -311,6 +311,11 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
       explicitlyCovered: ["currency", "locale", "private-image", "mfa-totp"]
     }
   });
+  if (REPORT_DIR) {
+    mkdirSync(REPORT_DIR, { recursive: true, mode: 0o700 });
+    writeFileSync(path.join(REPORT_DIR, "nexora-configurable-catalog-report.json"), JSON.stringify(catalogReport, null, 2) + "\n", { mode: 0o600 });
+    writeFileSync(path.join(REPORT_DIR, "nexora-site-engine-report.json"), JSON.stringify(siteReport, null, 2) + "\n", { mode: 0o600 });
+  }
 
   assert.deepEqual(catalogReport.totals, { pass: 6, fail: 0, skip: 0 });
   assert.equal(catalogReport.assessment.targets[0].ready, true);
@@ -319,11 +324,6 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
   ]);
 
   assert.deepEqual(siteReport.totals, { pass: 10, fail: 0, skip: 0 });
-  if (REPORT_DIR) {
-    mkdirSync(REPORT_DIR, { recursive: true, mode: 0o700 });
-    writeFileSync(path.join(REPORT_DIR, "nexora-configurable-catalog-report.json"), JSON.stringify(catalogReport, null, 2) + "\n", { mode: 0o600 });
-    writeFileSync(path.join(REPORT_DIR, "nexora-site-engine-report.json"), JSON.stringify(siteReport, null, 2) + "\n", { mode: 0o600 });
-  }
   assert.equal(siteReport.assessment.targets[0].ready, true);
   assert.equal(siteScenarios.length, 10);
   assert.deepEqual(siteReport.assessment.targets[0].coveredLevels, [
