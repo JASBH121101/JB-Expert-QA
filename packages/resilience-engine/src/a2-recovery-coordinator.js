@@ -264,11 +264,18 @@ function validForensicReceipt(value, record, operationReceipt, now) {
     value.expiresAtMs > now;
 }
 
+function contentByteLength(content) {
+  if (typeof content === "string") return Buffer.byteLength(content, "utf8");
+  if (content instanceof ArrayBuffer) return content.byteLength;
+  if (ArrayBuffer.isView(content)) return content.byteLength;
+  return null;
+}
+
 function contentBytes(content) {
   if (typeof content === "string") return Buffer.from(content, "utf8");
-  if (content instanceof ArrayBuffer) return Buffer.from(content);
+  if (content instanceof ArrayBuffer) return Buffer.from(new Uint8Array(content));
   if (ArrayBuffer.isView(content)) {
-    return Buffer.from(content.buffer, content.byteOffset, content.byteLength);
+    return Buffer.from(new Uint8Array(content.buffer, content.byteOffset, content.byteLength));
   }
   throw new TypeError("evidence resolver must return UTF-8 text or binary bytes");
 }
@@ -334,6 +341,7 @@ export function createA2RecoveryCoordinator({
   evidenceResolver,
   clock = Date.now,
   operationTimeoutMs = 5_000,
+  maxEvidenceBytes = 16 * 1024 * 1024,
   pageSize = 25,
   maxPages = 20
 } = {}) {
@@ -360,6 +368,7 @@ export function createA2RecoveryCoordinator({
   }
   if (typeof clock !== "function" ||
       !Number.isSafeInteger(operationTimeoutMs) || operationTimeoutMs < 100 || operationTimeoutMs > 30_000 ||
+      !Number.isSafeInteger(maxEvidenceBytes) || maxEvidenceBytes < 1 || maxEvidenceBytes > 64 * 1024 * 1024 ||
       !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100 ||
       !Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 100) {
     throw new TypeError("A2 recovery bounds are invalid");
@@ -420,6 +429,7 @@ export function createA2RecoveryCoordinator({
     }
     const operationReceipt = Object.freeze({ ...providerResult.receipt });
 
+    let resolvedEvidenceBytes = 0;
     for (const ref of record.evidenceRefs) {
       const resolved = await invokeBounded(evidenceResolver, "resolve", {
         refId: ref.refId,
@@ -429,10 +439,31 @@ export function createA2RecoveryCoordinator({
         atMs: assertTimestamp(clock(), "evidence resolution clock")
       }, operationTimeoutMs, "evidence-resolution");
       if (resolved.timedOut) return held(record.claimId, "evidence-resolution-timeout");
+      let contentLength;
       try {
         exactKeys(resolved.value, ["refId", "content"], "A2 resolved evidence");
-        if (resolved.value.refId !== ref.refId ||
-            createHash("sha256").update(contentBytes(resolved.value.content)).digest("hex") !== ref.sha256) {
+        if (resolved.value.refId !== ref.refId) {
+          return held(record.claimId, "evidence-reference-resolution-invalid");
+        }
+        contentLength = contentByteLength(resolved.value.content);
+      } catch {
+        return held(record.claimId, "evidence-reference-resolution-invalid");
+      }
+      if (contentLength === null) {
+        return held(record.claimId, "evidence-reference-resolution-invalid");
+      }
+      if (contentLength > maxEvidenceBytes - resolvedEvidenceBytes) {
+        return held(record.claimId, "evidence-byte-budget-exceeded", {
+          maxEvidenceBytes,
+          resolvedEvidenceBytes,
+          rejectedEvidenceBytes: contentLength
+        });
+      }
+      resolvedEvidenceBytes += contentLength;
+      try {
+        const bytes = contentBytes(resolved.value.content);
+        if (bytes.byteLength !== contentLength ||
+            createHash("sha256").update(bytes).digest("hex") !== ref.sha256) {
           return held(record.claimId, "evidence-reference-digest-mismatch");
         }
       } catch {
