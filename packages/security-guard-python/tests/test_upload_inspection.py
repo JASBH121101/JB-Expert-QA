@@ -53,14 +53,23 @@ class MemoryStorage:
 
 
 class Scanner:
-    def __init__(self, verdict="clean", alter_digest=False, raise_error=False):
+    def __init__(self, verdict="clean", alter_digest=False, raise_error=False, consume=True):
         self.verdict = verdict
         self.alter_digest = alter_digest
         self.raise_error = raise_error
+        self.consume = consume
 
     def scan(self, stream, metadata):
         if self.raise_error:
             raise RuntimeError("scanner private detail")
+        if not self.consume:
+            return {
+                "verdict": self.verdict,
+                "sha256": metadata["sha256"],
+                "size": metadata["size"],
+                "engine": "test-scanner",
+                "version": "1.0",
+            }
         data = stream.read()
         digest = hashlib.sha256(data).hexdigest()
         return {
@@ -126,7 +135,7 @@ class UploadInspectionTests(unittest.TestCase):
 
     def test_malicious_unknown_scanner_failure_and_digest_mismatch_never_promote(self):
         for scanner, reason, retain in (
-            (Scanner(verdict="malicious"), "MALWARE_DETECTED", True),
+            (Scanner(verdict="malicious"), "MALWARE_DETECTED", False),
             (Scanner(verdict="unknown"), "SCAN_NOT_CLEAN", True),
             (Scanner(raise_error=True), "SCANNER_UNAVAILABLE", True),
             (Scanner(alter_digest=True), "SCAN_INTEGRITY_MISMATCH", True),
@@ -142,7 +151,8 @@ class UploadInspectionTests(unittest.TestCase):
                 self.assertEqual(storage.approved, {})
                 self.assertEqual(bool(storage.quarantine), retain)
                 if reason == "MALWARE_DETECTED":
-                    self.assertEqual(storage.deleted, [])
+                    self.assertEqual(storage.deleted, [next(iter(storage.deleted))])
+                    self.assertEqual(storage.quarantine, {})
 
     def test_promotion_failure_never_returns_approved(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -186,6 +196,86 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertEqual(caught.exception.reason, "INVALID_SCAN_RESULT")
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
+
+    def test_scanner_cannot_claim_clean_without_consuming_the_complete_stream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, Scanner(consume=False))
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "SCAN_INCOMPLETE")
+            self.assertEqual(storage.approved, {})
+            self.assertTrue(storage.quarantine)
+
+    def test_shared_upload_inspection_conformance_vectors(self):
+        vectors_path = (
+            Path(__file__).resolve().parents[2]
+            / "security-guard-core"
+            / "tests"
+            / "fixtures"
+            / "upload-inspection"
+            / "conformance-vectors.v1.json"
+        )
+        vectors = __import__("json").loads(vectors_path.read_text(encoding="utf-8"))
+
+        for vector in vectors["fileCases"]:
+            with self.subTest(vector=vector["id"]), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "upload.bin"
+                path.write_bytes(bytes.fromhex(vector["bytesHex"]))
+                storage = MemoryStorage()
+                service = UploadInspectionService(
+                    storage,
+                    Scanner(verdict=vector["scannerVerdict"]),
+                )
+                result = None
+                reason = None
+                try:
+                    result = service.inspect(path, vector["fileName"], vector["declaredMimeType"])
+                except UploadInspectionError as error:
+                    reason = error.reason
+
+                expected = vector["expected"]
+                if expected["disposition"] == "approved":
+                    self.assertIsNotNone(result)
+                    self.assertEqual(result["mimeType"], expected["mimeType"])
+                    self.assertEqual(storage.approved[result["uploadId"]], bytes.fromhex(vector["bytesHex"]))
+                    self.assertEqual(storage.quarantine, {})
+                else:
+                    self.assertEqual(reason, expected["errorReason"])
+                    self.assertEqual(storage.approved, {})
+                    self.assertEqual(storage.quarantine, {})
+
+        for vector in vectors["scannerCases"]:
+            with self.subTest(vector=vector["id"]), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "upload.bin"
+                path.write_bytes(PNG)
+                storage = MemoryStorage()
+                service = UploadInspectionService(
+                    storage,
+                    Scanner(
+                        verdict=vector["verdict"],
+                        consume=vector["consume"] == "all",
+                    ),
+                )
+                result = None
+                reason = None
+                try:
+                    result = service.inspect(path, "sample.png", "image/png")
+                except UploadInspectionError as error:
+                    reason = error.reason
+
+                expected = vector["expected"]
+                if expected["disposition"] == "approved":
+                    self.assertIsNotNone(result)
+                    self.assertEqual(storage.approved[result["uploadId"]], PNG)
+                    self.assertEqual(storage.quarantine, {})
+                else:
+                    self.assertEqual(reason, expected["errorReason"])
+                    self.assertEqual(storage.approved, {})
+                    should_retain = expected["disposition"] == "quarantined"
+                    self.assertEqual(bool(storage.quarantine), should_retain)
 
     def test_windows_style_client_filename_is_reduced_to_extension_only(self):
         result, storage = self.inspect_fixture(filename=r"C:\fake\photo.png")
