@@ -29,12 +29,39 @@ const A3_REQUIREMENTS = Object.freeze([
   "budgetAvailable"
 ]);
 
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+function normalizeEvidence(value, allowedKeys) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    if (Object.getOwnPropertySymbols(value).length !== 0) return null;
+
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.some((key) => typeof key !== "string")) return null;
+
+    const normalized = Object.create(null);
+    for (const key of keys) {
+      const descriptor = descriptors[key];
+      if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value")) return null;
+      if (!allowedKeys.has(key)) {
+        return { unsupported: true };
+      }
+      normalized[key] = descriptor.value;
+    }
+
+    return { value: normalized, unsupported: false };
+  } catch {
+    return null;
+  }
 }
 
 function evaluate(kind, evidence, requirements) {
-  if (!isRecord(evidence)) {
+  const allowedKeys = new Set([...requirements, "observedAt", "expiresAt", "now"]);
+  const normalized = normalizeEvidence(evidence, allowedKeys);
+
+  if (normalized === null) {
     return Object.freeze({
       schema: "jb.resilience.continuity-readiness/v1",
       capability: kind,
@@ -45,13 +72,7 @@ function evaluate(kind, evidence, requirements) {
     });
   }
 
-  const denied = [];
-  for (const key of requirements) {
-    if (evidence[key] !== true) denied.push(key);
-  }
-
-  const allowedKeys = new Set([...requirements, "observedAt", "expiresAt", "now"]);
-  if (Object.keys(evidence).some((key) => !allowedKeys.has(key))) {
+  if (normalized.unsupported) {
     return Object.freeze({
       schema: "jb.resilience.continuity-readiness/v1",
       capability: kind,
@@ -62,7 +83,13 @@ function evaluate(kind, evidence, requirements) {
     });
   }
 
-  const { observedAt, expiresAt, now } = evidence;
+  const denied = [];
+  const safeEvidence = normalized.value;
+  for (const key of requirements) {
+    if (safeEvidence[key] !== true) denied.push(key);
+  }
+
+  const { observedAt, expiresAt, now } = safeEvidence;
   if (![observedAt, expiresAt, now].every(Number.isSafeInteger) ||
       observedAt < 0 || expiresAt <= observedAt || now < observedAt || now >= expiresAt) {
     denied.push("freshnessWindow");

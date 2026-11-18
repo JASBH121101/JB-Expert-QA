@@ -88,3 +88,42 @@ test("readiness output is immutable and never claims executable authority", () =
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.denied), true);
 });
+
+
+test("accessor-backed evidence is rejected without invoking getters", () => {
+  const evidence = evidenceFor(CONTINUITY_GATE_REQUIREMENTS.A2);
+  let getterCalled = false;
+  Object.defineProperty(evidence, "confirmedSecurityVerdict", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return true;
+    }
+  });
+
+  const result = evaluateA2ContainmentReadiness(evidence);
+  assert.equal(getterCalled, false);
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "invalid-evidence");
+  assert.equal(result.executable, false);
+});
+
+test("symbol and non-enumerable evidence fields are rejected", () => {
+  const withSymbol = evidenceFor(CONTINUITY_GATE_REQUIREMENTS.A2);
+  Object.defineProperty(withSymbol, Symbol("hidden"), { value: true });
+  assert.equal(evaluateA2ContainmentReadiness(withSymbol).reason, "invalid-evidence");
+
+  const withHiddenField = evidenceFor(CONTINUITY_GATE_REQUIREMENTS.A2);
+  Object.defineProperty(withHiddenField, "force", { value: true });
+  assert.equal(evaluateA2ContainmentReadiness(withHiddenField).reason, "invalid-evidence");
+});
+
+test("null-prototype plain evidence objects remain supported", () => {
+  const evidence = Object.assign(
+    Object.create(null),
+    evidenceFor(CONTINUITY_GATE_REQUIREMENTS.A2)
+  );
+  const result = evaluateA2ContainmentReadiness(evidence);
+  assert.equal(result.eligible, true);
+  assert.equal(result.executable, false);
+});

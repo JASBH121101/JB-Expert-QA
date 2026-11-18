@@ -4,7 +4,7 @@
 
 This increment adds a read-only readiness evaluator for the A2 containment and A3 controlled-failover capability classes. It does not execute containment, promote a writer, change routes, invoke an operating-system command or grant policy authorization.
 
-The evaluator is deliberately not an executor. Its output always has `executable: false`, including when every readiness predicate is true.
+The evaluator is deliberately not an executor. Its output always has `executable: false`, including when every readiness predicate is true. Evidence must be a plain data object with enumerable own data properties only; accessor-backed, symbol-keyed, hidden and class-instance inputs are rejected without invoking getters.
 
 ## A2 — bounded containment
 
