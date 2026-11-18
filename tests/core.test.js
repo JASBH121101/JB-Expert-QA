@@ -242,7 +242,7 @@ test("scoring rejects inherited weight and severity policy properties", () => {
   assert.throws(() => calculateScore([], {
     weights: inheritedWeights,
     includedSpecialists: ["responsive"]
-  }), /weights must be an object/);
+  }), /weights must be a plain object/);
 
   const inheritedPenalties = Object.create({ high: 100 });
   assert.throws(() => calculateScore([{
@@ -252,7 +252,7 @@ test("scoring rejects inherited weight and severity policy properties", () => {
     weights: { responsive: 100 },
     severityPenalties: inheritedPenalties,
     includedSpecialists: ["responsive"]
-  }), /severityPenalties must be an object/);
+  }), /severityPenalties must be a plain object/);
 });
 
 test("scoring accepts null-prototype policy maps without inheriting object members", () => {
@@ -458,7 +458,7 @@ test("scoring rejects accessor-backed array entries without invoking getters", (
   assert.throws(() => calculateScore([], {
     weights: { responsive: 100 },
     includedSpecialists: specialists
-  }), /includedSpecialists\\[0\\] must be an enumerable data property/);
+  }), /includedSpecialists\[0\] must be an enumerable data property/);
   assert.equal(invoked, false);
 });
 
