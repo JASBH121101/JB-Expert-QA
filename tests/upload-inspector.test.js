@@ -92,6 +92,16 @@ test("clean signature-validated uploads are scanned from quarantine before promo
   assert.equal(result.size, PNG.length);
   assert.equal(result.sha256, createHash("sha256").update(PNG).digest("hex"));
   assert.equal(result.scanner.engine, "MockAV");
+  assert.equal(result.attestation.schema, "jb.security.upload-inspection.attestation/v1");
+  assert.equal(result.attestation.uploadId, result.uploadId);
+  assert.equal(result.attestation.verdict, "clean");
+  assert.equal(result.attestation.sha256, result.sha256);
+  assert.equal(result.attestation.size, result.size);
+  assert.equal(result.attestation.mimeType, result.mimeType);
+  assert.equal(result.attestation.engine, "MockAV");
+  assert.equal(result.attestation.version, "1.0");
+  assert.ok(Number.isSafeInteger(result.attestation.scannedAtMs));
+  assert.deepEqual(store.approved.get(result.uploadId).metadata.attestation, result.attestation);
   assert.equal(store.approved.get(result.uploadId).bytes.equals(PNG), true);
   assert.equal(store.quarantine.has(result.uploadId), false);
   assert.deepEqual(store.calls.map(([name]) => name), [
