@@ -57,7 +57,7 @@ The contract is language-neutral; runtimes keep their native APIs:
 
 - **Node.js:** Guard passes stream, uploadId, size, sha256, detectedMimeType and an AbortSignal. Guard independently hashes and counts bytes in the verified stream and requires its readable side to end before accepting the scanner result.
 - **PHP:** UploadInspectionService supplies a typed `UploadInspectionReadOnlyStream` reader with bounded `read(maxBytes)` calls (maximum 1 MiB), no seek operation and no access to the underlying quarantine resource. The reader independently hashes and counts the exact bytes delivered to the scanner. Before attestation, the service requires confirmed EOF, exact byte count and SHA-256 equality with the ingested object.
-- **Python:** UploadInspectionService passes a read-only digest-tracking stream plus the same metadata. The wrapper counts and hashes the bytes actually delivered to the scanner, disallows seeking and verifies exact EOF before accepting the scanner's own digest/size result.
+- **Python:** UploadInspectionService passes a public `UploadInspectionReadOnlyStream` with bounded `read(max_bytes)` calls (maximum 1 MiB), no `readinto`, no seek and no underlying resource access. It deliberately does not inherit from `io.RawIOBase`, preventing a scanner from wrapping it in a prefetching `io.BufferedReader`. The reader hashes and counts the exact bytes returned to the scanner and verifies confirmed EOF, size and SHA-256 before accepting the result.
 
 The native scanner response shapes remain runtime-specific (engine/version in all current adapters; digest/size are independently supplied and verified according to each runtime). Adapters validate those native results and construct the language-neutral handoff/result envelope at the boundary.
 
