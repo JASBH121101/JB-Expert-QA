@@ -409,7 +409,7 @@ test("scoring rejects accessor-backed policy options and diagnostic inputs witho
 
 test("scoring safely handles prototype-sensitive specialist names", () => {
   const result = calculateScore([], {
-    weights: { "__proto__": 100 },
+    weights: { ["__proto__"]: 100 },
     includedSpecialists: ["__proto__"]
   });
   assert.equal(Object.hasOwn(result.specialistScores, "__proto__"), true);
@@ -442,4 +442,58 @@ test("engine constructor and audit options reject accessors without invoking the
   const engine = new ExpertQAEngine({ registry: new RuleRegistry(), config });
   await assert.rejects(() => engine.audit({}, auditOptions), /audit options\.specialist must be an enumerable data property/);
   assert.equal(auditInvoked, false);
+});
+
+test("scoring rejects accessor-backed array entries without invoking getters", () => {
+  let invoked = false;
+  const specialists = ["responsive"];
+  Object.defineProperty(specialists, "0", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      invoked = true;
+      return "responsive";
+    }
+  });
+  assert.throws(() => calculateScore([], {
+    weights: { responsive: 100 },
+    includedSpecialists: specialists
+  }), /includedSpecialists\\[0\\] must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("engine rejects accessor-backed findings arrays without invoking index getters", async () => {
+  let invoked = false;
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.finding-array-accessor",
+    specialist: "ui-ux",
+    evaluate() {
+      const findings = [{
+        id: "CORE-ARRAY-ACCESSOR",
+        title: "Array accessor",
+        description: "Must not run.",
+        severity: "low"
+      }];
+      Object.defineProperty(findings, "0", {
+        enumerable: true,
+        configurable: true,
+        get() {
+          invoked = true;
+          return {
+            id: "CORE-ARRAY-ACCESSOR",
+            title: "Array accessor",
+            description: "Must not run.",
+            severity: "low"
+          };
+        }
+      });
+      return findings;
+    }
+  });
+
+  const report = await new ExpertQAEngine({ registry, config }).audit();
+  assert.equal(invoked, false);
+  assert.equal(report.execution[0].status, "error");
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
 });
