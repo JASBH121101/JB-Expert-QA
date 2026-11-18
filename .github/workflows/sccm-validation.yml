@@ -1,0 +1,59 @@
+name: SCCM hierarchical certification registry
+
+on:
+  push:
+    branches: [main, "feature/**", "integration/**"]
+    paths:
+      - "packages/sccm/**"
+      - "scripts/sccm-report.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sccm-validation.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "packages/sccm/**"
+      - "scripts/sccm-report.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sccm-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sccm-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  registry:
+    name: SCCM hierarchy, evidence and gates / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate SCCM evidence ledger and hierarchy policy
+        run: npm run sccm:check
+      - name: Generate hierarchical certification report
+        run: npm run sccm:report > "${{ runner.temp }}/jb-sccm-report.json"
+      - name: Upload SCCM certification snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jb-sccm-report-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/jb-sccm-report.json
+          if-no-files-found: error
+          retention-days: 30
