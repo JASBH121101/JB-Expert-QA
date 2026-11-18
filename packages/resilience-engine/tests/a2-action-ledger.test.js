@@ -121,6 +121,21 @@ function createStore(filePath, overrides = {}) {
   });
 }
 
+test("file ledger reports whether its external monotonic revision anchor is configured", async () => {
+  await withTempDirectory(async (directory) => {
+    const localOnly = createStore(join(directory, "local-only.json"));
+    const externallyAnchored = createStore(join(directory, "anchored.json"), {
+      revisionAnchor: createMemoryRevisionAnchor(),
+      ledgerId: "a2-anchor-capability-test"
+    });
+
+    assert.equal(localOnly.durable, true);
+    assert.equal(localOnly.externalRevisionAnchorConfigured, false);
+    assert.equal(externallyAnchored.durable, true);
+    assert.equal(externallyAnchored.externalRevisionAnchorConfigured, true);
+  });
+});
+
 async function claimAndCreateRecord(store, {
   action = "apply-containment-profile",
   scope = SCOPE,
