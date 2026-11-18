@@ -6,6 +6,8 @@ on:
     paths:
       - "packages/localization-engine/**"
       - "packages/currency-engine/**"
+      - "packages/localization-engine/tests/**"
+      - "packages/currency-engine/tests/**"
       - "package.json"
       - ".github/workflows/internationalization-engines.yml"
   push:
