@@ -18,8 +18,8 @@ function normalizeCatalogs(catalogs) {
   return result;
 }
 
-function formatLocale(locale, available) {
-  return resolveLocale(locale, { supportedLocales: available, fallback: available[0] });
+function formatLocale(locale, available, fallback) {
+  return resolveLocale(locale, { supportedLocales: available, fallback });
 }
 
 export function createLocalization({ catalogs, defaultLocale = DEFAULT_LOCALE } = {}) {
@@ -32,7 +32,9 @@ export function createLocalization({ catalogs, defaultLocale = DEFAULT_LOCALE } 
   }
 
   function resolveCatalog(locale) {
-    const tag = formatLocale(locale ?? defaultTag, available);
+    // An unsupported locale must fall back to the configured default, not
+    // whichever catalog happened to be inserted first in the input object.
+    const tag = formatLocale(locale ?? defaultTag, available, defaultTag);
     if (Object.hasOwn(normalized, tag)) return { locale: tag, catalog: normalized[tag] };
     const language = new Intl.Locale(tag).language;
     const languageMatch = available.find((item) => new Intl.Locale(item).language === language);
