@@ -17,16 +17,48 @@ export function stableTranslationHash(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+function findShapeMismatchPath(path, otherKeys) {
+  const otherSet = otherKeys instanceof Set ? otherKeys : new Set(otherKeys);
+  const segments = path.split(".");
+  for (let length = segments.length - 1; length > 0; length--) {
+    const ancestor = segments.slice(0, length).join(".");
+    if (otherSet.has(ancestor)) return ancestor;
+  }
+  if (otherKeys.some((key) => key.startsWith(path + "."))) return path;
+  return null;
+}
+
 export function auditTranslationMaps(sourceMap, targetMap, { sourceLocale = "es-419", targetLocale = "en", library = new LanguageLibrary(), humanApproval = null } = {}) {
   const source = flattenTranslationMap(sourceMap);
   const target = flattenTranslationMap(targetMap);
+  const sourceKeys = Object.keys(source).sort();
+  const targetKeys = Object.keys(target).sort();
+  const sourceSet = new Set(sourceKeys);
+  const targetSet = new Set(targetKeys);
   const findings = [];
-  let missingKeys = 0, emptyValues = 0, placeholderMismatches = 0, obsoleteKeys = 0;
+  const reportedShapeMismatches = new Set();
+  let missingKeys = 0, emptyValues = 0, placeholderMismatches = 0, obsoleteKeys = 0, messageShapeMismatches = 0;
 
-  for (const key of Object.keys(source).sort()) {
-    if (!Object.hasOwn(target, key)) {
-      missingKeys++;
-      findings.push({ id: "missing-key", key, severity: "high", message: "Translation key is missing from target locale." });
+  const reportShapeMismatch = (key) => {
+    if (reportedShapeMismatches.has(key)) return;
+    reportedShapeMismatches.add(key);
+    messageShapeMismatches++;
+    findings.push({
+      id: "message-shape-mismatch",
+      key,
+      severity: "high",
+      message: "Source and target use different nested message structures."
+    });
+  };
+
+  for (const key of sourceKeys) {
+    if (!targetSet.has(key)) {
+      const shapeKey = findShapeMismatchPath(key, targetKeys);
+      if (shapeKey) reportShapeMismatch(shapeKey);
+      else {
+        missingKeys++;
+        findings.push({ id: "missing-key", key, severity: "high", message: "Translation key is missing from target locale." });
+      }
       continue;
     }
     if (!target[key].trim()) {
@@ -45,23 +77,38 @@ export function auditTranslationMaps(sourceMap, targetMap, { sourceLocale = "es-
     }
   }
 
-  for (const key of Object.keys(target).sort()) {
-    if (!Object.hasOwn(source, key)) {
-      obsoleteKeys++;
-      findings.push({ id: "obsolete-key", key, severity: "low", message: "Target locale contains a key absent from the source locale." });
+  for (const key of targetKeys) {
+    if (!sourceSet.has(key)) {
+      const shapeKey = findShapeMismatchPath(key, sourceKeys);
+      if (shapeKey) reportShapeMismatch(shapeKey);
+      else {
+        obsoleteKeys++;
+        findings.push({ id: "obsolete-key", key, severity: "low", message: "Target locale contains a key absent from the source locale." });
+      }
     }
   }
 
-  const state = resolveTranslationState({ missingKeys, emptyValues, placeholderMismatches, obsoleteKeys, humanApproval });
+  const state = resolveTranslationState({
+    missingKeys,
+    emptyValues,
+    placeholderMismatches,
+    obsoleteKeys,
+    messageShapeMismatches,
+    humanApproval
+  });
   return Object.freeze({
     status: "checked",
     sourceLocale,
     targetLocale,
     reviewStatus: state,
     counts: Object.freeze({
-      sourceKeys: Object.keys(source).length,
-      targetKeys: Object.keys(target).length,
-      missingKeys, emptyValues, placeholderMismatches, obsoleteKeys,
+      sourceKeys: sourceKeys.length,
+      targetKeys: targetKeys.length,
+      missingKeys,
+      emptyValues,
+      placeholderMismatches,
+      obsoleteKeys,
+      messageShapeMismatches,
       glossaryReview: findings.filter((item) => item.id === "glossary-review").length
     }),
     sourceHash: stableTranslationHash(source),
