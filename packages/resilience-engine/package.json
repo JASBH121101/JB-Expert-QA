@@ -31,7 +31,7 @@
     "./containment-controller": "./src/containment-controller.js",
     "./a2-recovery-coordinator": "./src/a2-recovery-coordinator.js",
     "./a2-action-ledger": "./src/a2-action-ledger.js",
-    "./adapters/postgres-a2-revision-anchor": "./src/adapters/postgres-storage.js"
+    "./adapters/postgres-a2-revision-anchor": "./src/adapters/postgres-a2-revision-anchor.js"
   },
   "files": [
     "src/**",
