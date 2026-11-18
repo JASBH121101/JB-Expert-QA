@@ -188,7 +188,7 @@ test("scanner stream digest must match even when tampered content has the same s
       source: Readable.from([PNG]),
       fileName: "tampered-in-quarantine.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => error.code === "SCAN_CONTENT_MISMATCH"
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
@@ -207,7 +207,7 @@ test("scanner stream cannot contain more bytes than the original upload", async 
       source: Readable.from([PNG]),
       fileName: "extended-in-quarantine.png"
     }),
-    (error) => error.code === "INVALID_SCAN_RESULT"
+    (error) => error.code === "SCAN_CONTENT_MISMATCH"
   );
   assert.equal(store.approved.size, 0);
   assert.equal(store.quarantine.size, 1);
