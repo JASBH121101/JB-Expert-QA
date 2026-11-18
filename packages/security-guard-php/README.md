@@ -52,7 +52,7 @@ The PHP package also provides a runtime-native upload inspection orchestrator:
 - `UploadQuarantineStorage`
 - `UploadMalwareScanner`
 
-The service accepts a server-side temporary file path (for example, Laravel's `UploadedFile::getRealPath()`), streams it into a quarantine adapter under an opaque server-generated ID, enforces a byte limit, checks a narrow file-signature allowlist, and calculates SHA-256. It then asks the scanner to consume the quarantined object and requires an explicit `clean` verdict whose reported digest and byte count match the ingested object. After the complete scan is verified, it creates the shared upload-inspection attestation v1 and calls the storage adapter's atomic promotion method with the expected digest, size and attestation.
+The service accepts a server-side temporary file path (for example, Laravel's `UploadedFile::getRealPath()`), streams it into a quarantine adapter under an opaque server-generated ID, enforces a byte limit, checks a narrow file-signature allowlist, and calculates SHA-256. It then asks the scanner to consume the quarantined object and requires a structurally valid `clean`, `malicious` or `unknown` verdict whose reported digest and byte count match the ingested object; only `clean` is eligible for promotion. After the complete scan is verified, it creates the shared upload-inspection attestation v1 and calls the storage adapter's atomic promotion method with the expected digest, size and attestation.
 
 The storage adapter contract is security-critical:
 
