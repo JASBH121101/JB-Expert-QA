@@ -41,6 +41,6 @@ The first command validates the registry and gate behavior. The second prints a 
 
 ## Current baseline
 
-The initial inventory contains 141 nodes across eight engines. It records assessed Language QA components and the Resilience A2 read-only reconciliation slice. The newly added CLDR catalog-audit component remains PENDING until its exact-head workflows and component-level evidence pass. Other engines and components remain pending until their scope-specific reviews and evidence are completed. The ecosystem is intentionally not marked certified.
+The versioned inventory contains 141 nodes across eight engines. The Language QA branch and CLDR catalog-audit component are PASS with evidence bound to source snapshot `13fbe4162aeb0132598d7038789bffe9a592fa00`. Its required Localization Engine CLDR plural-rules component is also PASS. Other Localization Engine components remain PENDING, so the Localization Engine as a whole is not certified. Resilience A2 read-only reconciliation remains PASS; other engine branches and components remain pending until their scope-specific reviews and evidence are completed. The ecosystem is intentionally not marked certified.
 
 SCCM does not deploy software, access production services, perform recovery actions, call external translation services or require paid providers.
