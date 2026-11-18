@@ -1,5 +1,4 @@
-import { snapshotPlainRecord } from "./safe-record.js";
-import { snapshotPlainRecord } from "./safe-record.js";
+import { snapshotArray, snapshotPlainRecord } from "./safe-record.js";
 import { createDiagnostic } from "./diagnostic.js";
 import { validateEngineConfig } from "./config.js";
 import { ENGINE_VERSION } from "./version.js";
@@ -53,7 +52,9 @@ export class ExpertQAEngine {
         } finally {
           clearTimeout(timeoutHandle);
         }
-        const findings = result == null ? [] : Array.isArray(result) ? result : [result];
+        const findings = result == null ? [] : Array.isArray(result)
+          ? snapshotArray(result, "rule findings")
+          : [result];
 
         for (const finding of findings) {
           if (finding) {
