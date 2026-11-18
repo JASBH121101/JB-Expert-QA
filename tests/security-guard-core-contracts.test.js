@@ -12,7 +12,8 @@ import {
   validateRateLimitPolicyV1,
   validateThreatSignalV1,
   validateThreatAssessmentV1,
-  validateThreatAssessmentPolicyV1
+  validateThreatAssessmentPolicyV1,
+  validateUploadInspectionAttestationV1
 } from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
@@ -120,7 +121,10 @@ const fixtureSchemas = [
   ["security-events/request-blocked.valid.json", "urn:jb:security-guard:security-event:v1"],
   ["threat-detection/signal-brute-force.valid.json", "urn:jb:security-guard:threat-signal:v1"],
   ["threat-detection/assessment-observe.valid.json", "urn:jb:security-guard:threat-assessment:v1"],
-  ["threat-detection/assessment-policy.valid.json", "urn:jb:security-guard:threat-assessment-policy:v1"]
+  ["threat-detection/assessment-policy.valid.json", "urn:jb:security-guard:threat-assessment-policy:v1"],
+  ["upload-inspection/attestation-clean.valid.json", "urn:jb:security-guard:upload-inspection:attestation:v1"],
+  ["upload-inspection/attestation-malicious.valid.json", "urn:jb:security-guard:upload-inspection:attestation:v1"],
+  ["upload-inspection/attestation-unknown.valid.json", "urn:jb:security-guard:upload-inspection:attestation:v1"]
 ];
 
 const runtimeValidators = new Map([
@@ -132,7 +136,8 @@ const runtimeValidators = new Map([
   ["urn:jb:security-guard:security-event:v1", validateSecurityEventV1],
   ["urn:jb:security-guard:threat-signal:v1", validateThreatSignalV1],
   ["urn:jb:security-guard:threat-assessment:v1", validateThreatAssessmentV1],
-  ["urn:jb:security-guard:threat-assessment-policy:v1", validateThreatAssessmentPolicyV1]
+  ["urn:jb:security-guard:threat-assessment-policy:v1", validateThreatAssessmentPolicyV1],
+  ["urn:jb:security-guard:upload-inspection:attestation:v1", validateUploadInspectionAttestationV1]
 ]);
 
 for (const [relativePath, schemaId] of fixtureSchemas) {
@@ -204,4 +209,35 @@ test("rate-limit decision rejects an incoherent enforced 429", async () => {
   fixture.unavailable = true;
   const schema = schemasById.get("urn:jb:security-guard:rate-limit:decision:v1");
   assert.ok(validateSchema(schema, fixture).length > 0);
+});
+
+
+test("upload attestation binds an exact object and rejects malformed or overbroad evidence", async () => {
+  const fixture = JSON.parse(await readFile(path.join(
+    coreRoot, "tests/fixtures/upload-inspection/attestation-clean.valid.json"
+  ), "utf8"));
+  assert.equal(validateUploadInspectionAttestationV1(fixture).verdict, "clean");
+
+  for (const mutation of [
+    (value) => { value.sha256 = "A".repeat(64); },
+    (value) => { value.size = 0; },
+    (value) => { value.size = 104857601; },
+    (value) => { value.mimeType = "application/x-msdownload"; },
+    (value) => { value.verdict = "no_match"; },
+    (value) => { value.engine = ""; },
+    (value) => { value.rawFileName = "customer-secret.png"; }
+  ]) {
+    const invalid = structuredClone(fixture);
+    mutation(invalid);
+    assert.throws(() => validateUploadInspectionAttestationV1(invalid));
+  }
+});
+
+test("a clean upload attestation is not an approval or storage-promotion decision", async () => {
+  const fixture = JSON.parse(await readFile(path.join(
+    coreRoot, "tests/fixtures/upload-inspection/attestation-clean.valid.json"
+  ), "utf8"));
+  assert.equal(validateUploadInspectionAttestationV1(fixture).verdict, "clean");
+  assert.equal(Object.hasOwn(fixture, "approved"), false);
+  assert.equal(Object.hasOwn(fixture, "promoted"), false);
 });
