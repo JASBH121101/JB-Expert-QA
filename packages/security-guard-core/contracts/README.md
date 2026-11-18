@@ -23,4 +23,4 @@ The `jb.security.upload-inspection.attestation/v1` message binds a scanner verdi
 - The contract deliberately excludes original filenames, local paths, raw file content, credentials, customer identifiers, scanner free-form diagnostics and arbitrary metadata.
 - The maximum object size is 100 MiB and the MIME allowlist is JPEG, PNG, GIF, WebP and PDF. Runtime policies may impose a lower size limit or a narrower MIME allowlist, but may not expand this shared v1 contract.
 
-The shared fixtures are in `tests/fixtures/upload-inspection`. Runtime adapters must validate the same positive vectors and reject malformed/unknown fields before this contract can be called cross-runtime conformant.
+The shared fixtures are in `tests/fixtures/upload-inspection`. The Node.js, PHP and Python Core validators consume the same positive vectors and reject malformed/unknown fields. This establishes validator-level conformance only; each upload pipeline must still map its verified scan result into this attestation and pass end-to-end integration tests before the contract can be called fully cross-runtime conformant.
