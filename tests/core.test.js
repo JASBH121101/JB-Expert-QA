@@ -278,3 +278,93 @@ test("scoring rejects finite weights whose aggregate overflows numeric bounds", 
     includedSpecialists: ["responsive", "ui-ux"]
   }), /total weight must be a finite positive number/);
 });
+test("rule registry rejects accessors without invoking them", () => {
+  let invoked = false;
+  const rule = { id: "test.accessor", specialist: "ui-ux" };
+  Object.defineProperty(rule, "evaluate", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return () => [];
+    }
+  });
+
+  const registry = new RuleRegistry();
+  assert.throws(() => registry.register(rule), /rule\.evaluate must be an enumerable data property/);
+  assert.equal(invoked, false);
+  assert.equal(registry.size, 0);
+});
+
+test("rule registry rejects inherited rule objects and accessor-backed filters", () => {
+  const registry = new RuleRegistry();
+  const inheritedRule = Object.create({
+    id: "test.inherited",
+    specialist: "ui-ux",
+    evaluate: () => []
+  });
+  assert.throws(() => registry.register(inheritedRule), /rule must be a plain object/);
+
+  let invoked = false;
+  const filter = {};
+  Object.defineProperty(filter, "specialist", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "ui-ux";
+    }
+  });
+  assert.throws(() => registry.list(filter), /registry filter\.specialist must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("diagnostic metadata rejects accessors without invoking them", () => {
+  let invoked = false;
+  const metadata = {};
+  Object.defineProperty(metadata, "secret", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "value";
+    }
+  });
+  assert.throws(() => createDiagnostic({
+    id: "CORE-ACCESSOR",
+    specialist: "ui-ux",
+    title: "Accessor metadata",
+    description: "Must not execute metadata getters.",
+    severity: "low",
+    metadata
+  }), /diagnostic\.metadata\.secret must be an enumerable data property/);
+  assert.equal(invoked, false);
+});
+
+test("engine fails closed on accessor-backed rule findings and freezes execution entries", async () => {
+  let invoked = false;
+  const registry = new RuleRegistry();
+  registry.register({
+    id: "test.finding-accessor",
+    specialist: "ui-ux",
+    evaluate() {
+      const finding = {
+        id: "CORE-ACCESSOR-FINDING",
+        title: "Accessor finding",
+        severity: "low"
+      };
+      Object.defineProperty(finding, "description", {
+        enumerable: true,
+        get() {
+          invoked = true;
+          return "must not run";
+        }
+      });
+      return finding;
+    }
+  });
+
+  const report = await new ExpertQAEngine({ registry, config }).audit();
+  assert.equal(invoked, false);
+  assert.equal(report.diagnostics.length, 0);
+  assert.equal(report.execution[0].status, "error");
+  assert.equal(report.scoring.blockedByExecutionErrors, true);
+  assert.equal(Object.isFrozen(report.execution[0]), true);
+});
