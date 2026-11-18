@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 48);
+  assert.equal(history.length, 57);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -230,6 +230,29 @@ test("Resilience A2 subbranch passes while the whole engine remains pending for 
   assert.ok(engine.blockingChildren.some((child) => child.status === "PENDING"));
 });
 
+test("Resilience A1 is certified while A2 and A3 stay bounded to laboratory components", () => {
+  const policy = evaluateSccmNode(inventory, history, "jb.resilience-engine.policy");
+  assert.equal(policy.status, "PASS");
+  assert.equal(policy.children[0].status, "PASS");
+  assert.equal(policy.children[0].children[0].status, "PASS");
+  assert.ok(policy.children[0].children[0].children.every((component) => component.status === "PASS"));
+
+  const containment = evaluateSccmNode(inventory, history, "jb.resilience-engine.containment");
+  const a2Module = evaluateSccmNode(inventory, history, "jb.resilience-engine.containment.a2-module");
+  assert.equal(containment.status, "PENDING");
+  assert.equal(a2Module.status, "PENDING");
+  assert.ok(a2Module.children.every((component) => component.ownStatus === "PASS"));
+
+  const failover = evaluateSccmNode(inventory, history, "jb.resilience-engine.failover");
+  const a3Module = evaluateSccmNode(inventory, history, "jb.resilience-engine.failover.a3-module");
+  assert.equal(failover.status, "PENDING");
+  assert.equal(a3Module.status, "PENDING");
+  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.leader-election").status, "PENDING");
+  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.fencing").ownStatus, "PASS");
+  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.replay").ownStatus, "PASS");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.resilience-engine").status, "PENDING");
+});
+
 test("a critical component failure propagates through every ancestor", () => {
   const failure = assessment("jb.expert-qa.language.semantic-integrity", {
     assessmentId: "asmt.language.semantic-integrity.failure",
@@ -280,7 +303,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 19);
+  assert.equal(report.counts.component.PASS, 25);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
