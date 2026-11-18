@@ -117,6 +117,21 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     }
 }
 
+final class UploadInspectionPartialScanner implements UploadMalwareScanner
+{
+    public function scan(mixed $stream, array $metadata): array
+    {
+        fread($stream, 1);
+        return [
+            'verdict' => 'clean',
+            'sha256' => $metadata['sha256'],
+            'size' => $metadata['size'],
+            'engine' => 'JB-Test-Scanner',
+            'version' => '1.0',
+        ];
+    }
+}
+
 function runUploadInspectionServiceTests(): void
 {
     $root = sys_get_temp_dir() . '/jb-security-guard-upload-' . bin2hex(random_bytes(6));
@@ -143,6 +158,18 @@ function runUploadInspectionServiceTests(): void
         expect($store->approvedAttestation($approved['uploadId']) === $attestation, 'PHP storage promotion must atomically persist the exact attestation with the approved object');
         expect($store->quarantineCount() === 0 && $store->approvedCount() === 1,
             'Only the atomically promoted private object may remain after a clean scan');
+
+        $partialStore = new UploadInspectionTestStorage($root . '/partial-scan');
+        $partial = new UploadInspectionService($partialStore, new UploadInspectionPartialScanner());
+        $partialRejected = false;
+        try {
+            $partial->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $partialRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($partialRejected, 'PHP scanner must consume the complete read-only stream before attestation');
+        expect($partialStore->quarantineCount() === 1 && $partialStore->approvedCount() === 0,
+            'Incomplete PHP scan must remain quarantined and never be promoted');
 
         $mismatchStore = new UploadInspectionTestStorage($root . '/mime-mismatch');
         $mismatch = new UploadInspectionService($mismatchStore, new UploadInspectionTestScanner());
