@@ -117,7 +117,9 @@ function createFixture({
     action === "apply-containment-profile" ? "contained" : "released",
     action === "apply-containment-profile" ? "contain-op-02" : "release-op-02"
   );
-  const outcome = providerOutcome ?? (action === "apply-containment-profile" ? "applied" : "released");
+  const outcome = providerOutcome === "abort-resolves"
+    ? (action === "apply-containment-profile" ? "applied" : "released")
+    : providerOutcome ?? (action === "apply-containment-profile" ? "applied" : "released");
   const journal = {
     durable: true,
     async listPending(input) {
