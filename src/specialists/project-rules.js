@@ -314,7 +314,7 @@ export const securityRules = [
       const patterns = [
         { regex: /\beval\s*\(/, label: "Dynamic eval execution", severity: "high", codeOnly: true },
         { regex: /\bnew\s+Function\s*\(/, label: "Dynamic Function constructor", severity: "high", codeOnly: true },
-        { regex: /\brejectUnauthorized\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high", codeOnly: false }
+        { regex: /\b["']?rejectUnauthorized["']?\s*:\s*false\b/, label: "TLS certificate verification disabled", severity: "high", codeOnly: false }
       ];
       const findings = [];
       for (const file of context.projectFiles ?? []) {
