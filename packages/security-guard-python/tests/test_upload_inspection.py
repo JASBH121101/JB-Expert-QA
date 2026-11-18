@@ -210,6 +210,30 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
 
+
+    def test_scanner_cannot_return_clean_without_consuming_complete_stream(self):
+        class PartialScanner:
+            def scan(self, stream, metadata):
+                stream.read(1)
+                return {
+                    "verdict": "clean",
+                    "sha256": metadata["sha256"],
+                    "size": metadata["size"],
+                    "engine": "test-scanner",
+                    "version": "1.0",
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, PartialScanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "SCAN_INCOMPLETE")
+            self.assertEqual(storage.approved, {})
+            self.assertTrue(storage.quarantine)
+
     def test_windows_style_client_filename_is_reduced_to_extension_only(self):
         result, storage = self.inspect_fixture(filename=r"C:\fake\photo.png")
         self.assertEqual(result["status"], "approved")
