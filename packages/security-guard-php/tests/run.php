@@ -70,6 +70,49 @@ expect(
     'Counter key must match the length-prefixed Core v1 format'
 );
 
+$uploadFixtureRoot = dirname(__DIR__, 2) . '/security-guard-core/tests/fixtures/upload-inspection';
+foreach ([
+    'attestation-clean.valid.json',
+    'attestation-malicious.valid.json',
+    'attestation-unknown.valid.json',
+] as $fixtureName) {
+    $uploadFixture = json_decode(
+        (string) file_get_contents($uploadFixtureRoot . '/' . $fixtureName),
+        true,
+        8,
+        JSON_THROW_ON_ERROR
+    );
+    $normalizedUpload = CoreV1::validateUploadInspectionAttestationV1($uploadFixture);
+    expect(
+        $normalizedUpload['verdict'] === $uploadFixture['verdict'],
+        'PHP upload attestation validator must accept shared fixture: ' . $fixtureName
+    );
+}
+
+$cleanUploadFixture = json_decode(
+    (string) file_get_contents($uploadFixtureRoot . '/attestation-clean.valid.json'),
+    true,
+    8,
+    JSON_THROW_ON_ERROR
+);
+foreach ([
+    ['sha256' => str_repeat('A', 64)],
+    ['size' => 0],
+    ['size' => 104857601],
+    ['mimeType' => 'application/x-msdownload'],
+    ['verdict' => 'no_match'],
+    ['extra' => 'must-be-rejected'],
+] as $mutation) {
+    $invalidUploadFixture = array_merge($cleanUploadFixture, $mutation);
+    $rejected = false;
+    try {
+        CoreV1::validateUploadInspectionAttestationV1($invalidUploadFixture);
+    } catch (InvalidArgumentException) {
+        $rejected = true;
+    }
+    expect($rejected, 'PHP upload attestation validator must reject malformed fields');
+}
+
 $captured = null;
 $client = new UniversalRateLimitClient(
     'https://guard.example/__jb/security-guard/v1/check',
