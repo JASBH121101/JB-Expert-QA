@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO, Callable, Protocol, Any
 
+from .core_v1 import validate_upload_inspection_attestation_v1
+
 
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 MAX_BYTES = 100 * 1024 * 1024
@@ -34,7 +36,7 @@ class UploadQuarantineStorage(Protocol):
 
     def create_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
     def open_quarantine_stream(self, upload_id: str) -> BinaryIO: ...
-    def promote(self, upload_id: str, expected_sha256: str, expected_size: int) -> bool: ...
+    def promote(self, upload_id: str, expected_sha256: str, expected_size: int, attestation: dict[str, Any]) -> bool: ...
     def delete(self, upload_id: str) -> None: ...
 
 
@@ -294,9 +296,24 @@ class UploadInspectionService:
                 retain_quarantine = True
                 raise UploadInspectionError("SCAN_NOT_CLEAN")
 
+            scanned_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
             retain_quarantine = True
             try:
-                promotion_result = self._storage.promote(upload_id, sha256, size)
+                attestation = validate_upload_inspection_attestation_v1({
+                    "schema": "jb.security.upload-inspection.attestation/v1",
+                    "uploadId": upload_id,
+                    "verdict": scan_result["verdict"],
+                    "sha256": sha256,
+                    "size": size,
+                    "mimeType": detected_type,
+                    "engine": scan_result["engine"],
+                    "version": scan_result["version"],
+                    "scannedAtMs": scanned_at_ms,
+                })
+            except (TypeError, ValueError) as exc:
+                raise UploadInspectionError("INVALID_SCAN_RESULT") from exc
+            try:
+                promotion_result = self._storage.promote(upload_id, sha256, size, attestation)
             except Exception as exc:
                 raise UploadInspectionError("PROMOTION_FAILED") from exc
             if promotion_result is not True:
@@ -311,7 +328,8 @@ class UploadInspectionService:
                 "size": size,
                 "mimeType": detected_type,
                 "scanner": {"engine": scan_result["engine"], "version": scan_result["version"]},
-                "scannedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "scannedAt": datetime.fromtimestamp(scanned_at_ms / 1000, timezone.utc).isoformat().replace("+00:00", "Z"),
+                "attestation": attestation,
             }
         except UploadInspectionError as exc:
             self._emit("upload-rejected", exc.reason)
