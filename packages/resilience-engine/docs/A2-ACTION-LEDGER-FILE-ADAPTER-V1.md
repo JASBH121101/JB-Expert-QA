@@ -68,6 +68,8 @@ A multi-host deployment can inject the separate `createPostgresA2ActionLedger(..
 
 The adapter's `durable: true` property describes the implemented local-file mechanism; it does not prove the host's filesystem, disk controller, volume configuration, backup/restore path, process supervisor or disaster-recovery behavior. Back up and restore the journal and its `.guard` sidecar together. A simultaneous rollback of both files to a matching older copy cannot be detected by this local pair alone and requires an independent off-host or monotonic backup/restore control. Those host operations require fault injection and independent certification.
 
+**Cryptographic threat-model boundary:** the `.guard` stores an unkeyed SHA-256 digest. It detects accidental corruption, missing files, one-sided edits and revision divergence, but it is not an authenticity mechanism: an actor able to write both the journal and the sidecar can recompute a matching digest or replace both together. The directory and volume must therefore be writable only by the trusted service identity and tightly controlled administrators. If the threat model includes a malicious local writer, the production host must add a keyed MAC/signature whose key is held outside this directory (for example in a separately protected OS/TPM-backed secret store) and/or an independently administered off-host monotonic append-only anchor. Do not enable A2 in a deployment that relies on this unkeyed pair as protection against a hostile local administrator or compromised service account.
+
 ## Required host tests before enabling A2
 
 - restart/reopen the same ledger file between every lifecycle boundary;
