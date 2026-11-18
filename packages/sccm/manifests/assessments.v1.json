@@ -2165,5 +2165,317 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.20261118.current",
+    "nodeId": "jb.expert-qa.visual",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:01Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117156/job/135165203529",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Expert QA full regression suite passed on Node.js 24 in the exact current-main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117156/job/135165203695",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Expert QA full regression suite passed on Node.js 22 in the exact current-main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.browser-analysis.20261118.current",
+    "nodeId": "jb.expert-qa.visual.browser-analysis",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:02Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117156/job/135165203529",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Expert QA full regression suite passed on Node.js 24 in the exact current-main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117156/job/135165203695",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Expert QA full regression suite passed on Node.js 22 in the exact current-main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.20261118.current",
+    "nodeId": "jb.expert-qa.security",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:03Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.static-analysis.20261118.current",
+    "nodeId": "jb.expert-qa.security.static-analysis",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:04Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.module.20261118.current",
+    "nodeId": "jb.expert-qa.security.module",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:05Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.rule-integrity.20261118.current",
+    "nodeId": "jb.expert-qa.security.rule-integrity",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:06Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.dependency-audit.20261118.current",
+    "nodeId": "jb.expert-qa.security.dependency-audit",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:07Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.finding-evidence.20261118.current",
+    "nodeId": "jb.expert-qa.security.finding-evidence",
+    "version": "0.8.0",
+    "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:03:08Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165202801",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 24: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117114/job/135165203392",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Security QA completed on Node.js 22: security profile tests, high/critical dependency audit and CycloneDX SBOM generation passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165203585",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44407117189/job/135165204084",
+        "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24."
+      }
+    ],
+    "findings": []
   }
 ]
