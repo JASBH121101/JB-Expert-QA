@@ -24,9 +24,14 @@ function isRecord(value) {
 
 function exactKeys(value, keys) {
   if (!isRecord(value)) return false;
-  const actual = Object.keys(value).sort();
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some((key) => typeof key !== "string")) return false;
+  const actual = ownKeys.sort();
   const expected = [...keys].sort();
-  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+  if (actual.length !== expected.length || !actual.every((key, index) => key === expected[index])) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  return actual.every((key) => descriptors[key]?.enumerable === true &&
+    Object.hasOwn(descriptors[key], "value"));
 }
 
 function deepFreeze(value) {
@@ -137,10 +142,15 @@ export function validateSccmInventory(inventory) {
   }
   if (rootCount < 1) addError(errors, "inventory must contain at least one ecosystem root");
 
+  const graph = new Map([...nodeById.keys()].map((id) => [id, []]));
   for (const node of nodeById.values()) {
     for (const dependency of node.dependencies ?? []) {
       if (!nodeById.has(dependency)) addError(errors, node.id + " references missing dependency " + dependency);
+      else graph.get(node.id).push(dependency);
       if (dependency === node.id) addError(errors, node.id + " cannot depend on itself");
+    }
+    for (const child of nodeById.values()) {
+      if (child.parentId === node.id) graph.get(node.id).push(child.id);
     }
   }
 
@@ -148,16 +158,16 @@ export function validateSccmInventory(inventory) {
   const visited = new Set();
   function visit(id) {
     if (visiting.has(id)) {
-      addError(errors, "dependency cycle detected at " + id);
+      addError(errors, "hierarchy/dependency cycle detected at " + id);
       return;
     }
-    if (visited.has(id) || !nodeById.has(id)) return;
+    if (visited.has(id) || !graph.has(id)) return;
     visiting.add(id);
-    for (const dependency of nodeById.get(id).dependencies ?? []) visit(dependency);
+    for (const next of graph.get(id)) visit(next);
     visiting.delete(id);
     visited.add(id);
   }
-  for (const id of nodeById.keys()) visit(id);
+  for (const id of graph.keys()) visit(id);
 
   return Object.freeze({ valid: errors.length === 0, errors: Object.freeze(errors) });
 }
@@ -241,6 +251,8 @@ export function validateSccmAssessment(inventory, assessment) {
 export function appendSccmAssessment(inventory, history, assessment) {
   assertSccmInventory(inventory);
   if (!Array.isArray(history)) throw new TypeError("assessment history must be an array");
+  const historyValidation = validateSccmHistory(inventory, history);
+  if (!historyValidation.valid) throw new TypeError("Invalid existing SCCM history: " + historyValidation.errors.join("; "));
   const validation = validateSccmAssessment(inventory, assessment);
   if (!validation.valid) throw new TypeError("Invalid SCCM assessment: " + validation.errors.join("; "));
   if (history.some((entry) => entry.assessmentId === assessment.assessmentId)) {
@@ -263,8 +275,12 @@ export function validateSccmHistory(inventory, history) {
   for (const [index, assessment] of history.entries()) {
     const result = validateSccmAssessment(inventory, assessment);
     if (!result.valid) errors.push(...result.errors.map((error) => "history[" + index + "]: " + error));
-    if (seen.has(assessment.assessmentId)) errors.push("history contains duplicate assessmentId " + assessment.assessmentId);
-    seen.add(assessment.assessmentId);
+    if (!isRecord(assessment)) continue;
+    if (typeof assessment.assessmentId === "string") {
+      if (seen.has(assessment.assessmentId)) errors.push("history contains duplicate assessmentId " + assessment.assessmentId);
+      seen.add(assessment.assessmentId);
+    }
+    if (typeof assessment.nodeId !== "string" || !validIsoDate(assessment.assessedAt)) continue;
     const previous = lastTimestamp.get(assessment.nodeId);
     if (previous !== undefined && Date.parse(assessment.assessedAt) < previous) {
       errors.push("history timestamps move backwards for " + assessment.nodeId);
