@@ -16,7 +16,10 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     private string $approved;
     private array $approvedAttestations = [];
 
-    public function __construct(string $root)
+    public function __construct(
+        string $root,
+        private readonly bool $alterScanContent = false
+    )
     {
         $this->quarantine = $root . '/quarantine';
         $this->approved = $root . '/approved';
@@ -32,7 +35,24 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     public function openQuarantineStream(string $uploadId): mixed
     {
         $path = $this->quarantine . '/' . $uploadId;
-        return is_file($path) ? fopen($path, 'rb') : false;
+        if (!is_file($path)) {
+            return false;
+        }
+        if (!$this->alterScanContent) {
+            return fopen($path, 'rb');
+        }
+
+        $bytes = file_get_contents($path);
+        if (!is_string($bytes) || $bytes === '') {
+            return false;
+        }
+        $bytes[0] = $bytes[0] === "\\0" ? "\\1" : "\\0";
+        $stream = fopen('php://temp', 'w+b');
+        if (!is_resource($stream) || fwrite($stream, $bytes) !== strlen($bytes)) {
+            return false;
+        }
+        rewind($stream);
+        return $stream;
     }
 
     public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool
@@ -117,6 +137,21 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     }
 }
 
+final class UploadInspectionLyingScanner implements UploadMalwareScanner
+{
+    public function scan(mixed $stream, array $metadata): array
+    {
+        stream_get_contents($stream);
+        return [
+            'verdict' => 'clean',
+            'sha256' => $metadata['sha256'],
+            'size' => $metadata['size'],
+            'engine' => 'JB-Test-Scanner',
+            'version' => '1.0',
+        ];
+    }
+}
+
 final class UploadInspectionPartialScanner implements UploadMalwareScanner
 {
     public function scan(mixed $stream, array $metadata): array
@@ -170,6 +205,18 @@ function runUploadInspectionServiceTests(): void
         expect($partialRejected, 'PHP scanner must consume the complete read-only stream before attestation');
         expect($partialStore->quarantineCount() === 1 && $partialStore->approvedCount() === 0,
             'Incomplete PHP scan must remain quarantined and never be promoted');
+
+        $changedScanStore = new UploadInspectionTestStorage($root . '/changed-scan-content', true);
+        $changedScan = new UploadInspectionService($changedScanStore, new UploadInspectionLyingScanner());
+        $changedScanRejected = false;
+        try {
+            $changedScan->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $changedScanRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+        }
+        expect($changedScanRejected, 'PHP must hash the actual bytes consumed by the scanner, not trust scanner-reported metadata');
+        expect($changedScanStore->quarantineCount() === 1 && $changedScanStore->approvedCount() === 0,
+            'PHP scan-stream digest mismatch must remain quarantined and never be promoted');
 
         $mismatchStore = new UploadInspectionTestStorage($root . '/mime-mismatch');
         $mismatch = new UploadInspectionService($mismatchStore, new UploadInspectionTestScanner());
