@@ -272,7 +272,7 @@ export function createPostgresA2RevisionAnchor({
         "NEW.revision <> OLD.revision + 1 THEN " +
         "RAISE EXCEPTION 'A2 external revision anchor updates must advance exactly one revision'; " +
         "END IF; " +
-        "END IF; RETURN NEW; END $a2anchor$"
+        "END IF; RETURN NEW; END; $a2anchor$"
       );
       await client.query(
         "DO $a2anchor$ BEGIN " +
@@ -281,7 +281,7 @@ export function createPostgresA2RevisionAnchor({
         "CREATE TRIGGER jb_resilience_a2_anchor_immutable_trigger " +
         "BEFORE INSERT OR UPDATE OR DELETE ON " + REVISION_ANCHOR_TABLE + " " +
         "FOR EACH ROW EXECUTE FUNCTION public.jb_resilience_a2_anchor_guard_mutation(); " +
-        "END IF; END $a2anchor$"
+        "END IF; END; $a2anchor$"
       );
       await validateSchema(client);
     });
