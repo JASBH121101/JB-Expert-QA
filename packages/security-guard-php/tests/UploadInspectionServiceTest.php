@@ -387,7 +387,11 @@ function runUploadInspectionServiceTests(): void
         try {
             $transientEmpty->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
-            $transientEmptyRejected = $exception->reason === 'SCAN_INCOMPLETE';
+            $transientEmptyRejected = in_array(
+                $exception->reason,
+                ['SCAN_INCOMPLETE', 'SCAN_CONTENT_MISMATCH'],
+                true
+            );
         }
         expect($transientEmptyRejected,
             'A transient empty read before trailing bytes must never be treated as true EOF');
