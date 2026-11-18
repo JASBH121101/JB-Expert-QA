@@ -84,7 +84,7 @@ A Content-Length check alone is not enough: chunked uploads do not declare the f
 
 ## Quarantine retention and cleanup
 
-Keep unknown, timed-out, malformed, or unavailable scan results private for investigation/retry. The host application must define a short, bounded quarantine retention period, retry budget, cleanup schedule, and storage quota. A failed deletion must generate an operational alert without exposing object paths or scanner internals.
+Keep malicious, unknown, timed-out, malformed, incomplete, or unavailable scan results private for controlled investigation/disposition; they must never enter the approved namespace or normal download/preview routes. The host application must define a short, bounded quarantine retention period, retry budget, cleanup schedule, storage quota, and restricted audited access. Malicious verdicts are rejected for promotion but their exact quarantined bytes are retained under this policy. A failed deletion must generate an operational alert without exposing object paths or scanner internals.
 
 ## Scanner integration acceptance tests
 
