@@ -26,9 +26,16 @@ _TYPES: dict[str, tuple[str, ...]] = {
 
 
 class UploadInspectionError(RuntimeError):
-    def __init__(self, reason: str, message: str = "Upload could not be safely approved") -> None:
+    def __init__(
+        self,
+        reason: str,
+        message: str = "Upload could not be safely approved",
+        attestation: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
+        if attestation is not None:
+            self.attestation = dict(attestation)
 
 
 class UploadQuarantineStorage(Protocol):
