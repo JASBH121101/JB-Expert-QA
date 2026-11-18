@@ -3,12 +3,60 @@ import { comparePlaceholders } from "./placeholders.js";
 import { LanguageLibrary } from "./glossary.js";
 import { resolveTranslationState } from "./review.js";
 
-export function flattenTranslationMap(value, prefix = "", output = {}) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return output;
-  for (const [key, item] of Object.entries(value)) {
+function isPlainTranslationRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function getTranslationEntries(value) {
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    throw new TypeError("translation map must not contain symbol keys");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const entries = [];
+  for (const key of Object.keys(descriptors)) {
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable) continue;
+    if (!Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("translation map must not contain accessor properties");
+    }
+    entries.push([key, descriptor.value]);
+  }
+  return entries;
+}
+
+export function flattenTranslationMap(value, prefix = "", output = Object.create(null), depth = 0) {
+  if (!isPlainTranslationRecord(output)) {
+    throw new TypeError("translation map output must be a plain record and not Object.prototype");
+  }
+  if (!isPlainTranslationRecord(value)) return output;
+  if (typeof prefix !== "string") {
+    throw new TypeError("translation map prefix must be a string");
+  }
+  if (!Number.isInteger(depth) || depth < 0 || depth > 24) {
+    throw new RangeError("translation map exceeds the maximum nesting depth");
+  }
+  for (const [key, item] of getTranslationEntries(value)) {
+    if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
+      throw new TypeError("translation map contains a prototype-sensitive key");
+    }
     const path = prefix ? prefix + "." + key : key;
-    if (typeof item === "string") output[path] = item;
-    else if (item && typeof item === "object" && !Array.isArray(item)) flattenTranslationMap(item, path, output);
+    if (typeof item === "string") {
+      if (Object.hasOwn(output, path)) {
+        throw new TypeError("translation map contains a duplicate flattened key: " + path);
+      }
+      Object.defineProperty(output, path, {
+        value: item,
+        enumerable: true,
+        configurable: true,
+        writable: true
+      });
+    } else if (isPlainTranslationRecord(item)) {
+      flattenTranslationMap(item, path, output, depth + 1);
+    }
   }
   return output;
 }
