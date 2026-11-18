@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileA2ActionLedger } from "../src/index.js";
@@ -576,5 +576,44 @@ test("file ledger refuses symbolic-link journal paths without reading their targ
       /regular file|symbolic link/
     );
     assert.equal(await readFile(targetPath, "utf8"), externalContent);
+  });
+});
+
+test("file ledger detects missing and rolled-back journals through its revision guard", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const guardPath = filePath + ".guard";
+    const store = createStore(filePath);
+    const claim = await claimAndCreateRecord(store);
+    const earlierLedger = await readFile(filePath, "utf8");
+    assert.match(await readFile(guardPath, "utf8"), /ledgerSha256/);
+
+    await store.complete({
+      claimId: claim.claimId,
+      outcome: "held-for-reconciliation",
+      reason: "backup-guard-test",
+      completedAtMs: NOW + 4
+    });
+    const latestLedger = await readFile(filePath, "utf8");
+
+    await writeFile(filePath, earlierLedger, "utf8");
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 5 }),
+      /rolled back|diverges/
+    );
+
+    await writeFile(filePath, latestLedger, "utf8");
+    const restored = await store.listPending({ cursor: null, limit: 10, atMs: NOW + 5 });
+    assert.deepEqual(restored.claimIds, [claim.claimId]);
+
+    await unlink(filePath);
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 6 }),
+      /missing while its durability guard exists/
+    );
+
+    await writeFile(filePath, latestLedger, "utf8");
+    const recovered = await store.listPending({ cursor: null, limit: 10, atMs: NOW + 7 });
+    assert.deepEqual(recovered.claimIds, [claim.claimId]);
   });
 });
