@@ -106,7 +106,8 @@ function createFixture({
   resolvedContent = CONTENT,
   malformedRecord = false,
   recorderIdOverride = "recorder-lab-01",
-  listPending = null
+  listPending = null,
+  operationTimeoutMs = 1_000
 } = {}) {
   const record = makeRecord(action);
   record.recorderId = recorderIdOverride;
@@ -139,14 +140,34 @@ function createFixture({
   const provider = {
     providerId: record.providerId,
     reconciliationReadOnly: true,
-    async reconcile() {
+    async reconcile(input) {
       events.push("reconcile-apply");
+      if (providerOutcome === "abort-resolves") {
+        assert.ok(input.signal instanceof AbortSignal);
+        assert.ok(Number.isSafeInteger(input.deadlineMs));
+        return new Promise((resolve) => {
+          input.signal.addEventListener("abort", () => {
+            events.push("provider-aborted");
+            resolve({ outcome, receipt });
+          }, { once: true });
+        });
+      }
       return providerOutcome === "unknown"
         ? { outcome: "unknown" }
         : { outcome, receipt };
     },
-    async reconcileRelease() {
+    async reconcileRelease(input) {
       events.push("reconcile-release");
+      if (providerOutcome === "abort-resolves") {
+        assert.ok(input.signal instanceof AbortSignal);
+        assert.ok(Number.isSafeInteger(input.deadlineMs));
+        return new Promise((resolve) => {
+          input.signal.addEventListener("abort", () => {
+            events.push("provider-aborted");
+            resolve({ outcome, receipt });
+          }, { once: true });
+        });
+      }
       return providerOutcome === "unknown"
         ? { outcome: "unknown" }
         : { outcome, receipt };
@@ -183,7 +204,7 @@ function createFixture({
     forensicRecorder: recorder,
     evidenceResolver: resolver,
     clock: () => NOW,
-    operationTimeoutMs: 1_000
+    operationTimeoutMs
   });
   return { coordinator, events, record };
 }
@@ -309,4 +330,21 @@ test("accessor-backed claim IDs are rejected without invoking the getter", async
   assert.equal(getterCalled, false);
   assert.equal(report.complete, false);
   assert.equal(report.findings[0].reason, "claim-id-page-contains-accessor-or-hole");
+});
+
+
+test("an adapter resolving while handling abort cannot override the reconciliation deadline", async () => {
+  const { coordinator, events } = createFixture({
+    providerOutcome: "abort-resolves",
+    operationTimeoutMs: 100
+  });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, false);
+  assert.equal(report.findings[0].state, "held-for-reconciliation");
+  assert.equal(report.findings[0].reason, "provider-reconciliation-unavailable");
+  assert.ok(events.includes("provider-aborted"));
+  assert.equal(events.includes("resolve-evidence"), false);
+  assert.equal(events.includes("verify-containment"), false);
+  assert.equal(events.includes("lookup-retention"), false);
 });
