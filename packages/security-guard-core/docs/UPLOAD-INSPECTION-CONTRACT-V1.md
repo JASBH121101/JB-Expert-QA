@@ -43,7 +43,7 @@ streamConsumed is an output assertion only after the runtime adapter independent
 | Scanner result | Guard disposition |
 |---|---|
 | clean, complete stream, exact upload ID/size/SHA-256 | Eligible for the host's private atomic promotion step |
-| malicious | Reject; remove the staging quarantine object. Any forensic evidence retention must use a separate, bounded and access-controlled recorder |
+| malicious | Reject promotion; retain the exact object in private quarantine for controlled response and forensic disposition. Enforce a bounded retention period, quotas, restricted audited access and explicit deletion; never serve it through normal download routes |
 | unknown | Do not promote; retain in private quarantine for an authorized review/disposition process |
 | Incomplete stream | Do not promote; retain in private quarantine |
 | Timeout, scanner outage, malformed result, wrong upload ID, digest or byte-count mismatch | Do not promote; retain in private quarantine |
@@ -96,7 +96,7 @@ Each runtime test must consume the same vector file and prove:
 2. filename-extension and declared-MIME mismatches are rejected;
 3. unsupported and truncated signatures are rejected;
 4. only a complete, exact clean scan can reach private promotion;
-5. malicious results are rejected and staging data is removed;
+5. malicious results are rejected for promotion, retained in private quarantine, and never served;
 6. unknown and incomplete results remain private and are never promoted.
 
 ## 8. Host deployment requirements
