@@ -2,12 +2,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   rmSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const execFileAsync = promisify(execFile);
 const timeoutMs = 20_000;
@@ -224,7 +225,41 @@ async function main() {
     : process.platform === "win32"
       ? await certifyWindowsScm()
       : (() => { throw new Error(`Unsupported platform: ${process.platform}`); })();
-  console.log(JSON.stringify({ certification: "passed", ...result }, null, 2));
+
+  const evidence = {
+    schema: "jb.resilience.os-service-manager-lab-report/v1",
+    generatedAt: new Date().toISOString(),
+    commit: process.env.GITHUB_SHA || null,
+    workflowRunId: process.env.GITHUB_RUN_ID || null,
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      architecture: process.arch
+    },
+    scope: {
+      testEnvironment: "ephemeral-github-hosted-runner",
+      target: "disposable-ci-service",
+      productionHostTested: false,
+      customerServiceTouched: false,
+      a2Executable: false,
+      a3Executable: false,
+      interpretation: "This report records one disposable CI service-manager exercise. It is not certification of a customer host, production service, provider, operating procedure, A2 containment or A3 failover."
+    },
+    result: {
+      certification: "passed",
+      ...result
+    }
+  };
+  const serialized = JSON.stringify(evidence, null, 2) + "\n";
+  console.log(serialized);
+
+  const outputPath = process.env.RESILIENCE_LAB_OUTPUT;
+  if (outputPath) {
+    const resolvedOutput = resolve(outputPath);
+    mkdirSync(dirname(resolvedOutput), { recursive: true, mode: 0o700 });
+    writeFileSync(resolvedOutput, serialized, { flag: "w", mode: 0o600 });
+    console.log("Operational evidence written to " + resolvedOutput);
+  }
 }
 
 main().catch((error) => {
