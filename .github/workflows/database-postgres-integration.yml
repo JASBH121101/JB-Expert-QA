@@ -98,14 +98,15 @@ jobs:
       - name: Detect Neon development credential
         id: neon-credential
         env:
+          ENABLE_NEON_DEVELOPMENT_E2E: ${{ vars.ENABLE_NEON_DEVELOPMENT_E2E }}
           QA_NEON_DEVELOPMENT_DATABASE_URL: ${{ secrets.QA_NEON_DEVELOPMENT_DATABASE_URL }}
         shell: bash
         run: |
-          if [ -n "$QA_NEON_DEVELOPMENT_DATABASE_URL" ]; then
+          if [ "$ENABLE_NEON_DEVELOPMENT_E2E" = "true" ] && [ -n "$QA_NEON_DEVELOPMENT_DATABASE_URL" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Neon E2E skipped: QA_NEON_DEVELOPMENT_DATABASE_URL is not configured."
+            echo "Neon E2E skipped: explicit ENABLE_NEON_DEVELOPMENT_E2E=true and a development-only credential are both required."
           fi
       - name: Set up Node.js
         if: steps.neon-credential.outputs.configured == 'true'
@@ -161,4 +162,4 @@ jobs:
           rm -f "$report"
       - name: Confirm Neon E2E was intentionally skipped
         if: steps.neon-credential.outputs.configured != 'true'
-        run: echo "No Neon credentials were used. Configure QA_NEON_DEVELOPMENT_DATABASE_URL with the development-only read-only URL to enable this extra check."
+        run: echo "Neon E2E was skipped. Enable it only by setting ENABLE_NEON_DEVELOPMENT_E2E=true and providing the development-only read-only URL."
