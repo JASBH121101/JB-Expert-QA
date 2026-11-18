@@ -114,6 +114,9 @@ async function main() {
   const a2First = createPostgresA2ActionLedger({ pool, ...a2Identities });
   const a2Second = createPostgresA2ActionLedger({ pool: a2SecondaryPool, ...a2Identities });
   assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, connectionTimeoutMs: 50
+  }), /connectionTimeoutMs is invalid/);
+  assert.throws(() => createPostgresA2ActionLedger({
     pool, ...a2Identities, statementTimeoutMs: 50
   }), /statementTimeoutMs is invalid/);
   assert.throws(() => createPostgresA2ActionLedger({
@@ -128,6 +131,28 @@ async function main() {
   });
   assert.deepEqual(await a2Second.initialize(), {
     initialized: true, dialect: "postgresql", schemaVersion: 1
+  });
+
+  await runCase("PostgreSQL A2 Pool connection wait timeout releases a late client", async () => {
+    let lateClientReleased = 0;
+    const lateConnectionPool = {
+      query: async () => { throw new Error("late Pool client should not execute SQL"); },
+      connect: () => new Promise((resolve) => setTimeout(() => resolve({
+        query: async () => { throw new Error("late Pool client should not execute SQL"); },
+        release: () => { lateClientReleased += 1; }
+      }), 150))
+    };
+    const boundedConnectionLedger = createPostgresA2ActionLedger({
+      pool: lateConnectionPool,
+      ...a2Identities,
+      connectionTimeoutMs: 100
+    });
+    await assert.rejects(
+      boundedConnectionLedger.initialize(),
+      /Pool connection wait timed out/
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(lateClientReleased, 1);
   });
 
   await runCase("PostgreSQL A2 ledger serializes unique claims across adapter instances", async () => {
