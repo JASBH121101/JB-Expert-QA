@@ -7,7 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jb_security_guard.uploads import UploadInspectionError, UploadInspectionService
+from jb_security_guard.uploads import (
+    UploadInspectionError,
+    UploadInspectionReadOnlyStream,
+    UploadInspectionService,
+)
 
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"safe-png-fixture"
@@ -230,6 +234,21 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertEqual(caught.exception.reason, "INVALID_SCAN_RESULT")
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
+
+    def test_scanner_reader_cannot_be_wrapped_in_a_prefetching_buffer(self):
+        reader = UploadInspectionReadOnlyStream(
+            io.BytesIO(PNG),
+            len(PNG),
+            hashlib.sha256(PNG).hexdigest(),
+        )
+        self.assertFalse(isinstance(reader, io.RawIOBase))
+        self.assertFalse(hasattr(reader, "readinto"))
+        self.assertFalse(hasattr(reader, "seek"))
+        with self.assertRaises((TypeError, AttributeError)):
+            io.BufferedReader(reader)
+
+        self.assertEqual(reader.read(1), PNG[:1])
+        self.assertEqual(reader.verify_complete(), "incomplete")
 
     def test_scanner_stream_rejects_same_size_content_substitution(self):
         class AlteredReadStorage(MemoryStorage):
