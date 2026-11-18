@@ -58,7 +58,7 @@ Six pull requests were open at the time of inspection:
 
 The Python JPEG and PNG checks contained two backslashes before hexadecimal escape sequences. Python therefore compared literal backslash text, not the actual JPEG/PNG byte signatures. The PNG test fixture repeated the same mistake, allowing the test to pass against the wrong representation. Real JPEG/PNG files could be rejected as unsupported, while a textual escape prefix could incorrectly satisfy the mistaken check if the injected scanner returned clean.
 
-A correction branch changes the literals to actual binary bytes, changes the PNG fixture to real binary bytes, adds a real JPEG positive test, and adds a negative test for textual escape bytes. This patch remains subject to CI confirmation and review; it has not been merged.
+PR #126 implements the correction on `fix/security-guard-python-upload-signatures-v1`: the literals now represent actual binary bytes, the PNG fixture is real binary data, and tests include a real JPEG positive case plus a negative textual-escape case. As of 2026-11-18 02:18 UTC, all five PR workflows passed: Engine Certification 30/30 jobs, Core Validation 2/2, Security QA 2/2, Security Guard multi-runtime 2/2 and NPM package distribution 2/2. PR #126 was moved from draft to ready for review; it remains open and unmerged.
 
 ### SG-INTEROP-001 — Security Guard runtime parity is explicitly partial
 **Severity:** High for any claim of universal parity
@@ -69,7 +69,7 @@ The Core README correctly states:
 - PHP/Laravel provides Core v1 identity/rate-limit integration and upload orchestration, not equivalent native request inspection, CSRF/origin, authentication/recovery and response-header middleware.
 - Python/FastAPI provides Core v1 identity/rate-limit integration and upload orchestration, not the full Node feature set.
 
-The Node, PHP and Python upload flows do not yet share a dedicated language-neutral upload-inspection JSON Schema and conformance fixture family. Their native result payloads are not guaranteed to be byte-for-byte equivalent. Do not label these runtimes feature-equivalent until the contract, shared vectors and runtime-specific conformance tests exist.
+The follow-on branch `feature/security-guard-upload-inspection-contract-v1` now introduces language-neutral v1 scan-request and scan-result JSON Schemas, shared synthetic magic-byte/scanner-disposition vectors, and a runtime mapping document. Node, PHP and Python upload tests have been wired to the same vector file. PHP now rejects clean results unless the sequential stream position reaches the ingested size. Python now passes a read-only digest-tracking stream, independently checks bytes consumed and SHA-256, and rejects incomplete scans; its malicious staging object is deleted consistently with Node and PHP. This work is on a stacked branch based on PR #126 and is not yet CI-certified or merged. Do not claim universal production parity until its CI passes and host-specific deployments are validated. Broader Security Guard protections remain intentionally partial across runtimes.
 
 The Node upload and request controls also remain host-dependent:
 - Default request mode is monitor; blocking is an explicit policy choice.
@@ -144,8 +144,8 @@ Recommended control: protect main with pull-request-only changes, required CI ch
 
 ## Recommended execution order
 
-1. Complete the isolated Python binary-signature correction and require the full Security Guard multi-runtime and Engine Certification CI to pass.
-2. Define upload-inspection contract v1 and shared cross-runtime vectors for Node, PHP and Python; then verify equivalent fail-closed behavior.
+1. **Completed on PR #126 (not merged):** isolated Python binary-signature correction, real PNG/JPEG test fixtures and full passing Security Guard multi-runtime / Engine Certification CI.
+2. **In progress on the stacked upload-contract branch:** define upload-inspection contract v1 and shared cross-runtime vectors for Node, PHP and Python; require each runtime to prove complete stream consumption and equivalent fail-closed outcomes.
 3. Add Composer and Python wheel/sdist clean-install distribution jobs.
 4. Audit Security Guard's request parsing, proxy trust, CSRF/origin, auth/recovery, shared-store semantics and real host upload integrations. Keep monitor-first rollout and do not claim WAF coverage.
 5. Expand Malware Engine's representative benign/positive test corpus and report measured false-positive, false-negative and unknown coverage; keep production antivirus claims disabled.
