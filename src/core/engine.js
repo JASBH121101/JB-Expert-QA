@@ -1,4 +1,5 @@
 import { snapshotPlainRecord } from "./safe-record.js";
+import { snapshotPlainRecord } from "./safe-record.js";
 import { createDiagnostic } from "./diagnostic.js";
 import { validateEngineConfig } from "./config.js";
 import { ENGINE_VERSION } from "./version.js";
@@ -6,7 +7,10 @@ import { calculateScore } from "./scoring.js";
 import { redactSensitiveText } from "./redaction.js";
 
 export class ExpertQAEngine {
-  constructor({ registry, config = {} } = {}) {
+  constructor(options = {}) {
+    const safeOptions = snapshotPlainRecord(options, "engine options");
+    const registry = safeOptions.registry;
+    const config = safeOptions.config ?? {};
     if (!registry || typeof registry.list !== "function") {
       throw new TypeError("A valid rule registry is required");
     }
@@ -15,13 +19,15 @@ export class ExpertQAEngine {
   }
 
   async audit(context = {}, options = {}) {
-    if (options.specialist !== undefined &&
-        (typeof options.specialist !== "string" || !options.specialist.trim())) {
+    const safeOptions = snapshotPlainRecord(options, "audit options");
+    const specialist = safeOptions.specialist;
+    if (specialist !== undefined &&
+        (typeof specialist !== "string" || !specialist.trim())) {
       throw new TypeError("options.specialist must be a non-empty specialist id");
     }
 
     const rules = this.registry.list(
-      options.specialist ? { specialist: options.specialist } : {}
+      specialist ? { specialist } : {}
     );
     const diagnostics = [];
     const execution = [];
