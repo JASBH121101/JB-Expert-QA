@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 85);
+  assert.equal(history.length, 91);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -326,6 +326,18 @@ test("Currency Engine branch, precision subbranch and curated components are PAS
   assert.equal(module.children.find((component) => component.id === "jb.currency-engine.money.fx").ownStatus, "PASS");
 });
 
+test("Currency QA hierarchy passes at component, module, subbranch and branch levels", () => {
+  const branch = evaluateSccmNode(inventory, history, "jb.expert-qa.currency");
+  const subbranch = evaluateSccmNode(inventory, history, "jb.expert-qa.currency.locale-validation");
+  const module = evaluateSccmNode(inventory, history, "jb.expert-qa.currency.module");
+  assert.equal(module.status, "PASS");
+  assert.equal(subbranch.status, "PASS");
+  assert.equal(branch.status, "PASS");
+  assert.equal(module.children.length, 3);
+  assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
+});
+
 test("Database QA PostgreSQL integration hierarchy passes without certifying unsupported adapters", () => {
   const branch = evaluateSccmNode(inventory, history, "jb.expert-qa.database");
   const subbranch = evaluateSccmNode(inventory, history, "jb.expert-qa.database.integration");
@@ -424,7 +436,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 41);
+  assert.equal(report.counts.component.PASS, 44);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
