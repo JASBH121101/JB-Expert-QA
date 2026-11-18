@@ -577,6 +577,41 @@ export function createFileOrchestrationStore({
     });
   }
 
+  async function listReconciliationCandidates({ now, limit = 100 } = {}) {
+    assertTimestamp(now, "reconciliation clock");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+      throw new TypeError("reconciliation candidate limit must be between 1 and 500");
+    }
+    return read((ledger) => Object.freeze(
+      Object.values(ledger.actions)
+        .filter((entry) => entry.status === "claimed" && entry.expiresAt <= now)
+        .sort((left, right) => left.expiresAt - right.expiresAt || left.actionId.localeCompare(right.actionId))
+        .slice(0, limit)
+        .map((entry) => {
+          const service = ledger.services[scopeKey(entry.environment, entry.assetId)] ?? null;
+          const incident = ledger.incidents[entry.incidentId] ?? null;
+          return Object.freeze({
+            actionId: entry.actionId,
+            incidentId: entry.incidentId,
+            assetId: entry.assetId,
+            environment: entry.environment,
+            serviceId: entry.serviceId,
+            action: entry.action,
+            claimedAt: entry.claimedAt,
+            expiresAt: entry.expiresAt,
+            expiredByMs: now - entry.expiresAt,
+            incidentState: incident?.state ?? "unknown",
+            incidentUpdatedAt: incident?.updatedAt ?? null,
+            lastActionAt: service?.lastActionAt ?? null,
+            lastOutcome: service?.lastOutcome ?? "unknown",
+            consecutiveFailures: service?.consecutiveFailures ?? 0,
+            status: "reconciliation-required",
+            automaticResolutionAllowed: false
+          });
+        })
+    ));
+  }
+
   async function getIncident(incidentId) {
     assertIdentifier(incidentId, "incidentId");
     return read((ledger) => {
@@ -594,6 +629,7 @@ export function createFileOrchestrationStore({
     claimAction,
     completeAction,
     recordActionOutcome,
+    listReconciliationCandidates,
     getIncident
   });
 }

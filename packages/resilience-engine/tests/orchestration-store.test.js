@@ -405,3 +405,99 @@ test("a process terminated immediately after a durable claim cannot replay the a
     });
   });
 });
+
+
+test("expired action claims are exposed as read-only reconciliation candidates", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "orchestration.json");
+    const store = createFileOrchestrationStore({ filePath });
+    const expiredInput = claimAction();
+    const expiredClaim = await store.claimAction(expiredInput);
+    assert.equal(expiredClaim.claimed, true);
+
+    const liveInput = claimAction({
+      assetId: "host-erp-02",
+      incidentId: "incident-live",
+      claimedAt: expiredInput.claimedAt,
+      expiresAt: expiredInput.expiresAt + 60_000
+    });
+    assert.equal((await store.claimAction(liveInput)).claimed, true);
+
+    const before = await readFile(filePath, "utf8");
+    const candidates = await store.listReconciliationCandidates({
+      now: expiredInput.expiresAt + 5_000
+    });
+    const after = await readFile(filePath, "utf8");
+
+    assert.equal(after, before, "read-only reconciliation must not mutate the durable ledger");
+    assert.equal(candidates.length, 1);
+    assert.deepEqual(candidates[0], {
+      actionId: expiredClaim.actionId,
+      incidentId: expiredInput.incidentId,
+      assetId: expiredInput.assetId,
+      environment: expiredInput.environment,
+      serviceId: expiredInput.serviceId,
+      action: expiredInput.action,
+      claimedAt: expiredInput.claimedAt,
+      expiresAt: expiredInput.expiresAt,
+      expiredByMs: 5_000,
+      incidentState: "unknown",
+      incidentUpdatedAt: null,
+      lastActionAt: null,
+      lastOutcome: "unknown",
+      consecutiveFailures: 0,
+      status: "reconciliation-required",
+      automaticResolutionAllowed: false
+    });
+    await assert.rejects(
+      store.listReconciliationCandidates({ now: expiredInput.expiresAt, limit: 0 }),
+      /between 1 and 500/
+    );
+  });
+});
+
+test("reconciliation candidates preserve incident and service context and enforce immutable bounded output", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "orchestration.json");
+    const store = createFileOrchestrationStore({ filePath });
+    assert.equal(await store.recordIncidentState(incidentState("OBSERVING")), true);
+    const input = claimAction();
+    const claim = await store.claimAction(input);
+    assert.equal(claim.claimed, true);
+    assert.equal(await store.recordActionOutcome({
+      assetId: input.assetId,
+      environment: input.environment,
+      action: input.action,
+      outcome: "failed",
+      at: input.claimedAt + 1,
+      failureThreshold: 2,
+      cooldownMs: 60_000
+    }), true);
+
+    const before = await readFile(filePath, "utf8");
+    const candidates = await store.listReconciliationCandidates({
+      now: input.expiresAt,
+      limit: 500
+    });
+    const after = await readFile(filePath, "utf8");
+
+    assert.equal(after, before, "inspection must not rewrite the ledger");
+    assert.equal(candidates.length, 1, "expiry equality must be considered expired");
+    assert.equal(candidates[0].incidentState, "OBSERVING");
+    assert.equal(candidates[0].incidentUpdatedAt, input.claimedAt);
+    assert.equal(candidates[0].lastActionAt, input.claimedAt + 1);
+    assert.equal(candidates[0].lastOutcome, "failed");
+    assert.equal(candidates[0].consecutiveFailures, 1);
+    assert.equal(candidates[0].automaticResolutionAllowed, false);
+    assert.equal(Object.isFrozen(candidates), true);
+    assert.equal(Object.isFrozen(candidates[0]), true);
+    await assert.rejects(
+      store.listReconciliationCandidates({ now: input.expiresAt, limit: 501 }),
+      /between 1 and 500/
+    );
+    await assert.rejects(
+      store.listReconciliationCandidates({ now: -1 }),
+      /non-negative safe integer/
+    );
+  });
+});
