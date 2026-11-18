@@ -16,8 +16,10 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     private string $approved;
     private array $approvedAttestations = [];
 
-    public function __construct(string $root)
-    {
+    public function __construct(
+        string $root,
+        private readonly bool $alterScanContent = false
+    ) {
         $this->quarantine = $root . '/quarantine';
         $this->approved = $root . '/approved';
         mkdir($this->quarantine, 0700, true);
@@ -32,7 +34,24 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
     public function openQuarantineStream(string $uploadId): mixed
     {
         $path = $this->quarantine . '/' . $uploadId;
-        return is_file($path) ? fopen($path, 'rb') : false;
+        if (!is_file($path)) {
+            return false;
+        }
+        if (!$this->alterScanContent) {
+            return fopen($path, 'rb');
+        }
+
+        $bytes = file_get_contents($path);
+        if (!is_string($bytes) || $bytes === '') {
+            return false;
+        }
+        $bytes[0] = $bytes[0] === "\\0" ? "\\1" : "\\0";
+        $stream = fopen('php://temp', 'w+b');
+        if (!is_resource($stream) || fwrite($stream, $bytes) !== strlen($bytes)) {
+            return false;
+        }
+        rewind($stream);
+        return $stream;
     }
 
     public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool
@@ -87,7 +106,9 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         private readonly bool $tamperDigest = false,
         private readonly bool $unavailable = false,
         private readonly bool $consume = true,
-        private readonly bool $seekToEnd = false
+        private readonly bool $seekToEnd = false,
+        private readonly int $consumeBytes = 0,
+        private readonly bool $reportExpectedDigest = false
     ) {
     }
 
@@ -98,6 +119,16 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         }
         if ($this->seekToEnd) {
             fseek($stream, 0, SEEK_END);
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
+        }
+        if ($this->consumeBytes > 0) {
+            fread($stream, $this->consumeBytes);
             return [
                 'verdict' => $this->verdict,
                 'sha256' => $metadata['sha256'],
@@ -126,6 +157,7 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         }
         $sha256 = hash_final($hash);
         if ($this->tamperDigest) $sha256 = str_repeat('0', 64);
+        if ($this->reportExpectedDigest) $sha256 = $metadata['sha256'];
         return [
             'verdict' => $this->verdict,
             'sha256' => $sha256,
@@ -247,6 +279,36 @@ function runUploadInspectionServiceTests(): void
         expect($scannerUnavailable, 'Scanner outage must fail closed');
         expect($unavailableStore->quarantineCount() === 1 && $unavailableStore->approvedCount() === 0,
             'Scanner outage must leave the object private in quarantine');
+
+        $partialStore = new UploadInspectionTestStorage($root . '/partial-scan');
+        $partial = new UploadInspectionService(
+            $partialStore,
+            new UploadInspectionTestScanner('clean', false, false, true, false, 1)
+        );
+        $partialRejected = false;
+        try {
+            $partial->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $partialRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($partialRejected, 'A scanner that reads only one byte must not satisfy complete consumption');
+        expect($partialStore->quarantineCount() === 1 && $partialStore->approvedCount() === 0,
+            'A partial one-byte scan must remain private in quarantine');
+
+        $changedStore = new UploadInspectionTestStorage($root . '/changed-scan-content', true);
+        $changed = new UploadInspectionService(
+            $changedStore,
+            new UploadInspectionTestScanner('clean', false, false, true, false, 0, true)
+        );
+        $changedRejected = false;
+        try {
+            $changed->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $changedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+        }
+        expect($changedRejected, 'PHP must independently hash the exact bytes delivered to the scanner');
+        expect($changedStore->quarantineCount() === 1 && $changedStore->approvedCount() === 0,
+            'A changed scan stream must remain private and never be promoted');
 
         $incompleteStore = new UploadInspectionTestStorage($root . '/incomplete-scan');
         $incomplete = new UploadInspectionService(
