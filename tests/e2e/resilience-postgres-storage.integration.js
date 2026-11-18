@@ -233,6 +233,20 @@ async function main() {
       reason: "provider-confirmed-not-applied",
       completedAtMs: startedAtMs + 5
     }), { completed: false });
+    const wrongProviderProof = {
+      schema: "jb.resilience.a2-provider-non-application/v1",
+      providerId: "spoofed-pg-provider",
+      action, scope, profileId, idempotencyKey,
+      outcome: "not-applied",
+      observedAtMs: startedAtMs + 4
+    };
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "not-applied",
+      reason: "provider-confirmed-not-applied",
+      completedAtMs: startedAtMs + 5,
+      providerReconciliation: wrongProviderProof
+    }), { completed: false });
     const proof = {
       schema: "jb.resilience.a2-provider-non-application/v1",
       providerId: a2Identities.providerId,
@@ -289,6 +303,63 @@ async function main() {
     assert.equal(new Set(all).size, all.length);
     for (const claimId of created) assert.ok(all.includes(claimId));
     assert.equal(second.nextCursor, null);
+  });
+
+  await runCase("PostgreSQL A2 altered recovery JSONB fails closed on exact read and finalization", async () => {
+    const scope = a2Scope("pg-a2-tamper", "pg-a2-incident-tamper");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_300_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "pg-a2-tamper-evidence",
+        sha256: createHash("sha256").update("integrity evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const startedAtMs = record.createdAtMs + 1;
+    assert.deepEqual(await a2First.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: { ...record, state: "provider-started", updatedAtMs: startedAtMs },
+      atMs: startedAtMs
+    }), { started: true });
+    await pool.query(
+      "UPDATE jb_resilience_a2_action_claims SET recovery_record=jsonb_set(recovery_record, '{providerId}', to_jsonb($2::text)) WHERE claim_id=$1",
+      [claim.claimId, "tampered-provider"]
+    );
+    await assert.rejects(a2Second.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 1
+    }), /identities do not match/);
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "succeeded",
+      reason: null,
+      completedAtMs: startedAtMs + 2
+    }), { completed: false });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId,
+      outcome: "held-for-reconciliation",
+      reason: "tampered-record",
+      completedAtMs: startedAtMs + 2
+    }), { completed: false });
   });
 
   await runCase("PostgreSQL A2 pre-provider claims remain held and expiry blocks provider start", async () => {
