@@ -189,36 +189,51 @@ function runUploadInspectionServiceTests(): void
         $unknownStore = new UploadInspectionTestStorage($root . '/unknown');
         $unknown = new UploadInspectionService($unknownStore, new UploadInspectionTestScanner('unknown'));
         $unknownRejected = false;
+        $unknownAttestation = null;
         try {
             $unknown->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $unknownRejected = $exception->reason === 'SCAN_NOT_CLEAN';
+            $unknownAttestation = $exception->attestation;
         }
         expect($unknownRejected, 'Unknown scanner verdict must not be treated as clean');
+        expect(is_array($unknownAttestation) && $unknownAttestation['verdict'] === 'unknown',
+            'PHP unknown result must expose its validated scanner attestation');
+        expect($unknownAttestation['sha256'] === hash('sha256', $png) && $unknownAttestation['size'] === strlen($png),
+            'PHP unknown attestation must bind the exact scanned bytes');
         expect($unknownStore->quarantineCount() === 1 && $unknownStore->approvedCount() === 0,
             'Unknown verdict must remain in private quarantine and never be promoted');
 
         $maliciousStore = new UploadInspectionTestStorage($root . '/malicious');
         $malicious = new UploadInspectionService($maliciousStore, new UploadInspectionTestScanner('malicious'));
         $malwareRejected = false;
+        $malwareAttestation = null;
         try {
             $malicious->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $malwareRejected = $exception->reason === 'MALWARE_DETECTED';
+            $malwareAttestation = $exception->attestation;
         }
         expect($malwareRejected, 'Malicious scanner verdict must be rejected');
+        expect(is_array($malwareAttestation) && $malwareAttestation['verdict'] === 'malicious',
+            'PHP malicious result must expose its validated scanner attestation');
+        expect($malwareAttestation['sha256'] === hash('sha256', $png) && $malwareAttestation['size'] === strlen($png),
+            'PHP malicious attestation must bind the exact scanned bytes');
         expect($maliciousStore->quarantineCount() === 0 && $maliciousStore->approvedCount() === 0,
             'Malicious upload must not remain available in approved storage');
 
         $tamperedStore = new UploadInspectionTestStorage($root . '/tampered');
         $tampered = new UploadInspectionService($tamperedStore, new UploadInspectionTestScanner('clean', true));
         $tamperedRejected = false;
+        $tamperedAttestation = null;
         try {
             $tampered->inspect($source, 'product.png', 'image/png');
         } catch (UploadInspectionException $exception) {
             $tamperedRejected = $exception->reason === 'SCAN_CONTENT_MISMATCH';
+            $tamperedAttestation = $exception->attestation;
         }
         expect($tamperedRejected, 'Scanner digest mismatch must fail closed');
+        expect($tamperedAttestation === null, 'Digest mismatch must not expose trusted scanner attestation');
         expect($tamperedStore->approvedCount() === 0, 'Digest mismatch must never be promoted');
 
         $unavailableStore = new UploadInspectionTestStorage($root . '/unavailable');
