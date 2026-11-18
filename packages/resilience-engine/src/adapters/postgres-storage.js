@@ -1064,6 +1064,15 @@ const A2_SCOPE_KEYS = Object.freeze([
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
 ]);
 
+const A2_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$/;
+
+function a2AssertIdentifier(value, label) {
+  if (typeof value !== "string" || !A2_IDENTIFIER.test(value)) {
+    throw new TypeError(label + " is invalid");
+  }
+  return value;
+}
+
 function a2ExactKeys(value, keys, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(label + " must be a plain data object");
@@ -1146,7 +1155,7 @@ function a2NormalizeScope(input) {
     } else if (key === "assetId") {
       assertAssetId(value, "A2 assetId");
     } else {
-      assertIdentifier(value, "A2 " + key);
+      a2AssertIdentifier(value, "A2 " + key);
     }
     scope[key] = value;
   }
@@ -1169,7 +1178,7 @@ function a2NormalizeEvidenceRefs(input) {
     }
     const item = descriptor.value;
     a2ExactKeys(item, ["refId", "sha256"], "A2 evidence reference");
-    const refId = assertIdentifier(item.refId, "A2 evidence refId");
+    const refId = a2AssertIdentifier(item.refId, "A2 evidence refId");
     if (typeof item.sha256 !== "string" || !SHA256.test(item.sha256) || seen.has(refId)) {
       throw new TypeError("A2 evidence reference digest or identity is invalid");
     }
@@ -1189,14 +1198,14 @@ function a2OperationKey(action, scope, profileId) {
 function a2NormalizeRecord(input, identities) {
   a2ExactKeys(input, A2_RECORD_KEYS, "A2 PostgreSQL recovery record");
   if (input.schema !== A2_RECORD_SCHEMA) throw new TypeError("A2 recovery record schema is invalid");
-  const claimId = assertIdentifier(input.claimId, "A2 claimId");
+  const claimId = a2AssertIdentifier(input.claimId, "A2 claimId");
   const action = input.action;
   if (!A2_ACTIONS.has(action)) throw new TypeError("A2 recovery action is invalid");
   const scope = a2NormalizeScope(input.scope);
-  const profileId = assertIdentifier(input.profileId, "A2 profileId");
-  const providerId = assertIdentifier(input.providerId, "A2 providerId");
-  const verifierId = assertIdentifier(input.verifierId, "A2 verifierId");
-  const recorderId = assertIdentifier(input.recorderId, "A2 recorderId");
+  const profileId = a2AssertIdentifier(input.profileId, "A2 profileId");
+  const providerId = a2AssertIdentifier(input.providerId, "A2 providerId");
+  const verifierId = a2AssertIdentifier(input.verifierId, "A2 verifierId");
+  const recorderId = a2AssertIdentifier(input.recorderId, "A2 recorderId");
   if (providerId !== identities.providerId || verifierId !== identities.verifierId ||
       recorderId !== identities.recorderId ||
       new Set([providerId, verifierId, recorderId]).size !== 3) {
@@ -1211,7 +1220,7 @@ function a2NormalizeRecord(input, identities) {
     throw new TypeError("A2 recovery state is invalid");
   }
   const originalOperationId = input.originalOperationId;
-  if (originalOperationId !== null) assertIdentifier(originalOperationId, "A2 originalOperationId");
+  if (originalOperationId !== null) a2AssertIdentifier(originalOperationId, "A2 originalOperationId");
   if ((action === "release-containment") !== (originalOperationId !== null)) {
     throw new TypeError("A2 original operation binding is invalid");
   }
@@ -1309,9 +1318,9 @@ export function createPostgresA2ActionLedger({
     }
   }
   const identities = Object.freeze({
-    providerId: assertIdentifier(providerId, "A2 providerId"),
-    verifierId: assertIdentifier(verifierId, "A2 verifierId"),
-    recorderId: assertIdentifier(recorderId, "A2 recorderId")
+    providerId: a2AssertIdentifier(providerId, "A2 providerId"),
+    verifierId: a2AssertIdentifier(verifierId, "A2 verifierId"),
+    recorderId: a2AssertIdentifier(recorderId, "A2 recorderId")
   });
   if (new Set(Object.values(identities)).size !== 3) {
     throw new TypeError("A2 provider, verifier and forensic recorder identities must differ");
@@ -1470,7 +1479,7 @@ export function createPostgresA2ActionLedger({
     const action = input.action;
     if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
     const scope = a2NormalizeScope(input.scope);
-    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const profileId = a2AssertIdentifier(input.profileId, "A2 profileId");
     const idempotencyKey = input.idempotencyKey;
     if (typeof idempotencyKey !== "string" ||
         idempotencyKey !== a2OperationKey(action, scope, profileId)) {
@@ -1558,11 +1567,11 @@ export function createPostgresA2ActionLedger({
     const input = a2Input(rawInput, [
       "claimId", "action", "scope", "profileId", "idempotencyKey", "recoveryRecord", "atMs"
     ]);
-    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    const claimId = a2AssertIdentifier(input.claimId, "A2 claimId");
     const action = input.action;
     if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
     const scope = a2NormalizeScope(input.scope);
-    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const profileId = a2AssertIdentifier(input.profileId, "A2 profileId");
     const idempotencyKey = input.idempotencyKey;
     const atMs = assertTimestamp(input.atMs, "A2 provider-start timestamp");
     const record = a2NormalizeRecord(input.recoveryRecord, identities);
@@ -1606,7 +1615,7 @@ export function createPostgresA2ActionLedger({
     const action = input.action;
     if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
     const scope = a2NormalizeScope(input.scope);
-    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const profileId = a2AssertIdentifier(input.profileId, "A2 profileId");
     const idempotencyKey = input.idempotencyKey;
     assertTimestamp(input.atMs, "A2 reconciliation time");
     assertInitialized();
@@ -1635,7 +1644,7 @@ export function createPostgresA2ActionLedger({
 
   async function complete(rawInput = {}) {
     const input = a2Input(rawInput, ["claimId", "outcome", "reason", "completedAtMs"], ["providerReconciliation"]);
-    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    const claimId = a2AssertIdentifier(input.claimId, "A2 claimId");
     const completedAtMs = assertTimestamp(input.completedAtMs, "A2 completedAtMs");
     if (!["succeeded", "not-applied", "held-for-reconciliation"].includes(input.outcome)) {
       throw new TypeError("A2 completion outcome is invalid");
@@ -1758,7 +1767,7 @@ export function createPostgresA2ActionLedger({
 
   async function getPendingByClaimId(rawInput = {}) {
     const input = a2Input(rawInput, ["claimId", "atMs"]);
-    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    const claimId = a2AssertIdentifier(input.claimId, "A2 claimId");
     assertTimestamp(input.atMs, "A2 exact lookup timestamp");
     assertInitialized();
     return runA2Transaction(input.signal, async (client) => {
