@@ -158,3 +158,29 @@ Recommended control: protect main with pull-request-only changes, required CI ch
 Main is a strong development baseline with successful CI, but the engine family is **not yet universally production-certified**. The immediate actionable defect is isolated to the Python upload signature detector and is being corrected on its own branch. Other gaps are documented above and should be closed with explicit contracts, tests and host-specific evidence rather than duplicate code or unsupported certification claims.
 
 No production deployment, production database mutation, policy grant or paid service is part of this audit.
+
+## Validation follow-up — 2026-11-18
+
+### Windows runner finding and fix
+
+The first full PR #127 Engine Certification attempt exposed three failing assertions in the Windows 2022 / Node 22 Malware Engine job. The log showed PowerShell child-process timeouts at 15 seconds in the clipboard handoff test and 20 seconds in the Sysmon provider. The Sysmon integration assertion then received POWERSHELL_FAILED rather than an explicit unavailable-log result. This was an OS-runner timeout, not a failure in the upload inspection path.
+
+PR #129 (branch fix/malware-windows-runner-timeouts-v1) addresses the underlying runner reliability and error semantics:
+- 60-second bounded startup/query timeouts;
+- explicit SYSMON_QUERY_TIMEOUT disposition for ETIMEDOUT, with no telemetry accepted;
+- the Windows Sysmon integration test only accepts explicit SYSMON_NOT_AVAILABLE or SYSMON_QUERY_TIMEOUT outcomes;
+- documentation now accurately describes the existing opt-in Sysmon provider.
+
+PR #129 passed its full Engine Certification matrix (30/30 jobs), Malware Engine Validation, Core Validation, Security QA and NPM package distribution on head 2e16061e2218030c3aeece9b346028ed5a34afc4.
+
+PR #127 is stacked on PR #129's branch so the same Windows fix is inherited rather than copied into the upload-contract changes. It must be revalidated on the new base before either branch is merged.
+
+### PHP and Python distribution follow-up
+
+PR #128 (branch feature/security-guard-runtime-distribution-v1) closes the previously missing Composer/Python artifact-install checks. Its final tested head 4f36ec9792e8b9e733e1a25e3948cd1a0d0e48a8 passed:
+- Composer archive creation and clean consumer installation;
+- Python wheel and sdist build plus separate clean virtual-environment installations;
+- Core Validation, Security QA, Guard multi-runtime, NPM distribution and Engine Certification.
+
+The Composer manifest intentionally has no fixed version field; the CI archive uses a temporary COMPOSER_ROOT_VERSION and consumer-only path-repository version override. No Packagist/PyPI publication occurred.
+
