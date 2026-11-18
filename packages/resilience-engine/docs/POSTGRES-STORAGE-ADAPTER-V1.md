@@ -64,7 +64,7 @@ await actionLedger.initialize();
 // The controller still defaults to disabled and ARC keeps A2 denied.
 ```
 
-Initialization creates only the namespaced `jb_resilience_a2_action_claims` table and its active-asset unique index. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row.
+Initialization creates only the namespaced `jb_resilience_a2_action_claims` table, its active-asset unique index and its partial pending-sequence index. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row. The sequence index covers only `claimed`/`provider-started` rows so permanent idempotency tombstones do not make pending scans degrade into full-history scans.
 
 The A2 journal provides:
 
