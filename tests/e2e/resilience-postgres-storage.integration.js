@@ -150,19 +150,22 @@ async function main() {
     revisionAnchorFirst.read({ ledgerId: "a2-anchor-before-init" }),
     /not initialized/
   );
-  const revisionAnchorInitialization = await Promise.all([
-    revisionAnchorFirst.initialize(),
-    revisionAnchorSecond.initialize()
-  ]);
-  assert.deepEqual(revisionAnchorInitialization.map((value) => ({
-    initialized: value.initialized,
-    dialect: value.dialect,
-    schemaVersion: value.schemaVersion
-  })), [
-    { initialized: true, dialect: "postgresql", schemaVersion: 1 },
-    { initialized: true, dialect: "postgresql", schemaVersion: 1 }
-  ]);
+  const revisionAnchorInitialization = await revisionAnchorFirst.initialize();
+  const revisionAnchorVerification = await revisionAnchorSecond.verify();
+  assert.deepEqual(revisionAnchorInitialization, {
+    initialized: true,
+    dialect: "postgresql",
+    schemaVersion: 1,
+    table: "public.jb_resilience_a2_revision_anchors"
+  });
+  assert.deepEqual(revisionAnchorVerification, {
+    verified: true,
+    dialect: "postgresql",
+    schemaVersion: 1,
+    table: "public.jb_resilience_a2_revision_anchors"
+  });
   assert.equal(revisionAnchorFirst.durable, true);
+  assert.equal(revisionAnchorFirst.atomicCompareAndSwap, true);
 
   await runCase("PostgreSQL A2 external revision anchor uses atomic cross-Pool compare-and-swap", async () => {
     const ledgerId = "a2-anchor-" + randomUUID();
