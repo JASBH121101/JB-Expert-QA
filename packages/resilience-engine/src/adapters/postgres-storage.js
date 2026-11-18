@@ -1407,6 +1407,12 @@ export function createPostgresA2ActionLedger({
 
   async function initialize() {
     await runA2Transaction(undefined, async (client) => {
+      // Serialize first-time DDL and constraint validation across all hosts
+      // sharing the same PostgreSQL primary.
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        ["jb-resilience-a2-schema-v1"]
+      );
       await client.query(
         "CREATE TABLE IF NOT EXISTS jb_resilience_a2_action_claims (" +
         "sequence BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE NOT NULL," +
