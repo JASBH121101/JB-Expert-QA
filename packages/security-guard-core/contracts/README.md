@@ -7,6 +7,7 @@ All v1 contracts use JSON Schema Draft 2020-12.
 - Identity keys are opaque lowercase 64-character HMAC-SHA-256 digests. The keyId identifies the active secret version; the secret itself is never transmitted.
 - additionalProperties: false is intentional: unknown fields fail conformance rather than being silently ignored.
 - HTTP 429 means an enforced quota was exceeded. HTTP 503 means an enforced dependency was unavailable.
+- Upload inspection attestation v1 is scanner evidence bound to one exact quarantined object; it is not a promotion/authorization decision or a cryptographic scanner signature.
 - Runtime adapters may expose richer native objects internally, but must map to these bounded wire shapes at contract boundaries.
 - Contract changes that alter meaning require a new schema version. Do not change v1 to accept raw identities, free-form metadata, or new decision semantics.
 
