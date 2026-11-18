@@ -1254,6 +1254,8 @@ function a2RecordCopy(record) {
 function a2SameAction(entry, action, scope, profileId, idempotencyKey) {
   return entry.action === action && entry.profile_id === profileId &&
     entry.idempotency_key.trim() === idempotencyKey &&
+    entry.asset_id === scope.assetId &&
+    entry.environment === scope.environment &&
     canonicalJson(entry.scope) === canonicalJson(scope);
 }
 
@@ -1290,7 +1292,7 @@ export function createPostgresA2ActionLedger({
   providerId,
   verifierId,
   recorderId,
-  connectionTimeoutMs = 5_000,
+  connectionTimeoutMs = 3_000,
   statementTimeoutMs = 4_000,
   lockTimeoutMs = 1_500,
   idleInTransactionTimeoutMs = 10_000
@@ -1415,7 +1417,9 @@ export function createPostgresA2ActionLedger({
         "recovery_record JSONB NULL," +
         "CHECK ((status='completed' AND outcome IN ('succeeded','not-applied') AND completed_at_ms IS NOT NULL AND recovery_record IS NULL) OR " +
         "(status IN ('claimed','provider-started') AND outcome IS NULL AND completed_at_ms IS NULL))," +
-        "CHECK (status <> 'provider-started' OR recovery_record IS NOT NULL)" +
+        "CHECK (status <> 'provider-started' OR recovery_record IS NOT NULL)," +
+        "CHECK (status <> 'completed' OR outcome IS NOT NULL)," +
+        "CHECK (scope->>'assetId'=asset_id AND scope->>'environment'=environment)" +
         ")"
       );
       await client.query(
