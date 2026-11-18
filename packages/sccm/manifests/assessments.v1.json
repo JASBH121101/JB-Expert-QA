@@ -1574,5 +1574,112 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.screenshot-diff.20261118",
+    "nodeId": "jb.expert-qa.visual.screenshot-diff",
+    "version": "0.8.0",
+    "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T20:56:59Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392712219",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "PNG pixel-diff and viewport baseline tests passed, including missing-baseline, explicit baseline update, comparison and dimension mismatch cases."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392713507",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "PNG pixel-diff and viewport baseline tests passed, including missing-baseline, explicit baseline update, comparison and dimension mismatch cases. Full engine certification matrix also passed on the same exact commit."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.layout-overflow.20261118",
+    "nodeId": "jb.expert-qa.visual.layout-overflow",
+    "version": "0.8.0",
+    "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T20:56:59Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392712219",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Layout-integrity rule and browser integration tests passed for clipped content, ancestor clipping, overflow, overlap and false-positive controls."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392713507",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Layout-integrity rule and browser integration tests passed for clipped content, ancestor clipping, overflow, overlap and false-positive controls. Full engine certification matrix also passed on the same exact commit."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.responsive-matrix.20261118",
+    "nodeId": "jb.expert-qa.visual.responsive-matrix",
+    "version": "0.8.0",
+    "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T20:56:59Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392712219",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Responsive viewport matrix tests passed on mobile and desktop, including mobile-only overflow/overlap detection and viewport input bounds."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392713507",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Responsive viewport matrix tests passed on mobile and desktop, including mobile-only overflow/overlap detection and viewport input bounds. Full engine certification matrix also passed on the same exact commit."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.browser-state.20261118",
+    "nodeId": "jb.expert-qa.visual.browser-state",
+    "version": "0.8.0",
+    "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T20:56:59Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392712219",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Browser interaction exploration and state-specific visual baseline tests passed; destructive and submit actions remain excluded."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392713507",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Browser interaction exploration and state-specific visual baseline tests passed; destructive and submit actions remain excluded. Full engine certification matrix also passed on the same exact commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44392712229",
+        "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8",
+        "outcome": "success",
+        "summary": "Browser interaction exploration and state-specific visual baseline tests passed; destructive and submit actions remain excluded. Full engine certification matrix also passed on the same exact commit."
+      }
+    ],
+    "findings": []
   }
 ]
