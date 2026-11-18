@@ -587,7 +587,7 @@ test("read-only access initializes an empty journal that accepts a later claim",
     assert.deepEqual(await store.listPending({
       cursor: null, limit: 10, atMs: NOW
     }), { claimIds: [], nextCursor: null });
-    assert.match(await readFile(filePath, "utf8"), /jb\\.resilience\\.a2-action-ledger\\/v1/);
+    assert.ok((await readFile(filePath, "utf8")).includes("jb.resilience.a2-action-ledger/v1"));
     assert.match(await readFile(filePath + ".guard", "utf8"), /ledgerSha256/);
     const claim = await store.claim({
       action: "apply-containment-profile",
