@@ -28,6 +28,7 @@ class MemoryStorage:
     def __init__(self, promotion_result=True):
         self.quarantine = {}
         self.approved = {}
+        self.approved_attestations = {}
         self.promotion_result = promotion_result
         self.deleted = []
 
@@ -37,13 +38,21 @@ class MemoryStorage:
     def open_quarantine_stream(self, upload_id):
         return io.BytesIO(self.quarantine[upload_id])
 
-    def promote(self, upload_id, expected_sha256, expected_size):
+    def promote(self, upload_id, expected_sha256, expected_size, attestation):
         data = self.quarantine[upload_id]
         if hashlib.sha256(data).hexdigest() != expected_sha256 or len(data) != expected_size:
             return False
         if self.promotion_result is not True:
             return False
+        if (
+            attestation.get("uploadId") != upload_id
+            or attestation.get("sha256") != expected_sha256
+            or attestation.get("size") != expected_size
+            or attestation.get("verdict") != "clean"
+        ):
+            return False
         self.approved[upload_id] = data
+        self.approved_attestations[upload_id] = dict(attestation)
         del self.quarantine[upload_id]
         return True
 
@@ -99,6 +108,7 @@ class UploadInspectionTests(unittest.TestCase):
         self.assertGreaterEqual(attestation["scannedAtMs"], 0)
         self.assertRegex(result["scannedAt"], r"^\d{4}-\d{2}-\d{2}T.*Z$")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
+        self.assertEqual(storage.approved_attestations[result["uploadId"]], attestation)
         self.assertEqual(storage.quarantine, {})
 
     def test_extension_and_declared_mime_mismatches_are_rejected(self):
@@ -169,7 +179,7 @@ class UploadInspectionTests(unittest.TestCase):
 
     def test_uncertain_promotion_exception_retains_quarantine(self):
         class UncertainStorage(MemoryStorage):
-            def promote(self, upload_id, expected_sha256, expected_size):
+            def promote(self, upload_id, expected_sha256, expected_size, attestation):
                 raise RuntimeError("promotion response lost")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "upload"
