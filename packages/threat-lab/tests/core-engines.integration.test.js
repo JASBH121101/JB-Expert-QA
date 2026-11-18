@@ -333,7 +333,7 @@ test("JB Threat Lab exercises Malware Engine, Security Guard and Expert QA again
           const expectedCode = malicious ? "MALWARE_DETECTED" : "SCAN_NOT_CLEAN";
           const passed = actualCode === expectedCode
             && store.approved.size === 0
-            && (malicious ? store.quarantine.size === 0 : store.quarantine.size === 1);
+            && store.quarantine.size === 1;
           return outcome(passed ? "pass" : "fail",
             malicious
               ? "Malicious test marker was blocked and never promoted"

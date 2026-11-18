@@ -564,7 +564,7 @@ test("upload Core v1 distinguishes malware rejection from a quarantined unknown 
   assert.equal(maliciousEvents.length, 1);
   assert.equal(maliciousEvents[0].ruleId, "JBG-MALWARE-001");
   assert.equal(maliciousEvents[0].severity, "critical");
-  assert.equal(maliciousEvents[0].action, "rejected");
+  assert.equal(maliciousEvents[0].action, "quarantined");
   assert.equal(maliciousEvents[0].outcome, "denied");
 
   const unknownStore = createMemoryStore();
@@ -648,8 +648,9 @@ test("a stalled security bridge cannot delay local rejection of a malicious uplo
   );
 
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
-  assert.ok(store.calls.some(([name]) => name === "delete"));
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
 });
 
 

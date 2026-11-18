@@ -134,7 +134,7 @@
       "verdict": "malicious",
       "consume": "all",
       "expected": {
-        "disposition": "rejected",
+        "disposition": "quarantined",
         "errorReason": "MALWARE_DETECTED"
       }
     }
