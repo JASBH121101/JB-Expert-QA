@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -151,7 +152,7 @@ class UploadInspectionTests(unittest.TestCase):
                 self.assertEqual(storage.approved, {})
                 self.assertEqual(bool(storage.quarantine), retain)
                 if reason == "MALWARE_DETECTED":
-                    self.assertEqual(storage.deleted, [next(iter(storage.deleted))])
+                    self.assertEqual(len(storage.deleted), 1)
                     self.assertEqual(storage.quarantine, {})
 
     def test_promotion_failure_never_returns_approved(self):
@@ -218,7 +219,7 @@ class UploadInspectionTests(unittest.TestCase):
             / "upload-inspection"
             / "conformance-vectors.v1.json"
         )
-        vectors = __import__("json").loads(vectors_path.read_text(encoding="utf-8"))
+        vectors = json.loads(vectors_path.read_text(encoding="utf-8"))
 
         for vector in vectors["fileCases"]:
             with self.subTest(vector=vector["id"]), tempfile.TemporaryDirectory() as directory:
