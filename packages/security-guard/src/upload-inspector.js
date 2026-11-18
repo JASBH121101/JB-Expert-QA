@@ -6,6 +6,7 @@ import {
   normalizeSecurityEventCoreContract,
   safelyEmitSecurityEventCore
 } from "./security-event-core-v1.js";
+import { validateUploadInspectionAttestationV1 } from "./core-contract-v1.js";
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SCANNER_TIMEOUT_MS = 15_000;
@@ -272,10 +273,10 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
   });
 }
 
-function validScannerLabel(value) {
+function validScannerLabel(value, maximumLength = 128) {
   return typeof value === "string" &&
     value.length >= 1 &&
-    value.length <= 80 &&
+    value.length <= maximumLength &&
     /^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/.test(value);
 }
 
@@ -636,10 +637,23 @@ export function createUploadInspector(options = {}) {
         }
         throw new UploadInspectionError("SCAN_NOT_CLEAN");
       }
-      if (!validScannerLabel(scanResult.engine) || !validScannerLabel(scanResult.version)) {
+      if (!validScannerLabel(scanResult.engine, 128) || !validScannerLabel(scanResult.version, 64)) {
         retainQuarantine = true;
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
       }
+
+      const scannedAtMs = Date.now();
+      const attestation = validateUploadInspectionAttestationV1({
+        schema: "jb.security.upload-inspection.attestation/v1",
+        uploadId,
+        verdict: scanResult.verdict,
+        sha256,
+        size: inspector.size,
+        mimeType: detectedMimeType,
+        engine: scanResult.engine,
+        version: scanResult.version,
+        scannedAtMs
+      });
 
       if (securityBridge) {
         let decision;
@@ -671,7 +685,8 @@ export function createUploadInspector(options = {}) {
           engine: scanResult.engine,
           version: scanResult.version
         }),
-        scannedAt: new Date().toISOString()
+        scannedAt: new Date(scannedAtMs).toISOString(),
+        attestation
       });
 
       let promotion;
