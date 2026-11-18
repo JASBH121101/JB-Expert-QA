@@ -381,3 +381,18 @@ test("Language QA catalog bridge rejects symbols, prototype keys and excessive n
     en: { nested: { title: "Hello" } }
   }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /nested plain object/);
 });
+
+test("complete CLDR plural catalogs pass structural audit without becoming human-approved", () => {
+  const result = auditTranslationCatalogs({
+    "es-419": {
+      items: { one: "{count} artículo", other: "{count} artículos" }
+    },
+    en: {
+      items: { one: "{count} item", other: "{count} items" }
+    }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoApproved, false);
+});
