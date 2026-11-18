@@ -16,7 +16,7 @@ interface UploadQuarantineStorage
      * Atomically verify the quarantined object's digest and size, then promote
      * that exact immutable object to a private approved namespace.
      */
-    public function promote(string $uploadId, string $expectedSha256, int $expectedSize): bool;
+    public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool;
 
     /** Idempotently delete an uncommitted object by opaque server-generated ID. */
     public function delete(string $uploadId): void;
