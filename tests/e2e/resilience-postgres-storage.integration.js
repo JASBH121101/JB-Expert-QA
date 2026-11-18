@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import {
@@ -7,6 +10,7 @@ import {
   createPostgresA2ActionLedger,
   createPostgresA2RevisionAnchor
 } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
+import { createFileA2ActionLedger } from "../../packages/resilience-engine/src/a2-action-ledger.js";
 import {
   createTrustedSignalGateway,
   signTrustedSignalEnvelope
@@ -252,6 +256,61 @@ async function main() {
     );
   });
 
+
+  await runCase("PostgreSQL external revision anchor is enforced by the local HMAC file ledger", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jb-a2-postgres-anchor-"));
+    const ledgerId = "a2-file-anchor-" + randomUUID();
+    try {
+      const fileLedger = createFileA2ActionLedger({
+        filePath: join(directory, "a2-actions.json"),
+        providerId: "file-anchor-provider",
+        verifierId: "file-anchor-verifier",
+        recorderId: "file-anchor-recorder",
+        integrityKeys: { "ci-key-1": "a".repeat(64) },
+        activeIntegrityKeyId: "ci-key-1",
+        revisionAnchor: revisionAnchorFirst,
+        ledgerId
+      });
+      assert.equal(fileLedger.externalRevisionAnchorConfigured, true);
+      const emptyPage = await fileLedger.listPending({
+        cursor: null,
+        limit: 10,
+        atMs: 1_800_000_500_000
+      });
+      assert.deepEqual(emptyPage, { claimIds: [], nextCursor: null });
+
+      const initialAnchor = await revisionAnchorSecond.read({ ledgerId });
+      assert.equal(initialAnchor.schema, "jb.resilience.a2-revision-anchor/v1");
+      assert.equal(initialAnchor.revision, 0);
+
+      const action = "apply-containment-profile";
+      const scope = a2Scope("pg-anchor-file-host", "pg-anchor-file-incident");
+      const profileId = "profile-anchor-lab";
+      const claim = await fileLedger.claim({
+        action,
+        scope,
+        profileId,
+        idempotencyKey: a2Key(action, scope, profileId),
+        claimedAtMs: 1_800_000_500_001,
+        expiresAtMs: 1_800_000_530_001
+      });
+      assert.equal(claim.claimed, true);
+
+      const advancedAnchor = await revisionAnchorSecond.read({ ledgerId });
+      assert.equal(advancedAnchor.revision, 1,
+        "a committed file-ledger mutation must advance the external PostgreSQL anchor");
+      assert.notEqual(advancedAnchor.ledgerSha256, initialAnchor.ledgerSha256,
+        "the external anchor digest must bind the changed HMAC-protected ledger");
+      const pending = await revisionAnchorFirst.read({ ledgerId });
+      assert.deepEqual(pending, advancedAnchor);
+    } finally {
+      await pool.query(
+        "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
+        [ledgerId]
+      );
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 
   await runCase("PostgreSQL A2 Pool connection wait timeout releases a late client", async () => {
     let lateClientReleased = 0;
