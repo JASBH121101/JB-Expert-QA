@@ -2867,5 +2867,130 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.20261118.package",
+    "nodeId": "jb.expert-qa.package",
+    "version": "0.8.0",
+    "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:31:01Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177627561",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177628029",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.distribution.20261118.package",
+    "nodeId": "jb.expert-qa.package.distribution",
+    "version": "0.8.0",
+    "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:31:02Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177627561",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177628029",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.consumer-install.20261118.package",
+    "nodeId": "jb.expert-qa.package.consumer-install",
+    "version": "0.8.0",
+    "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:31:03Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177627561",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177628029",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.exports.20261118.package",
+    "nodeId": "jb.expert-qa.package.exports",
+    "version": "0.8.0",
+    "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:31:04Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177627561",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177628029",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 24."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.boundaries.20261118.package",
+    "nodeId": "jb.expert-qa.package.boundaries",
+    "version": "0.8.0",
+    "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:31:05Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177627561",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410659430/job/135177628029",
+        "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97",
+        "outcome": "success",
+        "summary": "All seven JB engine package tarballs were packed, installed in isolated clean-consumer directories and smoke-tested on Node.js 24."
+      }
+    ],
+    "findings": []
   }
 ]
