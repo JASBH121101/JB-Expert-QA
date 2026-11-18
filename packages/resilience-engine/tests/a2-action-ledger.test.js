@@ -579,6 +579,28 @@ test("file ledger refuses symbolic-link journal paths without reading their targ
   });
 });
 
+
+test("read-only access initializes an empty journal that accepts a later claim", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const store = createStore(filePath);
+    assert.deepEqual(await store.listPending({
+      cursor: null, limit: 10, atMs: NOW
+    }), { claimIds: [], nextCursor: null });
+    assert.match(await readFile(filePath, "utf8"), /jb\\.resilience\\.a2-action-ledger\\/v1/);
+    assert.match(await readFile(filePath + ".guard", "utf8"), /ledgerSha256/);
+    const claim = await store.claim({
+      action: "apply-containment-profile",
+      scope: SCOPE,
+      profileId: PROFILE_ID,
+      idempotencyKey: makeIdempotencyKey(),
+      claimedAtMs: NOW + 1,
+      expiresAtMs: NOW + 10_000
+    });
+    assert.equal(claim.claimed, true);
+  });
+});
+
 test("file ledger detects loss, rollback, same-revision tampering and guard deletion", async () => {
   await withTempDirectory(async (directory) => {
     const filePath = join(directory, "a2-actions.json");
