@@ -1,7 +1,7 @@
 # JB Security Guard — Upload Inspection Contract v1
 
 **Status:** versioned laboratory contract  
-**Contract IDs:** jb.security.upload-scan-request/v1 and jb.security.upload-scan-result/v1  
+**Contract IDs:** jb.security.upload-scan-request/v1, jb.security.upload-scan-result/v1 and jb.security.upload-inspection.attestation/v1  
 **Runtime targets:** Node.js, PHP 8.2+, Python 3.11+  
 **Scope:** scanner handoff and the exact-byte / verdict binding at the quarantine boundary
 
@@ -59,9 +59,33 @@ The contract is language-neutral; runtimes keep their native APIs:
 - **PHP:** UploadInspectionService passes a readable quarantine resource plus metadata including uploadId, size, sha256 and detectedMimeType. The scanner must consume the stream sequentially; the service fails closed unless its read position equals the exact expected size.
 - **Python:** UploadInspectionService passes a read-only digest-tracking stream plus the same metadata. The wrapper counts and hashes the bytes actually delivered to the scanner, disallows seeking and verifies exact EOF before accepting the scanner's own digest/size result.
 
-The native scanner response shapes remain backward-compatible (engine/version in all current adapters; digest/size are independently supplied and verified according to each runtime). Adapters normalize these native results into the schema above at the boundary.
+The native scanner response shapes remain runtime-specific (engine/version in all current adapters; digest/size are independently supplied and verified according to each runtime). Adapters validate those native results and construct the language-neutral handoff/result envelope at the boundary.
 
-## 6. Shared conformance vectors
+## 6. Upload inspection attestation
+
+Schema: contracts/upload-inspection/v1/attestation.schema.json
+
+After and only after a runtime has observed complete sequential scanner consumption, verified the exact ingested byte count and SHA-256, and received an explicit `clean` result, it constructs a normalized attestation with:
+
+- `schema`: exact value `jb.security.upload-inspection.attestation/v1`.
+- `uploadId`: the exact server-generated ID used for quarantine and scanner handoff.
+- `verdict`: `clean`, `malicious` or `unknown`; native values such as `no_match`, `suspicious` or `not_scanned` are not interchangeable with `clean`.
+- `sha256`, `size` and `mimeType`: the exact digest, byte count and content-detected MIME of the inspected object.
+- `engine` and `version`: bounded scanner identity/version labels.
+- `scannedAtMs`: scan completion timestamp in Unix epoch milliseconds.
+
+The attestation is scanner evidence, not a promotion decision and not a cryptographic scanner signature. It excludes filenames, local paths, file bytes, credentials, arbitrary metadata and raw customer identity. A clean verdict never authorizes publication by itself.
+
+The actual upload pipeline returns this attestation for audit linkage. Storage promotion must bind it to the exact object in the same atomic commit:
+- Node.js passes it in `metadata.attestation` to `store.promote(...)`.
+- PHP requires it as the fourth argument to `UploadQuarantineStorage::promote(...)`.
+- Python requires it as the fourth argument to `UploadQuarantineStorage.promote(...)`.
+
+The host storage adapter must independently verify the upload ID, digest, size and clean verdict against the private quarantined bytes, then persist the attestation with the approved object in the same atomic transition. It must not store the object and attestation in separate, independently committed transactions. An adapter that cannot atomically commit both must not treat the object as approved.
+
+The attestation schema and clean/malicious/unknown fixtures establish normalized contract conformance only. They do not sign scanner output, prove scanner identity cryptographically, validate the actual production scanner, or certify host storage. Production deployments still require authenticated/versioned scanner adapters, protected key/credential management, private quarantine and approved namespaces, atomic promotion, authorized serving, image decode/re-encode, retention/cleanup and fault-injection tests.
+
+## 7. Shared conformance vectors
 
 tests/fixtures/upload-inspection/conformance-vectors.v1.json is the shared offline corpus for all three runtimes. It contains synthetic magic-byte prefixes, valid and invalid filename/MIME combinations, clean/malicious/unknown verdicts, and a scanner that returns without consuming the stream.
 
@@ -75,7 +99,7 @@ Each runtime test must consume the same vector file and prove:
 5. malicious results are rejected and staging data is removed;
 6. unknown and incomplete results remain private and are never promoted.
 
-## 7. Host deployment requirements
+## 8. Host deployment requirements
 
 - The multipart parser must enforce its own limits before handing a file stream to Guard.
 - Quarantine and approved namespaces must both be private.
