@@ -289,6 +289,8 @@ async function main() {
         ledgerId
       });
       assert.equal(fileLedger.externalRevisionAnchorConfigured, true);
+      assert.equal(fileLedger.externalRevisionAnchorDurable, true);
+      assert.equal(fileLedger.externalRevisionAnchorAtomic, true);
       const emptyPage = await fileLedger.listPending({
         cursor: null,
         limit: 10,
