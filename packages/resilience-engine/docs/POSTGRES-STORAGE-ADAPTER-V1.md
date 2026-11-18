@@ -92,12 +92,21 @@ the file ledger's `revisionAnchor` contract with a separate table,
 - SQL `UPDATE ... WHERE ledger_id AND state_schema AND revision AND
   ledger_sha256` is the atomic compare-and-swap. A competing or stale writer
   returns `false`; it never silently overwrites the newer anchor.
-- The initializer serializes DDL, checks the exact column layout and validates
-  the named primary-key and integrity constraints. A malformed/incompatible
-  pre-existing table fails closed.
+- The owner-run `initialize()` serializes DDL, checks the exact column layout
+  and validates the named primary-key, integrity constraints and monotonic
+  tombstone trigger. A malformed/incompatible pre-existing table fails closed.
+  The trigger allows only revision-zero inserts, updates that advance exactly
+  one revision without changing the ledger identity/schema, and no deletes.
+  Anchor rows are permanent tombstones; do not prune them.
 - Pool acquisition and transaction work are bounded with connection,
   statement, lock and idle-transaction timeouts. The late Pool-client path
   releases a client that arrives after the bounded acquisition has expired.
+- `verify()` performs a read-only check of the already-provisioned table,
+  constraints and trigger. Run `initialize()` only with a controlled migration
+  role; the runtime Pool can use `verify()` with a restricted database role.
+  Grant runtime only `SELECT`, `INSERT` and `UPDATE` on this table, with no
+  `DELETE`, table ownership or schema/function DDL privileges. The trigger is
+  defense in depth, not a substitute for separate database roles.
 
 Example composition with a local HMAC-protected file ledger:
 
@@ -115,8 +124,17 @@ const anchorPool = new pg.Pool({
   max: 4,
   connectionTimeoutMillis: 3_000
 });
-const revisionAnchor = createPostgresA2RevisionAnchor({ pool: anchorPool });
-await revisionAnchor.initialize();
+const migrationAnchor = createPostgresA2RevisionAnchor({ pool: anchorPool });
+await migrationAnchor.initialize();
+
+// The long-running service should use a separate Pool with its restricted role.
+const runtimeAnchorPool = new pg.Pool({
+  connectionString: process.env.JB_A2_REVISION_ANCHOR_RUNTIME_DATABASE_URL,
+  max: 4,
+  connectionTimeoutMillis: 3_000
+});
+const revisionAnchor = createPostgresA2RevisionAnchor({ pool: runtimeAnchorPool });
+await revisionAnchor.verify();
 
 const activeKeyId = process.env.JB_A2_LEDGER_KEY_ID;
 const actionLedger = createFileA2ActionLedger({
@@ -146,8 +164,11 @@ only a concurrency test, not proof of a separate trust/failure domain.
 
 The CI integration deliberately uses two Pools against one disposable
 PostgreSQL 16 primary. It proves transactionally atomic single-primary CAS
-(one concurrent writer wins), stale-write rejection, monotonic revision
-advance and integration with the local HMAC file ledger. It does **not**
+(one concurrent writer wins), stale-write rejection, protection against
+direct revision rollback/deletion, monotonic revision advance and integration
+with the local HMAC file ledger. The test Pools have schema-owner permissions;
+the restricted runtime-role permission matrix is an explicit host deployment
+responsibility. It does **not**
 certify split-brain handling, backup/restore independence, regional failover,
 or production availability. A production host must separately test those
 operational properties before treating the external anchor as a trusted
