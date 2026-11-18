@@ -13,8 +13,11 @@ interface UploadQuarantineStorage
     public function openQuarantineStream(string $uploadId): mixed;
 
     /**
-     * Atomically verify the quarantined object's digest and size, then promote
-     * that exact immutable object to a private approved namespace.
+     * Atomically verify the quarantined object's digest and size, validate that
+     * the attestation binds this exact clean object, then promote the bytes and
+     * persist the attestation together in a private approved namespace.
+     *
+     * The adapter must not commit the object separately from the attestation.
      */
     public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool;
 
