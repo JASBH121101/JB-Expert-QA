@@ -19,6 +19,8 @@ const SCOPE = Object.freeze({
 const PROVIDER_ID = "provider-lab-01";
 const VERIFIER_ID = "verifier-lab-01";
 const RECORDER_ID = "recorder-lab-01";
+const TEST_INTEGRITY_KEY_ID = "test-a2-key-v1";
+const TEST_INTEGRITY_KEY_HEX = "ab".repeat(32);
 const PROFILE_ID = "approved-profile-01";
 const CONTENT = "A2 durable ledger test evidence";
 const EVIDENCE_REFS = [{
@@ -97,6 +99,8 @@ function createStore(filePath, overrides = {}) {
     providerId: PROVIDER_ID,
     verifierId: VERIFIER_ID,
     recorderId: RECORDER_ID,
+    integrityKeys: { [TEST_INTEGRITY_KEY_ID]: TEST_INTEGRITY_KEY_HEX },
+    activeIntegrityKeyId: TEST_INTEGRITY_KEY_ID,
     ...overrides
   });
 }
@@ -252,7 +256,9 @@ test("separate OS processes serialize the same A2 idempotency claim", async () =
     const env = {
       JB_A2_LEDGER_MODULE: new URL("../src/a2-action-ledger.js", import.meta.url).href,
       JB_A2_LEDGER_CONFIG: JSON.stringify({
-        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID
+        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID,
+        integrityKeys: { [TEST_INTEGRITY_KEY_ID]: TEST_INTEGRITY_KEY_HEX },
+        activeIntegrityKeyId: TEST_INTEGRITY_KEY_ID
       }),
       JB_A2_CLAIM: JSON.stringify(input)
     };
@@ -315,7 +321,9 @@ test("A2 provider-start record survives process exit and a fresh store instance"
     const child = await runChild(source, {
       JB_A2_LEDGER_MODULE: new URL("../src/a2-action-ledger.js", import.meta.url).href,
       JB_A2_LEDGER_CONFIG: JSON.stringify({
-        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID
+        filePath, providerId: PROVIDER_ID, verifierId: VERIFIER_ID, recorderId: RECORDER_ID,
+        integrityKeys: { [TEST_INTEGRITY_KEY_ID]: TEST_INTEGRITY_KEY_HEX },
+        activeIntegrityKeyId: TEST_INTEGRITY_KEY_ID
       }),
       JB_A2_RESTART_INPUT: JSON.stringify({ claim, record })
     });
@@ -644,7 +652,7 @@ test("file ledger detects loss, rollback, same-revision tampering and guard dele
     await unlink(filePath);
     await assert.rejects(
       store.listPending({ cursor: null, limit: 10, atMs: NOW + 6 }),
-      /missing while its durability guard exists/
+      /missing while its cryptographic guard exists/
     );
 
     await writeFile(filePath, latestLedger, "utf8");
@@ -666,7 +674,79 @@ test("file ledger detects loss, rollback, same-revision tampering and guard dele
     await unlink(guardPath);
     await assert.rejects(
       store.listPending({ cursor: null, limit: 10, atMs: NOW + 9 }),
-      /durability guard is missing/
+      /cryptographic guard is missing/
+    );
+  });
+});
+
+
+
+test("file A2 ledger authenticates its guard with HMAC and rejects tampering or an unavailable key", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const store = createStore(filePath);
+    await claimAndCreateRecord(store);
+    const guardPath = filePath + ".guard";
+    const guard = JSON.parse(await readFile(guardPath, "utf8"));
+    assert.equal(guard.schema, "jb.resilience.a2-action-ledger-guard/v2");
+    assert.equal(guard.keyId, TEST_INTEGRITY_KEY_ID);
+    assert.match(guard.hmacSha256, /^[a-f0-9]{64}$/);
+
+    guard.revision += 1;
+    await writeFile(guardPath, JSON.stringify(guard) + "\n", "utf8");
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 3 }),
+      /HMAC authentication failed/
+    );
+  });
+
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const original = createStore(filePath);
+    await claimAndCreateRecord(original);
+    const wrongKeyStore = createStore(filePath, {
+      integrityKeys: { "attacker-key": "cd".repeat(32) },
+      activeIntegrityKeyId: "attacker-key"
+    });
+    await assert.rejects(
+      wrongKeyStore.listPending({ cursor: null, limit: 10, atMs: NOW + 3 }),
+      /HMAC authentication failed/
+    );
+  });
+});
+
+test("A2 guard key rotation verifies the previous key and re-signs with the active key", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const oldKeyId = "a2-test-old";
+    const newKeyId = "a2-test-new";
+    const oldKey = "11".repeat(32);
+    const newKey = "22".repeat(32);
+    const oldStore = createStore(filePath, {
+      integrityKeys: { [oldKeyId]: oldKey },
+      activeIntegrityKeyId: oldKeyId
+    });
+    const claim = await claimAndCreateRecord(oldStore);
+    const guardPath = filePath + ".guard";
+    assert.equal(JSON.parse(await readFile(guardPath, "utf8")).keyId, oldKeyId);
+
+    const rotatingStore = createStore(filePath, {
+      integrityKeys: { [oldKeyId]: oldKey, [newKeyId]: newKey },
+      activeIntegrityKeyId: newKeyId
+    });
+    const page = await rotatingStore.listPending({ cursor: null, limit: 10, atMs: NOW + 2 });
+    assert.deepEqual(page.claimIds, [claim.claimId]);
+    const rotatedGuard = JSON.parse(await readFile(guardPath, "utf8"));
+    assert.equal(rotatedGuard.keyId, newKeyId);
+    assert.match(rotatedGuard.hmacSha256, /^[a-f0-9]{64}$/);
+
+    const newOnlyStore = createStore(filePath, {
+      integrityKeys: { [newKeyId]: newKey },
+      activeIntegrityKeyId: newKeyId
+    });
+    assert.deepEqual(
+      await newOnlyStore.listPending({ cursor: null, limit: 10, atMs: NOW + 2 }),
+      { claimIds: [claim.claimId], nextCursor: null }
     );
   });
 });
