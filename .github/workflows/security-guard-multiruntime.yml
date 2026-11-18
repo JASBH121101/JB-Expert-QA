@@ -81,10 +81,11 @@ jobs:
           composer --version
           php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2 or newer is required.\n"); exit(1); }'
       - name: Validate Composer manifest and create distribution archive
+        working-directory: packages/security-guard-php
         run: |
-          composer validate --no-check-publish packages/security-guard-php/composer.json
+          composer validate --no-check-publish composer.json
           mkdir -p "$RUNNER_TEMP/composer-artifacts"
-          composer archive --dir=packages/security-guard-php --format=zip --file="$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
+          composer archive --format=zip --file="$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
           test -s "$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
       - name: Install archive into a clean consumer
         run: |
