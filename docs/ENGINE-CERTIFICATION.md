@@ -22,7 +22,7 @@ The `JB Engines Certification` GitHub Actions workflow runs:
 - A bounded Malware Engine performance benchmark using generated benign fixtures.
 - Resilience Engine policy, health-monitor and Linux/Windows adapter tests on Ubuntu and Windows, Node.js 22 and 24.
 - Clean package-distribution checks for all five independently installable packages on Node.js 22 and 24 (including the separately versioned Advisor package).
-- A unified Threat Lab v1 certification report that consolidates the original safe integration reports for the four JB engines and the two separate NEXORA targets, validates target/version uniqueness, exposes missing engines or tiers, and preserves skips/failures instead of treating them as passes. One report plus its source reports is retained per OS/Node matrix lane.
+- A unified Threat Lab v1 certification report that consolidates the original safe integration reports for the four JB engines, validates target/version uniqueness, exposes missing engines or tiers, and preserves skips/failures instead of treating them as passes. NEXORA Catalog and Site Engine remain separate product targets in their dedicated workflow because their repositories are not mounted in the monorepo runner. One report plus its source reports is retained per OS/Node matrix lane.
 
 All test payloads are synthetic or inert. Malware plumbing uses the harmless EICAR test string and generated fixtures; no suspicious executable is run. Security tests target local test handlers and in-memory fixtures, not public websites or production systems.
 
