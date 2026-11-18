@@ -251,12 +251,12 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
       else if (typeof chunk === "string") bytes = Buffer.from(chunk, encoding);
       else if (chunk instanceof Uint8Array) bytes = Buffer.from(chunk);
       else {
-        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
+        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
         return;
       }
 
       if (size + bytes.length > expectedSize) {
-        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
         return;
       }
 
@@ -267,7 +267,7 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
     flush(callback) {
       const actualSha256 = hash.digest("hex");
       if (size !== expectedSize || actualSha256 !== expectedSha256) {
-        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
         return;
       }
       callback();
