@@ -151,7 +151,9 @@ final class UploadInspectionReadOnlyStream
     public function stream_set_option(int $option, int $arg1, int $arg2): bool
     {
         if ($option === STREAM_OPTION_READ_BUFFER) {
-            return $arg1 === STREAM_BUFFER_NONE && $arg2 === 0;
+            // The wrapper is sequential-only; acknowledge the caller's explicit
+            // request to disable PHP's user-space read-ahead buffer.
+            return true;
         }
 
         return false;
