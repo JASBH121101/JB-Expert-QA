@@ -106,7 +106,7 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         private readonly bool $tamperDigest = false,
         private readonly bool $unavailable = false,
         private readonly bool $consume = true,
-        private readonly bool $seekToEnd = false,
+        private readonly bool $returnWithoutReading = false,
         private readonly int $consumeBytes = 0,
         private readonly bool $reportExpectedDigest = false
     ) {
@@ -117,7 +117,7 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         if ($this->unavailable) {
             throw new RuntimeException('Synthetic scanner outage');
         }
-        if ($this->seekToEnd) {
+        if ($this->returnWithoutReading) {
             // The reader exposes no seek operation; return without reading to
             // prove that a scanner cannot fabricate complete consumption.
             return [
@@ -336,7 +336,7 @@ function runUploadInspectionServiceTests(): void
         } catch (UploadInspectionException $exception) {
             $seekRejected = $exception->reason === 'SCAN_INCOMPLETE';
         }
-        expect($seekRejected, 'A scanner must not satisfy complete-consumption checks by seeking to EOF');
+        expect($seekRejected, 'A scanner that returns without reading must not satisfy complete-consumption checks');
         expect($seekStore->quarantineCount() === 1 && $seekStore->approvedCount() === 0,
             'A seek-only scan must remain private in quarantine');
 
