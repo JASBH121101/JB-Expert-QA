@@ -7,9 +7,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import {
   createPostgresResilienceStorageAdapter,
-  createPostgresA2ActionLedger,
-  createPostgresA2RevisionAnchor
+  createPostgresA2ActionLedger
 } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
+import {
+  createPostgresA2RevisionAnchor
+} from "../../packages/resilience-engine/src/adapters/postgres-a2-revision-anchor.js";
 import { createFileA2ActionLedger } from "../../packages/resilience-engine/src/a2-action-ledger.js";
 import {
   createTrustedSignalGateway,
