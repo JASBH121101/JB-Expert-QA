@@ -213,7 +213,7 @@ test("visual QA module passes while uncertified sibling components keep Expert Q
   assert.equal(visual.ownStatus, "PASS");
   assert.equal(visual.status, "PASS");
   assert.equal(visualBranch.status, "PENDING");
-  assert.ok(visual.blockingChildren.length > 0);
+  assert.equal(visual.blockingChildren.length, 0);
   assert.equal(expert.ownStatus, "PASS");
   assert.equal(expert.status, "PENDING");
   assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
