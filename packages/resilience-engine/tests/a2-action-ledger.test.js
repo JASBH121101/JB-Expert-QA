@@ -93,6 +93,22 @@ function runChild(source, env) {
   });
 }
 
+function createMemoryRevisionAnchor() {
+  const states = new Map();
+  return Object.freeze({
+    async read({ ledgerId }) {
+      const value = states.get(ledgerId);
+      return value ? { ...value } : null;
+    },
+    async compareAndSwap({ ledgerId, expected, next }) {
+      const current = states.has(ledgerId) ? states.get(ledgerId) : null;
+      if (canonical(current) !== canonical(expected)) return false;
+      states.set(ledgerId, { ...next });
+      return true;
+    }
+  });
+}
+
 function createStore(filePath, overrides = {}) {
   return createFileA2ActionLedger({
     filePath,
@@ -747,6 +763,76 @@ test("A2 guard key rotation verifies the previous key and re-signs with the acti
     assert.deepEqual(
       await newOnlyStore.listPending({ cursor: null, limit: 10, atMs: NOW + 2 }),
       { claimIds: [claim.claimId], nextCursor: null }
+    );
+  });
+});
+
+
+test("external monotonic revision anchor rejects coordinated restoration of an older journal and HMAC guard", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const anchor = createMemoryRevisionAnchor();
+    const options = {
+      revisionAnchor: anchor,
+      ledgerId: "a2-lab-ledger-01"
+    };
+    const store = createStore(filePath, options);
+
+    // Establish the external anchor for the empty journal and preserve a
+    // cryptographically valid old pair of local files.
+    await store.listPending({ cursor: null, limit: 10, atMs: NOW });
+    const earlierLedger = await readFile(filePath, "utf8");
+    const earlierGuard = await readFile(filePath + ".guard", "utf8");
+
+    const claim = await claimAndCreateRecord(store);
+    const committed = await store.getPendingByClaimId({
+      claimId: claim.claimId,
+      atMs: NOW + 2
+    });
+    assert.equal(committed.found, true);
+
+    // Both local files are restored together, so their HMAC is still valid.
+    // The independently stored monotonic anchor must reject this paired replay.
+    await writeFile(filePath, earlierLedger, "utf8");
+    await writeFile(filePath + ".guard", earlierGuard, "utf8");
+    const restarted = createStore(filePath, options);
+    await assert.rejects(
+      restarted.listPending({ cursor: null, limit: 10, atMs: NOW + 3 }),
+      /external monotonic revision anchor does not match/
+    );
+  });
+});
+
+test("external revision-anchor CAS failure holds the journal after local commit", async () => {
+  await withTempDirectory(async (directory) => {
+    const filePath = join(directory, "a2-actions.json");
+    const backing = createMemoryRevisionAnchor();
+    const refusingAnchor = Object.freeze({
+      read: (input) => backing.read(input),
+      compareAndSwap: (input) => input.next.revision === 0
+        ? backing.compareAndSwap(input)
+        : Promise.resolve(false)
+    });
+    const store = createStore(filePath, {
+      revisionAnchor: refusingAnchor,
+      ledgerId: "a2-cas-failure-ledger"
+    });
+    await store.listPending({ cursor: null, limit: 10, atMs: NOW });
+
+    await assert.rejects(
+      store.claim({
+        action: "apply-containment-profile",
+        scope: SCOPE,
+        profileId: PROFILE_ID,
+        idempotencyKey: makeIdempotencyKey(),
+        claimedAtMs: NOW + 1,
+        expiresAtMs: NOW + 10_000
+      }),
+      /compare-and-swap failed after local journal commit/
+    );
+    await assert.rejects(
+      store.listPending({ cursor: null, limit: 10, atMs: NOW + 2 }),
+      /external monotonic revision anchor does not match/
     );
   });
 });
