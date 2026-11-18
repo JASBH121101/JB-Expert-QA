@@ -184,3 +184,34 @@ test("money operations reject forged non-canonical currency identifiers", async 
     clock: () => NOW
   }), /canonical uppercase ISO code/);
 });
+
+test("ISO registry boundaries reject malformed metadata and prototype-sensitive records", () => {
+  assert.throws(() => createCurrencyRegistry({
+    BAD: { code: "BAD", name: "Bad precision", minorUnit: 5 }
+  }), /metadata is invalid/);
+  assert.throws(() => createCurrencyRegistry({
+    USD: { code: "USD", name: "Override", minorUnit: -1 }
+  }), /metadata is invalid/);
+  assert.throws(() => createCurrencyRegistry({
+    __proto__: { code: "__proto__", name: "Prototype", minorUnit: 2 }
+  }), /plain object|metadata is invalid/);
+  assert.throws(() => getCurrency("toString", DEFAULT_CURRENCIES), /not registered/);
+});
+
+test("decimal parsing enforces canonical syntax, bounded input and precision at zero-unit currencies", () => {
+  assert.equal(decimalToMinorUnits("0", "JPY"), 0n);
+  assert.equal(decimalToMinorUnits("-12", "JPY"), -12n);
+  assert.throws(() => decimalToMinorUnits("01.00", "USD"), /decimal string/);
+  assert.throws(() => decimalToMinorUnits("+1.00", "USD"), /decimal string/);
+  assert.throws(() => decimalToMinorUnits("1.0 ", "USD"), /decimal string/);
+  assert.throws(() => decimalToMinorUnits("1".repeat(49), "USD"), /decimal string/);
+});
+
+test("locale formatting preserves currency precision for zero-, two- and four-unit currencies", () => {
+  const zero = formatMoney(createMoney("1500", "JPY"), { locale: "en-US" });
+  const two = formatMoney(createMoney("1234.50", "NIO"), { locale: "es-NI" });
+  const four = formatMoney(createMoney("1.2345", "CLF"), { locale: "es-CL" });
+  assert.match(zero, /1,500/);
+  assert.match(two, /1\.234,50|1,234\.50|1 234,50/);
+  assert.match(four, /1,2345|1\.2345|1,2345/);
+});
