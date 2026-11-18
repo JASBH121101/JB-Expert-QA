@@ -9,14 +9,14 @@
 The PHP adapter is a standalone Composer library:
 
 - Package: jb/security-guard-php
-- Manifest version for the current archive: 0.1.0
+- Manifest version: inferred from VCS tags; no hard-coded version field
 - Minimum runtime: PHP 8.2
 - Required third-party runtime dependencies: none
 - Laravel integration remains optional and uses host-provided Illuminate packages.
 
-The workflow validates composer.json strictly, creates a ZIP archive through composer archive, and installs the archive using a local Composer artifact repository into a fresh consumer directory. It verifies PSR-4 autoloading for Core v1, the authenticated client, and upload-inspection interfaces/service. The archive excludes test fixtures and vendor content.
+The workflow validates composer.json strictly, creates a ZIP archive through composer archive with a temporary COMPOSER_ROOT_VERSION of 0.1.0, extracts it into a clean directory, then installs that extracted package through a Composer path repository with symlink=false and a test-only version override. It verifies PSR-4 autoloading for Core v1, the authenticated client, and upload-inspection interfaces/service. The archive excludes test fixtures and vendor content.
 
-When preparing a release, update the Composer manifest version deliberately and review the archive contents. The explicit version exists so the locally generated artifact can be installed deterministically; it must be advanced as part of a deliberate package release, not silently.
+The library manifest intentionally omits a fixed version so a real release can infer its version from a VCS tag. The temporary 0.1.0 override is only for this local CI consumer; it is not written into the package manifest.
 
 ## Python / wheel and source distribution
 
