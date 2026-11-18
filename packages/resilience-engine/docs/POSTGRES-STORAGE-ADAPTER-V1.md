@@ -64,7 +64,7 @@ await actionLedger.initialize();
 // The controller still defaults to disabled and ARC keeps A2 denied.
 ```
 
-Initialization creates only the namespaced `jb_resilience_a2_action_claims` table, its active-asset unique index and its partial pending-sequence index. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row. The sequence index covers only `claimed`/`provider-started` rows so permanent idempotency tombstones do not make pending scans degrade into full-history scans.
+Initialization creates or verifies the namespaced `jb_resilience_a2_action_claims` table, its active-asset unique index and its partial pending-sequence index. It also installs and validates the named terminal-outcome and scope-column integrity constraints on existing tables; invalid existing rows cause initialization to fail closed. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row. The sequence index covers only `claimed`/`provider-started` rows so permanent idempotency tombstones do not make pending scans degrade into full-history scans.
 
 The A2 journal provides:
 
@@ -80,7 +80,7 @@ This is a transactional single-primary PostgreSQL implementation, not a multi-re
 
 `createPostgresA2ActionLedger` applies transaction-local PostgreSQL limits to every operation, including read-only reconciliation and exact lookup:
 
-- `connectionTimeoutMs`: default 5,000 ms; accepted range 100–60,000 ms. If a Pool client arrives after the wait has timed out or been aborted, the late client is immediately released.
+- `connectionTimeoutMs`: default 3,000 ms; accepted range 100–60,000 ms. This sits below the A2 controller's default per-dependency timeout. If a Pool client arrives after the wait has timed out or been aborted, the late client is immediately released.
 - `statementTimeoutMs`: default 4,000 ms; accepted range 100–60,000 ms.
 - `lockTimeoutMs`: default 1,500 ms; accepted range 50–30,000 ms.
 - `idleInTransactionTimeoutMs`: default 10,000 ms; accepted range 100–120,000 ms.
