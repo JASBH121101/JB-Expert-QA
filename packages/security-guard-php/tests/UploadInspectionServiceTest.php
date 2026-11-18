@@ -322,7 +322,14 @@ function runUploadInspectionServiceTests(): void
             'Unknown verdict must remain in private quarantine and never be promoted');
 
         $maliciousStore = new UploadInspectionTestStorage($root . '/malicious');
-        $malicious = new UploadInspectionService($maliciousStore, new UploadInspectionTestScanner('malicious'));
+        $maliciousEvents = [];
+        $malicious = new UploadInspectionService(
+            $maliciousStore,
+            new UploadInspectionTestScanner('malicious'),
+            onEvent: static function (array $event) use (&$maliciousEvents): void {
+                $maliciousEvents[] = $event;
+            }
+        );
         $malwareRejected = false;
         $malwareAttestation = null;
         try {
@@ -336,8 +343,10 @@ function runUploadInspectionServiceTests(): void
             'PHP malicious result must expose its validated scanner attestation');
         expect($malwareAttestation['sha256'] === hash('sha256', $png) && $malwareAttestation['size'] === strlen($png),
             'PHP malicious attestation must bind the exact scanned bytes');
-        expect($maliciousStore->quarantineCount() === 0 && $maliciousStore->approvedCount() === 0,
-            'Malicious upload must not remain available in approved storage');
+        expect($maliciousStore->quarantineCount() === 1 && $maliciousStore->approvedCount() === 0,
+            'Malicious upload must remain isolated in private quarantine and never be promoted');
+        expect(($maliciousEvents[count($maliciousEvents) - 1]['action'] ?? null) === 'quarantined',
+            'Malicious upload telemetry must report quarantine rather than ordinary rejection');
 
         $tamperedStore = new UploadInspectionTestStorage($root . '/tampered');
         $tampered = new UploadInspectionService($tamperedStore, new UploadInspectionTestScanner('clean', true));

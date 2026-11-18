@@ -314,6 +314,8 @@ class UploadInspectionService:
                 raise UploadInspectionError("INVALID_SCAN_RESULT") from exc
 
             if scan_result["verdict"] == "malicious":
+                # Preserve malicious evidence in private quarantine for response and forensics.
+                retain_quarantine = True
                 raise UploadInspectionError("MALWARE_DETECTED", attestation=attestation)
             if scan_result["verdict"] != "clean":
                 retain_quarantine = True
@@ -340,7 +342,7 @@ class UploadInspectionService:
                 "attestation": attestation,
             }
         except UploadInspectionError as exc:
-            self._emit("upload-rejected", exc.reason)
+            self._emit("upload-quarantined" if retain_quarantine else "upload-rejected", exc.reason)
             if writer is not None:
                 try:
                     writer.close()
@@ -360,7 +362,7 @@ class UploadInspectionService:
                     raise UploadInspectionError("QUARANTINE_CLEANUP_FAILED") from cleanup_error
             raise
         except Exception as exc:
-            self._emit("upload-rejected", "INSPECTION_FAILED")
+            self._emit("upload-quarantined" if retain_quarantine else "upload-rejected", "INSPECTION_FAILED")
             if writer is not None:
                 try:
                     writer.close()

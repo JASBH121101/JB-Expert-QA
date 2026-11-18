@@ -238,8 +238,9 @@ test("promotion adapter must verify the exact scanned object before approval", a
   assert.equal(promotionCall[3], PNG.length);
 });
 
-test("malware verdicts are rejected and the quarantined object is deleted", async () => {
+test("malware verdicts are rejected and the quarantined object is retained privately", async () => {
   const store = createMemoryStore();
+  const events = [];
   const scanner = {
     async scan({ stream }) {
       for await (const chunk of stream) void chunk;
@@ -247,7 +248,7 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
     }
   };
   await assert.rejects(
-    inspector(store, scanner).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
+    inspector(store, scanner, { onEvent: (event) => events.push(event) }).inspect({ source: Readable.from([PNG]), fileName: "bad.png" }),
     (error) => {
       assert.equal(error.code, "MALWARE_DETECTED");
       assert.equal(error.attestation.schema, "jb.security.upload-inspection.attestation/v1");
@@ -258,7 +259,11 @@ test("malware verdicts are rejected and the quarantined object is deleted", asyn
     }
   );
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "promote"), false);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
+  assert.equal(events.at(-1)?.action, "quarantined");
 });
 
 test("unknown scan verdicts remain quarantined and cannot be promoted", async () => {

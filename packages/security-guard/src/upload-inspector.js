@@ -624,6 +624,8 @@ export function createUploadInspector(options = {}) {
       });
 
       if (scanResult.verdict === "malicious") {
+        // Preserve malicious evidence in private quarantine for response and forensics.
+        retainQuarantine = true;
         if (securityBridge) {
           try {
             await submitBridgeAssessment({

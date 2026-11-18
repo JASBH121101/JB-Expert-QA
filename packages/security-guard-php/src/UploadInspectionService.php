@@ -309,6 +309,8 @@ final class UploadInspectionService
             ]);
 
             if ($scanResult['verdict'] === 'malicious') {
+                // Preserve malicious evidence in private quarantine for response and forensics.
+                $retainQuarantine = true;
                 throw new UploadInspectionException('MALWARE_DETECTED', attestation: $attestation);
             }
 
