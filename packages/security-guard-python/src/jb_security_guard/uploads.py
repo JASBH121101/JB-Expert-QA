@@ -66,9 +66,9 @@ def _normalize_mime(value: str | None) -> str | None:
 
 
 def _detect_type(prefix: bytes) -> str | None:
-    if prefix.startswith(b"\\xff\\xd8\\xff"):
+    if prefix.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
-    if prefix.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+    if prefix.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if prefix.startswith((b"GIF87a", b"GIF89a")):
         return "image/gif"
