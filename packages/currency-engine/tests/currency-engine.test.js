@@ -14,6 +14,15 @@ test("registry has regional currencies and minor-unit metadata", () => {
   assert.equal(DEFAULT_CURRENCIES.USD.minorUnit, 2);
   assert.equal(DEFAULT_CURRENCIES.JPY.minorUnit, 0);
   assert.equal(DEFAULT_CURRENCIES.KWD.minorUnit, 3);
+  assert.equal(DEFAULT_CURRENCIES.CAD.minorUnit, 2);
+  assert.equal(DEFAULT_CURRENCIES.CHF.minorUnit, 2);
+  assert.equal(DEFAULT_CURRENCIES.INR.minorUnit, 2);
+  assert.equal(DEFAULT_CURRENCIES.KRW.minorUnit, 0);
+  assert.equal(DEFAULT_CURRENCIES.CLF.minorUnit, 4);
+  assert.equal(DEFAULT_CURRENCIES.UYW.minorUnit, 4);
+  assert.equal(decimalToMinorUnits("1.2345", "CLF"), 12345n);
+  assert.equal(decimalToMinorUnits("1.2345", "UYW"), 12345n);
+  assert.equal(decimalToMinorUnits("1500", "KRW"), 1500n);
   const registry = createCurrencyRegistry({ XTS: { code: "XTS", name: "Test currency", minorUnit: 2 } });
   assert.equal(registry.XTS.minorUnit, 2);
   assert.throws(() => createCurrencyRegistry({ BAD: { code: "NO", name: "bad", minorUnit: 2 } }));

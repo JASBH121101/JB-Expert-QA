@@ -123,6 +123,18 @@ export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } =
           findings.push({ locale, key, code: "placeholder-mismatch", severity: "high" });
         }
       } else {
+        const requiredPluralCategories = new Intl.PluralRules(locale).resolvedOptions().pluralCategories;
+        for (const category of requiredPluralCategories) {
+          if (!Object.hasOwn(targetValue, category)) {
+            findings.push({
+              locale,
+              key,
+              code: "plural-category-missing",
+              category,
+              severity: "high"
+            });
+          }
+        }
         // Plural languages may legitimately omit a count in grammatical
         // forms such as Arabic one/two. Compare the mandatory "other" form
         // and reject any target-only placeholder names in other forms.
