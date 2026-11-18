@@ -439,13 +439,22 @@ async function ensureLedgerGuard(filePath, ledger) {
     if (current) {
       throw new Error("A2 action ledger is missing while its durability guard exists; refusing empty reinitialization");
     }
+    // Establish a revision-zero guard before the first journal mutation. This
+    // gives subsequent missing-sidecar checks a durable baseline.
+    await writeLedgerGuard(guardPath, emptyLedger());
     return;
   }
 
   const digest = ledgerDigest(ledger);
   if (current === null) {
-    // Upgrade a pre-guard journal in place. Existing content is preserved and
-    // becomes the starting point for subsequent rollback detection.
+    // A sidecar can be bootstrapped only for a genuinely empty revision-zero
+    // journal. Reconstructing it for an existing journal would erase the
+    // evidence needed to detect sidecar deletion or rollback.
+    if (ledger.revision !== 0 ||
+        Object.keys(ledger.claims).length !== 0 ||
+        Object.keys(ledger.idempotency).length !== 0) {
+      throw new Error("A2 action ledger durability guard is missing; refusing to reinitialize its trust baseline");
+    }
     await writeLedgerGuard(guardPath, ledger);
     return;
   }
