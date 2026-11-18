@@ -543,6 +543,40 @@ async function ensureLedgerGuard(filePath, ledger, integrityKeys) {
   throw new Error("A2 action ledger revision diverges from its authenticated guard; manual review is required");
 }
 
+const REVISION_ANCHOR_SCHEMA = "jb.resilience.a2-revision-anchor/v1";
+
+function normalizeRevisionAnchorState(value) {
+  exactKeys(value, ["schema", "revision", "ledgerSha256"], "A2 external revision anchor");
+  if (value.schema !== REVISION_ANCHOR_SCHEMA ||
+      !Number.isSafeInteger(value.revision) || value.revision < 0 ||
+      typeof value.ledgerSha256 !== "string" || !SHA256.test(value.ledgerSha256)) {
+    throw new Error("A2 external revision anchor state is malformed");
+  }
+  return Object.freeze({
+    schema: REVISION_ANCHOR_SCHEMA,
+    revision: value.revision,
+    ledgerSha256: value.ledgerSha256
+  });
+}
+
+function makeRevisionAnchorState(ledger) {
+  return Object.freeze({
+    schema: REVISION_ANCHOR_SCHEMA,
+    revision: ledger.revision,
+    ledgerSha256: ledgerDigest(ledger)
+  });
+}
+
+function normalizeRevisionAnchorAdapter(adapter, ledgerId) {
+  if (adapter === undefined && ledgerId === undefined) return null;
+  if (!isRecord(adapter) || typeof adapter.read !== "function" ||
+      typeof adapter.compareAndSwap !== "function") {
+    throw new TypeError("revisionAnchor must implement read and compareAndSwap");
+  }
+  const normalizedLedgerId = assertIdentifier(ledgerId, "ledgerId");
+  return Object.freeze({ adapter, ledgerId: normalizedLedgerId });
+}
+
 async function readLedgerFile(filePath, maxBytes, identities, maxClaims, integrityKeys) {
   let handle;
   try {
@@ -682,7 +716,9 @@ export function createFileA2ActionLedger({
   maxClaims = 20_000,
   maxLedgerBytes = 16 * 1024 * 1024,
   integrityKeys,
-  activeIntegrityKeyId
+  activeIntegrityKeyId,
+  revisionAnchor,
+  ledgerId
 } = {}) {
   if (typeof filePath !== "string" || filePath.trim() === "") {
     throw new TypeError("filePath is required");
@@ -700,21 +736,56 @@ export function createFileA2ActionLedger({
   }
   const identities = assertIdentityOptions({ providerId, verifierId, recorderId });
   const normalizedIntegrityKeys = normalizeIntegrityKeyring(integrityKeys, activeIntegrityKeyId);
+  const normalizedRevisionAnchor = normalizeRevisionAnchorAdapter(revisionAnchor, ledgerId);
   const target = resolve(filePath);
   const lockPath = target + ".lock";
   const lockOptions = { timeoutMs: lockTimeoutMs, staleMs: lockStaleMs, pollIntervalMs };
 
+  async function verifyExternalRevisionAnchor(ledger) {
+    if (!normalizedRevisionAnchor) return null;
+    const { adapter, ledgerId: anchorId } = normalizedRevisionAnchor;
+    let current = await adapter.read({ ledgerId: anchorId });
+    if (current === null) {
+      const isEmpty = ledger.revision === 0 &&
+        Object.keys(ledger.claims).length === 0 &&
+        Object.keys(ledger.idempotency).length === 0;
+      if (!isEmpty) {
+        throw new Error("A2 external revision anchor is missing for a used ledger; refusing to establish a new baseline");
+      }
+      const initial = makeRevisionAnchorState(ledger);
+      const inserted = await adapter.compareAndSwap({
+        ledgerId: anchorId,
+        expected: null,
+        next: initial
+      });
+      if (inserted === true) {
+        current = initial;
+      } else {
+        current = await adapter.read({ ledgerId: anchorId });
+      }
+    }
+    const observed = normalizeRevisionAnchorState(current);
+    const expected = makeRevisionAnchorState(ledger);
+    if (canonicalJson(observed) !== canonicalJson(expected)) {
+      throw new Error("A2 external monotonic revision anchor does not match the authenticated journal; rollback or interrupted commit requires operator review");
+    }
+    return observed;
+  }
+
   async function read(signal, operation) {
     assertSignal(signal);
-    return withFileLock(lockPath, lockOptions, signal, async () =>
-      operation(await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys))
-    );
+    return withFileLock(lockPath, lockOptions, signal, async () => {
+      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys);
+      await verifyExternalRevisionAnchor(ledger);
+      return operation(ledger);
+    });
   }
 
   async function mutate(signal, operation) {
     assertSignal(signal);
     return withFileLock(lockPath, lockOptions, signal, async () => {
       const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys);
+      const priorAnchor = await verifyExternalRevisionAnchor(ledger);
       const result = await operation(ledger);
       if (result.changed) {
         ledger.revision += 1;
@@ -724,6 +795,17 @@ export function createFileA2ActionLedger({
         // for operator review instead of silently accepting ambiguous state.
         await writeLedgerGuard(target + ".guard", ledger, normalizedIntegrityKeys);
         await writeLedgerFile(target, ledger, maxLedgerBytes);
+        if (normalizedRevisionAnchor) {
+          const { adapter, ledgerId: anchorId } = normalizedRevisionAnchor;
+          const advanced = await adapter.compareAndSwap({
+            ledgerId: anchorId,
+            expected: priorAnchor,
+            next: makeRevisionAnchorState(ledger)
+          });
+          if (advanced !== true) {
+            throw new Error("A2 external monotonic revision anchor compare-and-swap failed after local journal commit; all further recovery must hold for operator review");
+          }
+        }
       }
       return result.value;
     });
