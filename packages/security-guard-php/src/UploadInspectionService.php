@@ -131,8 +131,10 @@ final class UploadInspectionService
 
             $sha256 = hash_final($hash);
             $metadata = [
+                'uploadId' => $uploadId,
                 'size' => $size,
                 'sha256' => $sha256,
+                'detectedMimeType' => $detectedType,
                 'mimeType' => $detectedType,
             ];
 
@@ -140,6 +142,13 @@ final class UploadInspectionService
             $this->assertStream($scanStream, false);
             try {
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
+                $scanPosition = ftell($scanStream);
+                if ($scanPosition === false || $scanPosition !== $size) {
+                    $retainQuarantine = true;
+                    throw new UploadInspectionException('SCAN_INCOMPLETE');
+                }
+            } catch (UploadInspectionException $exception) {
+                throw $exception;
             } catch (Throwable) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('SCANNER_UNAVAILABLE');
