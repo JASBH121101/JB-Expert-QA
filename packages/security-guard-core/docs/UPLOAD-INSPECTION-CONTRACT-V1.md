@@ -76,7 +76,7 @@ After and only after a runtime has observed complete sequential scanner consumpt
 
 The attestation is scanner evidence, not a promotion decision and not a cryptographic scanner signature. It excludes filenames, local paths, file bytes, credentials, arbitrary metadata and raw customer identity. A clean verdict never authorizes publication by itself.
 
-The actual upload pipeline returns this attestation for audit linkage. Storage promotion must bind it to the exact object in the same atomic commit:
+The actual upload pipeline returns a clean attestation alongside an approved result and exposes valid malicious/unknown attestations on the normalized inspection error for audit linkage. A non-clean attestation never authorizes promotion. If stream consumption is incomplete, the scanner result is malformed, or digest/size binding fails, no trusted attestation is emitted. Storage promotion must bind a clean attestation to the exact object in the same atomic commit:
 - Node.js passes it in `metadata.attestation` to `store.promote(...)`.
 - PHP requires it as the fourth argument to `UploadQuarantineStorage::promote(...)`.
 - Python requires it as the fourth argument to `UploadQuarantineStorage.promote(...)`.
