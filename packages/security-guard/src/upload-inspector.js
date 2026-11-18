@@ -134,7 +134,7 @@ function emitUploadCoreEvent(core, callback, action, reason, uploadId) {
         : "JBG-UPLOAD-QUARANTINE-001",
       severity: normalizedReason === "malware_detected" ? "critical" : "high",
       action: "quarantined",
-      outcome: "observed",
+      outcome: normalizedReason === "malware_detected" ? "denied" : "observed",
       scope: "upload_quarantine"
     };
   } else if (action === "cleanup_failed") {
@@ -625,6 +625,8 @@ export function createUploadInspector(options = {}) {
       });
 
       if (scanResult.verdict === "malicious") {
+        // Preserve malicious evidence in private quarantine for response and forensics.
+        retainQuarantine = true;
         if (securityBridge) {
           try {
             await submitBridgeAssessment({
