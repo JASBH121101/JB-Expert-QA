@@ -130,10 +130,10 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/wheel-consumer"
           "$RUNNER_TEMP/wheel-consumer/bin/python" -m pip install --disable-pip-version-check --no-deps "$RUNNER_TEMP"/python-dist/*.whl
-          "$RUNNER_TEMP/wheel-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard.client import SecurityGuardClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(SecurityGuardClient)'
+          "$RUNNER_TEMP/wheel-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard import UniversalRateLimitClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(UniversalRateLimitClient)'
       - name: Install source distribution into a clean consumer
         run: |
           python3 -m venv "$RUNNER_TEMP/sdist-consumer"
           "$RUNNER_TEMP/sdist-consumer/bin/python" -m pip install --disable-pip-version-check --no-deps "$RUNNER_TEMP"/python-dist/*.tar.gz
-          "$RUNNER_TEMP/sdist-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard.client import SecurityGuardClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(SecurityGuardClient)'
+          "$RUNNER_TEMP/sdist-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard import UniversalRateLimitClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(UniversalRateLimitClient)'
 
