@@ -63,6 +63,7 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
                 throw new RuntimeException('Test store could not delete upload');
             }
         }
+        unset($this->approvedAttestations[$uploadId]);
     }
 
     public function approvedAttestation(string $uploadId): ?array
