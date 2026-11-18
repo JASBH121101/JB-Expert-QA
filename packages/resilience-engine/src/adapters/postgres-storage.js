@@ -1049,3 +1049,609 @@ export function createPostgresResilienceStorageAdapter({ pool, maxTrustedSignals
     trustedSignalStore
   });
 }
+
+
+const A2_ACTIONS = new Set(["apply-containment-profile", "release-containment"]);
+const A2_RECORD_SCHEMA = "jb.resilience.a2-recovery-record/v1";
+const A2_TERMINAL_OUTCOMES = new Set(["succeeded", "not-applied"]);
+const A2_RECORD_KEYS = Object.freeze([
+  "schema", "claimId", "action", "scope", "profileId", "providerId",
+  "verifierId", "recorderId", "idempotencyKey", "state",
+  "originalOperationId", "evidenceRefs", "createdAtMs",
+  "updatedAtMs", "leaseExpiresAtMs"
+]);
+const A2_SCOPE_KEYS = Object.freeze([
+  "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
+]);
+
+function a2ExactKeys(value, keys, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(label + " must be a plain data object");
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(label + " must be a plain data object");
+  }
+  if (Object.getOwnPropertySymbols(value).length !== 0) {
+    throw new TypeError(label + " must not contain symbol properties");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const actual = Object.keys(descriptors);
+  if (actual.length !== keys.length || actual.some((key) => !keys.includes(key))) {
+    throw new TypeError(label + " has missing or unsupported fields");
+  }
+  for (const descriptor of Object.values(descriptors)) {
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError(label + " must not contain accessors or hidden values");
+    }
+  }
+}
+
+function a2Input(input, required, optional = []) {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("A2 PostgreSQL ledger input must be a plain data object");
+  }
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError("A2 PostgreSQL ledger input must be a plain data object");
+  }
+  if (Object.getOwnPropertySymbols(input).length !== 0) {
+    throw new TypeError("A2 PostgreSQL ledger input must not contain symbol properties");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const actual = Object.keys(descriptors);
+  const allowed = new Set([...required, ...optional, "deadline", "signal"]);
+  if (required.some((key) => !Object.hasOwn(descriptors, key)) ||
+      actual.some((key) => !allowed.has(key))) {
+    throw new TypeError("A2 PostgreSQL ledger input has missing or unsupported fields");
+  }
+  const output = Object.create(null);
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("A2 PostgreSQL ledger input must not contain accessors or hidden values");
+    }
+    if (key === "signal") {
+      const signal = descriptor.value;
+      if (signal === null || typeof signal !== "object" ||
+          typeof signal.aborted !== "boolean") {
+        throw new TypeError("A2 PostgreSQL ledger AbortSignal is invalid");
+      }
+      output.signal = signal;
+    } else if (key === "deadline") {
+      output.deadline = assertTimestamp(descriptor.value, "A2 PostgreSQL ledger deadline");
+    } else {
+      output[key] = cloneJsonData(descriptor.value);
+    }
+  }
+  return output;
+}
+
+function a2AssertSignal(signal) {
+  if (signal?.aborted) throw new Error("A2 PostgreSQL action ledger operation aborted");
+}
+
+function a2NormalizeScope(input) {
+  a2ExactKeys(input, A2_SCOPE_KEYS, "A2 PostgreSQL action scope");
+  const scope = Object.create(null);
+  for (const key of A2_SCOPE_KEYS) {
+    const value = input[key];
+    if (key === "policyRevision") {
+      if (!Number.isSafeInteger(value) || value < 1) {
+        throw new TypeError("A2 policyRevision is invalid");
+      }
+    } else if (key === "policyHash") {
+      if (typeof value !== "string" || !SHA256.test(value)) {
+        throw new TypeError("A2 policyHash is invalid");
+      }
+    } else if (key === "assetId") {
+      assertAssetId(value, "A2 assetId");
+    } else {
+      assertIdentifier(value, "A2 " + key);
+    }
+    scope[key] = value;
+  }
+  return Object.freeze(scope);
+}
+
+function a2NormalizeEvidenceRefs(input) {
+  if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype ||
+      input.length < 1 || input.length > 128 ||
+      Object.getOwnPropertySymbols(input).length !== 0 ||
+      Reflect.ownKeys(input).length !== input.length + 1) {
+    throw new TypeError("A2 evidence references must be a dense plain array");
+  }
+  const seen = new Set();
+  const refs = [];
+  for (let index = 0; index < input.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("A2 evidence references must not contain holes or accessors");
+    }
+    const item = descriptor.value;
+    a2ExactKeys(item, ["refId", "sha256"], "A2 evidence reference");
+    const refId = assertIdentifier(item.refId, "A2 evidence refId");
+    if (typeof item.sha256 !== "string" || !SHA256.test(item.sha256) || seen.has(refId)) {
+      throw new TypeError("A2 evidence reference digest or identity is invalid");
+    }
+    seen.add(refId);
+    refs.push(Object.freeze({ refId, sha256: item.sha256 }));
+  }
+  return Object.freeze(refs);
+}
+
+function a2OperationKey(action, scope, profileId) {
+  return createHash("sha256").update(canonicalJson({
+    schema: "jb.resilience.a2-operation-key/v1",
+    action, scope, profileId
+  }), "utf8").digest("hex");
+}
+
+function a2NormalizeRecord(input, identities) {
+  a2ExactKeys(input, A2_RECORD_KEYS, "A2 PostgreSQL recovery record");
+  if (input.schema !== A2_RECORD_SCHEMA) throw new TypeError("A2 recovery record schema is invalid");
+  const claimId = assertIdentifier(input.claimId, "A2 claimId");
+  const action = input.action;
+  if (!A2_ACTIONS.has(action)) throw new TypeError("A2 recovery action is invalid");
+  const scope = a2NormalizeScope(input.scope);
+  const profileId = assertIdentifier(input.profileId, "A2 profileId");
+  const providerId = assertIdentifier(input.providerId, "A2 providerId");
+  const verifierId = assertIdentifier(input.verifierId, "A2 verifierId");
+  const recorderId = assertIdentifier(input.recorderId, "A2 recorderId");
+  if (providerId !== identities.providerId || verifierId !== identities.verifierId ||
+      recorderId !== identities.recorderId ||
+      new Set([providerId, verifierId, recorderId]).size !== 3) {
+    throw new TypeError("A2 PostgreSQL recovery identities do not match configured adapters");
+  }
+  if (typeof input.idempotencyKey !== "string" || !SHA256.test(input.idempotencyKey) ||
+      input.idempotencyKey !== a2OperationKey(action, scope, profileId)) {
+    throw new TypeError("A2 recovery idempotency key is invalid");
+  }
+  const state = input.state;
+  if (!["claimed", "provider-started", "held-for-reconciliation"].includes(state)) {
+    throw new TypeError("A2 recovery state is invalid");
+  }
+  const originalOperationId = input.originalOperationId;
+  if (originalOperationId !== null) assertIdentifier(originalOperationId, "A2 originalOperationId");
+  if ((action === "release-containment") !== (originalOperationId !== null)) {
+    throw new TypeError("A2 original operation binding is invalid");
+  }
+  const evidenceRefs = a2NormalizeEvidenceRefs(input.evidenceRefs);
+  const createdAtMs = assertTimestamp(input.createdAtMs, "A2 createdAtMs");
+  const updatedAtMs = assertTimestamp(input.updatedAtMs, "A2 updatedAtMs");
+  const leaseExpiresAtMs = assertTimestamp(input.leaseExpiresAtMs, "A2 leaseExpiresAtMs");
+  if (updatedAtMs < createdAtMs || leaseExpiresAtMs <= createdAtMs) {
+    throw new TypeError("A2 recovery timestamps are inconsistent");
+  }
+  return Object.freeze({
+    schema: A2_RECORD_SCHEMA, claimId, action, scope, profileId,
+    providerId, verifierId, recorderId,
+    idempotencyKey: input.idempotencyKey,
+    state, originalOperationId, evidenceRefs,
+    createdAtMs, updatedAtMs, leaseExpiresAtMs
+  });
+}
+
+function a2RecordCopy(record) {
+  return {
+    schema: record.schema,
+    claimId: record.claimId,
+    action: record.action,
+    scope: { ...record.scope },
+    profileId: record.profileId,
+    providerId: record.providerId,
+    verifierId: record.verifierId,
+    recorderId: record.recorderId,
+    idempotencyKey: record.idempotencyKey,
+    state: record.state,
+    originalOperationId: record.originalOperationId,
+    evidenceRefs: record.evidenceRefs.map((item) => ({ ...item })),
+    createdAtMs: record.createdAtMs,
+    updatedAtMs: record.updatedAtMs,
+    leaseExpiresAtMs: record.leaseExpiresAtMs
+  };
+}
+
+function a2SameAction(entry, action, scope, profileId, idempotencyKey) {
+  return entry.action === action && entry.profile_id === profileId &&
+    entry.idempotency_key.trim() === idempotencyKey &&
+    canonicalJson(entry.scope) === canonicalJson(scope);
+}
+
+function a2ParseCursor(cursor) {
+  if (cursor === null || cursor === undefined) return { snapshot: null, last: 0 };
+  if (typeof cursor !== "string" || !/^a2pg1:[0-9]+:[0-9]+$/.test(cursor)) {
+    throw new TypeError("A2 PostgreSQL pending cursor is invalid");
+  }
+  const parts = cursor.split(":");
+  const snapshot = Number(parts[1]);
+  const last = Number(parts[2]);
+  if (!Number.isSafeInteger(snapshot) || snapshot < 0 ||
+      !Number.isSafeInteger(last) || last < 0 || last > snapshot) {
+    throw new TypeError("A2 PostgreSQL pending cursor is invalid");
+  }
+  return { snapshot, last };
+}
+
+/**
+ * PostgreSQL-backed transactional A2 action journal.
+ *
+ * Claims, recovery records and provider-start transitions live in one row and
+ * one database transaction. All hosts sharing the same PostgreSQL primary use
+ * the same unique idempotency keys and active-asset constraint.
+ */
+export function createPostgresA2ActionLedger({
+  pool, providerId, verifierId, recorderId
+} = {}) {
+  ensurePool(pool);
+  const identities = Object.freeze({
+    providerId: assertIdentifier(providerId, "A2 providerId"),
+    verifierId: assertIdentifier(verifierId, "A2 verifierId"),
+    recorderId: assertIdentifier(recorderId, "A2 recorderId")
+  });
+  if (new Set(Object.values(identities)).size !== 3) {
+    throw new TypeError("A2 provider, verifier and forensic recorder identities must differ");
+  }
+  let initialized = false;
+
+  function assertInitialized() {
+    if (!initialized) throw new Error("PostgreSQL A2 action ledger is not initialized");
+  }
+
+  async function runA2Transaction(signal, operation, isolation = "READ COMMITTED") {
+    a2AssertSignal(signal);
+    const client = await pool.connect();
+    let began = false;
+    try {
+      a2AssertSignal(signal);
+      await client.query("BEGIN ISOLATION LEVEL " + isolation);
+      began = true;
+      const result = await operation(client);
+      a2AssertSignal(signal);
+      await client.query("COMMIT");
+      began = false;
+      return result;
+    } catch (error) {
+      if (began) await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async function initialize() {
+    await runA2Transaction(undefined, async (client) => {
+      await client.query(
+        "CREATE TABLE IF NOT EXISTS jb_resilience_a2_action_claims (" +
+        "sequence BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE NOT NULL," +
+        "claim_id UUID PRIMARY KEY," +
+        "action TEXT NOT NULL CHECK (action IN ('apply-containment-profile','release-containment'))," +
+        "scope JSONB NOT NULL CHECK (jsonb_typeof(scope)='object')," +
+        "asset_id TEXT NOT NULL," +
+        "environment TEXT NOT NULL," +
+        "profile_id TEXT NOT NULL," +
+        "idempotency_key TEXT NOT NULL UNIQUE CHECK (idempotency_key ~ '^[a-f0-9]{64}$')," +
+        "claimed_at_ms BIGINT NOT NULL CHECK (claimed_at_ms >= 0)," +
+        "expires_at_ms BIGINT NOT NULL CHECK (expires_at_ms > claimed_at_ms)," +
+        "status TEXT NOT NULL CHECK (status IN ('claimed','provider-started','completed'))," +
+        "outcome TEXT NULL," +
+        "reason TEXT NULL CHECK (reason IS NULL OR length(reason) <= 160)," +
+        "completed_at_ms BIGINT NULL," +
+        "recovery_record JSONB NULL," +
+        "CHECK ((status='completed' AND outcome IN ('succeeded','not-applied') AND completed_at_ms IS NOT NULL AND recovery_record IS NULL) OR " +
+        "(status IN ('claimed','provider-started') AND outcome IS NULL AND completed_at_ms IS NULL))" +
+        ")"
+      );
+      await client.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS jb_resilience_a2_one_active_asset_idx " +
+        "ON jb_resilience_a2_action_claims (environment, asset_id) " +
+        "WHERE status IN ('claimed','provider-started')"
+      );
+    });
+    initialized = true;
+    return Object.freeze({ initialized: true, dialect: "postgresql", schemaVersion: 1 });
+  }
+
+  async function claim(rawInput = {}) {
+    const input = a2Input(rawInput, [
+      "action", "scope", "profileId", "idempotencyKey", "claimedAtMs", "expiresAtMs"
+    ]);
+    const action = input.action;
+    if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
+    const scope = a2NormalizeScope(input.scope);
+    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const idempotencyKey = input.idempotencyKey;
+    if (typeof idempotencyKey !== "string" ||
+        idempotencyKey !== a2OperationKey(action, scope, profileId)) {
+      throw new TypeError("A2 idempotency key does not bind the exact action");
+    }
+    const claimedAtMs = assertTimestamp(input.claimedAtMs, "A2 claimedAtMs");
+    const expiresAtMs = assertTimestamp(input.expiresAtMs, "A2 expiresAtMs");
+    if (expiresAtMs <= claimedAtMs) throw new TypeError("A2 claim expiry is invalid");
+    assertInitialized();
+    try {
+      return await runA2Transaction(input.signal, async (client) => {
+        const lockKey = canonicalJson([scope.environment, scope.assetId]);
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey]
+        );
+        const duplicate = await client.query(
+          "SELECT claim_id FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
+          [idempotencyKey]
+        );
+        if (duplicate.rowCount !== 0) {
+          return Object.freeze({ claimed: false, claimId: null });
+        }
+        const active = await client.query(
+          "SELECT claim_id FROM jb_resilience_a2_action_claims " +
+          "WHERE environment=$1 AND asset_id=$2 AND status IN ('claimed','provider-started') LIMIT 1",
+          [scope.environment, scope.assetId]
+        );
+        if (active.rowCount !== 0) {
+          return Object.freeze({ claimed: false, claimId: null });
+        }
+        const claimId = randomUUID();
+        await client.query(
+          "INSERT INTO jb_resilience_a2_action_claims " +
+          "(claim_id, action, scope, asset_id, environment, profile_id, idempotency_key, claimed_at_ms, expires_at_ms, status, outcome, reason, completed_at_ms, recovery_record) " +
+          "VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,'claimed',NULL,NULL,NULL,NULL)",
+          [claimId, action, JSON.stringify(scope), scope.assetId, scope.environment,
+            profileId, idempotencyKey, claimedAtMs, expiresAtMs]
+        );
+        return Object.freeze({ claimed: true, claimId });
+      });
+    } catch (error) {
+      if (error?.code === "23505") return Object.freeze({ claimed: false, claimId: null });
+      throw error;
+    }
+  }
+
+  async function createPendingRecord(rawInput = {}) {
+    const input = a2Input(rawInput, ["record", "atMs"]);
+    const atMs = assertTimestamp(input.atMs, "A2 pending record time");
+    const record = a2NormalizeRecord(input.record, identities);
+    assertInitialized();
+    return runA2Transaction(input.signal, async (client) => {
+      const result = await client.query(
+        "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1 FOR UPDATE",
+        [record.claimId]
+      );
+      if (result.rowCount !== 1) return Object.freeze({ created: false });
+      const entry = result.rows[0];
+      const expiry = toSafeInteger(entry.expires_at_ms, "A2 expires_at_ms");
+      const claimedAt = toSafeInteger(entry.claimed_at_ms, "A2 claimed_at_ms");
+      if (entry.status !== "claimed" || entry.recovery_record !== null ||
+          atMs < claimedAt || atMs >= expiry ||
+          !a2SameAction(entry, record.action, record.scope, record.profileId, record.idempotencyKey) ||
+          record.createdAtMs !== atMs || record.updatedAtMs !== atMs ||
+          record.leaseExpiresAtMs <= atMs || record.state !== "claimed") {
+        return Object.freeze({ created: false });
+      }
+      const updated = await client.query(
+        "UPDATE jb_resilience_a2_action_claims SET recovery_record=$2::jsonb " +
+        "WHERE claim_id=$1 AND status='claimed' AND recovery_record IS NULL",
+        [record.claimId, JSON.stringify(a2RecordCopy(record))]
+      );
+      return Object.freeze({ created: updated.rowCount === 1 });
+    });
+  }
+
+  async function markProviderStarted(rawInput = {}) {
+    const input = a2Input(rawInput, [
+      "claimId", "action", "scope", "profileId", "idempotencyKey", "recoveryRecord", "atMs"
+    ]);
+    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    const action = input.action;
+    if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
+    const scope = a2NormalizeScope(input.scope);
+    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const idempotencyKey = input.idempotencyKey;
+    const atMs = assertTimestamp(input.atMs, "A2 provider-start timestamp");
+    const record = a2NormalizeRecord(input.recoveryRecord, identities);
+    assertInitialized();
+    return runA2Transaction(input.signal, async (client) => {
+      const result = await client.query(
+        "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1 FOR UPDATE",
+        [claimId]
+      );
+      if (result.rowCount !== 1) return Object.freeze({ started: false });
+      const entry = result.rows[0];
+      const claimedAt = toSafeInteger(entry.claimed_at_ms, "A2 claimed_at_ms");
+      const expiresAt = toSafeInteger(entry.expires_at_ms, "A2 expires_at_ms");
+      if (entry.status !== "claimed" || entry.recovery_record === null ||
+          atMs < claimedAt || atMs >= expiresAt ||
+          !a2SameAction(entry, action, scope, profileId, idempotencyKey) ||
+          record.claimId !== claimId || record.state !== "provider-started" ||
+          record.updatedAtMs !== atMs) {
+        return Object.freeze({ started: false });
+      }
+      const prior = a2NormalizeRecord(entry.recovery_record, identities);
+      const expectedPrior = {
+        ...a2RecordCopy(record),
+        state: "claimed",
+        updatedAtMs: prior.updatedAtMs
+      };
+      if (canonicalJson(prior) !== canonicalJson(expectedPrior)) {
+        return Object.freeze({ started: false });
+      }
+      const updated = await client.query(
+        "UPDATE jb_resilience_a2_action_claims SET status='provider-started', recovery_record=$2::jsonb " +
+        "WHERE claim_id=$1 AND status='claimed'",
+        [claimId, JSON.stringify(a2RecordCopy(record))]
+      );
+      return Object.freeze({ started: updated.rowCount === 1 });
+    });
+  }
+
+  async function reconcile(rawInput = {}) {
+    const input = a2Input(rawInput, ["action", "scope", "profileId", "idempotencyKey", "atMs"]);
+    const action = input.action;
+    if (!A2_ACTIONS.has(action)) throw new TypeError("A2 action is invalid");
+    const scope = a2NormalizeScope(input.scope);
+    const profileId = assertIdentifier(input.profileId, "A2 profileId");
+    const idempotencyKey = input.idempotencyKey;
+    assertTimestamp(input.atMs, "A2 reconciliation time");
+    assertInitialized();
+    if (typeof idempotencyKey !== "string" ||
+        idempotencyKey !== a2OperationKey(action, scope, profileId)) {
+      return Object.freeze({ state: "unknown", claimId: null });
+    }
+    const result = await pool.query(
+      "SELECT claim_id, action, scope, profile_id, idempotency_key, status " +
+      "FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
+      [idempotencyKey]
+    );
+    if (result.rowCount === 0) return Object.freeze({ state: "not-found", claimId: null });
+    const row = result.rows[0];
+    if (!a2SameAction(row, action, scope, profileId, idempotencyKey)) {
+      return Object.freeze({ state: "unknown", claimId: null });
+    }
+    const state = row.status === "completed" ? "completed" : row.status;
+    if (!["claimed", "provider-started", "completed"].includes(state)) {
+      return Object.freeze({ state: "unknown", claimId: null });
+    }
+    return Object.freeze({ state, claimId: row.claim_id });
+  }
+
+  async function complete(rawInput = {}) {
+    const input = a2Input(rawInput, ["claimId", "outcome", "reason", "completedAtMs"], ["providerReconciliation"]);
+    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    const completedAtMs = assertTimestamp(input.completedAtMs, "A2 completedAtMs");
+    if (!["succeeded", "not-applied", "held-for-reconciliation"].includes(input.outcome)) {
+      throw new TypeError("A2 completion outcome is invalid");
+    }
+    if (input.reason !== null &&
+        (typeof input.reason !== "string" || input.reason.length > 160)) {
+      throw new TypeError("A2 completion reason is invalid");
+    }
+    assertInitialized();
+    return runA2Transaction(input.signal, async (client) => {
+      const result = await client.query(
+        "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1 FOR UPDATE",
+        [claimId]
+      );
+      if (result.rowCount !== 1) return Object.freeze({ completed: false });
+      const entry = result.rows[0];
+      const status = entry.status;
+      const claimedAt = toSafeInteger(entry.claimed_at_ms, "A2 claimed_at_ms");
+      if (!["claimed", "provider-started"].includes(status) || completedAtMs < claimedAt) {
+        return Object.freeze({ completed: false });
+      }
+      if (input.outcome === "succeeded") {
+        if (status !== "provider-started" || entry.recovery_record === null ||
+            a2NormalizeRecord(entry.recovery_record, identities).state !== "provider-started") {
+          return Object.freeze({ completed: false });
+        }
+      }
+      if (input.outcome === "not-applied" && status === "provider-started") {
+        try {
+          const proof = input.providerReconciliation;
+          a2ExactKeys(proof, [
+            "schema", "providerId", "action", "scope", "profileId",
+            "idempotencyKey", "outcome", "observedAtMs"
+          ], "A2 provider non-application proof");
+          const proofScope = a2NormalizeScope(proof.scope);
+          if (proof.schema !== "jb.resilience.a2-provider-non-application/v1" ||
+              proof.providerId !== identities.providerId ||
+              proof.action !== entry.action || proof.profileId !== entry.profile_id ||
+              proof.idempotencyKey !== entry.idempotency_key.trim() ||
+              proof.outcome !== "not-applied" ||
+              canonicalJson(proofScope) !== canonicalJson(entry.scope) ||
+              !Number.isSafeInteger(proof.observedAtMs) ||
+              proof.observedAtMs < claimedAt || proof.observedAtMs > completedAtMs) {
+            return Object.freeze({ completed: false });
+          }
+        } catch {
+          return Object.freeze({ completed: false });
+        }
+      }
+      if (input.outcome === "held-for-reconciliation") {
+        if (status === "provider-started" && entry.recovery_record !== null) {
+          const record = a2NormalizeRecord(entry.recovery_record, identities);
+          const updatedAtMs = Math.max(record.updatedAtMs, completedAtMs);
+          await client.query(
+            "UPDATE jb_resilience_a2_action_claims SET reason=$2, recovery_record=$3::jsonb WHERE claim_id=$1",
+            [claimId, input.reason,
+              JSON.stringify({ ...a2RecordCopy(record), state: "held-for-reconciliation", updatedAtMs })]
+          );
+        } else {
+          await client.query(
+            "UPDATE jb_resilience_a2_action_claims SET reason=$2 WHERE claim_id=$1",
+            [claimId, input.reason]
+          );
+        }
+        return Object.freeze({ completed: true });
+      }
+      const updated = await client.query(
+        "UPDATE jb_resilience_a2_action_claims SET status='completed', outcome=$2, reason=$3, " +
+        "completed_at_ms=$4, recovery_record=NULL WHERE claim_id=$1 AND status IN ('claimed','provider-started')",
+        [claimId, input.outcome, input.reason, completedAtMs]
+      );
+      return Object.freeze({ completed: updated.rowCount === 1 });
+    });
+  }
+
+  async function listPending(rawInput = {}) {
+    const input = a2Input(rawInput, ["limit", "atMs"], ["cursor"]);
+    assertTimestamp(input.atMs, "A2 pending page timestamp");
+    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+      throw new TypeError("A2 PostgreSQL pending page limit is invalid");
+    }
+    const { snapshot: cursorSnapshot, last } = a2ParseCursor(input.cursor);
+    assertInitialized();
+    return runA2Transaction(input.signal, async (client) => {
+      const snapshotResult = await client.query(
+        "SELECT COALESCE(MAX(sequence),0)::bigint AS snapshot FROM jb_resilience_a2_action_claims"
+      );
+      const snapshot = cursorSnapshot ?? toSafeInteger(snapshotResult.rows[0].snapshot, "A2 journal snapshot");
+      if (cursorSnapshot !== null && snapshot > toSafeInteger(snapshotResult.rows[0].snapshot, "A2 current max sequence")) {
+        throw new TypeError("A2 pending cursor is ahead of the database ledger");
+      }
+      const result = await client.query(
+        "SELECT claim_id, sequence FROM jb_resilience_a2_action_claims " +
+        "WHERE status IN ('claimed','provider-started') AND sequence > $1 AND sequence <= $2 " +
+        "ORDER BY sequence ASC LIMIT $3",
+        [last, snapshot, input.limit + 1]
+      );
+      const hasMore = result.rows.length > input.limit;
+      const selected = result.rows.slice(0, input.limit);
+      const claimIds = selected.map((row) => row.claim_id);
+      const nextCursor = hasMore && selected.length > 0
+        ? "a2pg1:" + snapshot + ":" + toSafeInteger(selected[selected.length - 1].sequence, "A2 page sequence")
+        : null;
+      return Object.freeze({
+        claimIds: Object.freeze(claimIds),
+        nextCursor
+      });
+    }, "REPEATABLE READ");
+  }
+
+  async function getPendingByClaimId(rawInput = {}) {
+    const input = a2Input(rawInput, ["claimId", "atMs"]);
+    const claimId = assertIdentifier(input.claimId, "A2 claimId");
+    assertTimestamp(input.atMs, "A2 exact lookup timestamp");
+    assertInitialized();
+    const result = await pool.query(
+      "SELECT status, recovery_record FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
+      [claimId]
+    );
+    if (result.rowCount !== 1 || !["claimed", "provider-started"].includes(result.rows[0].status) ||
+        result.rows[0].recovery_record === null) {
+      return Object.freeze({ found: false, record: null });
+    }
+    const record = a2NormalizeRecord(result.rows[0].recovery_record, identities);
+    return Object.freeze({ found: true, record: Object.freeze(a2RecordCopy(record)) });
+  }
+
+  return Object.freeze({
+    durable: true,
+    dialect: "postgresql",
+    initialize,
+    claim,
+    createPendingRecord,
+    markProviderStarted,
+    reconcile,
+    complete,
+    listPending,
+    getPendingByClaimId
+  });
+}
