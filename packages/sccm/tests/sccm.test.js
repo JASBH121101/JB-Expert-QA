@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 57);
+  assert.equal(history.length, 64);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const source = node && inventory.sources.find((item) => item.id === node.sourceId);
@@ -208,17 +208,30 @@ test("the Language QA dependency is certified without certifying all of Localiza
   assert.ok(localizationEngine.blockingChildren.length > 0);
 });
 
-test("visual QA module passes while uncertified sibling components keep Expert QA pending", () => {
+test("Visual QA branch and module pass while uncertified sibling branches keep Expert QA pending", () => {
   const visual = evaluateSccmNode(inventory, history, "jb.expert-qa.visual.module");
   const visualBranch = evaluateSccmNode(inventory, history, "jb.expert-qa.visual");
   const expert = evaluateSccmNode(inventory, history, "jb.expert-qa");
   assert.equal(visual.ownStatus, "PASS");
   assert.equal(visual.status, "PASS");
-  assert.equal(visualBranch.status, "PENDING");
+  assert.equal(visualBranch.status, "PASS");
+  assert.equal(visualBranch.children[0].status, "PASS");
   assert.equal(visual.blockingChildren.length, 0);
   assert.equal(expert.ownStatus, "PASS");
   assert.equal(expert.status, "PENDING");
   assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
+});
+
+test("Security QA branch, static-analysis subbranch and module are PASS within their declared scope", () => {
+  const branch = evaluateSccmNode(inventory, history, "jb.expert-qa.security");
+  const subbranch = evaluateSccmNode(inventory, history, "jb.expert-qa.security.static-analysis");
+  const module = evaluateSccmNode(inventory, history, "jb.expert-qa.security.module");
+  assert.equal(branch.status, "PASS");
+  assert.equal(subbranch.status, "PASS");
+  assert.equal(module.status, "PASS");
+  assert.equal(module.children.length, 3);
+  assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
 });
 
 test("Resilience A2 subbranch passes while the whole engine remains pending for other branches", () => {
@@ -303,7 +316,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 25);
+  assert.equal(report.counts.component.PASS, 28);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);

@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.2",
-  "generatedAt": "2026-11-18T21:46:27Z",
+  "inventoryVersion": "1.0.3",
+  "generatedAt": "2026-11-18T22:03:00Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -26,6 +26,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "certify/resilience-a1-a3-component-matrix-v1",
       "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2"
+    },
+    {
+      "id": "jb-expert-qa-current-certification-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "main",
+      "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15"
     }
   ],
   "nodes": [
@@ -246,7 +252,7 @@
       "name": "Visual QA",
       "level": "branch",
       "parentId": "jb.expert-qa",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -256,7 +262,7 @@
       "name": "Browser and visual analysis",
       "level": "subbranch",
       "parentId": "jb.expert-qa.visual",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -316,7 +322,7 @@
       "name": "Security QA",
       "level": "branch",
       "parentId": "jb.expert-qa",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -326,7 +332,7 @@
       "name": "Static security analysis",
       "level": "subbranch",
       "parentId": "jb.expert-qa.security",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -346,7 +352,7 @@
       "name": "Security rule integrity",
       "level": "component",
       "parentId": "jb.expert-qa.security.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -356,7 +362,7 @@
       "name": "Dependency vulnerability audit",
       "level": "component",
       "parentId": "jb.expert-qa.security.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -366,7 +372,7 @@
       "name": "Finding evidence and severity",
       "level": "component",
       "parentId": "jb.expert-qa.security.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-current-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
