@@ -1,19 +1,10 @@
 import { DEFAULT_SEVERITY_PENALTIES, SEVERITIES } from "./severities.js";
 import { isValidSpecialistId } from "./rule-registry.js";
-
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
+import { snapshotPlainRecord } from "./safe-record.js";
 
 export function validateEngineConfig(input = {}) {
-  if (!isRecord(input)) {
-    throw new TypeError("Engine config must be an object");
-  }
-
-  const weights = input.weights ?? {};
-  if (!isRecord(weights)) {
-    throw new TypeError("config.weights must be an object");
-  }
+  const suppliedConfig = snapshotPlainRecord(input, "Engine config");
+  const weights = snapshotPlainRecord(suppliedConfig.weights ?? {}, "config.weights");
   for (const [specialist, weight] of Object.entries(weights)) {
     if (!isValidSpecialistId(specialist)) {
       throw new TypeError("Invalid specialist id in config.weights: \"" + specialist + "\"");
@@ -23,10 +14,9 @@ export function validateEngineConfig(input = {}) {
     }
   }
 
-  const suppliedPenalties = input.severityPenalties ?? {};
-  if (!isRecord(suppliedPenalties)) {
-    throw new TypeError("config.severityPenalties must be an object");
-  }
+  const suppliedPenalties = snapshotPlainRecord(
+    suppliedConfig.severityPenalties ?? {}, "config.severityPenalties"
+  );
   for (const [severity, penalty] of Object.entries(suppliedPenalties)) {
     if (!SEVERITIES.includes(severity)) {
       throw new TypeError("Unknown severity penalty: \"" + severity + "\"");
@@ -36,10 +26,9 @@ export function validateEngineConfig(input = {}) {
     }
   }
 
-  const thresholds = input.thresholds ?? {};
-  if (!isRecord(thresholds)) {
-    throw new TypeError("config.thresholds must be an object");
-  }
+  const thresholds = snapshotPlainRecord(
+    suppliedConfig.thresholds ?? {}, "config.thresholds"
+  );
   const minimumScore = thresholds.minimumScore ?? 80;
   if (typeof minimumScore !== "number" || !Number.isFinite(minimumScore) ||
       minimumScore < 0 || minimumScore > 100) {
@@ -50,10 +39,7 @@ export function validateEngineConfig(input = {}) {
     throw new TypeError("config.thresholds.failOnCritical must be a boolean");
   }
 
-  const scan = input.scan ?? {};
-  if (!isRecord(scan)) {
-    throw new TypeError("config.scan must be an object");
-  }
+  const scan = snapshotPlainRecord(suppliedConfig.scan ?? {}, "config.scan");
   const scanDefaults = {
     maxFiles: 2500,
     maxFileBytes: 1_000_000,
@@ -69,10 +55,9 @@ export function validateEngineConfig(input = {}) {
     }
   }
 
-  const suppliedAdvisories = input.advisories ?? {};
-  if (!isRecord(suppliedAdvisories)) {
-    throw new TypeError("config.advisories must be an object");
-  }
+  const suppliedAdvisories = snapshotPlainRecord(
+    suppliedConfig.advisories ?? {}, "config.advisories"
+  );
   const advisoryDefaults = {
     enabled: false,
     required: false,
@@ -104,10 +89,9 @@ export function validateEngineConfig(input = {}) {
   }
   const advisories = { ...advisoryDefaults, ...suppliedAdvisories };
 
-  const suppliedExecution = input.execution ?? {};
-  if (!isRecord(suppliedExecution)) {
-    throw new TypeError("config.execution must be an object");
-  }
+  const suppliedExecution = snapshotPlainRecord(
+    suppliedConfig.execution ?? {}, "config.execution"
+  );
   const executionDefaults = { ruleTimeoutMs: 15000 };
   for (const [name, value] of Object.entries(suppliedExecution)) {
     if (!Object.hasOwn(executionDefaults, name)) {
@@ -119,13 +103,13 @@ export function validateEngineConfig(input = {}) {
   }
   const execution = { ...executionDefaults, ...suppliedExecution };
 
-  const profile = input.profile ?? "custom";
+  const profile = suppliedConfig.profile ?? "custom";
   if (typeof profile !== "string" || !profile.trim()) {
     throw new TypeError("config.profile must be a non-empty string");
   }
 
   return Object.freeze({
-    ...input,
+    ...suppliedConfig,
     profile,
     weights: Object.freeze({ ...weights }),
     severityPenalties: Object.freeze({
