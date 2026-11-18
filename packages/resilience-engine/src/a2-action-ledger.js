@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import {
   mkdir, open, readFile, rename, unlink, lstat
 } from "node:fs/promises";
@@ -355,16 +356,39 @@ async function withFileLock(lockPath, options, signal, operation) {
 }
 
 async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
+  let handle;
   try {
-    const metadata = await lstat(filePath);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+    // Open the journal itself without following a symbolic link. The lstat +
+    // readFile sequence was vulnerable to a path-swap between the two calls.
+    const noFollow = typeof fsConstants.O_NOFOLLOW === "number"
+      ? fsConstants.O_NOFOLLOW : 0;
+    handle = await open(filePath, fsConstants.O_RDONLY | noFollow);
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) {
       throw new Error("A2 action ledger path must be a regular file, not a symbolic link");
     }
-    if (metadata.size > maxBytes) throw new Error("A2 action ledger exceeds the configured size limit");
-    return validateLedger(JSON.parse(await readFile(filePath, "utf8")), maxClaims, identities);
+    // Windows may not expose O_NOFOLLOW. In that case, compare the opened
+    // file descriptor with the path metadata before reading any journal data.
+    if (noFollow === 0) {
+      const pathMetadata = await lstat(filePath);
+      if (pathMetadata.isSymbolicLink() || !pathMetadata.isFile() ||
+          pathMetadata.dev !== metadata.dev || pathMetadata.ino !== metadata.ino) {
+        throw new Error("A2 action ledger path must be a regular file, not a symbolic link");
+      }
+    }
+    if (metadata.size > maxBytes) {
+      throw new Error("A2 action ledger exceeds the configured size limit");
+    }
+    const serialized = await handle.readFile("utf8");
+    return validateLedger(JSON.parse(serialized), maxClaims, identities);
   } catch (error) {
     if (error?.code === "ENOENT") return emptyLedger();
+    if (error?.code === "ELOOP" || error?.code === "EMLINK") {
+      throw new Error("A2 action ledger path must be a regular file, not a symbolic link", { cause: error });
+    }
     throw error;
+  } finally {
+    if (handle) await handle.close().catch(() => {});
   }
 }
 
