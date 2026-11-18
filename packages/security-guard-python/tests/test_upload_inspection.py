@@ -59,6 +59,8 @@ class MemoryStorage:
     def delete(self, upload_id):
         self.deleted.append(upload_id)
         self.quarantine.pop(upload_id, None)
+        self.approved.pop(upload_id, None)
+        self.approved_attestations.pop(upload_id, None)
 
 
 class Scanner:
