@@ -11,6 +11,77 @@ use JB\SecurityGuard\UploadMalwareScanner;
 use JB\SecurityGuard\UploadQuarantineStorage;
 use RuntimeException;
 
+final class UploadInspectionTransientEmptyStream
+{
+    /** @var array<string, array{prefix:string, payload:string}> */
+    private static array $payloads = [];
+    private string $prefix = '';
+    private string $payload = '';
+    private int $position = 0;
+    private bool $paused = false;
+    public mixed $context;
+
+    public static function open(string $uploadId, string $bytes): mixed
+    {
+        $scheme = 'jbsg-transient-empty-test';
+        if (!in_array($scheme, stream_get_wrappers(), true)) {
+            if (!stream_wrapper_register($scheme, self::class)) {
+                return false;
+            }
+        }
+        self::$payloads[$uploadId] = [
+            'prefix' => $bytes,
+            'payload' => $bytes . 'TRAILING',
+        ];
+        return fopen($scheme . '://' . $uploadId, 'rb');
+    }
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+    {
+        if ($mode !== 'rb') {
+            return false;
+        }
+        $uploadId = parse_url($path, PHP_URL_HOST);
+        if (!is_string($uploadId) || !isset(self::$payloads[$uploadId])) {
+            return false;
+        }
+        $this->prefix = self::$payloads[$uploadId]['prefix'];
+        $this->payload = self::$payloads[$uploadId]['payload'];
+        return true;
+    }
+
+    public function stream_read(int $count): string
+    {
+        if ($this->position === strlen($this->prefix) && !$this->paused) {
+            $this->paused = true;
+            return '';
+        }
+        $chunk = substr($this->payload, $this->position, $count);
+        $this->position += strlen($chunk);
+        return $chunk;
+    }
+
+    public function stream_eof(): bool
+    {
+        return $this->position >= strlen($this->payload);
+    }
+
+    public function stream_stat(): array
+    {
+        return [];
+    }
+
+    public function url_stat(string $path, int $flags): array|false
+    {
+        return false;
+    }
+
+    public function stream_set_option(int $option, int $arg1, int $arg2): bool
+    {
+        return false;
+    }
+}
+
 final class UploadInspectionTestStorage implements UploadQuarantineStorage
 {
     private string $quarantine;
@@ -19,7 +90,8 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
 
     public function __construct(
         string $root,
-        private readonly bool $alterScanContent = false
+        private readonly bool $alterScanContent = false,
+        private readonly bool $transientEmptyAtEof = false
     ) {
         $this->quarantine = $root . '/quarantine';
         $this->approved = $root . '/approved';
@@ -37,6 +109,12 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
         $path = $this->quarantine . '/' . $uploadId;
         if (!is_file($path)) {
             return false;
+        }
+        if ($this->transientEmptyAtEof) {
+            $bytes = file_get_contents($path);
+            return is_string($bytes)
+                ? UploadInspectionTransientEmptyStream::open($uploadId, $bytes)
+                : false;
         }
         if (!$this->alterScanContent) {
             return fopen($path, 'rb');
@@ -295,6 +373,26 @@ function runUploadInspectionServiceTests(): void
         expect($partialRejected, 'A scanner that reads only one byte must not satisfy complete consumption');
         expect($partialStore->quarantineCount() === 1 && $partialStore->approvedCount() === 0,
             'A partial one-byte scan must remain private in quarantine');
+
+        $transientEmptyStore = new UploadInspectionTestStorage(
+            $root . '/transient-empty-before-trailing-bytes',
+            false,
+            true
+        );
+        $transientEmpty = new UploadInspectionService(
+            $transientEmptyStore,
+            new UploadInspectionTestScanner()
+        );
+        $transientEmptyRejected = false;
+        try {
+            $transientEmpty->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $transientEmptyRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($transientEmptyRejected,
+            'A transient empty read before trailing bytes must never be treated as true EOF');
+        expect($transientEmptyStore->quarantineCount() === 1 && $transientEmptyStore->approvedCount() === 0,
+            'A non-EOF empty read must remain quarantined and never be promoted');
 
         $changedStore = new UploadInspectionTestStorage($root . '/changed-scan-content', true);
         $changed = new UploadInspectionService(
