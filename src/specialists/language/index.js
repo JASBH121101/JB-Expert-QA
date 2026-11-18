@@ -36,6 +36,11 @@ function titleFor(id) {
     "placeholder-mismatch": "Translation placeholders do not match",
     "obsolete-key": "Target locale contains an obsolete key",
     "glossary-review": "Glossary terminology requires review",
+    "unchanged-source-text": "Source text may be untranslated",
+    "protected-url-mismatch": "Translation link differs from source",
+    "protected-email-mismatch": "Translation email differs from source",
+    "protected-markup-mismatch": "Translation markup structure differs",
+    "protected-number-mismatch": "Translation numeric literal differs",
     "missing-locale-file": "Translation resource is missing",
     "target-file-without-source": "Target resource has no source file",
     "resource-parse-error": "Translation resource could not be parsed safely"
@@ -57,5 +62,9 @@ function recommendationFor(id) {
   if (id === "obsolete-key") return "Confirm whether the target key should be removed or the source key restored.";
   if (id === "glossary-review") return "Check the approved glossary and local context; this is a low-confidence advisory, not an automatic translation error.";
   if (id === "resource-parse-error") return "Use a static literal translation array or JSON object. The parser deliberately refuses executable PHP.";
+  if (id === "unchanged-source-text") return "Confirm whether the source text is intentionally shared across locales or needs a reviewed translation.";
+  if (id === "protected-url-mismatch" || id === "protected-email-mismatch") return "Verify the link or email destination before approving the localized message.";
+  if (id === "protected-markup-mismatch") return "Restore equivalent HTML structure and validate nesting before approval.";
+  if (id === "protected-number-mismatch") return "Check the numeric value and use locale-aware formatting where appropriate.";
   return "Review the locale resource pair and confirm that public-facing text is complete and appropriate.";
 }

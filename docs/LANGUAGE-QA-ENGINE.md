@@ -18,6 +18,7 @@ The legacy locale label **es** and an explicit allowlist of Latin-American alias
 - Exact placeholder parity checks for Laravel :name, {name}, {{ name }} and positional printf placeholders.
 - A curated bilingual glossary for consistent core product terminology.
 - Deterministic glossary suggestions with no network call, no provider selection and no automatic approval.
+- Semantic-integrity signals for suspicious unchanged copy and protected URLs, email addresses, HTML tag structure and numeric literals.
 - Translation memory API with exact source/locale/context lookup and explicit stale state.
 - Human review states: pending, partial, review-required, approved and stale.
 - Project-audit integration and a dedicated language-audit CLI.
@@ -44,7 +45,7 @@ The PHP parser accepts only a static returned associative array made of literal 
 
 The tool does not translate arbitrary text with an AI provider. Glossary suggestions are terminology hints, not complete translations. Glossary mismatch findings are low-confidence advisory findings and require review.
 
-Structural validation never certifies semantic accuracy, tone, legal wording or cultural suitability. A translation is only marked **approved** when a named human reviewer explicitly records approval. A later source/target change must be reviewed again.
+Structural and semantic-integrity checks never certify meaning, tone, legal wording or cultural suitability. The new semantic checks are deterministic signals: identical source/target copy can be intentional (for example, a brand name), and numeric formatting may legitimately vary. Findings therefore require human review and are not proof of a mistranslation. A translation is only marked **approved** when a named human reviewer explicitly records approval. A later source/target change must be reviewed again.
 
 The initial TranslationMemory implementation is an in-memory API. Durable storage, collaborative review UI, TM import/export and per-key persisted approvals are follow-up work; no database schema is silently added in this phase.
 
@@ -54,6 +55,7 @@ The initial TranslationMemory implementation is an in-memory API. Durable storag
 - Unsupported: executable PHP, arbitrary PHP expressions, YAML, PO/POT, XLIFF, ICU message syntax validation and framework-specific dynamic translation functions.
 - Maximum: 500 files per locale and 2 MB per individual resource.
 - The glossary is an initial curated set and can produce false positives; its findings are advisory.
+- Semantic checks protect measurable content and flag likely untranslated copy, but do not infer meaning or assess fluency; identical words and numeric representations may be valid in context.
 - No AI, online translation API, paid key, network transmission or external provider is used.
 - The auditor checks structure and a limited glossary. It does not claim native-speaker quality assurance.
 
@@ -65,3 +67,8 @@ The initial TranslationMemory implementation is an in-memory API. Durable storag
 ## Structural audit hardening
 
 Nested leaf-versus-object changes are reported as `message-shape-mismatch` rather than a confusing pair of missing and obsolete keys. The test suite covers malformed locale tags, unsupported regional aliases and nested structural mismatches. The audit remains deterministic and dependency-free.
+
+
+## Semantic integrity validation
+
+`auditTranslationSemantics` operates on flattened string maps and reports review-only findings for identical source/target text and differences in URLs, email addresses, HTML tag order/structure or numeric literals. `auditTranslationMaps` includes these findings in its result counts and the Language QA specialist exposes them to the project auditor. Use `allowUntranslatedKeys` for approved brand names or other intentionally shared labels. No finding is auto-approved, and no semantic model or network provider is required.

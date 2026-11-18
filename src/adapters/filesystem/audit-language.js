@@ -200,7 +200,9 @@ export async function auditLanguageFiles(projectRoot, {
       parseErrors: parseErrors.length,
       missingKeys: findings.filter((item) => item.id === "missing-key").length,
       placeholderMismatches: findings.filter((item) => item.id === "placeholder-mismatch").length,
-      glossaryReview: findings.filter((item) => item.id === "glossary-review").length
+      glossaryReview: findings.filter((item) => item.id === "glossary-review").length,
+      unchangedSourceText: findings.filter((item) => item.id === "unchanged-source-text").length,
+      protectedTokenMismatches: findings.filter((item) => item.id.startsWith("protected-")).length
     })
   });
 }

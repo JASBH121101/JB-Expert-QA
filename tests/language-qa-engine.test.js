@@ -7,7 +7,7 @@ import {
   DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, resolveLocale,
   comparePlaceholders, parsePhpTranslationArray, LanguageLibrary,
   TranslationMemory, recordTranslationReview, resolveTranslationState,
-  auditTranslationMaps, flattenTranslationMap
+  auditTranslationMaps, flattenTranslationMap, auditTranslationSemantics
 } from "../src/language/index.js";
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -222,4 +222,81 @@ test("translation flattening bounds recursion and rejects ambiguous duplicate pa
   let deep = { value: "end" };
   for (let index = 0; index < 26; index += 1) deep = { child: deep };
   assert.throws(() => flattenTranslationMap(deep), /maximum nesting depth/);
+});
+
+
+test("semantic audit flags unchanged copy and respects explicit untranslated-key allowlists", () => {
+  const findings = auditTranslationSemantics(
+    { "settings.title": "Settings", "brand.name": "JB Collections" },
+    { "settings.title": "Settings", "brand.name": "JB Collections" },
+    {
+      sourceLocale: "en",
+      targetLocale: "es-419",
+      allowUntranslatedKeys: ["brand.name"]
+    }
+  );
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].id, "unchanged-source-text");
+  assert.equal(findings[0].key, "settings.title");
+  assert.equal(findings[0].severity, "low");
+});
+
+test("semantic audit preserves URL, email, markup and numeric literals", () => {
+  const findings = auditTranslationSemantics(
+    {
+      link: "Read https://example.test/terms",
+      contact: "Email support@example.test",
+      markup: "<strong>Save</strong>",
+      quantity: "There are 12 items"
+    },
+    {
+      link: "Leer https://example.test/conditions",
+      contact: "Correo help@example.test",
+      markup: "<b>Guardar</b>",
+      quantity: "Hay 13 artículos"
+    },
+    { sourceLocale: "en", targetLocale: "es-419" }
+  );
+  const ids = findings.map((item) => item.id);
+  assert.ok(ids.includes("protected-url-mismatch"));
+  assert.ok(ids.includes("protected-email-mismatch"));
+  assert.ok(ids.includes("protected-markup-mismatch"));
+  assert.ok(ids.includes("protected-number-mismatch"));
+  assert.ok(findings.every((item) => item.confidence === "mechanical-signal"));
+});
+
+test("semantic audit rejects accessor properties without executing them", () => {
+  let invoked = false;
+  const source = {};
+  Object.defineProperty(source, "message", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "Settings";
+    }
+  });
+  assert.throws(
+    () => auditTranslationSemantics(source, { message: "Ajustes" }, { sourceLocale: "en", targetLocale: "es-419" }),
+    /accessor properties/
+  );
+  assert.equal(invoked, false);
+});
+
+test("translation map audit surfaces semantic signals to the Language QA specialist without auto-approval", () => {
+  const result = auditTranslationMaps(
+    { title: "Settings", link: "Read https://example.test/help" },
+    { title: "Settings", link: "Abrir https://example.test/ayuda" },
+    { sourceLocale: "en", targetLocale: "es-419" }
+  );
+  assert.equal(result.counts.unchangedSourceText, 1);
+  assert.equal(result.counts.protectedTokenMismatches, 1);
+  assert.equal(result.reviewStatus, "review-required");
+  const diagnostics = languageRules[0].evaluate({ languageAudit: {
+    status: "checked",
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    findings: result.findings
+  } });
+  assert.ok(diagnostics.some((item) => item.title === "Source text may be untranslated"));
+  assert.ok(diagnostics.some((item) => item.title === "Translation link differs from source"));
 });
