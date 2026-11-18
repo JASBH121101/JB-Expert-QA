@@ -11,9 +11,9 @@ use Throwable;
 
 
 /**
- * Exposes a quarantine file to the scanner as a sequential, read-only stream.
- * Seeking is deliberately unsupported so ftell/EOF cannot be forged by jumping
- * to the end without consuming the bytes.
+ * Sequential reader over one quarantined object.
+ * Only bounded read() calls are exposed; the underlying resource and seek APIs
+ * are never passed to the scanner, so accounting reflects bytes actually delivered.
  */
 final class UploadInspectionReadOnlyStream
 {
