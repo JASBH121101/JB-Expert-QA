@@ -42,8 +42,10 @@ The unified assessment uses the same six-tier weighting and readiness rules as T
 - A structural target-scope skip remains visible but is excluded from the target's applicable score.
 - A required target absent from all source reports is listed as missing and blocks the unified ready state.
 
-The required default targets are the four JB engines and the two independently scoped NEXORA products:
-jb-malware-engine, jb-security-guard, jb-expert-qa, jb-advisor-engine, nexora-configurable-catalog and nexora-site-engine.
+The required default targets in the monorepo report are the four JB engines:
+jb-malware-engine, jb-security-guard, jb-expert-qa and jb-advisor-engine.
+
+NEXORA Configurable Catalog and NEXORA Site Engine are separately scoped targets validated by the dedicated NEXORA Threat Lab product workflow. Their source repositories are not mounted in the monorepo certification runner, so their absence from this report is not interpreted as either a pass or a failure. If their product reports are explicitly added to a future combined product-level report, they remain separate target identities and readiness records.
 
 ## Artifact and interpretation
 
