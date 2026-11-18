@@ -143,6 +143,10 @@ final class UploadInspectionReadOnlyStream
 
     public function stream_set_option(int $option, int $arg1, int $arg2): bool
     {
+        if ($option === STREAM_OPTION_READ_BUFFER) {
+            return $arg1 === STREAM_BUFFER_NONE && $arg2 === 0;
+        }
+
         return false;
     }
 
@@ -293,6 +297,9 @@ final class UploadInspectionService
                 throw new UploadInspectionException('STORAGE_UNAVAILABLE');
             }
             $this->assertStream($scanStream, false);
+            if (stream_set_read_buffer($scanStream, 0) !== 0) {
+                throw new UploadInspectionException('STORAGE_UNAVAILABLE');
+            }
             try {
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
                 $scanDisposition = UploadInspectionReadOnlyStream::verifyComplete(
