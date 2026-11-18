@@ -12,7 +12,8 @@ import {
   validateRateLimitPolicyV1,
   validateThreatSignalV1,
   validateThreatAssessmentV1,
-  validateThreatAssessmentPolicyV1
+  validateThreatAssessmentPolicyV1,
+  validateUploadInspectionAttestationV1
 } from "@jb/security-guard/core-contract-v1";
 import { isDeepStrictEqual } from "node:util";
 
@@ -277,3 +278,35 @@ test("shared upload inspection vectors remain deterministic and bounded", async 
   }
 });
 
+\ntest("upload inspection attestation schema and runtime validator bind exact object evidence", async () => {
+  const schema = schemasById.get("urn:jb:security-guard:upload-inspection:attestation:v1");
+  assert.ok(schema);
+  const fixtureRoot = path.join(coreRoot, "tests", "fixtures", "upload-inspection");
+  for (const [name, verdict] of [
+    ["attestation-clean.valid.json", "clean"],
+    ["attestation-malicious.valid.json", "malicious"],
+    ["attestation-unknown.valid.json", "unknown"]
+  ]) {
+    const fixture = JSON.parse(await readFile(path.join(fixtureRoot, name), "utf8"));
+    assert.deepEqual(validateSchema(schema, fixture), []);
+    assert.equal(validateUploadInspectionAttestationV1(fixture).verdict, verdict);
+  }
+
+  const clean = JSON.parse(await readFile(path.join(fixtureRoot, "attestation-clean.valid.json"), "utf8"));
+  for (const invalid of [
+    { ...clean, sha256: "A".repeat(64) },
+    { ...clean, size: 0 },
+    { ...clean, size: 104857601 },
+    { ...clean, mimeType: "application/x-msdownload" },
+    { ...clean, verdict: "no_match" },
+    { ...clean, engine: "" },
+    { ...clean, originalFileName: "customer-secret.png" }
+  ]) {
+    assert.notDeepEqual(validateSchema(schema, invalid), []);
+    assert.throws(() => validateUploadInspectionAttestationV1(invalid));
+  }
+
+  const evidence = validateUploadInspectionAttestationV1(clean);
+  assert.equal(Object.hasOwn(evidence, "approved"), false);
+  assert.equal(Object.hasOwn(evidence, "promoted"), false);
+});
