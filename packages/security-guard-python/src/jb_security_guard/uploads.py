@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import secrets
 from datetime import datetime, timezone
@@ -87,6 +88,55 @@ def _write_all(stream: BinaryIO, chunk: bytes) -> None:
         if not isinstance(written, int) or written <= 0:
             raise UploadInspectionError("QUARANTINE_WRITE_FAILED")
         offset += written
+
+
+class _VerifiedScannerStream(io.RawIOBase):
+    """Read-only stream that independently hashes and counts bytes delivered to a scanner."""
+
+    def __init__(self, source: BinaryIO, expected_size: int, expected_sha256: str) -> None:
+        super().__init__()
+        self._source = source
+        self._expected_size = expected_size
+        self._expected_sha256 = expected_sha256
+        self._digest = hashlib.sha256()
+        self._consumed = 0
+        self._eof = False
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
+
+    def readinto(self, buffer: Any) -> int:
+        if len(buffer) == 0 or self._eof:
+            return 0
+        remaining = self._expected_size - self._consumed
+        chunk = self._source.read(min(len(buffer), remaining + 1))
+        if chunk is None or not isinstance(chunk, bytes):
+            raise UploadInspectionError("SCAN_INCOMPLETE")
+        if len(chunk) > remaining:
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
+        if chunk == b"":
+            self._eof = True
+            return 0
+        buffer[: len(chunk)] = chunk
+        self._digest.update(chunk)
+        self._consumed += len(chunk)
+        return len(chunk)
+
+    def verify_complete(self) -> bool:
+        if self._consumed != self._expected_size:
+            return False
+        if not self._eof:
+            extra = self._source.read(1)
+            if extra is None or not isinstance(extra, bytes) or extra != b"":
+                return False
+            self._eof = True
+        return self._digest.hexdigest() == self._expected_sha256
+
+    def tell(self) -> int:
+        return self._consumed
 
 
 class UploadInspectionService:
@@ -196,12 +246,20 @@ class UploadInspectionService:
             sha256 = digest.hexdigest()
             metadata = {"size": size, "sha256": sha256, "mimeType": detected_type}
             scan_stream = self._storage.open_quarantine_stream(upload_id)
+            verified_scan_stream = _VerifiedScannerStream(scan_stream, size, sha256)
             try:
-                scan_result = self._scanner.scan(scan_stream, metadata)
+                scan_result = self._scanner.scan(verified_scan_stream, metadata)
+                if not verified_scan_stream.verify_complete():
+                    retain_quarantine = True
+                    raise UploadInspectionError("SCAN_INCOMPLETE")
+            except UploadInspectionError:
+                retain_quarantine = True
+                raise
             except Exception as exc:
                 retain_quarantine = True
                 raise UploadInspectionError("SCANNER_UNAVAILABLE") from exc
             finally:
+                verified_scan_stream.close()
                 scan_stream.close()
 
             if not isinstance(scan_result, dict) or set(scan_result) != {
