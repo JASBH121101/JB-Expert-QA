@@ -65,3 +65,76 @@ jobs:
         env:
           PYTHONPATH: packages/security-guard-python/src
         run: python3 -m unittest discover -s packages/security-guard-python/tests -v
+
+  php-composer-distribution:
+    name: PHP Composer archive / clean consumer (PHP 8.2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Verify PHP and Composer
+        run: |
+          php -v
+          composer --version
+          php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2 or newer is required.\n"); exit(1); }'
+      - name: Validate Composer manifest and create distribution archive
+        working-directory: packages/security-guard-php
+        run: |
+          composer validate --no-check-publish composer.json
+          mkdir -p "$RUNNER_TEMP/composer-artifacts"
+          composer archive --format=zip --dir="$RUNNER_TEMP/composer-artifacts" --file=jb-security-guard-php
+          test -s "$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
+      - name: Install archive into a clean consumer
+        run: |
+          mkdir -p "$RUNNER_TEMP/php-consumer"
+          cat > "$RUNNER_TEMP/php-consumer/composer.json" <<EOF
+          {
+            "name": "jb/security-guard-consumer-fixture",
+            "type": "project",
+            "repositories": [
+              {
+                "type": "artifact",
+                "url": "$RUNNER_TEMP/composer-artifacts"
+              }
+            ],
+            "require": {
+              "jb/security-guard-php": "0.1.0"
+            }
+          }
+          EOF
+          composer install --working-dir="$RUNNER_TEMP/php-consumer" --no-interaction --no-scripts --no-progress
+          php -r 'require $argv[1]; if (!class_exists("JB\\SecurityGuard\\UploadInspectionService")) { fwrite(STDERR, "Composer archive autoload failed.\n"); exit(1); }' "$RUNNER_TEMP/php-consumer/vendor/autoload.php"
+
+  python-wheel-sdist-distribution:
+    name: Python wheel and sdist / clean consumers (Python 3.11)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Verify Python runtime
+        run: |
+          python3 --version
+          python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11 or newer is required"'
+      - name: Build wheel and source distribution
+        run: |
+          python3 -m pip install --disable-pip-version-check build
+          python3 -m build --sdist --wheel --outdir "$RUNNER_TEMP/python-dist" packages/security-guard-python
+          test "$(find "$RUNNER_TEMP/python-dist" -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          test "$(find "$RUNNER_TEMP/python-dist" -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+      - name: Install wheel into a clean consumer
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wheel-consumer"
+          "$RUNNER_TEMP/wheel-consumer/bin/python" -m pip install --disable-pip-version-check --no-deps "$RUNNER_TEMP"/python-dist/*.whl
+          "$RUNNER_TEMP/wheel-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard import UniversalRateLimitClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(UniversalRateLimitClient)'
+      - name: Install source distribution into a clean consumer
+        run: |
+          python3 -m venv "$RUNNER_TEMP/sdist-consumer"
+          "$RUNNER_TEMP/sdist-consumer/bin/python" -m pip install --disable-pip-version-check --no-deps "$RUNNER_TEMP"/python-dist/*.tar.gz
+          "$RUNNER_TEMP/sdist-consumer/bin/python" -c 'from jb_security_guard.uploads import UploadInspectionService, UploadInspectionError; from jb_security_guard import UniversalRateLimitClient; assert callable(UploadInspectionService); assert issubclass(UploadInspectionError, RuntimeError); assert callable(UniversalRateLimitClient)'
+
