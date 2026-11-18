@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.0",
-  "generatedAt": "2026-11-18T19:08:00Z",
+  "inventoryVersion": "1.0.1",
+  "generatedAt": "2026-11-18T20:28:16Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -13,7 +13,7 @@
       "id": "jb-expert-qa-language-qa-pr167",
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
-      "commitSha": "62b9440f151c6f881b46f92529c0f92d82b2ae35"
+      "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00"
     }
   ],
   "nodes": [
