@@ -93,18 +93,8 @@ export function auditTranslationSemantics(sourceMap, targetMap, {
     const sourceTokens = extractProtectedTokens(sourceText);
     const targetTokens = extractProtectedTokens(targetText);
 
-    if (!allowed.has(key) && sourceText !== targetText &&
+    if (!allowed.has(key) &&
         comparableText(sourceText) === comparableText(targetText) &&
-        [...sourceText].filter((character) => /\p{L}/u.test(character)).length >= 5) {
-      findings.push(makeMismatch(
-        key,
-        "unchanged-source-text",
-        "Source and target text are identical; confirm this is intentional for the target locale.",
-        sourceText,
-        targetText,
-        "low"
-      ));
-    } else if (!allowed.has(key) && comparableText(sourceText) === comparableText(targetText) &&
         [...sourceText].filter((character) => /\p{L}/u.test(character)).length >= 5) {
       findings.push(makeMismatch(
         key,
