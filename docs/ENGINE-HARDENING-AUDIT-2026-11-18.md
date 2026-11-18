@@ -8,7 +8,7 @@
 
 ## Executive decision
 
-The reviewed changes show strong automated regression and distribution evidence. The current Malware Engine PowerShell lexer head `603da7e26a43635faa35bc4fe79baf223b29333d` passed its complete targeted package workflow and repository integration matrix: **42/42 workflow jobs** via #144. Security Guard's newer integrated candidate #145 has been rebuilt from the exact #136 head after discovering that #139 was based on a stale merge base; #145's full CI is now pending. This supports **laboratory / CI certification only** for the individually tested scopes, not production readiness, real-world antivirus effectiveness, exploit resistance, or independent third-party certification.
+The reviewed changes show strong automated regression and distribution evidence. The current Malware Engine PowerShell lexer head `603da7e26a43635faa35bc4fe79baf223b29333d` passed its complete targeted package workflow and repository integration matrix: **42/42 workflow jobs** via #144. Security Guard's canonical integrated candidate #145 is built directly on the exact #136 head. Its latest exact head `44109341a508bc3412b649658ff89845baff7fa2` passed all eight required workflows (30/30 jobs). This supports **laboratory / CI certification only** for the individually tested scopes, not production readiness, real-world antivirus effectiveness, exploit resistance, or independent third-party certification.
 
 No changes were made to `main`; the temporary validation PR #144 and obsolete validation requests #142/#143 were closed without merge. No paid service or production environment was accessed.
 
@@ -21,7 +21,7 @@ No changes were made to `main`; the temporary validation PR #144 and obsolete va
 | #136 | Security Guard upload inspection + attestation | c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5 | 61/61 | PASS |
 | #138 | PHP scanner byte-stream integrity (superseded/overlapping proposal) | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS (stale base; not combined evidence) |
 | #139 | Cross-runtime malicious-upload quarantine retention + PHP sequential reader | bc1b3ab438fbdd01a1bb25131df3fd23884455cc | 43/43 jobs on stale tree | NOT VALID as combined #136 evidence — 17 commits behind current parent; Python reader regressed |
-| #145 | Canonical integrated Security Guard candidate (built from exact #136 head) | 36b251ebf43d5a00bee666a42835a449bfb910e2 | 8 workflows pending | CONDITIONAL — fresh combined validation running |
+| #145 | Canonical integrated Security Guard candidate (built from exact #136 head) | 44109341a508bc3412b649658ff89845baff7fa2 | 8/8 workflows passed (30/30 jobs) | PASS — exact combined CI passed; laboratory scope only |
 | #132 | Threat Lab unified certification report | b8073677f581089e43548b5ce138c829e8e2c34c | 50/50 | PASS |
 | #131 | Resilience A1 operational evidence | e49edba95a3bc409911730e1d2755590c539cfa2 | 49/49 | PASS |
 | #130 | Malware Engine fixture-only calibration evidence | 02738c75ec1dd4b531177030a7cac32177e0c0ff | 54/54 | PASS |
@@ -35,7 +35,7 @@ All totals above were queried from commit-specific GitHub Actions runs/jobs, not
 **Severity:** High (integration / security regression)  
 PR #138 and PR #139 share merge base `1d050e1dad0c22f9cb855b585029b8dc92f61384`, not current PR #136 head `c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5`. Comparing #136 head to #139 code head `bc1b3ab438fbdd01a1bb25131df3fd23884455cc` reports a diverged history: #139 is 21 commits ahead and 17 behind, with merge base `1d050e1...`. Its 43/43 green jobs therefore do not validate a combined current #136 + #139 tree. Source review found a concrete regression: #136's Python `UploadInspectionReadOnlyStream` is a direct bounded reader that deliberately does not inherit `io.RawIOBase`, preventing a scanner from wrapping it in `io.BufferedReader` and falsely counting prefetched bytes as consumed. The stale #139 branch replaces it with `_VerifiedScannerStream(io.RawIOBase)` and removes related no-prefetch regression tests. #139's PHP sequential reader and malicious-retention changes remain valuable, but cannot be merged from that stale tree as-is.
 
-**Corrective action:** PR #145 has been rebuilt from exact #136 head `c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5`; comparing #136 head to #145 head `36b251ebf43d5a00bee666a42835a449bfb910e2` shows status `ahead`, 15 commits ahead, 0 behind, and merge base exactly `c6c69a6...`. It preserves the stronger Python direct reader and its tests, integrates the typed bounded PHP sequential reader and its adversarial tests, and applies malicious quarantine retention to Node/Python/PHP plus shared vectors and Threat Lab tests. Full CI on #145 is pending. Do not merge #138 or #139 independently. Review corrections were added to both PRs.
+**Corrective action:** PR #145 has been rebuilt from exact #136 head `c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5`; comparing #136 head to #145 head `44109341a508bc3412b649658ff89845baff7fa2` shows status `ahead`, 16 commits ahead, 0 behind, and merge base exactly `c6c69a6...`. It preserves the stronger Python direct reader and its tests, integrates the typed bounded PHP sequential reader and its adversarial tests, and applies malicious quarantine retention to Node/Python/PHP plus shared vectors and Threat Lab tests. Full CI on #145 passed on the exact head `44109341a508bc3412b649658ff89845baff7fa2`: 8/8 workflows and 30/30 jobs succeeded. Do not merge #138 or #139 independently. Review corrections were added to both PRs.
 
 ### F-02 — CI certification is not production malware-scanning certification
 **Severity:** High (assurance boundary)  
@@ -68,7 +68,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 | Resilience A1 | 49/49 CI checks | LAB-CERTIFIED |
 | Resilience A2 | 49/49 workflow jobs on head `95faf095ed575d62dc042433701ce909e00b0362` | LAB-CERTIFIED — read-only reconciliation only |
 | Security Guard core | 61/61 CI checks on #136 | LAB-CERTIFIED — integration pending |
-| Security Guard PHP stream + malicious quarantine lifecycle | #145 exact combined tree `36b251ebf43d5a00bee666a42835a449bfb910e2`; 8 full workflows pending | CONDITIONAL — awaiting fresh combined CI and review |
+| Security Guard PHP stream + malicious quarantine lifecycle | #145 exact combined tree `44109341a508bc3412b649658ff89845baff7fa2`; 8 full workflows pending | PASS — exact combined CI passed; source review still lab-scoped |
 | Security Guard distribution | 48/48 CI checks on #128 | LAB-CERTIFIED |
 | Malware Engine calibration + contextual PowerShell lexical triage | 42/42 workflow jobs on exact head `603da7e26a43635faa35bc4fe79baf223b29333d`; 204 tests per platform, Windows 204/204, Linux 200/200 plus four Windows-only skips | LAB-CERTIFIED — synthetic/fixture corpus only; not antivirus efficacy certification |
 | Threat Lab report | 50/50 CI checks | LAB-CERTIFIED — reporting/aggregation only |
@@ -89,3 +89,57 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 **Release readiness: BLOCKED on production host-adapter, access-control, retention, and operational integration gates.**
 
 This report is an engineering audit record, not a guarantee that the engines are invulnerable or that all defects have been found.
+
+## 2026-11-18 follow-up — additional engine source review
+
+This follow-up supersedes any earlier statement in this report that #145 CI was pending. All results below remain commit-pinned and laboratory-scoped.
+
+### Security Guard — canonical integrated candidate
+
+- Exact head: `44109341a508bc3412b649658ff89845baff7fa2`.
+- Latest exact-head run: eight workflows passed, with 30/30 jobs successful and no failed jobs.
+- The candidate combines the #136 attestation base with bounded Node/PHP/Python inspection paths, malicious-verdict quarantine retention and shared conformance/Threat Lab tests.
+- The integration preserves the Python direct bounded reader rather than reintroducing `io.RawIOBase` / `io.BufferedReader` prefetch semantics. PHP uses sequential bounded reads and verifies exact delivered-byte digest/size, incomplete consumption, trailing bytes and altered content.
+- Decision: **CI PASS; lab integration review may proceed.** Production certification remains blocked on host-provided private storage, authorization on retrieval, atomic promotion bound to digest/size/attestation, scanner provenance, timeout/resource policy, operational monitoring and tested retention/recovery.
+
+### Malware Engine — source and adversarial-fixture review (#135)
+
+- Exact code head: `603da7e26a43635faa35bc4fe79baf223b29333d`; CI evidence: 42/42 workflow jobs on that exact head.
+- The reviewed heuristic pipeline masks selected comments and literals before matching indicators. PowerShell processing retains selected semantically meaningful arguments and expandable subexpressions; Python preprocessing masks comments, ordinary strings and docstrings while examining executable f-string replacement expressions.
+- Heuristic-only evidence remains `suspicious`, not `malicious`; test fixtures explicitly verify that a heuristic-only result cannot authorize quarantine (`VERDICT_REQUIRED`). The synthetic calibration matrix includes benign controls, suspicious examples and the harmless EICAR plumbing marker.
+- Reported platform tests: Windows Node 22/24, 204/204 each; Ubuntu Node 22/24, 200/200 each, with four Windows-only tests skipped per Linux lane.
+- Decision: **LAB PASS for the tested lexical and static-analysis paths.** This is not a measured false-positive/false-negative rate, not an independent representative live-malware corpus, not behavioral sandbox certification and not real-time endpoint protection. The lexical filters are explicitly not full language parsers; evasive syntax and unsupported formats remain residual risks.
+
+### Resilience A2 — restart reconciliation and durable action ledger (#125)
+
+- Exact head: `95faf095ed575d62dc042433701ce909e00b0362`; previously verified certification matrix: 49/49 jobs successful.
+- Source review confirms the recovery coordinator accepts only a durable journal, an explicitly read-only provider adapter, a separate verifier, a forensic-retention lookup and an evidence resolver. It re-fetches each pending record by claim ID, binds records and receipts to exact action/scope/profile/idempotency identity, hashes resolved evidence locally, validates verification and retention receipts, and applies bounded timeouts/pages/cursor checks.
+- A claim without the durable provider-start marker is held without querying the provider. Unknown, malformed, stale, mismatched or unavailable evidence stays held. Every output is explicitly `executable: false`, `safeToRetry: false`, and `releaseAllowed: false`.
+- The file ledger uses a single-host lock, strict record validation, versioned HMAC-SHA-256 guard, atomic replacement/fsync and an optional external monotonic revision anchor. The PostgreSQL reference anchor performs conditional revision/digest compare-and-swap and validates its schema/trigger contract. Tests cover duplicate claims across processes, atomic lifecycle transitions, malformed/truncated state, symlink rejection, journal/guard rollback and revision divergence; PostgreSQL integration exercises two Pools against one disposable primary.
+- Decision: **LAB PASS for the tested ledger and read-only reconciliation contracts.** It does not establish an independently administered database failure domain, real provider behavior, independent backup/failover/restore resilience, production evidence retention or authorization. A two-Pool test against one primary is not evidence of independent rollback protection.
+
+### Resilience A1 — OS service-manager lab evidence (#131)
+
+- Exact head: `e49edba95a3bc409911730e1d2755590c539cfa2`; CI evidence: 49/49 jobs successful.
+- The operational lab creates a uniquely named disposable service on the hosted runner, invokes the typed Linux systemd or Windows SCM adapter, verifies the service-manager state after restart and confirms the process ID changed. Cleanup removes the disposable service and temporary files.
+- The evidence is bound to commit, workflow run, runtime, platform and architecture, and explicitly marks production/customer services as untested.
+- Decision: **LAB PASS for the named adapter exercises on the hosted runners only.** This does not prove recovery of customer applications/data, arbitrary host permissions/configurations, production monitoring, backup/restore, or A2/A3 authority.
+
+### Threat Lab — unified report and evidence aggregation (#132)
+
+- Exact head: `b8073677f581089e43548b5ce138c829e8e2c34c`; CI evidence: 50/50 jobs successful.
+- The report builder consumes persisted original Threat Lab v2 scenario reports; it does not infer a pass from workflow status. It rejects unsupported schemas, duplicate report IDs, duplicate target/scenario pairs, conflicting target definitions and missing required targets. Failed scenarios and non-scope skips block readiness; structural target-scope skips remain visible.
+- The report explicitly declares zero samples executed, zero network requests and no production targets tested. It preserves source outcomes and identifies commit/runtime/platform/architecture.
+- Decision: **LAB PASS for report aggregation and readiness semantics.** The report is not third-party certification or proof of absence of defects. Product-level artifact signing, externally verifiable provenance and longer-term evidence retention remain separate governance work.
+
+### Consolidated lab decision and remaining gates
+
+| Engine | Laboratory decision | Main remaining production gate |
+|---|---|---|
+| Security Guard | CI PASS on integrated #145 exact head | Real host storage, authorization, scanner trust, atomic promotion, retention and recovery |
+| Malware Engine | LAB PASS on #135 exact head | Representative independently labelled corpus, parser fuzzing, signed intelligence distribution and native endpoint service/driver |
+| Resilience A1 | LAB PASS on #131 exact head | Customer-host/application recovery and operational certification |
+| Resilience A2 | LAB PASS on #125 exact head; read-only only | Independent provider/verifier/recorder, external failure-domain anchor, backup/failover/restore and separately approved executor |
+| Threat Lab | LAB PASS on #132 exact head | Signed/provenanced artifacts and governance for product-level certification |
+
+All five workstreams remain unmerged. No production deployment or paid service was used. Green CI is evidence for the tested commit and workflows only; it is not a universal compatibility guarantee or a security warranty.
