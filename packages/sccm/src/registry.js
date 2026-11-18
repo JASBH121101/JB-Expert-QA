@@ -179,13 +179,14 @@ export function assertSccmInventory(inventory) {
 }
 
 const ASSESSMENT_KEYS = ["assessmentId", "nodeId", "version", "commitSha", "status", "assessedAt", "evidence", "findings"];
+const VERSIONED_ASSESSMENT_KEYS = [...ASSESSMENT_KEYS, "sourceId"];
 const EVIDENCE_KEYS = ["kind", "reference", "commitSha", "outcome", "summary"];
 
 export function validateSccmAssessment(inventory, assessment) {
   const errors = [];
   const inventoryResult = validateSccmInventory(inventory);
   if (!inventoryResult.valid) return Object.freeze({ valid: false, errors: Object.freeze(["inventory is invalid", ...inventoryResult.errors]) });
-  if (!exactKeys(assessment, ASSESSMENT_KEYS)) {
+  if (!exactKeys(assessment, ASSESSMENT_KEYS) && !exactKeys(assessment, VERSIONED_ASSESSMENT_KEYS)) {
     return Object.freeze({ valid: false, errors: Object.freeze(["assessment has missing or unknown fields"]) });
   }
   const node = inventory.nodes.find((item) => item.id === assessment.nodeId);
@@ -201,9 +202,18 @@ export function validateSccmAssessment(inventory, assessment) {
   if (typeof assessment.commitSha !== "string" || !SHA_PATTERN.test(assessment.commitSha)) {
     addError(errors, "assessment commitSha must be a full 40-character SHA");
   } else if (node) {
-    const source = inventory.sources.find((item) => item.id === node.sourceId);
-    if (source && assessment.commitSha !== source.commitSha) {
-      addError(errors, "assessment commitSha does not match the registered source snapshot");
+    const nodeSource = inventory.sources.find((item) => item.id === node.sourceId);
+    const assessmentSourceId = Object.hasOwn(assessment, "sourceId") ? assessment.sourceId : node.sourceId;
+    const source = inventory.sources.find((item) => item.id === assessmentSourceId);
+    if (typeof assessmentSourceId !== "string" || !source) {
+      addError(errors, "assessment sourceId does not identify a registered source snapshot");
+    } else {
+      if (!nodeSource || source.repository !== nodeSource.repository) {
+        addError(errors, "assessment source snapshot must belong to the node's registered repository");
+      }
+      if (assessment.commitSha !== source.commitSha) {
+        addError(errors, "assessment commitSha does not match its registered source snapshot");
+      }
     }
   }
   if (!STATUSES.has(assessment.status)) addError(errors, "assessment status must be PASS, FAIL or PENDING");

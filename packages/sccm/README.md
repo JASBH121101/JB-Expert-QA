@@ -8,7 +8,7 @@ SCCM is the source of truth for hierarchical, evidence-backed certification acro
 
 The versioned inventory at `manifests/inventory.v1.json` records stable IDs, ownership, parentage, source repository/ref, exact source commit, package version, criticality and required dependencies.
 
-The append-only evidence ledger at `manifests/assessments.v1.json` stores each assessment's unique ID, node, version, exact commit SHA, timestamp, result, evidence URLs and unresolved findings. A new assessment supersedes the previous assessment for a node without deleting history.
+The append-only evidence ledger at `manifests/assessments.v1.json` stores each assessment's unique ID, node, version, exact commit SHA, timestamp, result, evidence URLs and unresolved findings. New assessments may include `sourceId` to bind to a newly added immutable source snapshot; legacy entries continue to resolve through the node's original source. Source snapshots are added, never rewritten, so a component can be reassessed at a new SHA without invalidating or editing its older evidence.
 
 ## Status and gating rules
 
