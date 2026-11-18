@@ -73,16 +73,23 @@ The Python package now exposes `UploadInspectionService`, `UploadInspectionError
 
 The service streams a bounded source file into host-provided quarantine storage,
 calculates SHA-256, checks a narrow JPEG/PNG/GIF/WebP/PDF signature allowlist,
-verifies the scanner's explicit verdict, engine/version, byte count and digest,
-and only then requests private atomic promotion.
+and binds the scanner handoff to the opaque upload ID, exact byte count, SHA-256
+and detected MIME type. A read-only digest-tracking stream independently hashes
+and counts the bytes actually delivered to the scanner; a clean result returned
+without complete sequential consumption fails closed as SCAN_INCOMPLETE.
 
 Host adapters must keep quarantine and approved objects private, enforce scanner
-deadlines, consume the complete stream, verify exact bytes during promotion, and
-make deletion idempotent. Unknown verdicts, scanner errors, integrity mismatches
-and uncertain promotion outcomes never produce an approval. Malicious files,
-unknown verdicts and uncertain objects remain quarantined for forensic review. The
-request path never serves a quarantined original; disposal requires a separate,
-authorized retention/disposition process after the required evidence is preserved.
+deadlines, verify exact bytes during atomic promotion, and make deletion idempotent.
+Unknown verdicts, incomplete scans, scanner errors, integrity mismatches and
+uncertain promotion outcomes never produce an approval. A malicious verdict is
+rejected and the staging object is deleted; any required forensic retention must
+use a separate bounded and access-controlled recorder. Unknown and uncertain
+objects remain private in quarantine. The request path never serves a quarantined
+original.
+
+The normalized request/result contract and shared cross-runtime vectors are
+documented in packages/security-guard-core/docs/UPLOAD-INSPECTION-CONTRACT-V1.md
+and packages/security-guard-core/tests/fixtures/upload-inspection/.
 
 No antivirus engine or production storage implementation is bundled. Signature
 identification is not full format validation or image sanitization. The host
