@@ -311,13 +311,27 @@ final class UploadInspectionService
                 throw new UploadInspectionException('SCAN_CONTENT_MISMATCH');
             }
 
-            if (!$this->validScannerLabel($scanResult['engine']) ||
-                !$this->validScannerLabel($scanResult['version'])) {
+            if (!$this->validScannerLabel($scanResult['engine'], 128) ||
+                !$this->validScannerLabel($scanResult['version'], 64)) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('INVALID_SCAN_RESULT');
             }
 
-            if (!$this->storage->promote($uploadId, $sha256, $size)) {
+            $retainQuarantine = true;
+            $scannedAtMs = (int) floor(microtime(true) * 1000);
+            $attestation = CoreV1::validateUploadInspectionAttestationV1([
+                'schema' => 'jb.security.upload-inspection.attestation/v1',
+                'uploadId' => $uploadId,
+                'verdict' => $scanResult['verdict'],
+                'sha256' => $sha256,
+                'size' => $size,
+                'mimeType' => $detectedType,
+                'engine' => $scanResult['engine'],
+                'version' => $scanResult['version'],
+                'scannedAtMs' => $scannedAtMs,
+            ]);
+
+            if (!$this->storage->promote($uploadId, $sha256, $size, $attestation)) {
                 $retainQuarantine = true;
                 throw new UploadInspectionException('PROMOTION_FAILED');
             }
@@ -334,7 +348,8 @@ final class UploadInspectionService
                     'engine' => $scanResult['engine'],
                     'version' => $scanResult['version'],
                 ],
-                'scannedAt' => gmdate('c'),
+                'scannedAt' => gmdate('Y-m-d\\TH:i:s\\Z', (int) floor($scannedAtMs / 1000)),
+                'attestation' => $attestation,
             ];
         } catch (UploadInspectionException $exception) {
             if ($quarantineAttempted && !$retainQuarantine) {
@@ -471,9 +486,9 @@ final class UploadInspectionService
             is_string($result['version'] ?? null);
     }
 
-    private function validScannerLabel(string $value): bool
+    private function validScannerLabel(string $value, int $maximumLength): bool
     {
-        return $value !== '' && strlen($value) <= 80 &&
+        return $value !== '' && strlen($value) <= $maximumLength &&
             preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/D', $value) === 1;
     }
 }
