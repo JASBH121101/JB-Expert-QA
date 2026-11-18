@@ -70,7 +70,8 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     public function __construct(
         private readonly string $verdict = 'clean',
         private readonly bool $tamperDigest = false,
-        private readonly bool $unavailable = false
+        private readonly bool $unavailable = false,
+        private readonly bool $consume = true
     ) {
     }
 
@@ -78,6 +79,15 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     {
         if ($this->unavailable) {
             throw new RuntimeException('Synthetic scanner outage');
+        }
+        if (!$this->consume) {
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
         }
         $hash = hash_init('sha256');
         $size = 0;
@@ -186,6 +196,84 @@ function runUploadInspectionServiceTests(): void
         expect($scannerUnavailable, 'Scanner outage must fail closed');
         expect($unavailableStore->quarantineCount() === 1 && $unavailableStore->approvedCount() === 0,
             'Scanner outage must leave the object private in quarantine');
+
+        $incompleteStore = new UploadInspectionTestStorage($root . '/incomplete-scan');
+        $incomplete = new UploadInspectionService(
+            $incompleteStore,
+            new UploadInspectionTestScanner('clean', false, false, false)
+        );
+        $incompleteRejected = false;
+        try {
+            $incomplete->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $incompleteRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($incompleteRejected, 'A scanner that returns without consuming the complete stream must fail closed');
+        expect($incompleteStore->quarantineCount() === 1 && $incompleteStore->approvedCount() === 0,
+            'An incomplete scan must remain private in quarantine');
+
+        $vectorPath = dirname(__DIR__, 2) . '/security-guard-core/tests/fixtures/upload-inspection/conformance-vectors.v1.json';
+        $vectors = json_decode((string) file_get_contents($vectorPath), true, 16, JSON_THROW_ON_ERROR);
+        foreach ($vectors['fileCases'] as $vector) {
+            $vectorSource = $root . '/vector-' . $vector['id'] . '.bin';
+            file_put_contents($vectorSource, hex2bin($vector['bytesHex']));
+            $vectorStore = new UploadInspectionTestStorage($root . '/vector-store-' . $vector['id']);
+            $vectorService = new UploadInspectionService(
+                $vectorStore,
+                new UploadInspectionTestScanner($vector['scannerVerdict'])
+            );
+            $actual = null;
+            $actualReason = null;
+            try {
+                $actual = $vectorService->inspect(
+                    $vectorSource,
+                    $vector['fileName'],
+                    $vector['declaredMimeType']
+                );
+            } catch (UploadInspectionException $exception) {
+                $actualReason = $exception->reason;
+            }
+            if ($vector['expected']['disposition'] === 'approved') {
+                expect($actual !== null && $actual['mimeType'] === $vector['expected']['mimeType'],
+                    'Shared file vector must be approved with the expected MIME type: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 1 && $vectorStore->quarantineCount() === 0,
+                    'Shared clean file vector must be privately promoted: ' . $vector['id']);
+            } else {
+                expect($actualReason === $vector['expected']['errorReason'],
+                    'Shared file vector must return the expected error: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 0 && $vectorStore->quarantineCount() === 0,
+                    'Invalid file-type vectors must never be promoted or retained as clean: ' . $vector['id']);
+            }
+        }
+
+        foreach ($vectors['scannerCases'] as $vector) {
+            $vectorStore = new UploadInspectionTestStorage($root . '/scanner-vector-' . $vector['id']);
+            $consume = $vector['consume'] === 'all';
+            $vectorService = new UploadInspectionService(
+                $vectorStore,
+                new UploadInspectionTestScanner($vector['verdict'], false, false, $consume)
+            );
+            $actual = null;
+            $actualReason = null;
+            try {
+                $actual = $vectorService->inspect($source, 'product.png', 'image/png');
+            } catch (UploadInspectionException $exception) {
+                $actualReason = $exception->reason;
+            }
+            if ($vector['expected']['disposition'] === 'approved') {
+                expect($actual !== null, 'Complete clean scanner vector must be approved: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 1 && $vectorStore->quarantineCount() === 0,
+                    'Complete clean scanner vector must be privately promoted: ' . $vector['id']);
+            } else {
+                expect($actualReason === $vector['expected']['errorReason'],
+                    'Scanner vector must return the expected error: ' . $vector['id']);
+                expect($vectorStore->approvedCount() === 0,
+                    'Rejected scanner vector must never be promoted: ' . $vector['id']);
+                $expectedQuarantine = $vector['expected']['disposition'] === 'quarantined' ? 1 : 0;
+                expect($vectorStore->quarantineCount() === $expectedQuarantine,
+                    'Scanner vector quarantine disposition must match contract: ' . $vector['id']);
+            }
+        }
     } finally {
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
