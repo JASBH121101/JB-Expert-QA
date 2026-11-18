@@ -455,6 +455,28 @@ async function main() {
     assert.equal(stillPending.record.state, "provider-started");
   });
 
+  await runCase("PostgreSQL A2 initialization migrates and validates existing row constraints", async () => {
+    await pool.query(
+      "ALTER TABLE jb_resilience_a2_action_claims " +
+      "DROP CONSTRAINT IF EXISTS jb_resilience_a2_terminal_outcome_required"
+    );
+    await pool.query(
+      "ALTER TABLE jb_resilience_a2_action_claims " +
+      "DROP CONSTRAINT IF EXISTS jb_resilience_a2_scope_columns_match"
+    );
+    const migrated = await a2First.initialize();
+    assert.deepEqual(migrated, {
+      initialized: true, dialect: "postgresql", schemaVersion: 1
+    });
+    const result = await pool.query(
+      "SELECT conname, convalidated FROM pg_constraint " +
+      "WHERE conrelid='jb_resilience_a2_action_claims'::regclass " +
+      "AND conname IN ('jb_resilience_a2_terminal_outcome_required','jb_resilience_a2_scope_columns_match')"
+    );
+    assert.equal(result.rowCount, 2);
+    assert.equal(result.rows.every((row) => row.convalidated === true), true);
+  });
+
   await runCase("PostgreSQL A2 database constraints reject scope-column and terminal-outcome tampering", async () => {
     const scope = a2Scope("pg-a2-db-checks", "pg-a2-incident-db-checks");
     const profileId = "approved-a2-profile";
