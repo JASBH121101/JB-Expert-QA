@@ -22,6 +22,8 @@ The independent verification receipt must carry the exact provider operationId a
 
 All store durability markers are host integration assertions. The controller cannot prove that a custom adapter or database is truly durable; the host must certify its implementation and operational configuration.
 
+**External rollback-anchor execution gate:** when `enableExecution: true`, the controller additionally requires `actionLedger.externalRevisionAnchorConfigured === true`. The built-in file ledger sets this capability only when a `revisionAnchor` and stable `ledgerId` were supplied; without them the controller refuses construction for executable A2. This prevents an accidental local-HMAC-only configuration from being enabled. The flag proves only that an adapter was configured, not that it is linearizable, independently administered, correctly backed up or resistant to coordinated rollback. The host must independently certify those properties. The read-only recovery coordinator remains available without enabling A2 execution, and its findings never grant retry or release authority.
+
 ### Durable action journal semantics
 
 The action ledger is a transactional state machine, not a boolean idempotency cache. Its reconciliation result uses exactly one of these states: `claimed`, `provider-started`, `completed`, `not-found`, or `unknown`. The budget ledger uses `reserved`, `settled`, `not-found`, or `unknown`. Every lookup is keyed by the exact action, scope, profile and idempotency key.
