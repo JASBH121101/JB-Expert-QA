@@ -2992,5 +2992,200 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.20261118.database",
+    "nodeId": "jb.expert-qa.database",
+    "version": "0.8.0",
+    "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:39:01Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551142",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 22 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551613",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 24 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552334",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 22, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552429",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 24, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.integration.20261118.database",
+    "nodeId": "jb.expert-qa.database.integration",
+    "version": "0.8.0",
+    "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:39:02Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551142",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 22 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551613",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 24 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552334",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 22, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552429",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 24, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.postgres.20261118.database",
+    "nodeId": "jb.expert-qa.database.postgres",
+    "version": "0.8.0",
+    "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:39:03Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551142",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 22 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551613",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 24 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552334",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 22, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552429",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 24, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.migrations.20261118.database",
+    "nodeId": "jb.expert-qa.database.migrations",
+    "version": "0.8.0",
+    "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:39:04Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551142",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 22 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551613",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 24 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552334",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 22, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552429",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 24, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.transactions.20261118.database",
+    "nodeId": "jb.expert-qa.database.transactions",
+    "version": "0.8.0",
+    "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:39:05Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551142",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 22 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495860/job/135187551613",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Real PostgreSQL 16 driver and CLI integration passed on Node.js 24 against a disposable CI service; verifies read-only audit path, metadata-only coverage, diagnostics, rollback and connection cleanup."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552334",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 22, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44413495875/job/135187552429",
+        "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac",
+        "outcome": "success",
+        "summary": "Full Expert QA regression suite (`npm run check`) passed on Node.js 24, including PostgreSQL audit and database-specialist static migration/transaction fixtures."
+      }
+    ],
+    "findings": []
   }
 ]

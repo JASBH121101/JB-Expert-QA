@@ -79,3 +79,15 @@ The first version does not inspect application row contents, run arbitrary SQL, 
 The pull-request workflow runs the real `pg` driver and `src/database-cli.js` against a disposable PostgreSQL 16 service on Node.js 22 and 24. It creates one temporary table in that CI-only database and verifies the CLI's JSON report, read-only transaction confirmation, metadata-only coverage, and finding output. The test schema is removed after the audit; the hosted service is discarded with the runner.
 
 An additional Neon check is enabled only when the repository secret `QA_NEON_DEVELOPMENT_DATABASE_URL` is configured. Set it to the **development branch only**, using the dedicated read-only `jb_erp_runtime_sql` role. The workflow rejects non-Neon hosts and verifies the expected database and role. It does not print the URL or upload the report. Without that secret, the Neon step is explicitly skipped; local PostgreSQL CI success is not represented as a live Neon test.
+
+
+## SCCM certification coverage (2026-11)
+
+The Database QA hierarchy is evaluated against these bounded automated contracts:
+
+- **PostgreSQL integration:** the real pg driver and CLI run against a disposable PostgreSQL 16 service on Node.js 22 and 24. Tests confirm a read-only transaction, metadata-only catalog queries, schema findings, rejected writable mode, connection/URL validation, redaction, timeout handling, rollback and client closure.
+- **Migration consistency:** static database-specialist fixtures detect migration files without visible rollback, schema/ORM synchronization risks and unsafe raw SQL. This does not replay arbitrary application migrations against a live database or prove zero schema drift.
+- **Transaction and rollback behavior:** unit and disposable-database integration tests verify the initial read-only guard, rollback on normal/error paths, client cleanup and fail-closed handling if PostgreSQL does not confirm read-only mode.
+- **Least-privilege and isolation:** tests verify privilege diagnostics and the workflow's disposable test database. The optional Neon E2E remains skipped unless explicit development-only credentials are configured; no live Neon or production database is certified here.
+
+A PASS for this branch means these tests passed on the documented PostgreSQL/Node matrix. It does not certify MySQL, SQLite, all migration frameworks, backup recovery, every production role or workload-specific query performance.

@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.5",
-  "generatedAt": "2026-11-18T22:31:00Z",
+  "inventoryVersion": "1.0.6",
+  "generatedAt": "2026-11-18T22:39:00Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -44,6 +44,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "certify/currency-qa-engine-v1",
       "commitSha": "1feb1be76949e0cbd736b919e540fcf59b1fae97"
+    },
+    {
+      "id": "jb-expert-qa-database-certification-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "certify/expert-qa-database-qa-v1",
+      "commitSha": "7e418c2341b110cf784574febaa16ea4a4a3ccac"
     }
   ],
   "nodes": [
@@ -514,7 +520,7 @@
       "name": "Database QA",
       "level": "branch",
       "parentId": "jb.expert-qa",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-database-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -524,7 +530,7 @@
       "name": "Database integration",
       "level": "subbranch",
       "parentId": "jb.expert-qa.database",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-database-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -544,7 +550,7 @@
       "name": "PostgreSQL integration",
       "level": "component",
       "parentId": "jb.expert-qa.database.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-database-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -554,7 +560,7 @@
       "name": "Migration consistency",
       "level": "component",
       "parentId": "jb.expert-qa.database.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-database-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -564,7 +570,7 @@
       "name": "Transaction and rollback behavior",
       "level": "component",
       "parentId": "jb.expert-qa.database.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-database-certification-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
