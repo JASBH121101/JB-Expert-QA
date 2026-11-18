@@ -71,7 +71,8 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
         private readonly string $verdict = 'clean',
         private readonly bool $tamperDigest = false,
         private readonly bool $unavailable = false,
-        private readonly bool $consume = true
+        private readonly bool $consume = true,
+        private readonly bool $seekToEnd = false
     ) {
     }
 
@@ -79,6 +80,16 @@ final class UploadInspectionTestScanner implements UploadMalwareScanner
     {
         if ($this->unavailable) {
             throw new RuntimeException('Synthetic scanner outage');
+        }
+        if ($this->seekToEnd) {
+            fseek($stream, 0, SEEK_END);
+            return [
+                'verdict' => $this->verdict,
+                'sha256' => $metadata['sha256'],
+                'size' => $metadata['size'],
+                'engine' => 'JB-Test-Scanner',
+                'version' => '1.0',
+            ];
         }
         if (!$this->consume) {
             return [
@@ -211,6 +222,21 @@ function runUploadInspectionServiceTests(): void
         expect($incompleteRejected, 'A scanner that returns without consuming the complete stream must fail closed');
         expect($incompleteStore->quarantineCount() === 1 && $incompleteStore->approvedCount() === 0,
             'An incomplete scan must remain private in quarantine');
+
+        $seekStore = new UploadInspectionTestStorage($root . '/seek-scan');
+        $seekScanner = new UploadInspectionService(
+            $seekStore,
+            new UploadInspectionTestScanner('clean', false, false, true, true)
+        );
+        $seekRejected = false;
+        try {
+            $seekScanner->inspect($source, 'product.png', 'image/png');
+        } catch (UploadInspectionException $exception) {
+            $seekRejected = $exception->reason === 'SCAN_INCOMPLETE';
+        }
+        expect($seekRejected, 'A scanner must not satisfy complete-consumption checks by seeking to EOF');
+        expect($seekStore->quarantineCount() === 1 && $seekStore->approvedCount() === 0,
+            'A seek-only scan must remain private in quarantine');
 
         $vectorPath = dirname(__DIR__, 2) . '/security-guard-core/tests/fixtures/upload-inspection/conformance-vectors.v1.json';
         $vectors = json_decode((string) file_get_contents($vectorPath), true, 16, JSON_THROW_ON_ERROR);
