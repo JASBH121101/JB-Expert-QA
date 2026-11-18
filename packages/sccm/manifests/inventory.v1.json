@@ -10,7 +10,7 @@
       "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c"
     },
     {
-      "id": "jb-expert-qa-language-qa-pr167",
+      "id": "jb-expert-qa-pr167-snapshot",
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
       "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00"
@@ -192,7 +192,7 @@
       "name": "CLDR plural catalog audit bridge",
       "level": "component",
       "parentId": "jb.expert-qa.language.module",
-      "sourceId": "jb-expert-qa-language-qa-pr167",
+      "sourceId": "jb-expert-qa-pr167-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": [
@@ -1344,7 +1344,7 @@
       "name": "CLDR plural rules",
       "level": "component",
       "parentId": "jb.localization-engine.runtime.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-pr167-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
