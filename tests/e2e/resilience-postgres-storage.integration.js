@@ -140,6 +140,20 @@ async function main() {
     assert.equal([left, right].filter((value) => value.claimed).length, 1);
     assert.equal([left, right].filter((value) => !value.claimed).length, 1);
     const winner = left.claimed ? left : right;
+    const competingScope = { ...scope, incidentId: "pg-a2-incident-race-2" };
+    const competingKey = a2Key(action, competingScope, profileId);
+    assert.deepEqual(await a2Second.claim({
+      action, scope: competingScope, profileId, idempotencyKey: competingKey,
+      claimedAtMs: input.claimedAtMs + 1,
+      expiresAtMs: input.expiresAtMs + 1
+    }), { claimed: false, claimId: null });
+    assert.deepEqual(await a2Second.getPendingByClaimId({
+      claimId: winner.claimId, atMs: input.claimedAtMs + 1
+    }), { found: false, record: null });
+    const orphanPage = await a2Second.listPending({
+      cursor: null, limit: 10, atMs: input.claimedAtMs + 1
+    });
+    assert.ok(orphanPage.claimIds.includes(winner.claimId));
     assert.deepEqual(await a2First.reconcile({
       action, scope, profileId, idempotencyKey: idempotency,
       atMs: input.claimedAtMs + 1
@@ -239,6 +253,39 @@ async function main() {
       action, scope, profileId, idempotencyKey,
       claimedAtMs: startedAtMs + 7, expiresAtMs: startedAtMs + 30_000
     }), { claimed: false, claimId: null });
+  });
+
+  await runCase("PostgreSQL A2 pending journal uses bounded stable keyset pagination", async () => {
+    const created = [];
+    for (let index = 0; index < 3; index += 1) {
+      const scope = a2Scope(
+        "pg-a2-page-" + String(index + 1),
+        "pg-a2-page-incident-" + String(index + 1)
+      );
+      const profileId = "approved-a2-profile";
+      const action = "apply-containment-profile";
+      const idempotencyKey = a2Key(action, scope, profileId);
+      const result = await a2First.claim({
+        action, scope, profileId, idempotencyKey,
+        claimedAtMs: 1_800_000_250_000 + index,
+        expiresAtMs: 1_800_000_280_000 + index
+      });
+      assert.equal(result.claimed, true);
+      created.push(result.claimId);
+    }
+    const first = await a2First.listPending({
+      cursor: null, limit: 2, atMs: 1_800_000_250_100
+    });
+    assert.equal(first.claimIds.length, 2);
+    assert.ok(first.nextCursor);
+    const second = await a2Second.listPending({
+      cursor: first.nextCursor, limit: 2, atMs: 1_800_000_250_100
+    });
+    assert.ok(second.claimIds.length >= 1);
+    const all = [...first.claimIds, ...second.claimIds];
+    assert.equal(new Set(all).size, all.length);
+    for (const claimId of created) assert.ok(all.includes(claimId));
+    assert.equal(second.nextCursor, null);
   });
 
   await runCase("PostgreSQL A2 pre-provider claims remain held and expiry blocks provider start", async () => {
