@@ -8,6 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
 
 const LEDGER_SCHEMA = "jb.resilience.a2-action-ledger/v1";
+const GUARD_SCHEMA = "jb.resilience.a2-action-ledger-guard/v1";
 const RECORD_SCHEMA = "jb.resilience.a2-recovery-record/v1";
 const SCOPE_KEYS = Object.freeze([
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
@@ -355,6 +356,117 @@ async function withFileLock(lockPath, options, signal, operation) {
   }
 }
 
+function ledgerDigest(ledger) {
+  return createHash("sha256")
+    .update(JSON.stringify(ledger) + "\\n", "utf8")
+    .digest("hex");
+}
+
+async function readLedgerGuard(guardPath) {
+  let handle;
+  try {
+    const noFollow = typeof fsConstants.O_NOFOLLOW === "number"
+      ? fsConstants.O_NOFOLLOW : 0;
+    handle = await open(guardPath, fsConstants.O_RDONLY | noFollow);
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > 1_024) {
+      throw new Error("A2 action ledger durability guard is malformed");
+    }
+    if (noFollow === 0) {
+      const pathMetadata = await lstat(guardPath);
+      if (pathMetadata.isSymbolicLink() || !pathMetadata.isFile() ||
+          pathMetadata.dev !== metadata.dev || pathMetadata.ino !== metadata.ino) {
+        throw new Error("A2 action ledger durability guard must be a regular file");
+      }
+    }
+    const guard = JSON.parse(await handle.readFile("utf8"));
+    exactKeys(guard, ["schema", "revision", "ledgerSha256"], "A2 action ledger durability guard");
+    if (guard.schema !== GUARD_SCHEMA ||
+        !Number.isSafeInteger(guard.revision) || guard.revision < 0 ||
+        typeof guard.ledgerSha256 !== "string" || !SHA256.test(guard.ledgerSha256)) {
+      throw new Error("A2 action ledger durability guard is invalid");
+    }
+    return Object.freeze({
+      schema: GUARD_SCHEMA,
+      revision: guard.revision,
+      ledgerSha256: guard.ledgerSha256
+    });
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    if (error?.code === "ELOOP" || error?.code === "EMLINK") {
+      throw new Error("A2 action ledger durability guard must be a regular file", { cause: error });
+    }
+    throw error;
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+  }
+}
+
+async function writeLedgerGuard(guardPath, ledger) {
+  const directory = dirname(guardPath);
+  const temporaryPath = guardPath + "." + process.pid + "." + randomUUID() + ".tmp";
+  const guard = {
+    schema: GUARD_SCHEMA,
+    revision: ledger.revision,
+    ledgerSha256: ledgerDigest(ledger)
+  };
+  let handle;
+  try {
+    handle = await open(temporaryPath, "wx", 0o600);
+    await handle.writeFile(JSON.stringify(guard) + "\\n", "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await rename(temporaryPath, guardPath);
+    try {
+      const directoryHandle = await open(directory, "r");
+      try { await directoryHandle.sync(); } finally { await directoryHandle.close(); }
+    } catch (error) {
+      if (!["EINVAL", "ENOTSUP", "EISDIR", "EPERM", "EACCES"].includes(error?.code)) throw error;
+    }
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    await unlink(temporaryPath).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+    });
+  }
+}
+
+async function ensureLedgerGuard(filePath, ledger) {
+  const guardPath = filePath + ".guard";
+  const current = await readLedgerGuard(guardPath);
+  if (ledger === null) {
+    if (current) {
+      throw new Error("A2 action ledger is missing while its durability guard exists; refusing empty reinitialization");
+    }
+    return;
+  }
+
+  const digest = ledgerDigest(ledger);
+  if (current === null) {
+    // Upgrade a pre-guard journal in place. Existing content is preserved and
+    // becomes the starting point for subsequent rollback detection.
+    await writeLedgerGuard(guardPath, ledger);
+    return;
+  }
+  if (current.revision === ledger.revision) {
+    if (current.ledgerSha256 !== digest) {
+      throw new Error("A2 action ledger digest does not match its durability guard");
+    }
+    return;
+  }
+  if (current.revision > ledger.revision) {
+    throw new Error("A2 action ledger appears rolled back behind its durability guard");
+  }
+  if (ledger.revision === current.revision + 1) {
+    // Recover the one-step window where the ledger rename completed but the
+    // sidecar update was interrupted. Larger gaps are not auto-repaired.
+    await writeLedgerGuard(guardPath, ledger);
+    return;
+  }
+  throw new Error("A2 action ledger revision diverges from its durability guard");
+}
+
 async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
   let handle;
   try {
@@ -380,9 +492,14 @@ async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
       throw new Error("A2 action ledger exceeds the configured size limit");
     }
     const serialized = await handle.readFile("utf8");
-    return validateLedger(JSON.parse(serialized), maxClaims, identities);
+    const ledger = validateLedger(JSON.parse(serialized), maxClaims, identities);
+    await ensureLedgerGuard(filePath, ledger);
+    return ledger;
   } catch (error) {
-    if (error?.code === "ENOENT") return emptyLedger();
+    if (error?.code === "ENOENT") {
+      await ensureLedgerGuard(filePath, null);
+      return emptyLedger();
+    }
     if (error?.code === "ELOOP" || error?.code === "EMLINK") {
       throw new Error("A2 action ledger path must be a regular file, not a symbolic link", { cause: error });
     }
@@ -525,6 +642,7 @@ export function createFileA2ActionLedger({
         ledger.revision += 1;
         validateLedger(ledger, maxClaims, identities);
         await writeLedgerFile(target, ledger, maxLedgerBytes);
+        await ensureLedgerGuard(target, ledger);
       }
       return result.value;
     });
