@@ -1,0 +1,168 @@
+name: Security Guard PHP and Python package distribution
+
+on:
+  push:
+    branches: [main, "integration/**"]
+    paths:
+      - "packages/security-guard-php/**"
+      - "packages/security-guard-python/**"
+      - ".github/workflows/security-guard-runtime-distribution.yml"
+  pull_request:
+    branches: [main, "integration/**"]
+    paths:
+      - "packages/security-guard-php/**"
+      - "packages/security-guard-python/**"
+      - ".github/workflows/security-guard-runtime-distribution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-guard-runtime-distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-composer-distribution:
+    name: PHP 8.2 Composer archive and clean consumer install
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Verify PHP and Composer toolchain
+        run: |
+          php -v
+          composer --version
+          php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2 or newer is required.\n"); exit(1); }'
+      - name: Validate Composer manifest
+        working-directory: packages/security-guard-php
+        run: composer validate --no-check-publish
+      - name: Build PHP package archive
+        working-directory: packages/security-guard-php
+        env:
+          COMPOSER_DIST: ${{ runner.temp }}/jb-security-guard-composer
+          COMPOSER_ROOT_VERSION: "0.1.0"
+        run: |
+          mkdir -p "$COMPOSER_DIST"
+          composer archive --format=zip --dir="$COMPOSER_DIST" --file=jb-security-guard-php
+          ARCHIVE="$(find "$COMPOSER_DIST" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$ARCHIVE"
+          unzip -q "$ARCHIVE" -d "$RUNNER_TEMP/jb-security-guard-composer-extracted"
+          test -f "$RUNNER_TEMP/jb-security-guard-composer-extracted/composer.json"
+      - name: Install extracted archive in a clean Composer consumer
+        env:
+          COMPOSER_PACKAGE: ${{ runner.temp }}/jb-security-guard-composer-extracted
+          CONSUMER_DIR: ${{ runner.temp }}/jb-security-guard-consumer
+        run: |
+          mkdir -p "$CONSUMER_DIR"
+          cat > "$CONSUMER_DIR/composer.json" <<EOF
+          {
+            "name": "jb/security-guard-consumer-fixture",
+            "version": "1.0.0",
+            "type": "project",
+            "repositories": [
+              { "packagist.org": false },
+              {
+                "type": "path",
+                "url": "$COMPOSER_PACKAGE",
+                "options": {
+                  "symlink": false,
+                  "versions": { "jb/security-guard-php": "0.1.0" }
+                }
+              }
+            ],
+            "require": {
+              "jb/security-guard-php": "0.1.0"
+            },
+            "config": {
+              "allow-plugins": false,
+              "sort-packages": true
+            }
+          }
+          EOF
+          composer install --working-dir="$CONSUMER_DIR" --no-interaction --no-progress --prefer-dist
+          php -r '
+            require $argv[1];
+            foreach ([
+              "JB\\SecurityGuard\\CoreV1",
+              "JB\\SecurityGuard\\UniversalRateLimitClient",
+              "JB\\SecurityGuard\\UploadInspectionService",
+              "JB\\SecurityGuard\\UploadQuarantineStorage",
+              "JB\\SecurityGuard\\UploadMalwareScanner"
+            ] as $class) {
+              if (!class_exists($class) && !interface_exists($class)) {
+                fwrite(STDERR, "Missing Composer autoload symbol: " . $class . PHP_EOL);
+                exit(1);
+              }
+            }
+          ' "$CONSUMER_DIR/vendor/autoload.php"
+          test -f "$CONSUMER_DIR/vendor/jb/security-guard-php/composer.json"
+          test ! -d "$CONSUMER_DIR/vendor/jb/security-guard-php/tests"
+
+  python-wheel-sdist-distribution:
+    name: Python 3.11 wheel, sdist and clean consumer installs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: "3.11"
+      - name: Install the standard Python build frontend
+        run: python -m pip install --upgrade build
+      - name: Build wheel and source distribution from the package
+        env:
+          PYTHON_DIST: ${{ runner.temp }}/jb-security-guard-python-dist
+        run: |
+          mkdir -p "$PYTHON_DIST"
+          python -m build packages/security-guard-python --outdir "$PYTHON_DIST"
+          test -n "$(find "$PYTHON_DIST" -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$(find "$PYTHON_DIST" -maxdepth 1 -type f -name '*.tar.gz' -print -quit)"
+      - name: Install wheel in an isolated consumer
+        env:
+          PYTHON_DIST: ${{ runner.temp }}/jb-security-guard-python-dist
+          CONSUMER_DIR: ${{ runner.temp }}/jb-security-guard-python-wheel-consumer
+        run: |
+          python -m venv "$CONSUMER_DIR"
+          WHEEL="$(find "$PYTHON_DIST" -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          "$CONSUMER_DIR/bin/python" -m pip install --no-index --no-deps "$WHEEL"
+          (
+            cd "$RUNNER_TEMP"
+            "$CONSUMER_DIR/bin/python" - <<'PY'
+          from importlib.metadata import version
+          from jb_security_guard import (
+              UniversalRateLimitClient,
+              UploadInspectionService,
+              derive_identity_key,
+          )
+          assert version("jb-security-guard") == "0.1.0"
+          assert callable(UniversalRateLimitClient)
+          assert callable(UploadInspectionService)
+          assert callable(derive_identity_key)
+          PY
+          )
+      - name: Install source distribution in a separate clean consumer
+        env:
+          PYTHON_DIST: ${{ runner.temp }}/jb-security-guard-python-dist
+          CONSUMER_DIR: ${{ runner.temp }}/jb-security-guard-python-sdist-consumer
+        run: |
+          python -m venv "$CONSUMER_DIR"
+          SDIST="$(find "$PYTHON_DIST" -maxdepth 1 -type f -name '*.tar.gz' -print -quit)"
+          "$CONSUMER_DIR/bin/python" -m pip install --upgrade "setuptools>=68" wheel
+          "$CONSUMER_DIR/bin/python" -m pip install --no-index --no-deps --no-build-isolation "$SDIST"
+          (
+            cd "$RUNNER_TEMP"
+            "$CONSUMER_DIR/bin/python" - <<'PY'
+          from importlib.metadata import version
+          from jb_security_guard.uploads import UploadInspectionService
+          assert version("jb-security-guard") == "0.1.0"
+          assert callable(UploadInspectionService)
+          PY
+          )
