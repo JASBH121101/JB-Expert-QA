@@ -570,8 +570,11 @@ function makeRevisionAnchorState(ledger) {
 function normalizeRevisionAnchorAdapter(adapter, ledgerId) {
   if (adapter === undefined && ledgerId === undefined) return null;
   if (!isRecord(adapter) || typeof adapter.read !== "function" ||
-      typeof adapter.compareAndSwap !== "function") {
-    throw new TypeError("revisionAnchor must implement read and compareAndSwap");
+      typeof adapter.compareAndSwap !== "function" ||
+      adapter.durable !== true || adapter.atomicCompareAndSwap !== true) {
+    throw new TypeError(
+      "revisionAnchor must declare durable storage and atomic compareAndSwap semantics"
+    );
   }
   const normalizedLedgerId = assertIdentifier(ledgerId, "ledgerId");
   return Object.freeze({ adapter, ledgerId: normalizedLedgerId });
@@ -1076,6 +1079,8 @@ export function createFileA2ActionLedger({
   return Object.freeze({
     durable: true,
     externalRevisionAnchorConfigured: normalizedRevisionAnchor !== null,
+    externalRevisionAnchorDurable: normalizedRevisionAnchor !== null,
+    externalRevisionAnchorAtomic: normalizedRevisionAnchor !== null,
     filePath: target,
     claim,
     createPendingRecord,
