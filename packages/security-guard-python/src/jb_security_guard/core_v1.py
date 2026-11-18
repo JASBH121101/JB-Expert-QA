@@ -212,3 +212,42 @@ def create_rate_limit_counter_key(value: Any) -> str:
         raise ValueError("counterKey.identityKey must be a lowercase HMAC-SHA-256 digest")
     values.append(digest)
     return "".join(f"{len(part.encode('utf-8'))}:{part}" for part in values)
+
+
+_UPLOAD_ATTESTATION_ID = re.compile(
+    r"^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+)
+_UPLOAD_MIME_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
+}
+_UPLOAD_SCANNER_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+-]*$")
+
+
+def validate_upload_inspection_attestation_v1(value: Any) -> dict[str, Any]:
+    """Validate a scanner attestation bound to one exact quarantined object.
+
+    A clean scanner verdict is evidence only; it never authorizes promotion.
+    """
+    item = _exact_keys(value, {
+        "schema", "uploadId", "verdict", "sha256", "size", "mimeType",
+        "engine", "version", "scannedAtMs"
+    }, "uploadInspectionAttestation")
+    if item["schema"] != "jb.security.upload-inspection.attestation/v1":
+        raise ValueError("uploadInspectionAttestation.schema is unsupported")
+    if not isinstance(item["uploadId"], str) or _UPLOAD_ATTESTATION_ID.fullmatch(item["uploadId"]) is None:
+        raise ValueError("uploadInspectionAttestation.uploadId is invalid")
+    if item["verdict"] not in ("clean", "malicious", "unknown"):
+        raise ValueError("uploadInspectionAttestation.verdict is unsupported")
+    if not isinstance(item["sha256"], str) or _SHA256_HEX.fullmatch(item["sha256"]) is None:
+        raise ValueError("uploadInspectionAttestation.sha256 must be a lowercase SHA-256 digest")
+    if type(item["size"]) is not int or not 1 <= item["size"] <= 104857600:
+        raise ValueError("uploadInspectionAttestation.size is out of bounds")
+    if item["mimeType"] not in _UPLOAD_MIME_TYPES:
+        raise ValueError("uploadInspectionAttestation.mimeType is unsupported")
+    for field, maximum in (("engine", 128), ("version", 64)):
+        label = item[field]
+        if not isinstance(label, str) or len(label) > maximum or _UPLOAD_SCANNER_LABEL.fullmatch(label) is None:
+            raise ValueError(f"uploadInspectionAttestation.{field} is invalid")
+    if type(item["scannedAtMs"]) is not int or item["scannedAtMs"] < 0:
+        raise ValueError("uploadInspectionAttestation.scannedAtMs must be a non-negative integer")
+    return dict(item)
