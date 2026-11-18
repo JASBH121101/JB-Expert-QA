@@ -342,7 +342,7 @@
       "name": "Security QA module",
       "level": "module",
       "parentId": "jb.expert-qa.security.static-analysis",
-      "sourceId": "jb-expert-qa-current-certification-snapshot",
+      "sourceId": "jb-expert-qa-main",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
