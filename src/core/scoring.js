@@ -63,7 +63,12 @@ export function calculateScore(diagnostics, options = {}) {
       (sum, item) => sum + (severityPenalties[item.severity] ?? 0),
       0
     );
-    specialistScores[name] = Math.max(0, 100 - penalty);
+    Object.defineProperty(specialistScores, name, {
+      value: Math.max(0, 100 - penalty),
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
   }
 
   const totalWeight = activeNames.reduce((sum, name) => sum + (Object.hasOwn(weights, name) ? weights[name] : 0), 0);
