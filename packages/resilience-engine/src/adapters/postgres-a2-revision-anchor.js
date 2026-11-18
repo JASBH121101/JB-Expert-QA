@@ -294,6 +294,19 @@ export function createPostgresA2RevisionAnchor({
     });
   }
 
+  async function verify() {
+    await transaction(async (client) => {
+      await validateSchema(client);
+    });
+    initialized = true;
+    return Object.freeze({
+      verified: true,
+      dialect: "postgresql",
+      schemaVersion: 1,
+      table: REVISION_ANCHOR_TABLE
+    });
+  }
+
   async function read(input) {
     exactObjectKeys(input, ["ledgerId"], "A2 PostgreSQL revision-anchor read input");
     const ledgerId = assertLedgerId(input.ledgerId);
@@ -362,6 +375,7 @@ export function createPostgresA2RevisionAnchor({
     atomicCompareAndSwap: true,
     dialect: "postgresql",
     initialize,
+    verify,
     read,
     compareAndSwap
   });
