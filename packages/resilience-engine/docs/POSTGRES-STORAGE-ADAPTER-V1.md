@@ -80,11 +80,14 @@ This is a transactional single-primary PostgreSQL implementation, not a multi-re
 
 `createPostgresA2ActionLedger` applies transaction-local PostgreSQL limits to every operation, including read-only reconciliation and exact lookup:
 
+- `connectionTimeoutMs`: default 5,000 ms; accepted range 100–60,000 ms. If a Pool client arrives after the wait has timed out or been aborted, the late client is immediately released.
 - `statementTimeoutMs`: default 4,000 ms; accepted range 100–60,000 ms.
 - `lockTimeoutMs`: default 1,500 ms; accepted range 50–30,000 ms.
 - `idleInTransactionTimeoutMs`: default 10,000 ms; accepted range 100–120,000 ms.
 
-The limits are set with transaction-local `set_config(..., true)`; they do not modify the Pool's session defaults. The host must still configure a bounded node-postgres Pool connection wait (for example, `connectionTimeoutMillis`) because acquiring a Pool client occurs before the transaction-local limits can be set. A controller-side timeout can still make the caller uncertain about a query already sent to PostgreSQL; the server-side statement/lock limits bound how long that query can hold the database transaction. Unknown outcomes remain held and are reconciled by exact durable lookup; the adapter does not retry a provider operation.
+The transaction limits are set with transaction-local `set_config(..., true)`; they do not modify the Pool's session defaults. Pool acquisition is bounded by the ledger's `connectionTimeoutMs`, while the host should also configure node-postgres `connectionTimeoutMillis` on its Pool as defense in depth. Abort signals are checked during acquisition, before commit and around read-only reconciliation; node-postgres does not expose a universal AbortSignal cancellation contract, so the server-side statement/lock limits remain the authoritative bound once a query has been sent.
+
+A controller-side timeout can still make the caller uncertain about a query already sent to PostgreSQL. The adapter never converts that uncertainty into success or a retry; the controller keeps the action held and resolves it through exact durable lookup/reconciliation.
 
 
 ## Transaction and concurrency guarantees
