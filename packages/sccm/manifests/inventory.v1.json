@@ -1,0 +1,1415 @@
+{
+  "schema": "jb.sccm.inventory/v1",
+  "inventoryVersion": "1.0.0",
+  "generatedAt": "2026-11-18T19:08:00Z",
+  "sources": [
+    {
+      "id": "jb-expert-qa-main",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "main",
+      "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "jb.ecosystem",
+      "name": "JB Engines Ecosystem",
+      "level": "ecosystem",
+      "parentId": null,
+      "sourceId": "jb-expert-qa-main",
+      "version": "1.0.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa",
+      "name": "JB Expert QA",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.2.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard",
+      "name": "JB Security Guard",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine",
+      "name": "JB Malware Engine",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine",
+      "name": "JB Resilience Engine",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab",
+      "name": "JB Threat Lab",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine",
+      "name": "JB Advisor Engine",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine",
+      "name": "JB Localization Engine",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine",
+      "name": "JB Currency Engine",
+      "level": "engine",
+      "parentId": "jb.ecosystem",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language",
+      "name": "Language QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.translation-integrity",
+      "name": "Translation integrity",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.language",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.module",
+      "name": "Language QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.language.translation-integrity",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.locale-normalization",
+      "name": "Locale normalization (es-419/en)",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.catalog-parser",
+      "name": "Static PHP/JSON catalog parser",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.placeholder-parity",
+      "name": "Placeholder parity",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.glossary",
+      "name": "Terminology glossary",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.translation-memory",
+      "name": "Translation memory",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.semantic-integrity",
+      "name": "Semantic integrity checks",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.filesystem-adapter",
+      "name": "Filesystem audit adapter",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.review-state",
+      "name": "Human review state",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual",
+      "name": "Visual QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.browser-analysis",
+      "name": "Browser and visual analysis",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.visual",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.module",
+      "name": "Visual QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.visual.browser-analysis",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.screenshot-diff",
+      "name": "Screenshot regression comparison",
+      "level": "component",
+      "parentId": "jb.expert-qa.visual.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.layout-overflow",
+      "name": "Layout overflow and overlap",
+      "level": "component",
+      "parentId": "jb.expert-qa.visual.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.responsive-matrix",
+      "name": "Responsive viewport matrix",
+      "level": "component",
+      "parentId": "jb.expert-qa.visual.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.visual.browser-state",
+      "name": "Browser state and interaction",
+      "level": "component",
+      "parentId": "jb.expert-qa.visual.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security",
+      "name": "Security QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security.static-analysis",
+      "name": "Static security analysis",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.security",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security.module",
+      "name": "Security QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.security.static-analysis",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security.rule-integrity",
+      "name": "Security rule integrity",
+      "level": "component",
+      "parentId": "jb.expert-qa.security.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security.dependency-audit",
+      "name": "Dependency vulnerability audit",
+      "level": "component",
+      "parentId": "jb.expert-qa.security.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.security.finding-evidence",
+      "name": "Finding evidence and severity",
+      "level": "component",
+      "parentId": "jb.expert-qa.security.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency",
+      "name": "Currency QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency.locale-validation",
+      "name": "Currency and locale validation",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.currency",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency.module",
+      "name": "Currency QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.currency.locale-validation",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency.iso-registry",
+      "name": "ISO currency registry validation",
+      "level": "component",
+      "parentId": "jb.expert-qa.currency.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency.decimal-precision",
+      "name": "Minor-unit precision validation",
+      "level": "component",
+      "parentId": "jb.expert-qa.currency.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.currency.formatting",
+      "name": "Locale-aware amount formatting",
+      "level": "component",
+      "parentId": "jb.expert-qa.currency.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core",
+      "name": "Core QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core.analysis-core",
+      "name": "Analysis core",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.core",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core.module",
+      "name": "Core QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.core.analysis-core",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core.parser",
+      "name": "Source parser and AST boundary",
+      "level": "component",
+      "parentId": "jb.expert-qa.core.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core.rules",
+      "name": "Rule evaluation and deterministic output",
+      "level": "component",
+      "parentId": "jb.expert-qa.core.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.core.findings",
+      "name": "Finding normalization and evidence",
+      "level": "component",
+      "parentId": "jb.expert-qa.core.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database",
+      "name": "Database QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database.integration",
+      "name": "Database integration",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.database",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database.module",
+      "name": "Database QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.database.integration",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database.postgres",
+      "name": "PostgreSQL integration",
+      "level": "component",
+      "parentId": "jb.expert-qa.database.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database.migrations",
+      "name": "Migration consistency",
+      "level": "component",
+      "parentId": "jb.expert-qa.database.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.database.transactions",
+      "name": "Transaction and rollback behavior",
+      "level": "component",
+      "parentId": "jb.expert-qa.database.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package",
+      "name": "Package QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package.distribution",
+      "name": "Package distribution",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.package",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package.module",
+      "name": "Package QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.package.distribution",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package.consumer-install",
+      "name": "Clean consumer installation",
+      "level": "component",
+      "parentId": "jb.expert-qa.package.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package.exports",
+      "name": "Public exports and entrypoints",
+      "level": "component",
+      "parentId": "jb.expert-qa.package.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.package.boundaries",
+      "name": "Dependency and package boundaries",
+      "level": "component",
+      "parentId": "jb.expert-qa.package.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression",
+      "name": "Regression QA",
+      "level": "branch",
+      "parentId": "jb.expert-qa",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression.matrix",
+      "name": "Regression matrix",
+      "level": "subbranch",
+      "parentId": "jb.expert-qa.regression",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression.module",
+      "name": "Regression QA module",
+      "level": "module",
+      "parentId": "jb.expert-qa.regression.matrix",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression.node-matrix",
+      "name": "Node.js 22/24 regression matrix",
+      "level": "component",
+      "parentId": "jb.expert-qa.regression.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression.platform-matrix",
+      "name": "Operating-system compatibility",
+      "level": "component",
+      "parentId": "jb.expert-qa.regression.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.regression.fixture-integrity",
+      "name": "Fixture and edge-case integrity",
+      "level": "component",
+      "parentId": "jb.expert-qa.regression.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime",
+      "name": "Runtime protection",
+      "level": "branch",
+      "parentId": "jb.security-guard",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.request-defense",
+      "name": "Request defense",
+      "level": "subbranch",
+      "parentId": "jb.security-guard.runtime",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.module",
+      "name": "Request inspection module",
+      "level": "module",
+      "parentId": "jb.security-guard.runtime.request-defense",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.authentication",
+      "name": "Authentication/session controls",
+      "level": "component",
+      "parentId": "jb.security-guard.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.rate-limit",
+      "name": "Rate limiting and abuse controls",
+      "level": "component",
+      "parentId": "jb.security-guard.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.csrf",
+      "name": "CSRF and origin protection",
+      "level": "component",
+      "parentId": "jb.security-guard.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.runtime.upload",
+      "name": "Upload inspection and quarantine",
+      "level": "component",
+      "parentId": "jb.security-guard.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters",
+      "name": "Runtime adapters",
+      "level": "branch",
+      "parentId": "jb.security-guard",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters.php-python",
+      "name": "PHP and Python adapters",
+      "level": "subbranch",
+      "parentId": "jb.security-guard.adapters",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters.module",
+      "name": "Cross-runtime adapter module",
+      "level": "module",
+      "parentId": "jb.security-guard.adapters.php-python",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters.php",
+      "name": "PHP 8.2 adapter",
+      "level": "component",
+      "parentId": "jb.security-guard.adapters.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters.python",
+      "name": "Python 3.11 / ASGI adapter",
+      "level": "component",
+      "parentId": "jb.security-guard.adapters.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.security-guard.adapters.contracts",
+      "name": "Shared HMAC and contract compatibility",
+      "level": "component",
+      "parentId": "jb.security-guard.adapters.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis",
+      "name": "Malware analysis",
+      "level": "branch",
+      "parentId": "jb.malware-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis.static-inspection",
+      "name": "Static inspection",
+      "level": "subbranch",
+      "parentId": "jb.malware-engine.analysis",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis.module",
+      "name": "Static file analysis module",
+      "level": "module",
+      "parentId": "jb.malware-engine.analysis.static-inspection",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis.archive",
+      "name": "Archive parser and limits",
+      "level": "component",
+      "parentId": "jb.malware-engine.analysis.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis.patterns",
+      "name": "Byte pattern and indicator matching",
+      "level": "component",
+      "parentId": "jb.malware-engine.analysis.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.analysis.calibration",
+      "name": "Calibration corpus and scoring",
+      "level": "component",
+      "parentId": "jb.malware-engine.analysis.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety",
+      "name": "Safe processing",
+      "level": "branch",
+      "parentId": "jb.malware-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety.resource-bounds",
+      "name": "Resource and input bounds",
+      "level": "subbranch",
+      "parentId": "jb.malware-engine.safety",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety.module",
+      "name": "Input safety module",
+      "level": "module",
+      "parentId": "jb.malware-engine.safety.resource-bounds",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety.size-limits",
+      "name": "Fixture and corpus size limits",
+      "level": "component",
+      "parentId": "jb.malware-engine.safety.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety.object-safety",
+      "name": "Accessor and prototype safety",
+      "level": "component",
+      "parentId": "jb.malware-engine.safety.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.malware-engine.safety.temp-files",
+      "name": "Temporary file lifecycle",
+      "level": "component",
+      "parentId": "jb.malware-engine.safety.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.6.2",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration",
+      "name": "Service reliability orchestration",
+      "level": "branch",
+      "parentId": "jb.resilience-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.a2-readonly",
+      "name": "A2 read-only reconciliation",
+      "level": "subbranch",
+      "parentId": "jb.resilience-engine.orchestration",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.a2-module",
+      "name": "A2 reconciliation module",
+      "level": "module",
+      "parentId": "jb.resilience-engine.orchestration.a2-readonly",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.expired-claims",
+      "name": "Expired claimed-action filtering",
+      "level": "component",
+      "parentId": "jb.resilience-engine.orchestration.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.bounded-results",
+      "name": "Bounded candidate results",
+      "level": "component",
+      "parentId": "jb.resilience-engine.orchestration.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.incident-context",
+      "name": "Incident and service context projection",
+      "level": "component",
+      "parentId": "jb.resilience-engine.orchestration.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.ledger-readonly",
+      "name": "Byte-for-byte ledger immutability",
+      "level": "component",
+      "parentId": "jb.resilience-engine.orchestration.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.orchestration.no-auto-resolution",
+      "name": "Automatic resolution remains disabled",
+      "level": "component",
+      "parentId": "jb.resilience-engine.orchestration.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.policy",
+      "name": "Recovery policy",
+      "level": "branch",
+      "parentId": "jb.resilience-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.policy.a1-gates",
+      "name": "A1 policy and authorization gates",
+      "level": "subbranch",
+      "parentId": "jb.resilience-engine.policy",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.policy.a1-module",
+      "name": "A1 policy gate module",
+      "level": "module",
+      "parentId": "jb.resilience-engine.policy.a1-gates",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.policy.owner-approval",
+      "name": "Owner approval and policy boundaries",
+      "level": "component",
+      "parentId": "jb.resilience-engine.policy.a1-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.policy.action-eligibility",
+      "name": "Action eligibility and idempotency",
+      "level": "component",
+      "parentId": "jb.resilience-engine.policy.a1-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.containment",
+      "name": "Containment",
+      "level": "branch",
+      "parentId": "jb.resilience-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.containment.a2-actions",
+      "name": "A2 containment actions",
+      "level": "subbranch",
+      "parentId": "jb.resilience-engine.containment",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.containment.a2-module",
+      "name": "A2 containment module",
+      "level": "module",
+      "parentId": "jb.resilience-engine.containment.a2-actions",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.containment.action-safety",
+      "name": "Containment action safety",
+      "level": "component",
+      "parentId": "jb.resilience-engine.containment.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.containment.operator-verification",
+      "name": "Operator verification",
+      "level": "component",
+      "parentId": "jb.resilience-engine.containment.a2-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover",
+      "name": "Failover",
+      "level": "branch",
+      "parentId": "jb.resilience-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover.a3",
+      "name": "A3 distributed failover",
+      "level": "subbranch",
+      "parentId": "jb.resilience-engine.failover",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover.a3-module",
+      "name": "A3 failover module",
+      "level": "module",
+      "parentId": "jb.resilience-engine.failover.a3",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover.fencing",
+      "name": "Execution fencing",
+      "level": "component",
+      "parentId": "jb.resilience-engine.failover.a3-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover.leader-election",
+      "name": "Leader election and split-brain protection",
+      "level": "component",
+      "parentId": "jb.resilience-engine.failover.a3-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.resilience-engine.failover.replay",
+      "name": "Distributed replay protection",
+      "level": "component",
+      "parentId": "jb.resilience-engine.failover.a3-module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation",
+      "name": "Safe threat simulation",
+      "level": "branch",
+      "parentId": "jb.threat-lab",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.six-tier",
+      "name": "Six-tier test scenarios",
+      "level": "subbranch",
+      "parentId": "jb.threat-lab.simulation",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.module",
+      "name": "Threat simulation module",
+      "level": "module",
+      "parentId": "jb.threat-lab.simulation.six-tier",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.isolation",
+      "name": "Disposable isolated test environment",
+      "level": "component",
+      "parentId": "jb.threat-lab.simulation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.safety-policy",
+      "name": "Non-destructive safety boundaries",
+      "level": "component",
+      "parentId": "jb.threat-lab.simulation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.coverage",
+      "name": "Scenario coverage and reproducibility",
+      "level": "component",
+      "parentId": "jb.threat-lab.simulation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.threat-lab.simulation.evidence",
+      "name": "Evidence report integrity",
+      "level": "component",
+      "parentId": "jb.threat-lab.simulation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation",
+      "name": "Recommendation engine",
+      "level": "branch",
+      "parentId": "jb.advisor-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.fragrance",
+      "name": "Fragrance recommendation",
+      "level": "subbranch",
+      "parentId": "jb.advisor-engine.recommendation",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.module",
+      "name": "Recommendation module",
+      "level": "module",
+      "parentId": "jb.advisor-engine.recommendation.fragrance",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.identity",
+      "name": "Product identity matching",
+      "level": "component",
+      "parentId": "jb.advisor-engine.recommendation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.ranking",
+      "name": "Ranking and relevance metrics",
+      "level": "component",
+      "parentId": "jb.advisor-engine.recommendation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.explanation",
+      "name": "Evidence-backed explanations",
+      "level": "component",
+      "parentId": "jb.advisor-engine.recommendation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.advisor-engine.recommendation.domain-adapter",
+      "name": "Domain adapter contract",
+      "level": "component",
+      "parentId": "jb.advisor-engine.recommendation.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime",
+      "name": "Locale runtime",
+      "level": "branch",
+      "parentId": "jb.localization-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.intl",
+      "name": "Intl and locale resolution",
+      "level": "subbranch",
+      "parentId": "jb.localization-engine.runtime",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.module",
+      "name": "Localization runtime module",
+      "level": "module",
+      "parentId": "jb.localization-engine.runtime.intl",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.canonicalization",
+      "name": "BCP 47 canonicalization",
+      "level": "component",
+      "parentId": "jb.localization-engine.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.fallback",
+      "name": "Locale fallback and alias policy",
+      "level": "component",
+      "parentId": "jb.localization-engine.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.plurals",
+      "name": "CLDR plural rules",
+      "level": "component",
+      "parentId": "jb.localization-engine.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.localization-engine.runtime.dates-numbers",
+      "name": "Date and number formatting",
+      "level": "component",
+      "parentId": "jb.localization-engine.runtime.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money",
+      "name": "Currency and money",
+      "level": "branch",
+      "parentId": "jb.currency-engine",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.precision",
+      "name": "Currency precision and conversion",
+      "level": "subbranch",
+      "parentId": "jb.currency-engine.money",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.module",
+      "name": "Currency runtime module",
+      "level": "module",
+      "parentId": "jb.currency-engine.money.precision",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.iso4217",
+      "name": "ISO 4217 registry",
+      "level": "component",
+      "parentId": "jb.currency-engine.money.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.minor-units",
+      "name": "Minor-unit arithmetic and precision",
+      "level": "component",
+      "parentId": "jb.currency-engine.money.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.fx",
+      "name": "FX rates and conversion policy",
+      "level": "component",
+      "parentId": "jb.currency-engine.money.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.currency-engine.money.formatting",
+      "name": "Locale-aware currency formatting",
+      "level": "component",
+      "parentId": "jb.currency-engine.money.module",
+      "sourceId": "jb-expert-qa-main",
+      "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    }
+  ]
+}

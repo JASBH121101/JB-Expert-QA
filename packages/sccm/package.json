@@ -1,0 +1,17 @@
+{
+  "name": "@jb/sccm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "System Central Certification Manager for hierarchical, evidence-backed JB engine certification.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./registry": "./src/registry.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

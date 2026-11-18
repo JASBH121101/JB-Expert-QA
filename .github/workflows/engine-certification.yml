@@ -389,3 +389,33 @@ jobs:
           path: ${{ runner.temp }}/resilience-service-manager-lab.json
           if-no-files-found: error
           retention-days: 30
+
+  sccm-registry:
+    name: SCCM hierarchy and evidence gates / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate hierarchy, exact-SHA evidence and certification gates
+        run: npm run sccm:check
+      - name: Generate hierarchical SCCM report
+        run: npm run sccm:report > "${{ runner.temp }}/jb-sccm-report.json"
+      - name: Upload SCCM report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jb-sccm-report-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/jb-sccm-report.json
+          if-no-files-found: error
+          retention-days: 30
