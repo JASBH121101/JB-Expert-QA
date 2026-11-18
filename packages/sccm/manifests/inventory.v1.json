@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
   "inventoryVersion": "1.0.1",
-  "generatedAt": "2026-11-18T20:28:16Z",
+  "generatedAt": "2026-11-18T20:56:59Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -14,6 +14,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
       "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00"
+    },
+    {
+      "id": "jb-expert-qa-visual-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "main",
+      "commitSha": "32d1b5f2bd227308fd3cbb03b6dda06a13cb86e8"
     }
   ],
   "nodes": [
@@ -264,7 +270,7 @@
       "name": "Screenshot regression comparison",
       "level": "component",
       "parentId": "jb.expert-qa.visual.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-visual-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -274,7 +280,7 @@
       "name": "Layout overflow and overlap",
       "level": "component",
       "parentId": "jb.expert-qa.visual.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-visual-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -284,7 +290,7 @@
       "name": "Responsive viewport matrix",
       "level": "component",
       "parentId": "jb.expert-qa.visual.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-visual-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -294,7 +300,7 @@
       "name": "Browser state and interaction",
       "level": "component",
       "parentId": "jb.expert-qa.visual.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-visual-snapshot",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
