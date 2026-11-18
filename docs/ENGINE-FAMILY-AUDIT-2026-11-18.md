@@ -145,7 +145,7 @@ Recommended control: protect main with pull-request-only changes, required CI ch
 ## Recommended execution order
 
 1. **Completed on PR #126 (not merged):** isolated Python binary-signature correction, real PNG/JPEG test fixtures and full passing Security Guard multi-runtime / Engine Certification CI.
-2. **In progress on the stacked upload-contract branch:** define upload-inspection contract v1 and shared cross-runtime vectors for Node, PHP and Python; require each runtime to prove complete stream consumption and equivalent fail-closed outcomes.
+2. **In progress on PR #127:** define upload-inspection contract v1 and shared cross-runtime vectors for Node, PHP and Python; require each runtime to prove complete stream consumption and equivalent fail-closed outcomes.
 3. Add Composer and Python wheel/sdist clean-install distribution jobs.
 4. Audit Security Guard's request parsing, proxy trust, CSRF/origin, auth/recovery, shared-store semantics and real host upload integrations. Keep monitor-first rollout and do not claim WAF coverage.
 5. Expand Malware Engine's representative benign/positive test corpus and report measured false-positive, false-negative and unknown coverage; keep production antivirus claims disabled.
@@ -173,7 +173,7 @@ PR #129 (branch fix/malware-windows-runner-timeouts-v1) addresses the underlying
 
 PR #129 passed its full Engine Certification matrix (30/30 jobs), Malware Engine Validation, Core Validation, Security QA and NPM package distribution on head 2e16061e2218030c3aeece9b346028ed5a34afc4.
 
-PR #127 is stacked on PR #129's branch so the same Windows fix is inherited rather than copied into the upload-contract changes. It must be revalidated on the new base before either branch is merged.
+To restore the repository's required pull_request workflow triggers on main, the four Windows timeout-hardening files from PR #129 were incorporated into PR #127's own branch and PR #127 was retargeted back to main. PR #127 is now the single self-contained integration path for the Python upload signature fix, the shared upload contract and vectors, the Node/PHP/Python stream-verification hardening, and the Windows PowerShell timeout fix. PR #129 is a verified source of that Windows patch (30/30 Engine Certification jobs) and should be closed as superseded only after PR #127's complete main-target CI passes. No patch is to be merged twice.
 
 ### PHP and Python distribution follow-up
 
