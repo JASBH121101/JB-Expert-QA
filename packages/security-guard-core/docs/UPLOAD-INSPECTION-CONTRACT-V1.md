@@ -43,7 +43,7 @@ streamConsumed is an output assertion only after the runtime adapter independent
 | Scanner result | Guard disposition |
 |---|---|
 | clean, complete stream, exact upload ID/size/SHA-256 | Eligible for the host's private atomic promotion step |
-| malicious | Reject; remove the staging quarantine object. Any forensic evidence retention must use a separate, bounded and access-controlled recorder |
+| malicious | Reject promotion; retain the exact object in private quarantine for controlled response and forensic disposition. Enforce a bounded retention period, quotas, restricted audited access and explicit deletion; never serve it through normal download routes |
 | unknown | Do not promote; retain in private quarantine for an authorized review/disposition process |
 | Incomplete stream | Do not promote; retain in private quarantine |
 | Timeout, scanner outage, malformed result, wrong upload ID, digest or byte-count mismatch | Do not promote; retain in private quarantine |
