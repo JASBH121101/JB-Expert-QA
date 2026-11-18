@@ -112,7 +112,9 @@ Weights increase exponentially so a missed high-difficulty case cannot be hidden
 ### Initial coverage map
 
 
-These tier footprints are an inventory across separate local test files. The current test runner executes those files independently; it does not yet merge their results into one cross-suite certification report. Each report certifies only the scenarios selected and executed in that individual run.
+The integration suites still run independently so a failure remains attributable to its owning target/profile. The certification workflow now persists each original Threat Lab v2 report and then builds one unified report using `jb.threat-lab.unified-certification-report/v1`. The aggregator preserves every source outcome, records its source report, validates stable target kind/version, rejects duplicate target/scenario pairs, lists missing required targets, and computes six-tier readiness across the combined evidence. Structural target-scope skips remain visible but do not count as failed tests; adapter/report-budget skips and failures block readiness. A single-green source suite cannot conceal a missing engine or tier in the consolidated result.
+
+The unified report is emitted for each OS/Node matrix lane and retained as a 30-day workflow artifact. It includes the four JB engines plus the separately scoped NEXORA Catalog and Site Engine profiles, along with the Malware-focused Trojan/PE integration suites. Each report still certifies only the named, safe scenarios that actually ran; it is not a production security certification.
 The first classification of existing scenarios currently gives these per-engine tier footprints:
 
 | Engine | Covered tiers | Current gaps |
