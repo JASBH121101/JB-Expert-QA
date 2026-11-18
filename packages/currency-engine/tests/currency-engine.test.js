@@ -118,3 +118,37 @@ test("rejects unknown currencies and fractional digits beyond registry precision
   assert.throws(() => createMoney("1.001", "USD"));
   assert.throws(() => createMoneyFromMinorUnits(100n, "XXX"));
 });
+
+test("same-currency display conversion preserves exact minor units without an FX provider", async () => {
+  const amount = createMoney("90071992547409.91", "NIO");
+  const result = await convertMoney(amount, "NIO", { clock: () => NOW });
+  assert.equal(result.money.minorUnits, amount.minorUnits);
+  assert.equal(result.rate, null);
+  assert.equal(moneyToDecimalString(result.money), "90071992547409.91");
+});
+
+test("provider timeout aborts the adapter and never returns a converted amount", async () => {
+  let aborted = false;
+  const provider = {
+    getRate({ signal }) {
+      return new Promise(() => {
+        signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+      });
+    }
+  };
+  await assert.rejects(() => convertMoney(createMoney("1.00", "USD"), "EUR", {
+    rateProvider: provider, clock: () => NOW, timeoutMs: 100
+  }), /FX_RATE_PROVIDER_TIMEOUT/);
+  assert.equal(aborted, true);
+});
+
+test("negative amounts keep their sign after explicit FX rounding", async () => {
+  const provider = { async getRate() {
+    return { from: "USD", to: "EUR", rate: "0.92", source: "fixture",
+      asOf: "2026-11-18T13:59:00Z", validUntil: "2026-11-18T15:00:00Z" };
+  } };
+  const result = await convertMoney(createMoney("-10.00", "USD"), "EUR", {
+    rateProvider: provider, clock: () => NOW
+  });
+  assert.equal(moneyToDecimalString(result.money), "-9.20");
+});
