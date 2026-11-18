@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.3",
-  "generatedAt": "2026-11-18T22:03:00Z",
+  "inventoryVersion": "1.0.4",
+  "generatedAt": "2026-11-18T22:22:00Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -32,6 +32,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "main",
       "commitSha": "cce6ac9a835ce4df00c3164749f86222e38cff15"
+    },
+    {
+      "id": "jb-internationalization-certification-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "certify/currency-qa-engine-v1",
+      "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d"
     }
   ],
   "nodes": [
@@ -1312,7 +1318,7 @@
       "name": "Locale runtime",
       "level": "branch",
       "parentId": "jb.localization-engine",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1322,7 +1328,7 @@
       "name": "Intl and locale resolution",
       "level": "subbranch",
       "parentId": "jb.localization-engine.runtime",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1342,7 +1348,7 @@
       "name": "BCP 47 canonicalization",
       "level": "component",
       "parentId": "jb.localization-engine.runtime.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1352,7 +1358,7 @@
       "name": "Locale fallback and alias policy",
       "level": "component",
       "parentId": "jb.localization-engine.runtime.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1372,7 +1378,7 @@
       "name": "Date and number formatting",
       "level": "component",
       "parentId": "jb.localization-engine.runtime.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1382,7 +1388,7 @@
       "name": "Currency and money",
       "level": "branch",
       "parentId": "jb.currency-engine",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1392,7 +1398,7 @@
       "name": "Currency precision and conversion",
       "level": "subbranch",
       "parentId": "jb.currency-engine.money",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1412,7 +1418,7 @@
       "name": "ISO 4217 registry",
       "level": "component",
       "parentId": "jb.currency-engine.money.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1422,7 +1428,7 @@
       "name": "Minor-unit arithmetic and precision",
       "level": "component",
       "parentId": "jb.currency-engine.money.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1432,7 +1438,7 @@
       "name": "FX rates and conversion policy",
       "level": "component",
       "parentId": "jb.currency-engine.money.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
@@ -1442,7 +1448,7 @@
       "name": "Locale-aware currency formatting",
       "level": "component",
       "parentId": "jb.currency-engine.money.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []

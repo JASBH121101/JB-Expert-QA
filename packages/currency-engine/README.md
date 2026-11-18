@@ -45,3 +45,14 @@ The registry uses three-letter currency identifiers consistent with ISO 4217. Un
 - A rate is not trusted just because a caller supplied a number; source, timestamp, pair and validity are checked, but the adapter/operator must still establish source authenticity.
 - The core does not sign rates. Production adapters should verify transport/signatures and preserve the signed provider payload.
 - Historical transaction amounts keep their original currency and rate snapshot; changing a tenant's display preference must not rewrite ledger entries.
+
+
+## Certification coverage and limits
+
+The package test suite covers the curated registry entries and minor-unit metadata, exact decimal-to-minor-unit conversion, BigInt money arithmetic, canonical serialization, locale formatting, explicit rounding modes, FX input validation, provenance, freshness and timeout behavior.
+
+This certification scope is intentionally bounded:
+- The built-in currency list is a curated operational subset, not a complete, automatically refreshed ISO 4217 registry.
+- FX conversion is only a validated contract around an explicitly injected rate provider. No provider is bundled, contacted or trusted automatically; no market-rate accuracy is implied.
+- Locale formatting is delegated to the runtime's Intl/ICU implementation. It does not change stored monetary values.
+- The tests do not certify tax, accounting, payment settlement, cash-rounding rules or jurisdiction-specific compliance.

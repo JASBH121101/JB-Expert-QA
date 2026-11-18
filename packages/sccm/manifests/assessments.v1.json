@@ -2438,5 +2438,434 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.20261118.i18n",
+    "nodeId": "jb.localization-engine.runtime",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:01Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine runtime contract passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine runtime contract passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine runtime contract passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine runtime contract passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.intl.20261118.i18n",
+    "nodeId": "jb.localization-engine.runtime.intl",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:02Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine Intl and catalog contract passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine Intl and catalog contract passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine Intl and catalog contract passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Localization Engine Intl and catalog contract passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.canonicalization.20261118.i18n",
+    "nodeId": "jb.localization-engine.runtime.canonicalization",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:03Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "BCP 47 canonicalization and locale resolution tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "BCP 47 canonicalization and locale resolution tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "BCP 47 canonicalization and locale resolution tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "BCP 47 canonicalization and locale resolution tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.fallback.20261118.i18n",
+    "nodeId": "jb.localization-engine.runtime.fallback",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:04Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Deterministic locale fallback tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Deterministic locale fallback tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Deterministic locale fallback tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Deterministic locale fallback tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.dates-numbers.20261118.i18n",
+    "nodeId": "jb.localization-engine.runtime.dates-numbers",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:05Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-sensitive date and number formatting tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-sensitive date and number formatting tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-sensitive date and number formatting tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-sensitive date and number formatting tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.20261118.i18n",
+    "nodeId": "jb.currency-engine.money",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:06Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency Engine branch contract passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency Engine branch contract passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency Engine branch contract passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency Engine branch contract passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.precision.20261118.i18n",
+    "nodeId": "jb.currency-engine.money.precision",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:07Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency precision and conversion tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency precision and conversion tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency precision and conversion tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Currency precision and conversion tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.iso4217.20261118.i18n",
+    "nodeId": "jb.currency-engine.money.iso4217",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:08Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Curated currency registry and minor-unit metadata tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Curated currency registry and minor-unit metadata tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Curated currency registry and minor-unit metadata tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Curated currency registry and minor-unit metadata tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.minor-units.20261118.i18n",
+    "nodeId": "jb.currency-engine.money.minor-units",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:09Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Exact BigInt money and minor-unit precision tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Exact BigInt money and minor-unit precision tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Exact BigInt money and minor-unit precision tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Exact BigInt money and minor-unit precision tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.fx.20261118.i18n",
+    "nodeId": "jb.currency-engine.money.fx",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:10Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Injected FX provider contract and provenance tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Injected FX provider contract and provenance tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Injected FX provider contract and provenance tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Injected FX provider contract and provenance tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.formatting.20261118.i18n",
+    "nodeId": "jb.currency-engine.money.formatting",
+    "version": "0.1.0",
+    "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T22:22:11Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175684753",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-aware currency formatting tests passed — Ubuntu 24.04 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685044",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-aware currency formatting tests passed — Windows 2022 / Node.js 24; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685065",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-aware currency formatting tests passed — Windows 2022 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44410116281/job/135175685242",
+        "commitSha": "7a2720ec176cde5a8fb607a9033819bcd871234d",
+        "outcome": "success",
+        "summary": "Locale-aware currency formatting tests passed — Ubuntu 24.04 / Node.js 22; the complete Localization Engine and Currency Engine test files passed."
+      }
+    ],
+    "findings": []
   }
 ]
