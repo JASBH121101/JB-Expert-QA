@@ -55,7 +55,7 @@ export function createLocalization({ catalogs, defaultLocale = DEFAULT_LOCALE } 
   }
 
   function formatNumber(value, { locale, ...options } = {}) {
-    const selected = resolveCatalog(locale ?? defaultTag).locale;
+    const selected = canonicalizeLocale(locale ?? defaultTag) ?? defaultTag;
     if (!(typeof value === "number" && Number.isFinite(value)) && typeof value !== "bigint") {
       throw new TypeError("formatNumber value must be a finite number or bigint");
     }
@@ -63,14 +63,14 @@ export function createLocalization({ catalogs, defaultLocale = DEFAULT_LOCALE } 
   }
 
   function formatDate(value, { locale, ...options } = {}) {
-    const selected = resolveCatalog(locale ?? defaultTag).locale;
+    const selected = canonicalizeLocale(locale ?? defaultTag) ?? defaultTag;
     const date = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(date.getTime())) throw new TypeError("formatDate value is invalid");
     return new Intl.DateTimeFormat(selected, options).format(date);
   }
 
   function direction(locale) {
-    return getTextDirection(resolveCatalog(locale ?? defaultTag).locale);
+    return getTextDirection(canonicalizeLocale(locale ?? defaultTag) ?? defaultTag);
   }
 
   return Object.freeze({
