@@ -42,7 +42,8 @@ export const DEFAULT_CURRENCIES = Object.freeze({
   NGN: Object.freeze({ code: "NGN", name: "Nigerian naira", minorUnit: 2 }),
   KES: Object.freeze({ code: "KES", name: "Kenyan shilling", minorUnit: 2 }),
   UAH: Object.freeze({ code: "UAH", name: "Ukrainian hryvnia", minorUnit: 2 }),
-  CLF: Object.freeze({ code: "CLF", name: "Chilean unidad de fomento", minorUnit: 4 })
+  CLF: Object.freeze({ code: "CLF", name: "Chilean unidad de fomento", minorUnit: 4 }),
+  UYW: Object.freeze({ code: "UYW", name: "Uruguayan unidad previsional", minorUnit: 4 })
 });
 
 export function normalizeCurrencyCode(value) {
