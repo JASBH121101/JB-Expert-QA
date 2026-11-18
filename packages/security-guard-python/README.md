@@ -74,9 +74,13 @@ The Python package now exposes `UploadInspectionService`, `UploadInspectionError
 The service streams a bounded source file into host-provided quarantine storage,
 calculates SHA-256, checks a narrow JPEG/PNG/GIF/WebP/PDF signature allowlist,
 and binds the scanner handoff to the opaque upload ID, exact byte count, SHA-256
-and detected MIME type. A read-only digest-tracking stream independently hashes
-and counts the bytes actually delivered to the scanner; a clean result returned
-without complete sequential consumption fails closed as SCAN_INCOMPLETE.
+and detected MIME type. A public `UploadInspectionReadOnlyStream` reader independently hashes and counts
+the exact bytes returned by bounded `read(max_bytes)` calls (maximum 1 MiB).
+It deliberately does not inherit from `io.RawIOBase`, expose `readinto` or
+support seeking, so scanners cannot wrap it in a prefetching
+`io.BufferedReader` and have buffered bytes counted as consumed. The scanner
+must loop until `read()` returns `b""`; a clean result returned without
+complete sequential consumption fails closed as `SCAN_INCOMPLETE`.
 
 Host adapters must keep quarantine and approved objects private, enforce scanner
 deadlines, verify exact bytes during atomic promotion, and make deletion idempotent. The `promote(upload_id, expected_sha256, expected_size, attestation)` method must also verify that the shared `jb.security.upload-inspection.attestation/v1` binds the same upload ID, digest, byte count and `clean` verdict, then persist the attestation and approved bytes together in the same atomic commit. Do not persist the attestation after a separate object-promotion transaction.
