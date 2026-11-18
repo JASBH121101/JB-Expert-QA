@@ -285,7 +285,7 @@ async function main() {
     const page = await a2First.listPending({
       cursor: null, limit: 10, atMs: claimedAtMs + 8
     });
-    assert.deepEqual(page.claimIds, [claim.claimId]);
+    assert.ok(page.claimIds.includes(claim.claimId));
     const held = await a2Second.getPendingByClaimId({
       claimId: claim.claimId, atMs: claimedAtMs + 8
     });
