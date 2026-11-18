@@ -29,3 +29,10 @@ auditCatalogs compares target catalogs with a designated source locale. It disti
 ## Integration boundary
 
 Applications should persist the tenant's locale preference independently of country, currency and time zone. A tenant may use es-NI with USD or en-US with NIO. Currency selection and conversion belong to JB Currency Engine, not to this package.
+
+
+## Certification coverage and limits
+
+The package test suite covers BCP 47 canonicalization, deterministic locale fallback, safe scalar interpolation, runtime CLDR plural categories, RTL direction, locale-sensitive number/date formatting, catalog auditing, placeholder parity, immutable catalog snapshots and prototype-safe catalog flattening.
+
+The engine uses built-in Intl/ICU capabilities and has no runtime translation dependency. It does not automatically translate text, download translations or approve linguistic copy. A locale is only production-ready when its product catalogs have been supplied and reviewed by a human linguist. The current contract implements cardinal plural rules and simple interpolation rather than the full ICU MessageFormat feature set.
