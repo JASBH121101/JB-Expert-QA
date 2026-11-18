@@ -1290,12 +1290,14 @@ export function createPostgresA2ActionLedger({
   providerId,
   verifierId,
   recorderId,
+  connectionTimeoutMs = 5_000,
   statementTimeoutMs = 4_000,
   lockTimeoutMs = 1_500,
   idleInTransactionTimeoutMs = 10_000
 } = {}) {
   ensurePool(pool);
   for (const [name, value, min, max] of [
+    ["connectionTimeoutMs", connectionTimeoutMs, 100, 60_000],
     ["statementTimeoutMs", statementTimeoutMs, 100, 60_000],
     ["lockTimeoutMs", lockTimeoutMs, 50, 30_000],
     ["idleInTransactionTimeoutMs", idleInTransactionTimeoutMs, 100, 120_000]
@@ -1318,9 +1320,50 @@ export function createPostgresA2ActionLedger({
     if (!initialized) throw new Error("PostgreSQL A2 action ledger is not initialized");
   }
 
+  async function acquireA2Client(signal) {
+    a2AssertSignal(signal);
+    const pendingConnection = Promise.resolve().then(() => pool.connect());
+    let timer;
+    let abortHandler;
+    const races = [
+      pendingConnection,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("A2 PostgreSQL Pool connection wait timed out"));
+        }, connectionTimeoutMs);
+      })
+    ];
+    if (signal && typeof signal.addEventListener === "function" &&
+        typeof signal.removeEventListener === "function") {
+      races.push(new Promise((_, reject) => {
+        abortHandler = () => reject(new Error("A2 PostgreSQL Pool connection wait aborted"));
+        signal.addEventListener("abort", abortHandler, { once: true });
+      }));
+    }
+    try {
+      const client = await Promise.race(races);
+      clearTimeout(timer);
+      if (abortHandler) signal.removeEventListener("abort", abortHandler);
+      try {
+        a2AssertSignal(signal);
+      } catch (error) {
+        client.release();
+        throw error;
+      }
+      return client;
+    } catch (error) {
+      clearTimeout(timer);
+      if (abortHandler) signal.removeEventListener("abort", abortHandler);
+      // pool.connect() has no AbortSignal contract. If it resolves after our
+      // bounded wait/abort wins, immediately return the late client to the Pool.
+      pendingConnection.then((client) => client.release()).catch(() => {});
+      throw error;
+    }
+  }
+
   async function runA2Transaction(signal, operation, isolation = "READ COMMITTED") {
     a2AssertSignal(signal);
-    const client = await pool.connect();
+    const client = await acquireA2Client(signal);
     let began = false;
     try {
       a2AssertSignal(signal);
