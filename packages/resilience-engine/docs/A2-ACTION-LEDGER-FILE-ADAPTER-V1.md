@@ -22,11 +22,14 @@ const actionLedger = createFileA2ActionLedger({
   filePath: "/var/lib/jb-resilience/a2-actions.json",
   providerId: "containment-provider",
   verifierId: "independent-verifier",
-  recorderId: "forensic-recorder"
+  recorderId: "forensic-recorder",
+  // Load this secret from a protected host secret store; never from the ledger directory.
+  integrityKeys: { "a2-2026-11": process.env.JB_RESILIENCE_A2_HMAC_KEY_HEX },
+  activeIntegrityKeyId: "a2-2026-11"
 });
 ```
 
-The example path and identifiers are illustrative. The host must choose a protected writable location, configure the actual adapter identities, and keep the write-capable ledger object inside the trusted controller composition. Do not expose `claim`, `createPendingRecord`, `markProviderStarted` or `complete` to untrusted callers.
+The example path and identifiers are illustrative. integrityKeys is a keyring of 32-4096-byte keys (or lowercase hex encodings); activeIntegrityKeyId selects the key used for new guard writes. Obtain keys from a host-managed secret store or HSM/TPM-backed provider, keep them outside the journal directory, and never commit them. Keep the write-capable ledger object inside the trusted controller composition. Do not expose claim, createPendingRecord, markProviderStarted or complete to untrusted callers.
 
 The default bounds are a 5-second lock wait, 120-second dead-process lock threshold, 25-millisecond lock polling interval, 20,000 lifetime claims and a 16 MiB ledger file. Limits can be lowered or raised within validated bounds. Capacity exhaustion is fail-closed: old idempotency keys are not silently evicted to make room.
 
@@ -53,7 +56,7 @@ The adapter uses:
 - descriptor-based no-follow opening (with a conservative metadata comparison fallback on platforms without `O_NOFOLLOW`) and rejection of symbolic-link ledger files;
 - bounded file size and lifetime claim count;
 - write-to-new-temporary-file, file `fsync`, atomic rename and directory sync where supported;
-- a revision/SHA-256 `.guard` sidecar that detects a missing journal or guard, same-revision content tampering and rollback to an older journal revision;
+- a versioned HMAC-SHA-256 `.guard` sidecar (guard schema v2) that authenticates the revision and journal digest with a key ID; MAC comparisons use constant-time comparison and fail closed on missing keys or authentication errors;
 - guard bootstrap only for a genuinely empty revision-zero journal; a used journal with a missing guard fails closed;
 - strict record, identity, idempotency, timestamp and evidence-reference validation;
 - abort-aware lock waiting and bounded host operations through the controller's `AbortSignal`.
@@ -68,7 +71,7 @@ A multi-host deployment can inject the separate `createPostgresA2ActionLedger(..
 
 The adapter's `durable: true` property describes the implemented local-file mechanism; it does not prove the host's filesystem, disk controller, volume configuration, backup/restore path, process supervisor or disaster-recovery behavior. Back up and restore the journal and its `.guard` sidecar together. A simultaneous rollback of both files to a matching older copy cannot be detected by this local pair alone and requires an independent off-host or monotonic backup/restore control. Those host operations require fault injection and independent certification.
 
-**Cryptographic threat-model boundary:** the `.guard` stores an unkeyed SHA-256 digest. It detects accidental corruption, missing files, one-sided edits and revision divergence, but it is not an authenticity mechanism: an actor able to write both the journal and the sidecar can recompute a matching digest or replace both together. The directory and volume must therefore be writable only by the trusted service identity and tightly controlled administrators. If the threat model includes a malicious local writer, the production host must add a keyed MAC/signature whose key is held outside this directory (for example in a separately protected OS/TPM-backed secret store) and/or an independently administered off-host monotonic append-only anchor. Do not enable A2 in a deployment that relies on this unkeyed pair as protection against a hostile local administrator or compromised service account.
+**Cryptographic threat-model boundary:** guard schema v2 authenticates the journal revision and SHA-256 digest with HMAC-SHA-256. A writer who can modify the journal and guard but does not possess an accepted key cannot forge a new valid guard. Key rotation requires the host to dual-load the old and new key IDs, set the new ID as active, verify/re-sign, and only then retire the old key. HMAC does not by itself prevent replay of a previously valid journal/guard pair: a coordinated restore of both files to an older signed snapshot can still pass local authentication. Production anti-rollback therefore requires an independently administered monotonic revision/digest anchor or equivalent off-host append-only control. This file adapter does not implement that external anchor. Do not enable A2 against a hostile-local-writer or rollback threat model until the host supplies and fault-tests that independent control.
 
 ## Required host tests before enabling A2
 
