@@ -633,7 +633,7 @@ test("file ledger detects loss, rollback, same-revision tampering and guard dele
     const trustedGuard = await readFile(guardPath, "utf8");
     const oneStepAhead = JSON.parse(latestLedger);
     oneStepAhead.revision += 1;
-    await writeFile(filePath, JSON.stringify(oneStepAhead) + "\\n", "utf8");
+    await writeFile(filePath, JSON.stringify(oneStepAhead) + "\n", "utf8");
     await assert.rejects(
       store.listPending({ cursor: null, limit: 10, atMs: NOW + 6 }),
       /revision diverges.*manual review/
