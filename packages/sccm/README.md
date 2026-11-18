@@ -41,6 +41,6 @@ The first command validates the registry and gate behavior. The second prints a 
 
 ## Current baseline
 
-The initial inventory contains 140 nodes across eight engines. It records exact-main evidence for the Language QA component tree and Resilience A2 read-only reconciliation slice. Other engines and components remain pending until their scope-specific reviews and evidence are completed. The ecosystem is intentionally not marked certified.
+The initial inventory contains 141 nodes across eight engines. It records exact-main evidence for the Language QA component tree and Resilience A2 read-only reconciliation slice. Other engines and components remain pending until their scope-specific reviews and evidence are completed. The ecosystem is intentionally not marked certified.
 
 SCCM does not deploy software, access production services, perform recovery actions, call external translation services or require paid providers.
