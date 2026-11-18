@@ -1286,9 +1286,24 @@ function a2ParseCursor(cursor) {
  * the same unique idempotency keys and active-asset constraint.
  */
 export function createPostgresA2ActionLedger({
-  pool, providerId, verifierId, recorderId
+  pool,
+  providerId,
+  verifierId,
+  recorderId,
+  statementTimeoutMs = 4_000,
+  lockTimeoutMs = 1_500,
+  idleInTransactionTimeoutMs = 10_000
 } = {}) {
   ensurePool(pool);
+  for (const [name, value, min, max] of [
+    ["statementTimeoutMs", statementTimeoutMs, 100, 60_000],
+    ["lockTimeoutMs", lockTimeoutMs, 50, 30_000],
+    ["idleInTransactionTimeoutMs", idleInTransactionTimeoutMs, 100, 120_000]
+  ]) {
+    if (!Number.isSafeInteger(value) || value < min || value > max) {
+      throw new TypeError("A2 PostgreSQL " + name + " is invalid");
+    }
+  }
   const identities = Object.freeze({
     providerId: assertIdentifier(providerId, "A2 providerId"),
     verifierId: assertIdentifier(verifierId, "A2 verifierId"),
@@ -1311,6 +1326,18 @@ export function createPostgresA2ActionLedger({
       a2AssertSignal(signal);
       await client.query("BEGIN ISOLATION LEVEL " + isolation);
       began = true;
+      // Transaction-local server limits bound lock waits, statement execution
+      // and idle open transactions without changing the caller's Pool defaults.
+      await client.query(
+        "SELECT set_config('statement_timeout',$1,true), " +
+        "set_config('lock_timeout',$2,true), " +
+        "set_config('idle_in_transaction_session_timeout',$3,true)",
+        [
+          String(statementTimeoutMs) + "ms",
+          String(lockTimeoutMs) + "ms",
+          String(idleInTransactionTimeoutMs) + "ms"
+        ]
+      );
       const result = await operation(client);
       a2AssertSignal(signal);
       await client.query("COMMIT");
@@ -1514,23 +1541,23 @@ export function createPostgresA2ActionLedger({
         idempotencyKey !== a2OperationKey(action, scope, profileId)) {
       return Object.freeze({ state: "unknown", claimId: null });
     }
-    a2AssertSignal(input.signal);
-    const result = await pool.query(
-      "SELECT claim_id, action, scope, profile_id, idempotency_key, status " +
-      "FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
-      [idempotencyKey]
-    );
-    a2AssertSignal(input.signal);
-    if (result.rowCount === 0) return Object.freeze({ state: "not-found", claimId: null });
-    const row = result.rows[0];
-    if (!a2SameAction(row, action, scope, profileId, idempotencyKey)) {
-      return Object.freeze({ state: "unknown", claimId: null });
-    }
-    const state = row.status === "completed" ? "completed" : row.status;
-    if (!["claimed", "provider-started", "completed"].includes(state)) {
-      return Object.freeze({ state: "unknown", claimId: null });
-    }
-    return Object.freeze({ state, claimId: row.claim_id });
+    return runA2Transaction(input.signal, async (client) => {
+      const result = await client.query(
+        "SELECT claim_id, action, scope, profile_id, idempotency_key, status " +
+        "FROM jb_resilience_a2_action_claims WHERE idempotency_key=$1",
+        [idempotencyKey]
+      );
+      if (result.rowCount === 0) return Object.freeze({ state: "not-found", claimId: null });
+      const row = result.rows[0];
+      if (!a2SameAction(row, action, scope, profileId, idempotencyKey)) {
+        return Object.freeze({ state: "unknown", claimId: null });
+      }
+      const state = row.status === "completed" ? "completed" : row.status;
+      if (!["claimed", "provider-started", "completed"].includes(state)) {
+        return Object.freeze({ state: "unknown", claimId: null });
+      }
+      return Object.freeze({ state, claimId: row.claim_id });
+    });
   }
 
   async function complete(rawInput = {}) {
@@ -1661,24 +1688,24 @@ export function createPostgresA2ActionLedger({
     const claimId = assertIdentifier(input.claimId, "A2 claimId");
     assertTimestamp(input.atMs, "A2 exact lookup timestamp");
     assertInitialized();
-    a2AssertSignal(input.signal);
-    const result = await pool.query(
-      "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
-      [claimId]
-    );
-    a2AssertSignal(input.signal);
-    if (result.rowCount !== 1 || !["claimed", "provider-started"].includes(result.rows[0].status) ||
-        result.rows[0].recovery_record === null) {
-      return Object.freeze({ found: false, record: null });
-    }
-    const entry = result.rows[0];
-    const record = a2NormalizeRecord(entry.recovery_record, identities);
-    const allowedStates = entry.status === "claimed"
-      ? ["claimed"] : ["provider-started", "held-for-reconciliation"];
-    if (!a2RecordMatchesEntry(record, entry, allowedStates)) {
-      throw new Error("A2 PostgreSQL recovery record does not match its durable claim row");
-    }
-    return Object.freeze({ found: true, record: Object.freeze(a2RecordCopy(record)) });
+    return runA2Transaction(input.signal, async (client) => {
+      const result = await client.query(
+        "SELECT * FROM jb_resilience_a2_action_claims WHERE claim_id=$1",
+        [claimId]
+      );
+      if (result.rowCount !== 1 || !["claimed", "provider-started"].includes(result.rows[0].status) ||
+          result.rows[0].recovery_record === null) {
+        return Object.freeze({ found: false, record: null });
+      }
+      const entry = result.rows[0];
+      const record = a2NormalizeRecord(entry.recovery_record, identities);
+      const allowedStates = entry.status === "claimed"
+        ? ["claimed"] : ["provider-started", "held-for-reconciliation"];
+      if (!a2RecordMatchesEntry(record, entry, allowedStates)) {
+        throw new Error("A2 PostgreSQL recovery record does not match its durable claim row");
+      }
+      return Object.freeze({ found: true, record: Object.freeze(a2RecordCopy(record)) });
+    });
   }
 
   return Object.freeze({
