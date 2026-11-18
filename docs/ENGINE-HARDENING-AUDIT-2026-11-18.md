@@ -8,7 +8,7 @@
 
 ## Executive decision
 
-The reviewed changes show strong automated regression and distribution evidence. The listed CI suites are green on the exact inspected heads. This supports **laboratory / CI certification only**. It does not establish production readiness, antivirus effectiveness, exploit resistance, or independent third-party certification.
+The reviewed changes show strong automated regression and distribution evidence. The listed CI suites are green on the exact inspected heads where stated. The updated Malware Engine PowerShell lexer commit is an explicit exception: only focused local lexer checks have run, and its full CI validation remains pending. This supports **laboratory / CI certification only** for the previously tested scope. It does not establish production readiness, antivirus effectiveness, exploit resistance, or independent third-party certification.
 
 No changes were made to main, no PR was merged, and no paid service or production environment was accessed.
 
@@ -16,8 +16,8 @@ No changes were made to main, no PR was merged, and no paid service or productio
 
 | PR | Area | Inspected head | Check runs | Result |
 |---|---|---|---:|---|
-| #125 | Resilience A2 restart reconciliation | cb200af6f6df8edf6cb3abd198b495a68f512011 | 59/59 | PASS |
-| #135 | Malware Engine synthetic calibration | 04aef0251b1ef0bc7e36f43078dfcae0baf8ac29 | 48/48 | PASS |
+| #125 | Resilience A2 restart reconciliation | 95faf095ed575d62dc042433701ce909e00b0362 | 49/49 workflow jobs | PASS — latest inspected head |
+| #135 | Malware Engine calibration + PowerShell string-context hardening | 665699bd6aab2d747ff94cad2e5af350a4c682d7 | 40/40 jobs on predecessor `04aef0251b1ef0bc7e36f43078dfcae0baf8ac29`; 5 focused local lexer cases PASS | CONDITIONAL — current lexer commit has no recorded full CI run |
 | #136 | Security Guard upload inspection + attestation | c6c69a6a8fa8a451c0a35b6eb0f2213e73ba56b5 | 61/61 | PASS |
 | #138 | PHP scanner byte-stream integrity (superseded/overlapping proposal) | a64a02ff9ca3d5df74670b8a0e8f3e13127ee30e | 48/48 | PASS (stale base; not combined evidence) |
 | #139 | Cross-runtime malicious-upload quarantine retention + PHP sequential reader | bc1b3ab438fbdd01a1bb25131df3fd23884455cc | 43/43 jobs | PASS (code head; later commits are documentation-only) |
@@ -64,20 +64,21 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 | Engine / subsystem | Laboratory evidence | Current decision |
 |---|---|---|
 | Resilience A1 | 49/49 CI checks | LAB-CERTIFIED |
-| Resilience A2 | 59/59 CI checks | LAB-CERTIFIED — read-only reconciliation only |
+| Resilience A2 | 49/49 workflow jobs on head `95faf095ed575d62dc042433701ce909e00b0362` | LAB-CERTIFIED — read-only reconciliation only |
 | Security Guard core | 61/61 CI checks on #136 | LAB-CERTIFIED — integration pending |
 | Security Guard PHP stream + malicious quarantine lifecycle | 43/43 workflow jobs on #139 code head | LAB-CERTIFIED — host storage/scanner integration pending |
 | Security Guard distribution | 48/48 CI checks on #128 | LAB-CERTIFIED |
-| Malware Engine calibration | 48/48 CI checks on #135; 54/54 on #130 | LAB-CERTIFIED — synthetic corpus only |
+| Malware Engine calibration | 40/40 workflow jobs on predecessor `04aef0251b1ef0bc7e36f43078dfcae0baf8ac29`; 5 focused local PowerShell lexer cases on current head | CONDITIONAL — synthetic corpus only; latest lexer hardening still needs full CI |
 | Threat Lab report | 50/50 CI checks | LAB-CERTIFIED — reporting/aggregation only |
 
 ## Release gates
 
 1. Keep #139 as the canonical child of #136; do not merge the stale/overlapping #138 branch independently. Verify CI on the final code head and re-run after any further code changes.
-2. Review the full diffs and adversarial tests for each PR, not just the green status.
-3. Keep all draft PRs unmerged until dependency order and combined CI are proven.
-4. For production adoption, require a real host integration review covering storage isolation, atomic promotion, authorization, secrets, observability, backups, and incident response.
-5. Publish a certification artifact tied to immutable commit SHAs and explicit scope/limitations.
+2. Re-run the complete Malware Engine workflows on exact head `665699bd6aab2d747ff94cad2e5af350a4c682d7`; focused lexer tests passed locally, but no full CI run is recorded for the new PowerShell preprocessing yet.
+3. Review the full diffs and adversarial tests for each PR, not just the green status.
+4. Keep all draft PRs unmerged until dependency order and combined CI are proven.
+5. For production adoption, require a real host integration review covering storage isolation, atomic promotion, authorization, secrets, observability, backups, and incident response.
+6. Publish a certification artifact tied to immutable commit SHAs and explicit scope/limitations.
 
 ## Final status
 
