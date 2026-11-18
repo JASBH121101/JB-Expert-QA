@@ -126,7 +126,7 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
             return false;
         }
         if ($this->alterScanContent) {
-            $bytes[0] = $bytes[0] === "\\0" ? "\\1" : "\\0";
+            $bytes[0] = chr(ord($bytes[0]) ^ 1);
         }
         if ($this->appendScanContent) {
             $bytes .= 'TRAILING';
