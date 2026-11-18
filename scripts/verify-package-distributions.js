@@ -330,8 +330,28 @@ try {
   ], { cwd: resilienceInstall });
   progress("Resilience Engine package checks passed");
 
-  progress("All five standalone package checks completed");
-  console.log("PASS: all five npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API and offline dataset smoke checks passed.");
+  // Shared localization runtime.
+  progress("Packing standalone Localization Engine tarball");
+  const localizationTarball = await pack("packages/localization-engine");
+  const localizationInstall = await install(localizationTarball, "install-localization-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createLocalization, canonicalizeLocale } from "@jb/localization-engine"; const i18n = createLocalization({ catalogs: { "es-419": { greeting: "Hola, {name}" }, "en-US": { greeting: "Hello, {name}" } }, defaultLocale: "es-419" }); if (canonicalizeLocale("es_ni") !== "es-NI" || i18n.t("greeting", { locale: "en-US", params: { name: "JB" } }) !== "Hello, JB" || i18n.direction("ar") !== "rtl") process.exit(1);'
+  ], { cwd: localizationInstall });
+  progress("Localization Engine clean-consumer checks passed");
+
+  // Exact money and injected FX boundary.
+  progress("Packing standalone Currency Engine tarball");
+  const currencyTarball = await pack("packages/currency-engine");
+  const currencyInstall = await install(currencyTarball, "install-currency-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createMoney, addMoney, moneyToDecimalString, serializeMoney, convertMoney } from "@jb/currency-engine"; const a = createMoney("10.25", "USD"); const b = createMoney("2.75", "USD"); if (moneyToDecimalString(addMoney(a,b)) !== "13.00" || serializeMoney(a).minorUnits !== "1025") process.exit(1); const result = await convertMoney(createMoney("1.00", "USD"), "USD"); if (result.money.minorUnits !== 100n || result.rate !== null) process.exit(1);'
+  ], { cwd: currencyInstall });
+  progress("Currency Engine clean-consumer checks passed");
+
+  progress("All seven standalone package checks completed");
+  console.log("PASS: all seven npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization and exact Currency Engine smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
