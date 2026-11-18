@@ -32,13 +32,26 @@ function assertPlainCatalog(value, label = "catalog", depth = 0) {
   }
 }
 
-export function flattenCatalog(value, prefix = "", output = {}) {
-  if (!isRecord(value)) return output;
+function flattenCatalogInto(value, prefix, output, depth) {
+  if (depth > 24) throw new TypeError("catalog exceeds the maximum nesting depth");
   for (const [key, item] of Object.entries(value)) {
+    if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
+      throw new TypeError("catalog contains an unsafe key");
+    }
     const path = prefix ? prefix + "." + key : key;
     if (typeof item === "string" || isPluralEntry(item)) output[path] = item;
-    else flattenCatalog(item, path, output);
+    else if (isRecord(item)) flattenCatalogInto(item, path, output, depth + 1);
+    else throw new TypeError("catalog." + path + " must be a string, plural object, or nested object");
   }
+}
+
+export function flattenCatalog(value, prefix = "", output = Object.create(null)) {
+  if (!isRecord(value)) return output;
+  if (typeof prefix !== "string" || !isRecord(output)) {
+    throw new TypeError("catalog flattening prefix and output are invalid");
+  }
+  assertPlainCatalog(value, "catalog");
+  flattenCatalogInto(value, prefix, output, 0);
   return output;
 }
 
@@ -96,6 +109,20 @@ export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } =
   }
   const source = validateCatalog(catalogs[sourceTag], sourceTag).entries;
   const findings = [];
+  const sourceKeys = Object.keys(source);
+  const sourceKeySet = new Set(sourceKeys);
+  const findShapeMismatchPath = (path, otherKeys) => {
+    const otherSet = otherKeys instanceof Set ? otherKeys : new Set(otherKeys);
+    const segments = path.split(".");
+    for (let length = segments.length - 1; length > 0; length--) {
+      const ancestor = segments.slice(0, length).join(".");
+      if (otherSet.has(ancestor)) return ancestor;
+    }
+    for (const key of otherSet) {
+    if (key.startsWith(path + ".")) return path;
+  }
+    return null;
+  };
   for (const localeValue of requiredLocales) {
     const locale = canonicalizeLocale(localeValue);
     if (!locale) throw new TypeError("requiredLocales contains an invalid locale");
@@ -104,9 +131,19 @@ export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } =
       continue;
     }
     const target = validateCatalog(catalogs[locale], locale).entries;
-    for (const key of Object.keys(source)) {
+    const targetKeys = Object.keys(target);
+    const targetKeySet = new Set(targetKeys);
+    const reportedShapeMismatches = new Set();
+    const reportShapeMismatch = (key) => {
+      if (reportedShapeMismatches.has(key)) return;
+      reportedShapeMismatches.add(key);
+      findings.push({ locale, key, code: "message-shape-mismatch", severity: "high" });
+    };
+    for (const key of sourceKeys) {
       if (!Object.hasOwn(target, key)) {
-        findings.push({ locale, key, code: "translation-missing", severity: "high" });
+        const shapeKey = findShapeMismatchPath(key, targetKeySet);
+        if (shapeKey) reportShapeMismatch(shapeKey);
+        else findings.push({ locale, key, code: "translation-missing", severity: "high" });
         continue;
       }
       const sourceValue = source[key];
@@ -150,8 +187,12 @@ export function auditCatalogs(catalogs, { sourceLocale, requiredLocales = [] } =
         }
       }
     }
-    for (const key of Object.keys(target)) {
-      if (!Object.hasOwn(source, key)) findings.push({ locale, key, code: "obsolete-translation", severity: "low" });
+    for (const key of targetKeys) {
+      if (!Object.hasOwn(source, key)) {
+        const shapeKey = findShapeMismatchPath(key, sourceKeySet);
+        if (shapeKey) reportShapeMismatch(shapeKey);
+        else findings.push({ locale, key, code: "obsolete-translation", severity: "low" });
+      }
     }
   }
   return Object.freeze({

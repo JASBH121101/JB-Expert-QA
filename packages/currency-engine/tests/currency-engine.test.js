@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_CURRENCIES, createCurrencyRegistry, createMoney, createMoneyFromMinorUnits,
+  DEFAULT_CURRENCIES, createCurrencyRegistry, getCurrency, createMoney, createMoneyFromMinorUnits,
   decimalToMinorUnits, minorUnitsToDecimal, moneyToDecimalString, serializeMoney,
   deserializeMoney, addMoney, subtractMoney, compareMoney, multiplyMoneyByInteger,
   formatMoney, convertMoney
@@ -160,4 +160,16 @@ test("negative amounts keep their sign after explicit FX rounding", async () => 
     rateProvider: provider, clock: () => NOW
   });
   assert.equal(moneyToDecimalString(result.money), "-9.20");
+});
+
+
+test("currency lookup rejects inherited registry entries and malformed metadata", () => {
+  const inherited = Object.create({ USD: DEFAULT_CURRENCIES.USD });
+  assert.throws(() => getCurrency("USD", inherited), /plain object/);
+
+  const nullPrototypeRegistry = Object.create(null);
+  nullPrototypeRegistry.USD = DEFAULT_CURRENCIES.USD;
+  assert.equal(getCurrency("USD", nullPrototypeRegistry).code, "USD");
+
+  assert.throws(() => createCurrencyRegistry(Object.create({ EUR: DEFAULT_CURRENCIES.EUR })), /plain object/);
 });

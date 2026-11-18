@@ -148,3 +148,30 @@ test("unsafe or dynamic PHP translation resources become parse findings instead 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("locale aliases are canonical and reject unsupported or malformed regional tags", () => {
+  assert.equal(normalizeLocale("es-NI"), "es-419");
+  assert.equal(normalizeLocale("es-MX"), "es-419");
+  assert.equal(normalizeLocale("es_419"), "es-419");
+  assert.equal(normalizeLocale("es-ES"), null);
+  assert.equal(normalizeLocale("es-XY"), null);
+  assert.equal(normalizeLocale("es-MX-u-ca-gregory"), null);
+  assert.equal(normalizeLocale("en-US"), "en");
+  assert.equal(normalizeLocale("en-GB"), "en");
+  assert.equal(normalizeLocale("en-not-a-region"), null);
+  assert.equal(normalizeLocale("en-US-u-ca-gregory"), null);
+});
+
+test("translation audit distinguishes nested message shape changes from missing keys", () => {
+  const result = auditTranslationMaps(
+    { setup: { heading: "Welcome", actions: { save: "Save" } } },
+    { setup: "Bienvenido" },
+    { sourceLocale: "en", targetLocale: "es-419" }
+  );
+  assert.equal(result.counts.messageShapeMismatches, 1);
+  assert.equal(result.counts.missingKeys, 0);
+  assert.equal(result.counts.obsoleteKeys, 0);
+  assert.equal(result.reviewStatus, "review-required");
+  assert.ok(result.findings.some((item) => item.id === "message-shape-mismatch" && item.key === "setup"));
+});

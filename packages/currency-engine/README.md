@@ -12,6 +12,8 @@
 - Validate source/target pair, positive decimal rate, source label, asOf, validUntil and maximum rate age.
 - Record rate provenance and the selected rounding mode with each conversion result.
 
+Currency registries accept only plain records with own currency-code entries and validated code/name/minor-unit metadata; inherited prototype entries are never treated as registered currencies.
+
 The curated initial registry includes NIO, USD, MXN, CRC, HNL, GTQ, PAB, COP, BRL, EUR, GBP, JPY, KWD, AUD, CAD, CHF, CNY, INR, AED, SAR, SGD, SEK, NOK, DKK, NZD, ZAR, PLN, CZK, THB, KRW, CLP, PEN, DOP, ARS, PHP, MYR, HKD, ISK, EGP, MAD, NGN, KES, UAH and the four-decimal units of account CLF and UYW. This is a broader operational subset, not a complete or automatically refreshed ISO 4217 registry. Verify active status and minor-unit metadata against the current official ISO list before production use.
 
 ## Exact amount model

@@ -7,6 +7,7 @@ import {
   auditCatalogs,
   resolveLocale
 } from "../src/index.js";
+import { flattenCatalog } from "../src/catalog.js";
 
 const catalogs = {
   "es-419": {
@@ -109,4 +110,25 @@ test("plural audit flags missing CLDR categories required by the target locale",
     .sort();
   assert.deepEqual(missing, ["few", "many", "two", "zero"]);
   assert.equal(result.status, "review-required");
+});
+
+
+test("catalog flattening rejects prototype-sensitive keys without mutating object prototypes", () => {
+  const malicious = JSON.parse('{"__proto__":{"polluted":"yes"}}');
+  assert.throws(() => flattenCatalog(malicious), /unsafe key/);
+  assert.equal({}.polluted, undefined);
+
+  const flattened = flattenCatalog({ common: { ready: "Ready" } });
+  assert.equal(Object.getPrototypeOf(flattened), null);
+  assert.equal(flattened["common.ready"], "Ready");
+});
+
+test("catalog audit reports leaf-versus-object structural mismatches", () => {
+  const result = auditCatalogs({
+    "es-419": { settings: { title: "Configuración" } },
+    "en-US": { settings: "Settings" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en-US"] });
+  assert.ok(result.findings.some((item) => item.code === "message-shape-mismatch" && item.key === "settings"));
+  assert.equal(result.findings.some((item) => item.code === "translation-missing"), false);
+  assert.equal(result.findings.some((item) => item.code === "obsolete-translation"), false);
 });

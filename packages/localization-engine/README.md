@@ -24,7 +24,7 @@ This v0.1 contract implements cardinal plurals and simple interpolation, not ful
 
 ## QA
 
-auditCatalogs compares target catalogs with a designated source locale. Missing or extra placeholders are review-required. It never generates or auto-approves a translation. Human linguistic review remains required before release.
+auditCatalogs compares target catalogs with a designated source locale. It distinguishes missing/obsolete keys from leaf-versus-object message-shape mismatches and checks placeholder parity plus target-locale CLDR plural categories. Catalog flattening rejects prototype-sensitive keys and returns a null-prototype map. It never generates or auto-approves a translation. Human linguistic review remains required before release.
 
 ## Integration boundary
 
