@@ -859,8 +859,8 @@ test("A2 blocks when mutation control or policy authorization denies the operati
   assert.equal(denied.events.includes("apply"), false);
 });
 
-test("A2 refuses executable controller construction without an external monotonic revision anchor", () => {
-  assert.throws(() => createA2ContainmentController({
+test("A2 refuses executable controller construction without a durable atomic external anchor", () => {
+  const createWithAnchorCapabilities = (capabilities) => createA2ContainmentController({
     enableExecution: true,
     policyAuthority: {
       authorize() {}, assertAuthorization() {}, completeAuthorization() {}
@@ -874,11 +874,25 @@ test("A2 refuses executable controller construction without an external monotoni
     actionLedger: {
       durable: true,
       claim() {}, markProviderStarted() {}, reconcile() {}, complete() {},
-      createPendingRecord() {}, listPending() {}, getPendingByClaimId() {}
+      createPendingRecord() {}, listPending() {}, getPendingByClaimId() {},
+      ...capabilities
     },
     auditStore: { durable: true, append() {} },
     mutationControl: { assertAllowed() {} }
-  }), /external monotonic revision anchor/);
+  });
+
+  const denial = /durable external monotonic revision anchor with atomic compare-and-swap/;
+  assert.throws(() => createWithAnchorCapabilities({}), denial);
+  assert.throws(() => createWithAnchorCapabilities({
+    externalRevisionAnchorConfigured: true,
+    externalRevisionAnchorDurable: false,
+    externalRevisionAnchorAtomic: true
+  }), denial);
+  assert.throws(() => createWithAnchorCapabilities({
+    externalRevisionAnchorConfigured: true,
+    externalRevisionAnchorDurable: true,
+    externalRevisionAnchorAtomic: false
+  }), denial);
 });
 
 test("A2 refuses non-durable ledgers and executor/verifier identity collisions", () => {
