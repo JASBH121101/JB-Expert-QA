@@ -29,6 +29,7 @@ class MemoryStorage:
     def __init__(self, promotion_result=True):
         self.quarantine = {}
         self.approved = {}
+        self.approved_attestations = {}
         self.promotion_result = promotion_result
         self.deleted = []
 
@@ -38,19 +39,29 @@ class MemoryStorage:
     def open_quarantine_stream(self, upload_id):
         return io.BytesIO(self.quarantine[upload_id])
 
-    def promote(self, upload_id, expected_sha256, expected_size):
+    def promote(self, upload_id, expected_sha256, expected_size, attestation):
         data = self.quarantine[upload_id]
         if hashlib.sha256(data).hexdigest() != expected_sha256 or len(data) != expected_size:
+            return False
+        if (
+            attestation.get("uploadId") != upload_id
+            or attestation.get("sha256") != expected_sha256
+            or attestation.get("size") != expected_size
+            or attestation.get("verdict") != "clean"
+        ):
             return False
         if self.promotion_result is not True:
             return False
         self.approved[upload_id] = data
+        self.approved_attestations[upload_id] = dict(attestation)
         del self.quarantine[upload_id]
         return True
 
     def delete(self, upload_id):
         self.deleted.append(upload_id)
         self.quarantine.pop(upload_id, None)
+        self.approved.pop(upload_id, None)
+        self.approved_attestations.pop(upload_id, None)
 
 
 class Scanner:
@@ -96,6 +107,17 @@ class UploadInspectionTests(unittest.TestCase):
     def test_clean_upload_is_scanned_and_promoted_privately(self):
         result, storage = self.inspect_fixture()
         self.assertEqual(result["status"], "approved")
+        attestation = result["attestation"]
+        self.assertEqual(attestation["schema"], "jb.security.upload-inspection.attestation/v1")
+        self.assertEqual(attestation["uploadId"], result["uploadId"])
+        self.assertEqual(attestation["verdict"], "clean")
+        self.assertEqual(attestation["sha256"], result["sha256"])
+        self.assertEqual(attestation["size"], result["size"])
+        self.assertEqual(attestation["mimeType"], result["mimeType"])
+        self.assertEqual(attestation["engine"], "test-scanner")
+        self.assertEqual(attestation["version"], "1.0")
+        self.assertIs(type(attestation["scannedAtMs"]), int)
+        self.assertGreaterEqual(attestation["scannedAtMs"], 0)
         self.assertRegex(result["scannedAt"], r"^\d{4}-\d{2}-\d{2}T.*Z$")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
         self.assertEqual(storage.quarantine, {})
@@ -169,7 +191,7 @@ class UploadInspectionTests(unittest.TestCase):
 
     def test_uncertain_promotion_exception_retains_quarantine(self):
         class UncertainStorage(MemoryStorage):
-            def promote(self, upload_id, expected_sha256, expected_size):
+            def promote(self, upload_id, expected_sha256, expected_size, attestation):
                 raise RuntimeError("promotion response lost")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "upload"
