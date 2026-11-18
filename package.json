@@ -31,7 +31,9 @@
     "test:localization-engine": "node --test packages/localization-engine/tests/localization-engine.test.js",
     "test:currency-engine": "node --test packages/currency-engine/tests/currency-engine.test.js",
     "test:internationalization": "npm run test:language-qa && npm run test:localization-engine && npm run test:currency-engine",
-    "test:language-qa": "node --test tests/language-qa-engine.test.js"
+    "test:language-qa": "node --test tests/language-qa-engine.test.js",
+    "sccm:check": "npm --workspace @jb/sccm run test",
+    "sccm:report": "node scripts/sccm-report.mjs"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -51,6 +53,7 @@
     "packages/resilience-engine",
     "packages/engine-contracts",
     "packages/localization-engine",
-    "packages/currency-engine"
+    "packages/currency-engine",
+    "packages/sccm"
   ]
 }
