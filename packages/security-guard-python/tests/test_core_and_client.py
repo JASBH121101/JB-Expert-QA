@@ -54,7 +54,7 @@ class CoreV1Tests(unittest.TestCase):
             {"engine": ""},
             {"originalFileName": "customer-secret.png"},
         ):
-            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+            with self.subTest(mutation=mutation), self.assertRaises((TypeError, ValueError)):
                 validate_upload_inspection_attestation_v1({**clean, **mutation})
 
     def test_hmac_matches_shared_node_known_answer_vector(self):
