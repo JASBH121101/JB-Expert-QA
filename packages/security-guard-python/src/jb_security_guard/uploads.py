@@ -132,15 +132,23 @@ class _VerifiedScannerStream(io.RawIOBase):
         self._consumed += len(chunk)
         return len(chunk)
 
-    def verify_complete(self) -> bool:
+    def verify_complete(self) -> str:
         if self._consumed != self._expected_size:
-            return False
-        if not self._eof:
-            extra = self._source.read(1)
-            if extra is None or not isinstance(extra, bytes) or extra != b"":
-                return False
-            self._eof = True
-        return self._digest.hexdigest() == self._expected_sha256
+            return "incomplete"
+
+        # Re-probe the underlying source after the scanner returns. Do not
+        # treat a missing/non-bytes response as EOF, and reject any trailing
+        # byte even when the scanner has already consumed the expected size.
+        extra = self._source.read(1)
+        if extra is None:
+            return "incomplete"
+        if not isinstance(extra, bytes) or extra != b"":
+            return "content_mismatch"
+        self._eof = True
+
+        if self._digest.hexdigest() != self._expected_sha256:
+            return "content_mismatch"
+        return "complete"
 
     def tell(self) -> int:
         return self._consumed
@@ -262,9 +270,14 @@ class UploadInspectionService:
             verified_scan_stream = _VerifiedScannerStream(scan_stream, size, sha256)
             try:
                 scan_result = self._scanner.scan(verified_scan_stream, metadata)
-                if not verified_scan_stream.verify_complete():
+                scan_disposition = verified_scan_stream.verify_complete()
+                if scan_disposition != "complete":
                     retain_quarantine = True
-                    raise UploadInspectionError("SCAN_INCOMPLETE")
+                    raise UploadInspectionError(
+                        "SCAN_CONTENT_MISMATCH"
+                        if scan_disposition == "content_mismatch"
+                        else "SCAN_INCOMPLETE"
+                    )
             except UploadInspectionError:
                 retain_quarantine = True
                 raise
