@@ -173,3 +173,14 @@ test("currency lookup rejects inherited registry entries and malformed metadata"
 
   assert.throws(() => createCurrencyRegistry(Object.create({ EUR: DEFAULT_CURRENCIES.EUR })), /plain object/);
 });
+
+
+test("money operations reject forged non-canonical currency identifiers", async () => {
+  const forged = Object.freeze({ currency: "usd", minorUnits: 100n });
+  assert.throws(() => serializeMoney(forged), /canonical uppercase ISO code/);
+  assert.throws(() => addMoney(forged, createMoney("1.00", "USD")), /canonical uppercase ISO code/);
+  await assert.rejects(() => convertMoney(forged, "EUR", {
+    rateProvider: { async getRate() { throw new Error("provider must not be called"); } },
+    clock: () => NOW
+  }), /canonical uppercase ISO code/);
+});
