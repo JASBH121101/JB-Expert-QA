@@ -12,6 +12,7 @@ from jb_security_guard import (
     normalize_rate_limit_check,
     normalize_rate_limit_decision,
     normalize_rate_limit_policy,
+    validate_upload_inspection_attestation_v1,
 )
 from jb_security_guard.fastapi import SecurityGuardRateLimitMiddleware
 
@@ -110,6 +111,35 @@ class CoreV1Tests(unittest.TestCase):
                     {"id": "same", "identityType": "ip", "scope": "other", "windowSeconds": 60, "maxRequests": 10},
                 ],
             })
+
+
+    def test_upload_attestation_matches_shared_cross_runtime_vectors(self):
+        fixture_root = ROOT / "packages/security-guard-core/tests/fixtures/upload-inspection"
+        for fixture_name in (
+            "attestation-clean.valid.json",
+            "attestation-malicious.valid.json",
+            "attestation-unknown.valid.json",
+        ):
+            with self.subTest(fixture=fixture_name):
+                fixture = json.loads((fixture_root / fixture_name).read_text(encoding="utf-8"))
+                normalized = validate_upload_inspection_attestation_v1(fixture)
+                self.assertEqual(normalized["verdict"], fixture["verdict"])
+
+        clean = json.loads(
+            (fixture_root / "attestation-clean.valid.json").read_text(encoding="utf-8")
+        )
+        for mutation in (
+            {"sha256": "A" * 64},
+            {"size": 0},
+            {"size": 104857601},
+            {"mimeType": "application/x-msdownload"},
+            {"verdict": "no_match"},
+            {"extra": "must-be-rejected"},
+            {"uploadId": "D47A5D9E40C44D3BBF9C62D79ECF9F3A"},
+        ):
+            with self.subTest(mutation=mutation):
+                with self.assertRaises((TypeError, ValueError)):
+                    validate_upload_inspection_attestation_v1({**clean, **mutation})
 
 
 class UniversalClientTests(unittest.IsolatedAsyncioTestCase):
