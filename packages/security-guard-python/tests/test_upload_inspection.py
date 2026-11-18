@@ -163,7 +163,7 @@ class UploadInspectionTests(unittest.TestCase):
 
     def test_malicious_unknown_scanner_failure_and_digest_mismatch_never_promote(self):
         for scanner, reason, retain in (
-            (Scanner(verdict="malicious"), "MALWARE_DETECTED", False),
+            (Scanner(verdict="malicious"), "MALWARE_DETECTED", True),
             (Scanner(verdict="unknown"), "SCAN_NOT_CLEAN", True),
             (Scanner(raise_error=True), "SCANNER_UNAVAILABLE", True),
             (Scanner(alter_digest=True), "SCAN_INTEGRITY_MISMATCH", True),
@@ -172,7 +172,8 @@ class UploadInspectionTests(unittest.TestCase):
                 path = Path(directory) / "upload"
                 path.write_bytes(PNG)
                 storage = MemoryStorage()
-                service = UploadInspectionService(storage, scanner)
+                events = []
+                service = UploadInspectionService(storage, scanner, on_event=events.append)
                 with self.assertRaises(UploadInspectionError) as caught:
                     service.inspect(path, "photo.png", "image/png")
                 self.assertEqual(caught.exception.reason, reason)
@@ -182,15 +183,16 @@ class UploadInspectionTests(unittest.TestCase):
                     self.assertEqual(evidence["sha256"], hashlib.sha256(PNG).hexdigest())
                     self.assertEqual(evidence["size"], len(PNG))
                     self.assertRegex(evidence["uploadId"], r"^[a-f0-9]{32}$")
-                    expected_upload_id = storage.deleted[0] if reason == "MALWARE_DETECTED" else next(iter(storage.quarantine))
+                    expected_upload_id = next(iter(storage.quarantine))
                     self.assertEqual(evidence["uploadId"], expected_upload_id)
                 else:
                     self.assertFalse(hasattr(caught.exception, "attestation"))
                 self.assertEqual(storage.approved, {})
                 self.assertEqual(bool(storage.quarantine), retain)
                 if reason == "MALWARE_DETECTED":
-                    self.assertEqual(len(storage.deleted), 1)
-                    self.assertEqual(storage.quarantine, {})
+                    self.assertEqual(storage.deleted, [])
+                    self.assertEqual(next(iter(storage.quarantine.values())), PNG)
+                self.assertEqual(events[-1]["event"], "upload-quarantined" if retain else "upload-rejected")
 
     def test_promotion_failure_never_returns_approved(self):
         with tempfile.TemporaryDirectory() as directory:
