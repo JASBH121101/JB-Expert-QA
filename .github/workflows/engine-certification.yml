@@ -361,4 +361,14 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Exercise the real OS service manager through the typed adapter
+        env:
+          RESILIENCE_LAB_OUTPUT: ${{ runner.temp }}/resilience-service-manager-lab.json
         run: node scripts/resilience-service-manager-lab.mjs
+      - name: Upload disposable service-manager certification evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resilience-service-manager-lab-${{ matrix.os }}
+          path: ${{ runner.temp }}/resilience-service-manager-lab.json
+          if-no-files-found: error
+          retention-days: 30
