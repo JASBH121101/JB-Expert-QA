@@ -173,7 +173,7 @@ test("assessment history is append-only, immutable and timestamp-monotonic per n
   const first = assessment("jb.expert-qa.visual.screenshot-diff", {
     status: "PENDING",
     assessmentId: "asmt.visual.pending",
-    assessedAt: "2026-11-18T19:11:00Z",
+    assessedAt: "2026-11-18T20:57:00Z",
     ev: []
   });
   const next = appendSccmAssessment(inventory, existing, first);
@@ -182,7 +182,7 @@ test("assessment history is append-only, immutable and timestamp-monotonic per n
   assert.equal(Object.isFrozen(next.at(-1)), true);
   assert.equal(existing.length, history.length);
   assert.throws(() => appendSccmAssessment(inventory, next, first), /already exists/);
-  const older = { ...first, assessmentId: "asmt.visual.older", assessedAt: "2026-11-18T19:09:00Z" };
+  const older = { ...first, assessmentId: "asmt.visual.older", assessedAt: "2026-11-18T20:56:00Z" };
   assert.throws(() => appendSccmAssessment(inventory, next, older), /cannot move backwards/);
 });
 
