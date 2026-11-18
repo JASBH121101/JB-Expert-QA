@@ -175,3 +175,22 @@ test("translation audit distinguishes nested message shape changes from missing 
   assert.equal(result.reviewStatus, "review-required");
   assert.ok(result.findings.some((item) => item.id === "message-shape-mismatch" && item.key === "setup"));
 });
+
+
+test("translation flattening rejects prototype-sensitive keys without mutating prototypes", () => {
+  const malicious = JSON.parse('{"__proto__":{"polluted":"yes"}}');
+  assert.throws(() => flattenTranslationMap(malicious), /prototype-sensitive key/);
+  assert.equal({}.polluted, undefined);
+
+  const flattened = flattenTranslationMap({ setup: { title: "Welcome" } });
+  assert.equal(Object.getPrototypeOf(flattened), null);
+  assert.equal(flattened["setup.title"], "Welcome");
+  assert.throws(() => flattenTranslationMap({ constructor: "unsafe" }), /prototype-sensitive key/);
+});
+
+test("translation flattening bounds recursion and rejects ambiguous duplicate paths", () => {
+  assert.throws(() => flattenTranslationMap({ a: { b: "nested" }, "a.b": "flat" }), /duplicate flattened key/);
+  let deep = { value: "end" };
+  for (let index = 0; index < 26; index++) deep = { child: deep };
+  assert.throws(() => flattenTranslationMap(deep), /maximum nesting depth/);
+});
