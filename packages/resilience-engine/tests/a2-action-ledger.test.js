@@ -96,6 +96,8 @@ function runChild(source, env) {
 function createMemoryRevisionAnchor() {
   const states = new Map();
   return Object.freeze({
+    durable: true,
+    atomicCompareAndSwap: true,
     async read({ ledgerId }) {
       const value = states.get(ledgerId);
       return value ? { ...value } : null;
@@ -131,8 +133,21 @@ test("file ledger reports whether its external monotonic revision anchor is conf
 
     assert.equal(localOnly.durable, true);
     assert.equal(localOnly.externalRevisionAnchorConfigured, false);
+    assert.equal(localOnly.externalRevisionAnchorDurable, false);
+    assert.equal(localOnly.externalRevisionAnchorAtomic, false);
     assert.equal(externallyAnchored.durable, true);
     assert.equal(externallyAnchored.externalRevisionAnchorConfigured, true);
+    assert.equal(externallyAnchored.externalRevisionAnchorDurable, true);
+    assert.equal(externallyAnchored.externalRevisionAnchorAtomic, true);
+
+    const untrustedAdapter = {
+      async read() { return null; },
+      async compareAndSwap() { return true; }
+    };
+    assert.throws(() => createStore(join(directory, "untrusted.json"), {
+      revisionAnchor: untrustedAdapter,
+      ledgerId: "a2-anchor-untrusted"
+    }), /durable storage and atomic compareAndSwap/);
   });
 });
 
@@ -823,6 +838,8 @@ test("external revision-anchor CAS failure holds the journal after local commit"
     const filePath = join(directory, "a2-actions.json");
     const backing = createMemoryRevisionAnchor();
     const refusingAnchor = Object.freeze({
+      durable: true,
+      atomicCompareAndSwap: true,
       read: (input) => backing.read(input),
       compareAndSwap: (input) => input.next.revision === 0
         ? backing.compareAndSwap(input)
