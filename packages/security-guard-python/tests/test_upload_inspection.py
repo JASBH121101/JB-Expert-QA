@@ -231,6 +231,41 @@ class UploadInspectionTests(unittest.TestCase):
             self.assertTrue(storage.quarantine)
             self.assertEqual(storage.approved, {})
 
+    def test_scanner_stream_rejects_same_size_content_substitution(self):
+        class AlteredReadStorage(MemoryStorage):
+            def open_quarantine_stream(self, upload_id):
+                data = bytearray(super().open_quarantine_stream(upload_id).getvalue())
+                data[-1] ^= 0x01
+                return io.BytesIO(bytes(data))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = AlteredReadStorage()
+            service = UploadInspectionService(storage, Scanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "SCAN_CONTENT_MISMATCH")
+            self.assertEqual(storage.approved, {})
+            self.assertTrue(storage.quarantine)
+
+    def test_scanner_stream_rejects_trailing_bytes_beyond_the_ingested_object(self):
+        class ExtendedReadStorage(MemoryStorage):
+            def open_quarantine_stream(self, upload_id):
+                data = super().open_quarantine_stream(upload_id).getvalue()
+                return io.BytesIO(data + b"unexpected-trailing-data")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(PNG)
+            storage = ExtendedReadStorage()
+            service = UploadInspectionService(storage, Scanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "SCAN_CONTENT_MISMATCH")
+            self.assertEqual(storage.approved, {})
+            self.assertTrue(storage.quarantine)
+
     def test_scanner_cannot_claim_clean_without_consuming_the_complete_stream(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "upload"
