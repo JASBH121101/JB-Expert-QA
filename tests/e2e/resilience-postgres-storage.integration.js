@@ -15,6 +15,7 @@ const connectionString = process.env.QA_DATABASE_URL;
 if (!connectionString) throw new Error("QA_DATABASE_URL is required for the PostgreSQL resilience adapter integration test");
 
 const pool = new Pool({ connectionString, max: 8, connectionTimeoutMillis: 5_000 });
+const a2SecondaryPool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 });
 const storage = createPostgresResilienceStorageAdapter({ pool });
 const secondStorage = createPostgresResilienceStorageAdapter({ pool });
 
@@ -111,7 +112,7 @@ async function main() {
     recorderId: "pg-a2-forensic-recorder"
   };
   const a2First = createPostgresA2ActionLedger({ pool, ...a2Identities });
-  const a2Second = createPostgresA2ActionLedger({ pool, ...a2Identities });
+  const a2Second = createPostgresA2ActionLedger({ pool: a2SecondaryPool, ...a2Identities });
   await assert.rejects(
     a2Second.listPending({ cursor: null, limit: 10, atMs: 1_800_000_000_000 }),
     /not initialized/
@@ -769,5 +770,5 @@ async function main() {
 try {
   await main();
 } finally {
-  await pool.end();
+  await Promise.all([pool.end(), a2SecondaryPool.end()]);
 }
