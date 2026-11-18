@@ -1,0 +1,1444 @@
+[
+  {
+    "assessmentId": "asmt.jb.ecosystem.20261118",
+    "nodeId": "jb.ecosystem",
+    "version": "1.0.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160929",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "PostgreSQL database integration passed (3/3 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377161100",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.20261118",
+    "nodeId": "jb.expert-qa",
+    "version": "0.2.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258053",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Expert QA regression suite passed on Node.js runtime matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258559",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Expert QA regression suite passed on Node.js runtime matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258838",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258871",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258963",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.20261118",
+    "nodeId": "jb.security-guard",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059259001",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059259020",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258806",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258843",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377161100",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.malware-engine.20261118",
+    "nodeId": "jb.malware-engine",
+    "version": "0.6.2",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258651",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258650",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.20261118",
+    "nodeId": "jb.resilience-engine",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.threat-lab.20261118",
+    "nodeId": "jb.threat-lab",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258634",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258560",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258716",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258684",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.advisor-engine.20261118",
+    "nodeId": "jb.advisor-engine",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30/30 jobs across the current integrated main snapshot."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258901",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258805",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258833",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258913",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.20261118",
+    "nodeId": "jb.localization-engine",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.20261118",
+    "nodeId": "jb.currency-engine",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.visual.module.20261118",
+    "nodeId": "jb.expert-qa.visual.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258838",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258871",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258963",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Independently installable Expert QA package/browser audit test job passed."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.security.module.20261118",
+    "nodeId": "jb.expert-qa.security.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377161100",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.currency.module.20261118",
+    "nodeId": "jb.expert-qa.currency.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.core.module.20261118",
+    "nodeId": "jb.expert-qa.core.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.database.module.20261118",
+    "nodeId": "jb.expert-qa.database.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160929",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "PostgreSQL database integration passed (3/3 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.package.module.20261118",
+    "nodeId": "jb.expert-qa.package.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Package distribution boundary and independently installable package tests passed in the engine-certification matrix."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.regression.module.20261118",
+    "nodeId": "jb.expert-qa.regression.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258053",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Expert QA regression suite passed on Node.js runtime matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258559",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Expert QA regression suite passed on Node.js runtime matrix."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.module.20261118",
+    "nodeId": "jb.security-guard.runtime.module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059259001",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059259020",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258806",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258843",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Security Guard regression and attack-simulation suite passed on this OS/Node matrix entry."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.malware-engine.analysis.module.20261118",
+    "nodeId": "jb.malware-engine.analysis.module",
+    "version": "0.6.2",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258651",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258650",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.malware-engine.safety.module.20261118",
+    "nodeId": "jb.malware-engine.safety.module",
+    "version": "0.6.2",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258651",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258650",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Malware Engine full test suite, including calibration and Guard adapter, passed on Ubuntu/Node matrix."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.threat-lab.simulation.module.20261118",
+    "nodeId": "jb.threat-lab.simulation.module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258634",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258560",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258716",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258684",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier certification suite passed on this OS/Node matrix entry."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.advisor-engine.recommendation.module.20261118",
+    "nodeId": "jb.advisor-engine.recommendation.module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258901",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258805",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258833",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258913",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation test suite passed on this OS/Node matrix entry."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.localization-engine.runtime.module.20261118",
+    "nodeId": "jb.localization-engine.runtime.module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.currency-engine.money.module.20261118",
+    "nodeId": "jb.currency-engine.money.module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160905",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.locale-normalization.20261118",
+    "nodeId": "jb.expert-qa.language.locale-normalization",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.catalog-parser.20261118",
+    "nodeId": "jb.expert-qa.language.catalog-parser",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.placeholder-parity.20261118",
+    "nodeId": "jb.expert-qa.language.placeholder-parity",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.glossary.20261118",
+    "nodeId": "jb.expert-qa.language.glossary",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.translation-memory.20261118",
+    "nodeId": "jb.expert-qa.language.translation-memory",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.semantic-integrity.20261118",
+    "nodeId": "jb.expert-qa.language.semantic-integrity",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.filesystem-adapter.20261118",
+    "nodeId": "jb.expert-qa.language.filesystem-adapter",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.review-state.20261118",
+    "nodeId": "jb.expert-qa.language.review-state",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.module.20261118",
+    "nodeId": "jb.expert-qa.language.module",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.translation-integrity.20261118",
+    "nodeId": "jb.expert-qa.language.translation-integrity",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.20261118",
+    "nodeId": "jb.expert-qa.language",
+    "version": "0.8.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258780",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258477",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258714",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258811",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Language QA test suite passed on this OS/Node matrix entry; runs node --test tests/language-qa-engine.test.js."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.expired-claims.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.expired-claims",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.bounded-results.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.bounded-results",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.incident-context.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.incident-context",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.ledger-readonly.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.ledger-readonly",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.no-auto-resolution.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.no-auto-resolution",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.a2-module.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.a2-module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.a2-readonly.20261118",
+    "nodeId": "jb.resilience-engine.orchestration.a2-readonly",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.jb.resilience-engine.orchestration.20261118",
+    "nodeId": "jb.resilience-engine.orchestration",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-18T19:10:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258590",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258703",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258653",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44377160751/job/135059258552",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Resilience Engine tests passed on this OS/Node matrix entry; includes durable orchestration and A2 read-only reconciliation tests."
+      }
+    ],
+    "findings": []
+  }
+]
