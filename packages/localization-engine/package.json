@@ -1,0 +1,15 @@
+{
+  "name": "@jb/localization-engine",
+  "version": "0.1.0",
+  "description": "Dependency-free, catalog-driven localization runtime for JB engines and Nexora.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": {
+    ".": "./src/index.js",
+    "./locale": "./src/locale.js",
+    "./catalog": "./src/catalog.js"
+  },
+  "files": ["src/**", "README.md"],
+  "scripts": { "test": "node --test tests/*.test.js" },
+  "license": "UNLICENSED"
+}
