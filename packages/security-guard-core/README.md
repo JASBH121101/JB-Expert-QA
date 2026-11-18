@@ -21,6 +21,7 @@ Each adapter must implement its own middleware, storage, cryptography, cancellat
 - `contracts/security-events/v1`: privacy-bounded, sanitized security events.
 - `contracts/policies/v1`: tenant/application-scoped rate-limit policy.
 - `contracts/threat-detection/v1`: normalized threat signals and risk assessments.
+- `contracts/upload-inspection/v1`: scanner request/result envelopes bound to an opaque upload ID, exact byte count, SHA-256 and complete stream consumption.
 
 All schemas use JSON Schema Draft 2020-12. Contract identifiers are immutable: incompatible changes require a new major schema version or a new versioned directory, not silent edits to v1 semantics.
 
@@ -39,7 +40,7 @@ The Node conformance suite validates the shared Core v1 fixtures against the ava
 
 The Node.js adapter also includes an opt-in deterministic threat aggregator driven by a server-owned policy. It produces a bounded Core v1 risk score and one of the `observe/challenge/block/review` assessment labels. The assessment remains advisory: it does not enforce a block or issue a challenge. The risk score is a policy index, not a probability; request-pattern confidence values remain heuristic and have not been statistically calibrated.
 
-The Node, PHP and Python upload inspectors now follow a compatible high-level quarantine/scan/digest/private-promotion lifecycle. They still do not share a dedicated language-neutral JSON Schema and conformance fixture family, and their result payloads are not yet guaranteed byte-for-byte equivalent. Production readiness still requires host-specific private storage, real versioned scanner adapters, image decode/re-encode, authorization-aware serving and deployment tests. Do not claim cross-runtime upload parity until that contract and the Python adapter are completed and tested.
+The upload-inspection family now defines language-neutral v1 scan-request and scan-result schemas plus shared synthetic conformance vectors for Node, PHP and Python. The Node adapter independently verifies the scanned stream's byte count and SHA-256; PHP now requires the scanner's sequential read position to reach the exact upload size; Python passes a read-only digest-tracking stream and independently verifies complete consumption and content digest. Shared tests cover JPEG/PNG/GIF/WebP/PDF signature identification, filename/MIME mismatches, unsupported/truncated types, clean/malicious/unknown verdicts and scanners that return without consuming the stream. The native method signatures remain runtime-specific and map to the normalized v1 envelope; this is contract conformance for the tested upload path, not full security-feature parity across Node, PHP and Python. Production readiness still requires host-specific private storage, real versioned scanner adapters, image decode/re-encode, authorization-aware serving, operational retention/cleanup and deployment tests.
 
 The separate local double-filter protocol `jb.security.assessment/v1` is not interchangeable with `jb.security.threat-assessment/v1`; it does not provide the required Core risk score or signal references.
 
