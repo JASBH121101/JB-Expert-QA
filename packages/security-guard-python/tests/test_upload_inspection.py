@@ -9,7 +9,7 @@ from pathlib import Path
 from jb_security_guard.uploads import UploadInspectionError, UploadInspectionService
 
 
-PNG = b"\\x89PNG\\r\\n\\x1a\\n" + b"safe-png-fixture"
+PNG = b"\x89PNG\r\n\x1a\n" + b"safe-png-fixture"
 
 
 class _QuarantineWriter(io.BytesIO):
@@ -226,6 +226,31 @@ class UploadInspectionTests(unittest.TestCase):
             result = service.inspect(path, "private-customer-name.png", "image/png")
             self.assertEqual(result["status"], "approved")
         self.assertEqual(events, [{"event": "upload-approved"}])
+
+
+    def test_real_jpeg_binary_signature_is_recognized(self):
+        jpeg = b"\xff\xd8\xff\xe0" + b"synthetic-jpeg-fixture"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(jpeg)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, Scanner())
+            result = service.inspect(path, "photo.jpg", "image/jpeg")
+            self.assertEqual(result["mimeType"], "image/jpeg")
+            self.assertEqual(storage.approved[result["uploadId"]], jpeg)
+
+    def test_textual_escape_bytes_are_not_accepted_as_png(self):
+        literal_png = b"\\x89PNG\\r\\n\\x1a\\n" + b"safe-png-fixture"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "upload"
+            path.write_bytes(literal_png)
+            storage = MemoryStorage()
+            service = UploadInspectionService(storage, Scanner())
+            with self.assertRaises(UploadInspectionError) as caught:
+                service.inspect(path, "photo.png", "image/png")
+            self.assertEqual(caught.exception.reason, "UNSUPPORTED_TYPE")
+            self.assertEqual(storage.approved, {})
+            self.assertEqual(storage.quarantine, {})
 
 
 if __name__ == "__main__":
