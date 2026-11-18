@@ -1,0 +1,7 @@
+{
+  "$schema": "jb.security.upload-scan-request/v1",
+  "uploadId": "aabbccddeeff00112233445566778899",
+  "size": 9,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "detectedMimeType": "image/png"
+}
