@@ -79,10 +79,11 @@ const ERROR_MESSAGES = Object.freeze({
 });
 
 export class UploadInspectionError extends Error {
-  constructor(code) {
+  constructor(code, attestation = null) {
     super(ERROR_MESSAGES[code] ?? ERROR_MESSAGES.PROCESSING_FAILED);
     this.name = "UploadInspectionError";
     this.code = ERROR_MESSAGES[code] ? code : "PROCESSING_FAILED";
+    if (attestation !== null) this.attestation = attestation;
   }
 }
 
@@ -604,39 +605,6 @@ export function createUploadInspector(options = {}) {
         retainQuarantine = true;
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
       }
-      if (scanResult.verdict === "malicious") {
-        if (securityBridge) {
-          try {
-            await submitBridgeAssessment({
-              correlationId,
-              verdict: "block",
-              severity: "critical",
-              reasonCode: "JBG-MALWARE-001",
-              evidence: { sha256 }
-            });
-          } catch {
-            // Local malware rejection remains effective if telemetry is unavailable.
-          }
-        }
-        throw new UploadInspectionError("MALWARE_DETECTED");
-      }
-      if (scanResult.verdict !== "clean") {
-        retainQuarantine = true;
-        if (securityBridge) {
-          try {
-            await submitBridgeAssessment({
-              correlationId,
-              verdict: "quarantine",
-              severity: "high",
-              reasonCode: "JBG-SCAN-UNKNOWN",
-              evidence: { sha256 }
-            });
-          } catch {
-            // The object remains quarantined even when the bridge is unavailable.
-          }
-        }
-        throw new UploadInspectionError("SCAN_NOT_CLEAN");
-      }
       if (!validScannerLabel(scanResult.engine, 128) || !validScannerLabel(scanResult.version, 64)) {
         retainQuarantine = true;
         throw new UploadInspectionError("INVALID_SCAN_RESULT");
@@ -655,6 +623,40 @@ export function createUploadInspector(options = {}) {
         scannedAtMs
       });
 
+      if (scanResult.verdict === "malicious") {
+        if (securityBridge) {
+          try {
+            await submitBridgeAssessment({
+              correlationId,
+              verdict: "block",
+              severity: "critical",
+              reasonCode: "JBG-MALWARE-001",
+              evidence: { sha256 }
+            });
+          } catch {
+            // Local malware rejection remains effective if telemetry is unavailable.
+          }
+        }
+        throw new UploadInspectionError("MALWARE_DETECTED", attestation);
+      }
+      if (scanResult.verdict !== "clean") {
+        retainQuarantine = true;
+        if (securityBridge) {
+          try {
+            await submitBridgeAssessment({
+              correlationId,
+              verdict: "quarantine",
+              severity: "high",
+              reasonCode: "JBG-SCAN-UNKNOWN",
+              evidence: { sha256 }
+            });
+          } catch {
+            // The object remains quarantined even when the bridge is unavailable.
+          }
+        }
+        throw new UploadInspectionError("SCAN_NOT_CLEAN", attestation);
+      }
+
       if (securityBridge) {
         let decision;
         try {
@@ -667,13 +669,13 @@ export function createUploadInspector(options = {}) {
           });
         } catch {
           retainQuarantine = true;
-          throw new UploadInspectionError("BRIDGE_UNAVAILABLE");
+          throw new UploadInspectionError("BRIDGE_UNAVAILABLE", attestation);
         }
         if (!decision || decision.action !== "allow" || decision.status !== "complete") {
           retainQuarantine = true;
           throw new UploadInspectionError(decision?.action === "block"
             ? "BRIDGE_BLOCKED"
-            : "BRIDGE_REVIEW_REQUIRED");
+            : "BRIDGE_REVIEW_REQUIRED", attestation);
         }
       }
 
@@ -710,12 +712,14 @@ export function createUploadInspector(options = {}) {
         );
       } catch (error) {
         retainQuarantine = true;
-        if (error instanceof UploadInspectionError) throw error;
-        throw new UploadInspectionError("APPROVAL_FAILED");
+        if (error instanceof UploadInspectionError) {
+          throw error.attestation ? error : new UploadInspectionError(error.code, attestation);
+        }
+        throw new UploadInspectionError("APPROVAL_FAILED", attestation);
       }
       if (!isRecord(promotion) || promotion.promoted !== true) {
         retainQuarantine = true;
-        throw new UploadInspectionError("APPROVAL_FAILED");
+        throw new UploadInspectionError("APPROVAL_FAILED", attestation);
       }
 
       notify("approved", "clean_scan");
@@ -730,7 +734,7 @@ export function createUploadInspector(options = {}) {
       }
       const code = error instanceof UploadInspectionError ? error.code : "PROCESSING_FAILED";
       notify(retainQuarantine ? "quarantined" : "rejected", code.toLowerCase());
-      throw new UploadInspectionError(code);
+      throw new UploadInspectionError(code, error instanceof UploadInspectionError ? error.attestation ?? null : null);
     }
   }
 
