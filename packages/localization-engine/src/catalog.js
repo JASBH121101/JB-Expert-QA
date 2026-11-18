@@ -149,5 +149,6 @@ export function getCatalogEntry(catalog, key) {
   if (typeof key !== "string" || !key.trim() || key.length > 256) {
     throw new TypeError("translation key must be a non-empty string up to 256 characters");
   }
+  if (Object.hasOwn(catalog, key)) return catalog[key];
   return getByPath(catalog, key);
 }
