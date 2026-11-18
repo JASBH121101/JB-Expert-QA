@@ -455,6 +455,42 @@ async function main() {
     assert.equal(stillPending.record.state, "provider-started");
   });
 
+  await runCase("PostgreSQL A2 database constraints reject scope-column and terminal-outcome tampering", async () => {
+    const scope = a2Scope("pg-a2-db-checks", "pg-a2-incident-db-checks");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_375_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    await assert.rejects(
+      pool.query(
+        "UPDATE jb_resilience_a2_action_claims SET asset_id=$2 WHERE claim_id=$1",
+        [claim.claimId, "different-asset"]
+      ),
+      (error) => error && error.code === "23514"
+    );
+    await assert.rejects(
+      pool.query(
+        "UPDATE jb_resilience_a2_action_claims " +
+        "SET status='completed', outcome=NULL, completed_at_ms=$2, recovery_record=NULL " +
+        "WHERE claim_id=$1",
+        [claim.claimId, claimedAtMs + 1]
+      ),
+      (error) => error && error.code === "23514"
+    );
+    assert.deepEqual(await a2Second.reconcile({
+      action, scope, profileId, idempotencyKey, atMs: claimedAtMs + 2
+    }), { state: "claimed", claimId: claim.claimId });
+    assert.deepEqual(await a2Second.complete({
+      claimId: claim.claimId, outcome: "not-applied",
+      reason: "no-provider-call-made", completedAtMs: claimedAtMs + 3
+    }), { completed: true });
+  });
+
   await runCase("PostgreSQL A2 altered recovery JSONB fails closed on exact read and finalization", async () => {
     const scope = a2Scope("pg-a2-tamper", "pg-a2-incident-tamper");
     const profileId = "approved-a2-profile";
