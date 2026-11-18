@@ -85,7 +85,7 @@ jobs:
         run: |
           composer validate --no-check-publish composer.json
           mkdir -p "$RUNNER_TEMP/composer-artifacts"
-          composer archive --format=zip --file="$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
+          composer archive --format=zip --file="$RUNNER_TEMP/composer-artifacts/jb-security-guard-php"
           test -s "$RUNNER_TEMP/composer-artifacts/jb-security-guard-php.zip"
       - name: Install archive into a clean consumer
         run: |
