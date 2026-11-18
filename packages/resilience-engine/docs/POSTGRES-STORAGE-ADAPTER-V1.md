@@ -7,7 +7,7 @@
 
 ## Scope
 
-This adapter replaces the single-host JSON-file orchestration ledger with a PostgreSQL-backed transactional implementation of the existing v0.6 orchestration-store contract. It returns five stores:
+This adapter provides PostgreSQL-backed transactional stores for the existing v0.6 orchestration contract and its related audit/coordination primitives. A separate `createPostgresA2ActionLedger({ pool, providerId, verifierId, recorderId })` factory in the same module implements the A2 controller's own durable action-journal contract. It is exported from the package root and the `@jb/resilience-engine/adapters/postgres-a2-action-ledger` subpath. The existing adapter factory returns five stores:
 
 - `orchestrationStore`: incident state, service state, circuit-breaker state, idempotency claims and one-time action finalization.
 - `auditStore`: append-only, SHA-256 hash-chained audit events.
@@ -15,7 +15,7 @@ This adapter replaces the single-host JSON-file orchestration ledger with a Post
 - `fencedTargetStore`: a PostgreSQL-managed JSON state target that atomically enforces the current lease and durable fencing high-water mark on every state mutation.
 - `trustedSignalStore`: a durable, database-unique replay registry shared by processes using the same authoritative PostgreSQL primary.
 
-The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The host owns the Pool and passes it in explicitly.
+The adapter does not create connections from environment variables, own credentials, install a database driver, contact a hosted database, or provision infrastructure. The A2 action-ledger factory also requires three distinct configured provider/verifier/recorder identities; these are consistency bindings, not proof of operational independence or trust. The host owns the Pool and passes it in explicitly.
 
 ## Initialization
 
@@ -40,6 +40,41 @@ await storage.initialize();
 ```
 
 The package only requires a Pool with `connect()`, and connected clients with `query()` and `release()`. The application must manage Pool lifecycle and close it when its process shuts down.
+
+## Transactional A2 action journal
+
+The A2 controller has a distinct ledger contract from the older v0.6 orchestration action API. Do not inject `orchestrationStore` as an A2 `actionLedger`: their identifiers, claims, lifecycle states, policy scope and finalization rules are not interchangeable.
+
+A host can create the A2 journal on the same injected Pool:
+
+```js
+import pg from "pg";
+import { createPostgresA2ActionLedger } from "@jb/resilience-engine/adapters/postgres-a2-action-ledger";
+
+const pool = new pg.Pool({ connectionString: process.env.JB_RESILIENCE_DATABASE_URL, max: 8 });
+const actionLedger = createPostgresA2ActionLedger({
+  pool,
+  providerId: "host-configured-provider-id",
+  verifierId: "host-configured-independent-verifier-id",
+  recorderId: "host-configured-forensic-recorder-id"
+});
+await actionLedger.initialize();
+
+// Inject actionLedger into the A2 controller composition.
+// The controller still defaults to disabled and ARC keeps A2 denied.
+```
+
+Initialization creates only the namespaced `jb_resilience_a2_action_claims` table and its active-asset unique index. The table holds the durable claim, exact six-field policy scope, profile, deterministic idempotency key, lease timestamps, lifecycle state, completion reason and complete recovery record in a single row.
+
+The A2 journal provides:
+
+- **Atomic claim:** database advisory transaction locking serializes claim attempts for the exact asset/environment pair; a unique idempotency key is retained permanently; a partial unique index independently prevents a second active claim for that asset/environment.
+- **Exact pending record:** `createPendingRecord` binds the full record to an existing unexpired claim, and `getPendingByClaimId` re-fetches the exact durable record.
+- **Atomic provider start:** `markProviderStarted` locks the claim row, checks the unexpired claim and full original record, and transitions the claim plus recovery JSON in one transaction.
+- **Read-only reconciliation:** `reconcile`, bounded `listPending` keyset pagination and exact lookup expose state without resuming an action. Held claims stay active; expired claims are not recycled.
+- **Fail-closed completion:** success is allowed only after provider start. A post-start `not-applied` completion requires a proof envelope bound to the provider identity, action, exact scope, profile, idempotency key and observation time. Terminal rows preserve idempotency tombstones.
+
+This is a transactional single-primary PostgreSQL implementation, not a multi-region consensus system. Database backups and point-in-time restore must preserve A2 idempotency tombstones; restoring an older snapshot can reopen old idempotency keys and requires an operator-controlled recovery plan before the ledger is trusted again. The host must use least-privilege roles, protect the database endpoint and backups, and independently test failover/restore semantics. The ledger itself does not authenticate policy approval, perform provider operations, validate independent verification, or grant release authority.
 
 ## Transaction and concurrency guarantees
 
