@@ -172,6 +172,16 @@ class UploadInspectionTests(unittest.TestCase):
                 with self.assertRaises(UploadInspectionError) as caught:
                     service.inspect(path, "photo.png", "image/png")
                 self.assertEqual(caught.exception.reason, reason)
+                if reason in ("MALWARE_DETECTED", "SCAN_NOT_CLEAN"):
+                    evidence = caught.exception.attestation
+                    self.assertEqual(evidence["verdict"], "malicious" if reason == "MALWARE_DETECTED" else "unknown")
+                    self.assertEqual(evidence["sha256"], hashlib.sha256(PNG).hexdigest())
+                    self.assertEqual(evidence["size"], len(PNG))
+                    self.assertRegex(evidence["uploadId"], r"^[a-f0-9]{32}$")
+                    expected_upload_id = storage.deleted[0] if reason == "MALWARE_DETECTED" else next(iter(storage.quarantine))
+                    self.assertEqual(evidence["uploadId"], expected_upload_id)
+                else:
+                    self.assertFalse(hasattr(caught.exception, "attestation"))
                 self.assertEqual(storage.approved, {})
                 self.assertEqual(bool(storage.quarantine), retain)
                 if reason == "MALWARE_DETECTED":
