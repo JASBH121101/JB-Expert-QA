@@ -6,6 +6,7 @@ namespace JB\SecurityGuard\Tests;
 
 use JB\SecurityGuard\UploadInspectionException;
 use JB\SecurityGuard\UploadInspectionService;
+use JB\SecurityGuard\UploadInspectionReadOnlyStream;
 use JB\SecurityGuard\UploadMalwareScanner;
 use JB\SecurityGuard\UploadQuarantineStorage;
 use RuntimeException;
