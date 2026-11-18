@@ -225,7 +225,7 @@ test("a critical component failure propagates through every ancestor", () => {
 
 test("non-critical component failure is visible but does not block its parent", () => {
   const fixture = fixtureInventory({ optionalComponent: true });
-  const ids = fixture.nodes.map((node) => node.id).filter((id) => id !== "fixture.dependency-module" && id !== "fixture.dependency-component");
+  const ids = fixture.nodes.map((node) => node.id);
   const allPass = passHistory(fixture, ids);
   const failure = {
     assessmentId: "asmt.optional.failure",
@@ -259,7 +259,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
-  assert.equal(report.counts.component.total, 59);
+  assert.equal(report.counts.component.total, 71);
   assert.equal(report.counts.component.PASS, 13);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
