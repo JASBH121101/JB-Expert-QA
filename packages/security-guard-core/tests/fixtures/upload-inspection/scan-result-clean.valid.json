@@ -1,5 +1,4 @@
 {
-  "$schema": "jb.security.upload-scan-result/v1",
   "uploadId": "aabbccddeeff00112233445566778899",
   "verdict": "clean",
   "size": 9,
@@ -8,5 +7,6 @@
     "id": "JB-Test-Scanner",
     "version": "1.0"
   },
-  "streamConsumed": true
+  "streamConsumed": true,
+  "schema": "jb.security.upload-scan-result/v1"
 }
