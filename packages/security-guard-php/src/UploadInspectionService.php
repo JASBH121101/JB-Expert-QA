@@ -21,10 +21,15 @@ final class UploadInspectionReadOnlyStream
 
     /** @var array<string, resource> */
     private static array $sources = [];
+    /** @var array<string, int> */
+    private static array $positions = [];
+    /** @var array<string, \HashContext> */
+    private static array $hashes = [];
     private static bool $registered = false;
 
     /** @var resource|null */
     private $source = null;
+    private string $uploadId = '';
     private int $position = 0;
     public mixed $context;
 
@@ -54,9 +59,29 @@ final class UploadInspectionReadOnlyStream
         return $stream;
     }
 
+    public static function verifyComplete(
+        string $uploadId,
+        int $expectedSize,
+        string $expectedSha256
+    ): string {
+        if (!isset(self::$sources[$uploadId], self::$positions[$uploadId], self::$hashes[$uploadId])) {
+            return 'incomplete';
+        }
+
+        $source = self::$sources[$uploadId];
+        if (!is_resource($source) ||
+            self::$positions[$uploadId] !== $expectedSize ||
+            !feof($source)) {
+            return 'incomplete';
+        }
+
+        $actualSha256 = hash_final(hash_copy(self::$hashes[$uploadId]));
+        return hash_equals($expectedSha256, $actualSha256) ? 'complete' : 'content_mismatch';
+    }
+
     public static function forget(string $uploadId): void
     {
-        unset(self::$sources[$uploadId]);
+        unset(self::$sources[$uploadId], self::$positions[$uploadId], self::$hashes[$uploadId]);
     }
 
     public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
@@ -72,7 +97,10 @@ final class UploadInspectionReadOnlyStream
         }
 
         $this->source = self::$sources[$uploadId];
+        $this->uploadId = $uploadId;
         $this->position = 0;
+        self::$positions[$uploadId] = 0;
+        self::$hashes[$uploadId] = hash_init('sha256');
         return true;
     }
 
@@ -87,7 +115,11 @@ final class UploadInspectionReadOnlyStream
             return false;
         }
 
+        if ($bytes !== '') {
+            hash_update(self::$hashes[$this->uploadId], $bytes);
+        }
         $this->position += strlen($bytes);
+        self::$positions[$this->uploadId] = $this->position;
         return $bytes;
     }
 
@@ -118,6 +150,10 @@ final class UploadInspectionReadOnlyStream
 
     public function stream_set_option(int $option, int $arg1, int $arg2): bool
     {
+        if ($option === STREAM_OPTION_READ_BUFFER) {
+            return $arg1 === STREAM_BUFFER_NONE && $arg2 === 0;
+        }
+
         return false;
     }
 
@@ -271,11 +307,20 @@ final class UploadInspectionService
             }
             $this->assertStream($scanStream, false);
             try {
+                if (stream_set_read_buffer($scanStream, 0) !== 0) {
+                    throw new UploadInspectionException('STORAGE_UNAVAILABLE');
+                }
                 $scanResult = $this->scanner->scan($scanStream, $metadata);
-                $scanPosition = ftell($scanStream);
-                if ($scanPosition === false || $scanPosition !== $size || !feof($scanStream)) {
+                $scanDisposition = is_resource($scanStream)
+                    ? UploadInspectionReadOnlyStream::verifyComplete($uploadId, $size, $sha256)
+                    : 'incomplete';
+                if ($scanDisposition !== 'complete') {
                     $retainQuarantine = true;
-                    throw new UploadInspectionException('SCAN_INCOMPLETE');
+                    throw new UploadInspectionException(
+                        $scanDisposition === 'content_mismatch'
+                            ? 'SCAN_CONTENT_MISMATCH'
+                            : 'SCAN_INCOMPLETE'
+                    );
                 }
             } catch (UploadInspectionException $exception) {
                 throw $exception;
