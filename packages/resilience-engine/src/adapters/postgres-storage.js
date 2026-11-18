@@ -2093,6 +2093,7 @@ export function createPostgresA2RevisionAnchor({
 
   return Object.freeze({
     durable: true,
+    atomicCompareAndSwap: true,
     dialect: "postgresql",
     initialize,
     read,
