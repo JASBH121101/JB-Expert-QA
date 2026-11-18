@@ -10,7 +10,10 @@ function assertMoney(value, registry = DEFAULT_CURRENCIES) {
       typeof value.minorUnits !== "bigint") {
     throw new TypeError("money must be an exact { currency, minorUnits: bigint } value");
   }
-  getCurrency(value.currency, registry);
+  const metadata = getCurrency(value.currency, registry);
+  if (value.currency !== metadata.code) {
+    throw new TypeError("money currency must use its canonical uppercase ISO code");
+  }
   return value;
 }
 
