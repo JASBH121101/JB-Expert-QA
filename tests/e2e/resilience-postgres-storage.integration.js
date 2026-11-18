@@ -311,6 +311,51 @@ async function main() {
     assert.equal(second.nextCursor, null);
   });
 
+  await runCase("PostgreSQL A2 lock timeout releases a contended asset claim", async () => {
+    const scope = a2Scope("pg-a2-lock-timeout", "pg-a2-incident-lock-timeout");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_325_000;
+    const input = {
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    };
+    const boundedLedger = createPostgresA2ActionLedger({
+      pool: a2SecondaryPool,
+      ...a2Identities,
+      statementTimeoutMs: 2_000,
+      lockTimeoutMs: 100,
+      idleInTransactionTimeoutMs: 2_000
+    });
+    await boundedLedger.initialize();
+    const locker = await pool.connect();
+    let locked = false;
+    try {
+      await locker.query("BEGIN");
+      locked = true;
+      await locker.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [canonicalA2([scope.environment, scope.assetId])]
+      );
+      await assert.rejects(
+        boundedLedger.claim(input),
+        (error) => error && error.code === "55P03"
+      );
+    } finally {
+      if (locked) await locker.query("ROLLBACK").catch(() => {});
+      locker.release();
+    }
+    const retriedAfterLockRelease = await a2First.claim(input);
+    assert.equal(retriedAfterLockRelease.claimed, true);
+    assert.deepEqual(await a2Second.complete({
+      claimId: retriedAfterLockRelease.claimId,
+      outcome: "not-applied",
+      reason: "no-provider-call-made",
+      completedAtMs: claimedAtMs + 1
+    }), { completed: true });
+  });
+
   await runCase("PostgreSQL A2 server statement timeout releases a blocked row lock", async () => {
     const scope = a2Scope("pg-a2-timeout", "pg-a2-incident-timeout");
     const profileId = "approved-a2-profile";
