@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import os
 import secrets
 from datetime import datetime, timezone
@@ -15,6 +14,7 @@ DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 MAX_BYTES = 100 * 1024 * 1024
 CHUNK_SIZE = 64 * 1024
 MAX_SIGNATURE_BYTES = 8192
+MAX_SCANNER_READ_BYTES = 1024 * 1024
 
 _TYPES: dict[str, tuple[str, ...]] = {
     "image/jpeg": ("jpg", "jpeg"),
@@ -50,7 +50,7 @@ class UploadQuarantineStorage(Protocol):
 class UploadMalwareScanner(Protocol):
     """Host adapter backed by a real, versioned scanner with its own hard deadline."""
 
-    def scan(self, stream: BinaryIO, metadata: dict[str, Any]) -> dict[str, Any]: ...
+    def scan(self, stream: UploadInspectionReadOnlyStream, metadata: dict[str, Any]) -> dict[str, Any]: ...
 
 
 def _extension(filename: str) -> str | None:
@@ -97,11 +97,14 @@ def _write_all(stream: BinaryIO, chunk: bytes) -> None:
         offset += written
 
 
-class _VerifiedScannerStream(io.RawIOBase):
-    """Read-only stream that independently hashes and counts bytes delivered to a scanner."""
+class UploadInspectionReadOnlyStream:
+    """Unbuffered, sequential scanner reader with independent byte accounting.
+
+    This is intentionally not an io.RawIOBase: a scanner cannot wrap it in
+    io.BufferedReader and make a small read appear to consume prefetched bytes.
+    """
 
     def __init__(self, source: BinaryIO, expected_size: int, expected_sha256: str) -> None:
-        super().__init__()
         self._source = source
         self._expected_size = expected_size
         self._expected_sha256 = expected_sha256
@@ -109,36 +112,37 @@ class _VerifiedScannerStream(io.RawIOBase):
         self._consumed = 0
         self._eof = False
 
-    def readable(self) -> bool:
-        return True
+    def read(self, size: int = CHUNK_SIZE) -> bytes:
+        if type(size) is not int or size < 1 or size > MAX_SCANNER_READ_BYTES:
+            raise UploadInspectionError("INVALID_SCAN_RESULT")
+        if self._eof:
+            return b""
 
-    def seekable(self) -> bool:
-        return False
-
-    def readinto(self, buffer: Any) -> int:
-        if len(buffer) == 0 or self._eof:
-            return 0
         remaining = self._expected_size - self._consumed
-        chunk = self._source.read(min(len(buffer), remaining + 1))
-        if chunk is None or not isinstance(chunk, bytes):
+        if remaining < 0:
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
+
+        chunk = self._source.read(min(size, remaining + 1))
+        if chunk is None:
             raise UploadInspectionError("SCAN_INCOMPLETE")
+        if not isinstance(chunk, bytes):
+            raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
         if len(chunk) > remaining:
             raise UploadInspectionError("SCAN_CONTENT_MISMATCH")
         if chunk == b"":
             self._eof = True
-            return 0
-        buffer[: len(chunk)] = chunk
+            return b""
+
         self._digest.update(chunk)
         self._consumed += len(chunk)
-        return len(chunk)
+        return chunk
 
     def verify_complete(self) -> str:
         if self._consumed != self._expected_size:
             return "incomplete"
 
-        # Re-probe the underlying source after the scanner returns. Do not
-        # treat a missing/non-bytes response as EOF, and reject any trailing
-        # byte even when the scanner has already consumed the expected size.
+        # Probe the underlying source after the scanner returns. The reader
+        # itself never exposes this resource or a buffered/readinto interface.
         extra = self._source.read(1)
         if extra is None:
             return "incomplete"
@@ -149,9 +153,6 @@ class _VerifiedScannerStream(io.RawIOBase):
         if self._digest.hexdigest() != self._expected_sha256:
             return "content_mismatch"
         return "complete"
-
-    def tell(self) -> int:
-        return self._consumed
 
 
 class UploadInspectionService:
@@ -267,7 +268,7 @@ class UploadInspectionService:
                 "mimeType": detected_type,
             }
             scan_stream = self._storage.open_quarantine_stream(upload_id)
-            verified_scan_stream = _VerifiedScannerStream(scan_stream, size, sha256)
+            verified_scan_stream = UploadInspectionReadOnlyStream(scan_stream, size, sha256)
             try:
                 scan_result = self._scanner.scan(verified_scan_stream, metadata)
                 scan_disposition = verified_scan_stream.verify_complete()
