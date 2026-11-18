@@ -38,15 +38,18 @@ The default bounds are a 5-second lock wait, 120-second dead-process lock thresh
 
 ## External monotonic revision anchor
 
-For rollback resistance against restoring both local files to an older, previously valid snapshot, the host can inject a separate revisionAnchor adapter and stable ledgerId. The adapter contract is:
+For rollback resistance against restoring both local files to an older, previously valid snapshot, the host injects a separate `revisionAnchor` adapter and stable `ledgerId`. The adapter must declare `durable: true` and `atomicCompareAndSwap: true`; the file ledger rejects adapters that omit either capability assertion.
 
-- read({ ledgerId }) returns null only before the first anchor commit, or { schema: jb.resilience.a2-revision-anchor/v1, revision, ledgerSha256 }.
-- compareAndSwap({ ledgerId, expected, next }) atomically and durably replaces the exact expected state with next; expected is null only during empty-ledger bootstrap. It returns true only when the requested transition is committed.
-- The anchor service must provide linearizable compare-and-swap, authenticate its callers, retain monotonic state independently of the ledger directory, and have a backup/restore policy that cannot be rolled back together with the local journal. A second file beside the journal is not an independent anchor.
+The repository includes `createPostgresA2RevisionAnchor()` at `@jb/resilience-engine/adapters/postgres-a2-revision-anchor`. Its contract is:
+
+- `read({ ledgerId })` returns null only before the first anchor commit, or a state with schema `jb.resilience.a2-revision-anchor/v1`, non-negative revision and SHA-256 digest.
+- `compareAndSwap({ ledgerId, expected, next })` commits only the exact expected tuple. Initial insertion requires `expected: null` and revision zero; each later transition advances exactly one revision and matches the previous schema/revision/digest tuple.
+- PostgreSQL uses a conditional `UPDATE ... WHERE ledger_id AND state_schema AND revision AND ledger_sha256` for atomic CAS. A table trigger enforces revision-zero insert, exactly-one revision advances, immutable ledger identity/schema and permanent tombstones (deletion is rejected).
+- `initialize()` provisions and validates the table/constraints/trigger using a migration owner. `verify()` checks an existing schema without DDL and is intended for the restricted runtime Pool.
 
 Every ledger read verifies that anchor revision and digest exactly match the authenticated local journal. A mutation first fsyncs the HMAC guard and journal, then advances the external anchor with compare-and-swap. If that CAS is lost or uncertain, the call fails and every later read holds because local and external state diverge; it never assumes success. A coordinated restoration of an older journal/guard pair is rejected while the external anchor retains the newer revision/digest. If both local files are missing while the external anchor exists, the adapter refuses to bootstrap an empty journal; an operator must restore or reconcile the original state.
 
-This package implements the adapter boundary and lab test doubles only. It does not provide or host an off-host anchor service. Without revisionAnchor, HMAC still prevents a writer without the key from forging a new guard, but replay of both old local files remains possible. Production A2 must require a host-owned anchor appropriate to the threat model and fault-test its durability, access controls, failover and restore behavior.
+The CI integration exercises two Pools against one disposable PostgreSQL primary and also composes the adapter with the file HMAC ledger. This verifies atomic single-primary CAS and the adapter contract, not an independent failure domain. A production host must use a separately administered anchor database with independent credentials, backups, PITR and failover. Sharing the action ledger's PostgreSQL cluster or restoring both from the same snapshot does not provide independent rollback protection. Without a surviving external anchor, HMAC still prevents a writer without the key from forging a new guard, but replay of both old local files remains possible.
 
 ## Atomic lifecycle
 
