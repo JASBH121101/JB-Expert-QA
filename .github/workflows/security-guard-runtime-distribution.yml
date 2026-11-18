@@ -104,7 +104,6 @@ jobs:
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
           python-version: "3.11"
-          cache: "false"
       - name: Install the standard Python build frontend
         run: python -m pip install --upgrade build
       - name: Build wheel and source distribution from the package
@@ -145,7 +144,7 @@ jobs:
         run: |
           python -m venv "$CONSUMER_DIR"
           SDIST="$(find "$PYTHON_DIST" -maxdepth 1 -type f -name '*.tar.gz' -print -quit)"
-          "$CONSUMER_DIR/bin/python" -m pip install --upgrade "setuptools>=68"
+          "$CONSUMER_DIR/bin/python" -m pip install --upgrade "setuptools>=68" wheel
           "$CONSUMER_DIR/bin/python" -m pip install --no-index --no-deps --no-build-isolation "$SDIST"
           (
             cd "$RUNNER_TEMP"
