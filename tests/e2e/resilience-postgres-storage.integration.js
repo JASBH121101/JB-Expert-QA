@@ -255,24 +255,26 @@ async function main() {
     }), { claimed: false, claimId: null });
   });
 
-  await runCase("PostgreSQL A2 pending journal uses bounded stable keyset pagination", async () => {
-    const created = [];
-    for (let index = 0; index < 3; index += 1) {
+  await runCase("PostgreSQL A2 pending journal uses bounded stable keyset pagination under concurrent claims", async () => {
+    const inputs = Array.from({ length: 3 }, (_, index) => {
       const scope = a2Scope(
         "pg-a2-page-" + String(index + 1),
         "pg-a2-page-incident-" + String(index + 1)
       );
       const profileId = "approved-a2-profile";
       const action = "apply-containment-profile";
-      const idempotencyKey = a2Key(action, scope, profileId);
-      const result = await a2First.claim({
-        action, scope, profileId, idempotencyKey,
+      return {
+        action, scope, profileId,
+        idempotencyKey: a2Key(action, scope, profileId),
         claimedAtMs: 1_800_000_250_000 + index,
         expiresAtMs: 1_800_000_280_000 + index
-      });
-      assert.equal(result.claimed, true);
-      created.push(result.claimId);
-    }
+      };
+    });
+    const claimResults = await Promise.all(inputs.map((input, index) =>
+      (index % 2 === 0 ? a2First : a2Second).claim(input)
+    ));
+    assert.equal(claimResults.every((result) => result.claimed), true);
+    const created = claimResults.map((result) => result.claimId);
     const first = await a2First.listPending({
       cursor: null, limit: 2, atMs: 1_800_000_250_100
     });
