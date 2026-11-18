@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import {
   mkdir, open, readFile, rename, unlink, lstat
@@ -8,7 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
 
 const LEDGER_SCHEMA = "jb.resilience.a2-action-ledger/v1";
-const GUARD_SCHEMA = "jb.resilience.a2-action-ledger-guard/v1";
+const GUARD_SCHEMA = "jb.resilience.a2-action-ledger-guard/v2";
+const INTEGRITY_KEY_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 const RECORD_SCHEMA = "jb.resilience.a2-recovery-record/v1";
 const SCOPE_KEYS = Object.freeze([
   "assetId", "environment", "incidentId", "policyId", "policyRevision", "policyHash"
@@ -362,39 +363,109 @@ function ledgerDigest(ledger) {
     .digest("hex");
 }
 
-async function readLedgerGuard(guardPath) {
+function normalizeIntegrityKeyring(input, activeKeyId) {
+  if (!isRecord(input) ||
+      (Object.getPrototypeOf(input) !== Object.prototype &&
+       Object.getPrototypeOf(input) !== null) ||
+      Object.getOwnPropertySymbols(input).length !== 0) {
+    throw new TypeError("integrityKeys must be a plain keyring object");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const ids = Object.keys(descriptors);
+  if (ids.length < 1 || ids.length > 8) {
+    throw new TypeError("integrityKeys must contain between 1 and 8 versioned keys");
+  }
+  const keys = Object.create(null);
+  for (const id of ids) {
+    const descriptor = descriptors[id];
+    if (!INTEGRITY_KEY_ID.test(id) || !descriptor.enumerable ||
+        !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("integrityKeys contains an invalid key entry");
+    }
+    const value = descriptor.value;
+    let bytes;
+    if (typeof value === "string" && /^(?:[a-f0-9]{2}){32,4096}$/.test(value)) {
+      bytes = Buffer.from(value, "hex");
+    } else if (value instanceof Uint8Array) {
+      bytes = Buffer.from(value);
+    } else {
+      throw new TypeError("each A2 integrity key must be 32-4096 bytes or lowercase hex");
+    }
+    if (bytes.length < 32 || bytes.length > 4096) {
+      throw new TypeError("each A2 integrity key must contain 32-4096 bytes");
+    }
+    keys[id] = bytes;
+  }
+  if (typeof activeKeyId !== "string" || !INTEGRITY_KEY_ID.test(activeKeyId) ||
+      !Object.hasOwn(keys, activeKeyId)) {
+    throw new TypeError("activeIntegrityKeyId must identify a key in integrityKeys");
+  }
+  return Object.freeze({ keys, activeKeyId });
+}
+
+function ledgerGuardMac(payload, key) {
+  return createHmac("sha256", key)
+    .update("jb.resilience.a2-ledger-guard/v2", "utf8")
+    .update(Buffer.from([0]))
+    .update(canonicalJson(payload), "utf8")
+    .digest("hex");
+}
+
+function verifyLedgerGuardMac(guard, key) {
+  const payload = {
+    schema: guard.schema,
+    revision: guard.revision,
+    ledgerSha256: guard.ledgerSha256,
+    keyId: guard.keyId
+  };
+  const expected = Buffer.from(ledgerGuardMac(payload, key), "hex");
+  const supplied = Buffer.from(guard.hmacSha256, "hex");
+  return supplied.length === expected.length && timingSafeEqual(expected, supplied);
+}
+
+async function readLedgerGuard(guardPath, integrityKeys) {
   let handle;
   try {
     const noFollow = typeof fsConstants.O_NOFOLLOW === "number"
       ? fsConstants.O_NOFOLLOW : 0;
     handle = await open(guardPath, fsConstants.O_RDONLY | noFollow);
     const metadata = await handle.stat();
-    if (!metadata.isFile() || metadata.size > 1_024) {
-      throw new Error("A2 action ledger durability guard is malformed");
+    if (!metadata.isFile() || metadata.size > 2_048) {
+      throw new Error("A2 action ledger cryptographic guard is malformed");
     }
     if (noFollow === 0) {
       const pathMetadata = await lstat(guardPath);
       if (pathMetadata.isSymbolicLink() || !pathMetadata.isFile() ||
           pathMetadata.dev !== metadata.dev || pathMetadata.ino !== metadata.ino) {
-        throw new Error("A2 action ledger durability guard must be a regular file");
+        throw new Error("A2 action ledger cryptographic guard must be a regular file");
       }
     }
     const guard = JSON.parse(await handle.readFile("utf8"));
-    exactKeys(guard, ["schema", "revision", "ledgerSha256"], "A2 action ledger durability guard");
+    exactKeys(guard, [
+      "schema", "revision", "ledgerSha256", "keyId", "hmacSha256"
+    ], "A2 action ledger cryptographic guard");
     if (guard.schema !== GUARD_SCHEMA ||
         !Number.isSafeInteger(guard.revision) || guard.revision < 0 ||
-        typeof guard.ledgerSha256 !== "string" || !SHA256.test(guard.ledgerSha256)) {
-      throw new Error("A2 action ledger durability guard is invalid");
+        typeof guard.ledgerSha256 !== "string" || !SHA256.test(guard.ledgerSha256) ||
+        typeof guard.keyId !== "string" || !INTEGRITY_KEY_ID.test(guard.keyId) ||
+        typeof guard.hmacSha256 !== "string" || !SHA256.test(guard.hmacSha256)) {
+      throw new Error("A2 action ledger cryptographic guard is invalid");
+    }
+    const key = integrityKeys.keys[guard.keyId];
+    if (!key || !verifyLedgerGuardMac(guard, key)) {
+      throw new Error("A2 action ledger guard HMAC authentication failed");
     }
     return Object.freeze({
       schema: GUARD_SCHEMA,
       revision: guard.revision,
-      ledgerSha256: guard.ledgerSha256
+      ledgerSha256: guard.ledgerSha256,
+      keyId: guard.keyId,
+      hmacSha256: guard.hmacSha256
     });
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     if (error?.code === "ELOOP" || error?.code === "EMLINK") {
-      throw new Error("A2 action ledger durability guard must be a regular file", { cause: error });
+      throw new Error("A2 action ledger cryptographic guard must be a regular file", { cause: error });
     }
     throw error;
   } finally {
@@ -402,13 +473,18 @@ async function readLedgerGuard(guardPath) {
   }
 }
 
-async function writeLedgerGuard(guardPath, ledger) {
+async function writeLedgerGuard(guardPath, ledger, integrityKeys) {
   const directory = dirname(guardPath);
   const temporaryPath = guardPath + "." + process.pid + "." + randomUUID() + ".tmp";
-  const guard = {
+  const payload = {
     schema: GUARD_SCHEMA,
     revision: ledger.revision,
-    ledgerSha256: ledgerDigest(ledger)
+    ledgerSha256: ledgerDigest(ledger),
+    keyId: integrityKeys.activeKeyId
+  };
+  const guard = {
+    ...payload,
+    hmacSha256: ledgerGuardMac(payload, integrityKeys.keys[integrityKeys.activeKeyId])
   };
   let handle;
   try {
@@ -432,49 +508,44 @@ async function writeLedgerGuard(guardPath, ledger) {
   }
 }
 
-async function ensureLedgerGuard(filePath, ledger) {
+async function ensureLedgerGuard(filePath, ledger, integrityKeys) {
   const guardPath = filePath + ".guard";
-  const current = await readLedgerGuard(guardPath);
+  const current = await readLedgerGuard(guardPath, integrityKeys);
   if (ledger === null) {
     if (current) {
-      throw new Error("A2 action ledger is missing while its durability guard exists; refusing empty reinitialization");
+      throw new Error("A2 action ledger is missing while its cryptographic guard exists; refusing empty reinitialization");
     }
     return;
   }
 
   const digest = ledgerDigest(ledger);
   if (current === null) {
-    // A sidecar can be bootstrapped only for a genuinely empty revision-zero
-    // journal. Reconstructing it for an existing journal would erase the
-    // evidence needed to detect sidecar deletion or rollback.
     if (ledger.revision !== 0 ||
         Object.keys(ledger.claims).length !== 0 ||
         Object.keys(ledger.idempotency).length !== 0) {
-      throw new Error("A2 action ledger durability guard is missing; refusing to reinitialize its trust baseline");
+      throw new Error("A2 action ledger cryptographic guard is missing; refusing to reinitialize its trust baseline");
     }
-    await writeLedgerGuard(guardPath, ledger);
+    await writeLedgerGuard(guardPath, ledger, integrityKeys);
     return;
   }
   if (current.revision === ledger.revision) {
     if (current.ledgerSha256 !== digest) {
-      throw new Error("A2 action ledger digest does not match its durability guard");
+      throw new Error("A2 action ledger digest does not match its authenticated guard");
+    }
+    if (current.keyId !== integrityKeys.activeKeyId) {
+      await writeLedgerGuard(guardPath, ledger, integrityKeys);
     }
     return;
   }
   if (current.revision > ledger.revision) {
-    throw new Error("A2 action ledger appears rolled back behind its durability guard");
+    throw new Error("A2 action ledger appears rolled back behind its authenticated guard");
   }
-  // Never promote an ahead-of-guard journal automatically. It may reflect
-  // an interrupted write, but accepting it would also bless a forged one-step
-  // revision increase. Require operator review for every revision mismatch.
-  throw new Error("A2 action ledger revision diverges from its durability guard; manual review is required");
+  throw new Error("A2 action ledger revision diverges from its authenticated guard; manual review is required");
 }
 
-async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
+async function readLedgerFile(filePath, maxBytes, identities, maxClaims, integrityKeys) {
   let handle;
   try {
-    // Open the journal itself without following a symbolic link. The lstat +
-    // readFile sequence was vulnerable to a path-swap between the two calls.
     const noFollow = typeof fsConstants.O_NOFOLLOW === "number"
       ? fsConstants.O_NOFOLLOW : 0;
     handle = await open(filePath, fsConstants.O_RDONLY | noFollow);
@@ -482,8 +553,6 @@ async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
     if (!metadata.isFile()) {
       throw new Error("A2 action ledger path must be a regular file, not a symbolic link");
     }
-    // Windows may not expose O_NOFOLLOW. In that case, compare the opened
-    // file descriptor with the path metadata before reading any journal data.
     if (noFollow === 0) {
       const pathMetadata = await lstat(filePath);
       if (pathMetadata.isSymbolicLink() || !pathMetadata.isFile() ||
@@ -496,16 +565,14 @@ async function readLedgerFile(filePath, maxBytes, identities, maxClaims) {
     }
     const serialized = await handle.readFile("utf8");
     const ledger = validateLedger(JSON.parse(serialized), maxClaims, identities);
-    await ensureLedgerGuard(filePath, ledger);
+    await ensureLedgerGuard(filePath, ledger, integrityKeys);
     return ledger;
   } catch (error) {
     if (error?.code === "ENOENT") {
-      // Materialize the empty journal before its guard so a read-only first
-      // access cannot leave a guard pointing at a file that does not exist.
-      await ensureLedgerGuard(filePath, null);
+      await ensureLedgerGuard(filePath, null, integrityKeys);
       const initial = emptyLedger();
       await writeLedgerFile(filePath, initial, maxBytes);
-      await ensureLedgerGuard(filePath, initial);
+      await ensureLedgerGuard(filePath, initial, integrityKeys);
       return initial;
     }
     if (error?.code === "ELOOP" || error?.code === "EMLINK") {
@@ -613,7 +680,9 @@ export function createFileA2ActionLedger({
   lockStaleMs = 120_000,
   pollIntervalMs = 25,
   maxClaims = 20_000,
-  maxLedgerBytes = 16 * 1024 * 1024
+  maxLedgerBytes = 16 * 1024 * 1024,
+  integrityKeys,
+  activeIntegrityKeyId
 } = {}) {
   if (typeof filePath !== "string" || filePath.trim() === "") {
     throw new TypeError("filePath is required");
@@ -630,6 +699,7 @@ export function createFileA2ActionLedger({
     }
   }
   const identities = assertIdentityOptions({ providerId, verifierId, recorderId });
+  const normalizedIntegrityKeys = normalizeIntegrityKeyring(integrityKeys, activeIntegrityKeyId);
   const target = resolve(filePath);
   const lockPath = target + ".lock";
   const lockOptions = { timeoutMs: lockTimeoutMs, staleMs: lockStaleMs, pollIntervalMs };
@@ -637,14 +707,14 @@ export function createFileA2ActionLedger({
   async function read(signal, operation) {
     assertSignal(signal);
     return withFileLock(lockPath, lockOptions, signal, async () =>
-      operation(await readLedgerFile(target, maxLedgerBytes, identities, maxClaims))
+      operation(await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys))
     );
   }
 
   async function mutate(signal, operation) {
     assertSignal(signal);
     return withFileLock(lockPath, lockOptions, signal, async () => {
-      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims);
+      const ledger = await readLedgerFile(target, maxLedgerBytes, identities, maxClaims, normalizedIntegrityKeys);
       const result = await operation(ledger);
       if (result.changed) {
         ledger.revision += 1;
@@ -652,7 +722,7 @@ export function createFileA2ActionLedger({
         // Advance the guard first. If the subsequent journal replacement is
         // interrupted, the guard will be ahead and every read fails closed
         // for operator review instead of silently accepting ambiguous state.
-        await writeLedgerGuard(target + ".guard", ledger);
+        await writeLedgerGuard(target + ".guard", ledger, normalizedIntegrityKeys);
         await writeLedgerFile(target, ledger, maxLedgerBytes);
       }
       return result.value;
