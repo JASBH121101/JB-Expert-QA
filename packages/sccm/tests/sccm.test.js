@@ -24,19 +24,21 @@ function evidence(outcome = "success", commitSha = sourceSha) {
   }];
 }
 
-function assessment(nodeId, {
-  assessmentId = "asmt.test." + nodeId.split(".").at(-1),
-  status = "PASS",
-  assessedAt = "2026-11-18T19:11:00Z",
-  ev = evidence(status === "FAIL" ? "failure" : "success"),
-  findings = []
-} = {}) {
+function assessment(nodeId, options = {}) {
   const node = inventory.nodes.find((entry) => entry.id === nodeId);
+  const source = inventory.sources.find((entry) => entry.id === node.sourceId);
+  const {
+    assessmentId = "asmt.test." + nodeId.split(".").at(-1),
+    status = "PASS",
+    assessedAt = "2026-11-18T19:11:00Z",
+    ev = evidence(status === "FAIL" ? "failure" : "success", source.commitSha),
+    findings = []
+  } = options;
   return {
     assessmentId,
     nodeId,
     version: node.version,
-    commitSha: sourceSha,
+    commitSha: source.commitSha,
     status,
     assessedAt,
     evidence: ev,
@@ -278,7 +280,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 15);
+  assert.equal(report.counts.component.PASS, 19);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
