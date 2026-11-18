@@ -113,6 +113,12 @@ async function main() {
   };
   const a2First = createPostgresA2ActionLedger({ pool, ...a2Identities });
   const a2Second = createPostgresA2ActionLedger({ pool: a2SecondaryPool, ...a2Identities });
+  assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, statementTimeoutMs: 50
+  }), /statementTimeoutMs is invalid/);
+  assert.throws(() => createPostgresA2ActionLedger({
+    pool, ...a2Identities, lockTimeoutMs: 0
+  }), /lockTimeoutMs is invalid/);
   await assert.rejects(
     a2Second.listPending({ cursor: null, limit: 10, atMs: 1_800_000_000_000 }),
     /not initialized/
@@ -303,6 +309,80 @@ async function main() {
     assert.equal(new Set(all).size, all.length);
     for (const claimId of created) assert.ok(all.includes(claimId));
     assert.equal(second.nextCursor, null);
+  });
+
+  await runCase("PostgreSQL A2 server statement timeout releases a blocked row lock", async () => {
+    const scope = a2Scope("pg-a2-timeout", "pg-a2-incident-timeout");
+    const profileId = "approved-a2-profile";
+    const action = "apply-containment-profile";
+    const idempotencyKey = a2Key(action, scope, profileId);
+    const claimedAtMs = 1_800_000_350_000;
+    const claim = await a2First.claim({
+      action, scope, profileId, idempotencyKey,
+      claimedAtMs, expiresAtMs: claimedAtMs + 30_000
+    });
+    assert.equal(claim.claimed, true);
+    const record = {
+      schema: "jb.resilience.a2-recovery-record/v1",
+      claimId: claim.claimId,
+      action, scope, profileId,
+      ...a2Identities,
+      idempotencyKey,
+      state: "claimed",
+      originalOperationId: null,
+      evidenceRefs: [{
+        refId: "pg-a2-timeout-evidence",
+        sha256: createHash("sha256").update("timeout evidence").digest("hex")
+      }],
+      createdAtMs: claimedAtMs + 1,
+      updatedAtMs: claimedAtMs + 1,
+      leaseExpiresAtMs: claimedAtMs + 20_000
+    };
+    assert.deepEqual(await a2First.createPendingRecord({
+      record, atMs: record.createdAtMs
+    }), { created: true });
+    const startedAtMs = record.createdAtMs + 1;
+    assert.deepEqual(await a2First.markProviderStarted({
+      claimId: claim.claimId, action, scope, profileId, idempotencyKey,
+      recoveryRecord: { ...record, state: "provider-started", updatedAtMs: startedAtMs },
+      atMs: startedAtMs
+    }), { started: true });
+
+    const boundedLedger = createPostgresA2ActionLedger({
+      pool: a2SecondaryPool,
+      ...a2Identities,
+      statementTimeoutMs: 100,
+      lockTimeoutMs: 1_000,
+      idleInTransactionTimeoutMs: 2_000
+    });
+    await boundedLedger.initialize();
+    const locker = await pool.connect();
+    let locked = false;
+    try {
+      await locker.query("BEGIN");
+      locked = true;
+      await locker.query(
+        "SELECT claim_id FROM jb_resilience_a2_action_claims WHERE claim_id=$1 FOR UPDATE",
+        [claim.claimId]
+      );
+      await assert.rejects(
+        boundedLedger.complete({
+          claimId: claim.claimId,
+          outcome: "held-for-reconciliation",
+          reason: "timeout-lab",
+          completedAtMs: startedAtMs + 2
+        }),
+        (error) => error && error.code === "57014"
+      );
+    } finally {
+      if (locked) await locker.query("ROLLBACK").catch(() => {});
+      locker.release();
+    }
+    const stillPending = await a2First.getPendingByClaimId({
+      claimId: claim.claimId, atMs: startedAtMs + 3
+    });
+    assert.equal(stillPending.found, true);
+    assert.equal(stillPending.record.state, "provider-started");
   });
 
   await runCase("PostgreSQL A2 altered recovery JSONB fails closed on exact read and finalization", async () => {
