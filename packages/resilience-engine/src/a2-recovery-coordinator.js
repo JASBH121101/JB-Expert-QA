@@ -293,6 +293,9 @@ async function invokeBounded(owner, method, input, timeoutMs, label) {
       })),
       timeout
     ]);
+    // An adapter may resolve while synchronously handling abort. The deadline
+    // still wins: never accept a value after the timeout callback has fired.
+    if (timedOut) return { value: null, timedOut: true };
     return { value, timedOut: false };
   } catch {
     return { value: null, timedOut };
