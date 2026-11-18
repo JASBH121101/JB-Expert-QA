@@ -68,6 +68,7 @@ const ERROR_MESSAGES = Object.freeze({
   SCANNER_TIMEOUT: "Malware scan exceeded its time limit",
   SCAN_NOT_CLEAN: "File did not receive an explicit clean verdict",
   SCAN_INCOMPLETE: "Malware scanner did not consume the complete verified stream",
+  SCAN_CONTENT_MISMATCH: "Quarantined bytes differ from the ingested upload",
   INVALID_SCAN_RESULT: "Malware scanner returned an invalid result",
   MALWARE_DETECTED: "File was rejected by malware scanning",
   APPROVAL_FAILED: "File could not be promoted to approved storage",
@@ -250,7 +251,7 @@ function makeScanVerificationStream(expectedSize, expectedSha256) {
       else if (typeof chunk === "string") bytes = Buffer.from(chunk, encoding);
       else if (chunk instanceof Uint8Array) bytes = Buffer.from(chunk);
       else {
-        callback(new UploadInspectionError("INVALID_SCAN_RESULT"));
+        callback(new UploadInspectionError("SCAN_CONTENT_MISMATCH"));
         return;
       }
 
