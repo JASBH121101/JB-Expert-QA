@@ -236,3 +236,45 @@ test("execution timeout configuration is validated and bounded", () => {
     config: { execution: { unexpected: true } }
   }), /Unknown execution option/);
 });
+
+test("scoring rejects inherited weight and severity policy properties", () => {
+  const inheritedWeights = Object.create({ responsive: 100 });
+  assert.throws(() => calculateScore([], {
+    weights: inheritedWeights,
+    includedSpecialists: ["responsive"]
+  }), /weights must be an object/);
+
+  const inheritedPenalties = Object.create({ high: 100 });
+  assert.throws(() => calculateScore([{
+    specialist: "responsive",
+    severity: "high"
+  }], {
+    weights: { responsive: 100 },
+    severityPenalties: inheritedPenalties,
+    includedSpecialists: ["responsive"]
+  }), /severityPenalties must be an object/);
+});
+
+test("scoring accepts null-prototype policy maps without inheriting object members", () => {
+  const weights = Object.create(null);
+  weights.responsive = 100;
+  const penalties = Object.create(null);
+  penalties.high = 12;
+  const result = calculateScore([{
+    specialist: "responsive",
+    severity: "high"
+  }], {
+    weights,
+    severityPenalties: penalties,
+    includedSpecialists: ["responsive"]
+  });
+  assert.equal(result.score, 88);
+  assert.equal(result.passed, true);
+});
+
+test("scoring rejects finite weights whose aggregate overflows numeric bounds", () => {
+  assert.throws(() => calculateScore([], {
+    weights: { responsive: Number.MAX_VALUE, "ui-ux": Number.MAX_VALUE },
+    includedSpecialists: ["responsive", "ui-ux"]
+  }), /total weight must be a finite positive number/);
+});

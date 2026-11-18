@@ -1,7 +1,9 @@
 import { DEFAULT_SEVERITY_PENALTIES, SEVERITIES } from "./severities.js";
 
 function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 export function calculateScore(diagnostics, {
@@ -68,7 +70,10 @@ export function calculateScore(diagnostics, {
     specialistScores[name] = Math.max(0, 100 - penalty);
   }
 
-  const totalWeight = activeNames.reduce((sum, name) => sum + (weights[name] ?? 0), 0);
+  const totalWeight = activeNames.reduce((sum, name) => sum + (Object.hasOwn(weights, name) ? weights[name] : 0), 0);
+  if (!Number.isFinite(totalWeight)) {
+    throw new TypeError("total weight must be a finite positive number");
+  }
   const hasAssessments = activeNames.length > 0 && totalWeight > 0;
   const score = hasAssessments
     ? Math.round(activeNames.reduce(
