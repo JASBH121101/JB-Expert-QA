@@ -9,7 +9,7 @@ The initial supported locales are:
 - **es-419** — Latin American Spanish (default and fallback).
 - **en** — English.
 
-The legacy locale label **es** is normalized to **es-419** for comparison. Locale variants such as **es-MX** and **es-ES** map to the same initial locale; separate regional variants are not claimed.
+The legacy locale label **es** and an explicit allowlist of Latin-American aliases (including **es-NI**, **es-MX** and **es-419**) normalize to **es-419**. English regional aliases such as **en-US** and **en-GB** normalize to **en**. Unsupported or malformed tags are rejected instead of being silently collapsed. **es-ES is deliberately not mapped to es-419**, because European Spanish is not the same locale commitment as Latin-American Spanish.
 
 ## What is included
 
@@ -60,3 +60,8 @@ The initial TranslationMemory implementation is an in-memory API. Durable storag
 ## Ownership
 
 **JB Expert QA / Language QA Engine** owns this library. NEXORA consumes only language resources reviewed and approved for use. The tool is not a NEXORA customer-runtime dependency.
+
+
+## Structural audit hardening
+
+Nested leaf-versus-object changes are reported as `message-shape-mismatch` rather than a confusing pair of missing and obsolete keys. The test suite covers malformed locale tags, unsupported regional aliases and nested structural mismatches. The audit remains deterministic and dependency-free.
