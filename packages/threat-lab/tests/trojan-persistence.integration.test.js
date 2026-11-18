@@ -1,4 +1,5 @@
 import test from "node:test";
+import { persistThreatLabReport } from "./helpers/persist-report.js";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -115,6 +116,7 @@ test("JB Threat Lab validates Trojan-like script chains across persistence mecha
       productionTargets: false
     }
   });
+  await persistThreatLabReport(report, "trojan-persistence");
 
   assert.equal(report.totals.fail, 0, JSON.stringify(report.results.filter((item) => item.status === "fail"), null, 2));
   assert.equal(report.totals.pass, VARIANTS.length);
