@@ -2,7 +2,7 @@
   "name": "jb/security-guard-php",
   "description": "PHP Core v1 helpers and Laravel-compatible client for JB Security Guard",
   "type": "library",
-  "license": "UNLICENSED",
+  "license": "proprietary",
   "require": {
     "php": ">=8.2"
   },
