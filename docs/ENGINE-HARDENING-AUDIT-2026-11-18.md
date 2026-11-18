@@ -84,7 +84,7 @@ The report schema itself states that it aggregates registered safe scenarios, ru
 
 ## Final status
 
-**Laboratory evidence: PASS for individually inspected components, including Malware Engine candidate `603da7e...` (42/42 workflow jobs) and integrated Security Guard #145 (30/30 CI jobs). Resilience A2's updated candidate is pending fresh exact-head CI after the timeout-race fix.**  
+**Laboratory evidence: PASS for individually inspected components, including Malware Engine candidate `603da7e...` (42/42 workflow jobs) and integrated Security Guard #145 (30/30 CI jobs). Resilience A2's updated candidate `70e26eab24b2f5127e038955399b641c3be9a513` passed its exact-head matrix (8/8 workflows, 49/49 jobs) including the timeout-race regression.**  
 **Production certification: NOT GRANTED.**  
 **Release readiness: BLOCKED on production host-adapter, access-control, retention, and operational integration gates.**
 
