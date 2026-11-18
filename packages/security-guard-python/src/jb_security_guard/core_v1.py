@@ -217,9 +217,9 @@ def create_rate_limit_counter_key(value: Any) -> str:
 _UPLOAD_ATTESTATION_ID = re.compile(
     r"^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
 )
-_UPLOAD_MIME_TYPES = {
+_UPLOAD_MIME_TYPES = (
     "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
-}
+)
 _UPLOAD_SCANNER_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._+-]*$")
 
 
@@ -242,7 +242,7 @@ def validate_upload_inspection_attestation_v1(value: Any) -> dict[str, Any]:
         raise ValueError("uploadInspectionAttestation.sha256 must be a lowercase SHA-256 digest")
     if type(item["size"]) is not int or not 1 <= item["size"] <= 104857600:
         raise ValueError("uploadInspectionAttestation.size is out of bounds")
-    if item["mimeType"] not in _UPLOAD_MIME_TYPES:
+    if not isinstance(item["mimeType"], str) or item["mimeType"] not in _UPLOAD_MIME_TYPES:
         raise ValueError("uploadInspectionAttestation.mimeType is unsupported")
     for field, maximum in (("engine", 128), ("version", 64)):
         label = item[field]
