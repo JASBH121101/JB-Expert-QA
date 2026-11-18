@@ -14,6 +14,7 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
 {
     private string $quarantine;
     private string $approved;
+    private array $approvedAttestations = [];
 
     public function __construct(string $root)
     {
@@ -34,7 +35,7 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
         return is_file($path) ? fopen($path, 'rb') : false;
     }
 
-    public function promote(string $uploadId, string $expectedSha256, int $expectedSize): bool
+    public function promote(string $uploadId, string $expectedSha256, int $expectedSize, array $attestation): bool
     {
         $source = $this->quarantine . '/' . $uploadId;
         if (!is_file($source) ||
@@ -42,7 +43,17 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
             hash_file('sha256', $source) !== $expectedSha256) {
             return false;
         }
-        return rename($source, $this->approved . '/' . $uploadId);
+        if (($attestation['uploadId'] ?? null) !== $uploadId ||
+            ($attestation['sha256'] ?? null) !== $expectedSha256 ||
+            ($attestation['size'] ?? null) !== $expectedSize ||
+            ($attestation['verdict'] ?? null) !== 'clean') {
+            return false;
+        }
+        if (!rename($source, $this->approved . '/' . $uploadId)) {
+            return false;
+        }
+        $this->approvedAttestations[$uploadId] = $attestation;
+        return true;
     }
 
     public function delete(string $uploadId): void
@@ -52,6 +63,11 @@ final class UploadInspectionTestStorage implements UploadQuarantineStorage
                 throw new RuntimeException('Test store could not delete upload');
             }
         }
+    }
+
+    public function approvedAttestation(string $uploadId): ?array
+    {
+        return $this->approvedAttestations[$uploadId] ?? null;
     }
 
     public function quarantineCount(): int
@@ -123,6 +139,7 @@ function runUploadInspectionServiceTests(): void
         expect($attestation['mimeType'] === 'image/png', 'PHP attestation must bind detected MIME');
         expect($attestation['engine'] === 'JB-Test-Scanner' && $attestation['version'] === '1.0', 'PHP attestation must preserve scanner identity and version');
         expect(is_int($attestation['scannedAtMs']) && $attestation['scannedAtMs'] >= 0, 'PHP attestation must include a numeric scan timestamp');
+        expect($store->approvedAttestation($approved['uploadId']) === $attestation, 'PHP storage promotion must atomically persist the exact attestation with the approved object');
         expect($store->quarantineCount() === 0 && $store->approvedCount() === 1,
             'Only the atomically promoted private object may remain after a clean scan');
 
