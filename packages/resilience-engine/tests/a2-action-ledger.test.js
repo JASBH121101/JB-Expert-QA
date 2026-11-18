@@ -559,7 +559,7 @@ test("file ledger refuses symbolic-link journal paths without reading their targ
   await withTempDirectory(async (directory) => {
     const targetPath = join(directory, "external.json");
     const filePath = join(directory, "a2-actions.json");
-    const externalContent = "{\\\"external\\\":\\\"must-not-be-read\\\"}";
+    const externalContent = "EXTERNAL_TARGET_SENTINEL";
     await writeFile(targetPath, externalContent, "utf8");
     try {
       await symlink(targetPath, filePath);
