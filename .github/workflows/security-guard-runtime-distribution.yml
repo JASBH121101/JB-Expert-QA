@@ -46,11 +46,14 @@ jobs:
           COMPOSER_DIST: ${{ runner.temp }}/jb-security-guard-composer
         run: |
           mkdir -p "$COMPOSER_DIST"
-          composer archive --format=zip --dir="$COMPOSER_DIST" --file=jb-security-guard-php-0.1.0
-          test -n "$(find "$COMPOSER_DIST" -maxdepth 1 -type f -name '*.zip' -print -quit)"
-      - name: Install archive in a clean Composer consumer
+          composer archive --format=zip --dir="$COMPOSER_DIST" --file=jb-security-guard-php
+          ARCHIVE="$(find "$COMPOSER_DIST" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$ARCHIVE"
+          unzip -q "$ARCHIVE" -d "$RUNNER_TEMP/jb-security-guard-composer-extracted"
+          test -f "$RUNNER_TEMP/jb-security-guard-composer-extracted/composer.json"
+      - name: Install extracted archive in a clean Composer consumer
         env:
-          COMPOSER_DIST: ${{ runner.temp }}/jb-security-guard-composer
+          COMPOSER_PACKAGE: ${{ runner.temp }}/jb-security-guard-composer-extracted
           CONSUMER_DIR: ${{ runner.temp }}/jb-security-guard-consumer
         run: |
           mkdir -p "$CONSUMER_DIR"
@@ -61,7 +64,14 @@ jobs:
             "type": "project",
             "repositories": [
               { "packagist.org": false },
-              { "type": "artifact", "url": "$COMPOSER_DIST" }
+              {
+                "type": "path",
+                "url": "$COMPOSER_PACKAGE",
+                "options": {
+                  "symlink": false,
+                  "versions": { "jb/security-guard-php": "0.1.0" }
+                }
+              }
             ],
             "require": {
               "jb/security-guard-php": "0.1.0"
