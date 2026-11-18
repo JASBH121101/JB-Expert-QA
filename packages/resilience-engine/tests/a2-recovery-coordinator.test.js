@@ -107,7 +107,8 @@ function createFixture({
   malformedRecord = false,
   recorderIdOverride = "recorder-lab-01",
   listPending = null,
-  operationTimeoutMs = 1_000
+  operationTimeoutMs = 1_000,
+  maxEvidenceBytes = 16 * 1024 * 1024
 } = {}) {
   const record = makeRecord(action);
   record.recorderId = recorderIdOverride;
@@ -206,7 +207,8 @@ function createFixture({
     forensicRecorder: recorder,
     evidenceResolver: resolver,
     clock: () => NOW,
-    operationTimeoutMs
+    operationTimeoutMs,
+    maxEvidenceBytes
   });
   return { coordinator, events, record };
 }
@@ -349,4 +351,30 @@ test("an adapter resolving while handling abort cannot override the reconciliati
   assert.equal(events.includes("resolve-evidence"), false);
   assert.equal(events.includes("verify-containment"), false);
   assert.equal(events.includes("lookup-retention"), false);
+});
+
+
+test("evidence resolver payloads are bounded before hashing or verification", async () => {
+  const { coordinator, events } = createFixture({
+    resolvedContent: "x".repeat(17),
+    maxEvidenceBytes: 16
+  });
+  const report = await coordinator.reconcilePending();
+
+  assert.equal(report.complete, false);
+  assert.equal(report.findings[0].state, "held-for-reconciliation");
+  assert.equal(report.findings[0].reason, "evidence-byte-budget-exceeded");
+  assert.equal(report.findings[0].maxEvidenceBytes, 16);
+  assert.equal(report.findings[0].resolvedEvidenceBytes, 0);
+  assert.equal(report.findings[0].rejectedEvidenceBytes, 17);
+  assert.equal(report.findings[0].safeToRetry, false);
+  assert.equal(report.findings[0].executable, false);
+  assert.equal(events.includes("verify-containment"), false);
+  assert.equal(events.includes("lookup-retention"), false);
+});
+
+test("A2 recovery coordinator rejects unbounded evidence budget configuration", () => {
+  assert.throws(() => createFixture({
+    maxEvidenceBytes: 64 * 1024 * 1024 + 1
+  }), /A2 recovery bounds are invalid/);
 });
