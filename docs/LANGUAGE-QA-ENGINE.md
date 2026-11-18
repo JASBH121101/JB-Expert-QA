@@ -72,3 +72,12 @@ Nested leaf-versus-object changes are reported as `message-shape-mismatch` rathe
 ## Semantic integrity validation
 
 `auditTranslationSemantics` operates on flattened string maps and reports review-only findings for identical source/target text and differences in URLs, email addresses, HTML tag order/structure or numeric literals. `auditTranslationMaps` includes these findings in its result counts and the Language QA specialist exposes them to the project auditor. Use `allowUntranslatedKeys` for approved brand names or other intentionally shared labels. No finding is auto-approved, and no semantic model or network provider is required.
+
+
+## CLDR plural-catalog bridge (Language QA 2.0)
+
+`auditTranslationCatalogs` validates complete locale catalogs through the shared Localization Engine while enforcing Language QA's supported locale policy (`es-419` and `en`). It detects missing CLDR plural categories, message-shape changes and plural placeholder inconsistencies. Locale aliases are normalized before validation and duplicate aliases are rejected.
+
+This bridge is an audit integration, not a translation provider. Findings remain review-required and are never auto-approved. The runtime relies on Node's built-in `Intl`/ICU data; it adds no third-party dependency or network call.
+
+The bridge snapshots input catalogs using own-property descriptors before delegation. Accessors, symbol keys, prototype-sensitive keys, unsupported object types, excessive nesting and catalogs above 10,000 entries are rejected without executing getters. This protects the shared Localization Engine from unsafe caller-supplied objects.

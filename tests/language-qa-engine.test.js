@@ -300,3 +300,99 @@ test("translation map audit surfaces semantic signals to the Language QA special
   assert.ok(diagnostics.some((item) => item.title === "Source text may be untranslated"));
   assert.ok(diagnostics.some((item) => item.title === "Translation link differs from source"));
 });
+
+import { auditTranslationCatalogs } from "../src/language/index.js";
+
+test("Language QA delegates CLDR plural categories and placeholder parity to the localization engine", () => {
+  const result = auditTranslationCatalogs({
+    "es-419": {
+      items: { one: "{count} artículo", other: "{count} artículos" }
+    },
+    en: {
+      items: { other: "{count} items" }
+    }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] });
+
+  assert.equal(result.engine, "jb-localization-engine");
+  assert.equal(result.status, "review-required");
+  assert.equal(result.autoApproved, false);
+  assert.equal(result.reviewRequired, true);
+  assert.ok(result.findings.some((item) =>
+    item.code === "plural-category-missing" && item.locale === "en" && item.category === "one"
+  ));
+});
+
+test("Language QA catalog bridge rejects unsupported locales and duplicate aliases", () => {
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": { title: "Hola" },
+    "fr-FR": { title: "Bonjour" }
+  }, { sourceLocale: "es-419", requiredLocales: ["fr-FR"] }), /not supported|unsupported/);
+
+  assert.throws(() => auditTranslationCatalogs({
+    es: { title: "Hola" },
+    "es-419": { title: "Qué tal" },
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /duplicate locale/);
+});
+
+test("Language QA catalog bridge rejects invalid required locale sets", () => {
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": { title: "Hola" },
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["es-NI"] }), /must not include the source locale|duplicate/);
+});
+
+test("Language QA catalog bridge rejects accessors without executing them", () => {
+  let invoked = false;
+  const source = { title: "Hola" };
+  Object.defineProperty(source, "danger", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "should not run";
+    }
+  });
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": source,
+    en: { title: "Hello", danger: "safe" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /accessor properties/);
+  assert.equal(invoked, false);
+});
+
+test("Language QA catalog bridge rejects symbols, prototype keys and excessive nesting", () => {
+  const symbolCatalog = { title: "Hola" };
+  symbolCatalog[Symbol("unsafe")] = "hidden";
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": symbolCatalog,
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /symbol keys/);
+
+  const polluted = JSON.parse('{"__proto__":{"polluted":"yes"},"title":"Hola"}');
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": polluted,
+    en: { title: "Hello" }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /prototype-sensitive key/);
+  assert.equal({}.polluted, undefined);
+
+  let deep = { title: "Hola" };
+  for (let index = 0; index < 26; index += 1) deep = { nested: deep };
+  assert.throws(() => auditTranslationCatalogs({
+    "es-419": deep,
+    en: { nested: { title: "Hello" } }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] }), /nested plain object/);
+});
+
+test("complete CLDR plural catalogs pass structural audit without becoming human-approved", () => {
+  const result = auditTranslationCatalogs({
+    "es-419": {
+      items: { one: "{count} artículo", other: "{count} artículos" }
+    },
+    en: {
+      items: { one: "{count} item", other: "{count} items" }
+    }
+  }, { sourceLocale: "es-419", requiredLocales: ["en"] });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoApproved, false);
+});

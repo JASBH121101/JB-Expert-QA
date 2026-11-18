@@ -95,7 +95,7 @@ test("the versioned hierarchy inventory validates with all six certification lev
     [...new Set(inventory.nodes.map((node) => node.level))].sort(),
     ["branch", "component", "ecosystem", "engine", "module", "subbranch"]
   );
-  assert.equal(inventory.nodes.length, 140);
+  assert.equal(inventory.nodes.length, 141);
   assert.equal(inventory.nodes.filter((node) => node.level === "engine").length, 8);
 });
 
@@ -133,11 +133,15 @@ test("inventory rejects accessor properties without executing them", () => {
   assert.equal(invoked, false);
 });
 
-test("the initial evidence ledger contains only valid exact-SHA assessments", () => {
+test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 42);
-  assert.ok(history.every((entry) => entry.commitSha === sourceSha));
+  assert.equal(history.length, 44);
+  assert.ok(history.every((entry) => {
+    const node = inventory.nodes.find((item) => item.id === entry.nodeId);
+    const source = node && inventory.sources.find((item) => item.id === node.sourceId);
+    return Boolean(source && entry.commitSha === source.commitSha);
+  }));
 });
 
 test("PASS requires success evidence bound to the exact source commit", () => {
@@ -185,9 +189,21 @@ test("Language QA is PASS at component, module, subbranch and branch levels", ()
   const module = evaluateSccmNode(inventory, history, "jb.expert-qa.language.module");
   const components = branch.children[0].children[0].children;
   assert.equal(branch.status, "PASS");
+  assert.equal(branch.children[0].status, "PASS");
   assert.equal(module.status, "PASS");
-  assert.equal(components.length, 8);
+  assert.equal(components.length, 9);
   assert.ok(components.every((component) => component.status === "PASS"));
+  assert.equal(components.find((component) => component.id === "jb.expert-qa.language.cldr-catalog-audit").ownStatus, "PASS");
+});
+
+
+test("the Language QA dependency is certified without certifying all of Localization Engine", () => {
+  const pluralRules = evaluateSccmNode(inventory, history, "jb.localization-engine.runtime.plurals");
+  const localizationEngine = evaluateSccmNode(inventory, history, "jb.localization-engine");
+  assert.equal(pluralRules.status, "PASS");
+  assert.equal(pluralRules.ownStatus, "PASS");
+  assert.equal(localizationEngine.status, "PENDING");
+  assert.ok(localizationEngine.blockingChildren.length > 0);
 });
 
 test("green module workflows do not bypass uncertified critical components", () => {
@@ -259,11 +275,11 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
-  assert.equal(report.counts.component.total, 71);
-  assert.equal(report.counts.component.PASS, 13);
+  assert.equal(report.counts.component.total, 72);
+  assert.equal(report.counts.component.PASS, 15);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
-  assert.equal(report.progress.total, 140);
+  assert.equal(report.progress.total, 141);
 });
 
 test("history validation fails closed on malformed entries rather than throwing", () => {

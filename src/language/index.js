@@ -6,3 +6,4 @@ export { TranslationMemory } from "./translation-memory.js";
 export { TRANSLATION_REVIEW_STATES, recordTranslationReview, resolveTranslationState } from "./review.js";
 export { flattenTranslationMap, stableTranslationHash, auditTranslationMaps } from "./audit.js";
 export { auditTranslationSemantics } from "./semantic-audit.js";
+export { auditTranslationCatalogs } from "./catalog-audit.js";

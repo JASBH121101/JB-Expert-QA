@@ -31,7 +31,8 @@
     "cli/**",
     "config/**",
     "package-version.js",
-    "README.md"
+    "README.md",
+    "packages/localization-engine/src/**"
   ],
   "scripts": {
     "setup:browser": "node cli/package-cli.js setup --browser chromium"

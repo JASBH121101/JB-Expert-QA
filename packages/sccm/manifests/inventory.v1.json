@@ -1,13 +1,19 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.0",
-  "generatedAt": "2026-11-18T19:08:00Z",
+  "inventoryVersion": "1.0.1",
+  "generatedAt": "2026-11-18T20:28:16Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "main",
       "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c"
+    },
+    {
+      "id": "jb-expert-qa-pr167-snapshot",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "feature/language-qa-2.0-plural-catalog-audit-v1",
+      "commitSha": "13fbe4162aeb0132598d7038789bffe9a592fa00"
     }
   ],
   "nodes": [
@@ -180,6 +186,18 @@
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.cldr-catalog-audit",
+      "name": "CLDR plural catalog audit bridge",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-pr167-snapshot",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": [
+        "jb.localization-engine.runtime.plurals"
+      ]
     },
     {
       "id": "jb.expert-qa.language.semantic-integrity",
@@ -1326,7 +1344,7 @@
       "name": "CLDR plural rules",
       "level": "component",
       "parentId": "jb.localization-engine.runtime.module",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-pr167-snapshot",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
