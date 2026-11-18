@@ -22,6 +22,7 @@ The `JB Engines Certification` GitHub Actions workflow runs:
 - A bounded Malware Engine performance benchmark using generated benign fixtures.
 - Resilience Engine policy, health-monitor and Linux/Windows adapter tests on Ubuntu and Windows, Node.js 22 and 24.
 - Clean package-distribution checks for all five independently installable packages on Node.js 22 and 24 (including the separately versioned Advisor package).
+- A unified Threat Lab v1 certification report that consolidates the original safe integration reports for the four JB engines, validates target/version uniqueness, exposes missing engines or tiers, and preserves skips/failures instead of treating them as passes. NEXORA Catalog and Site Engine remain separate product targets in their dedicated workflow because their repositories are not mounted in the monorepo runner. One report plus its source reports is retained per OS/Node matrix lane.
 
 All test payloads are synthetic or inert. Malware plumbing uses the harmless EICAR test string and generated fixtures; no suspicious executable is run. Security tests target local test handlers and in-memory fixtures, not public websites or production systems.
 
@@ -91,7 +92,7 @@ Possible outcomes: **Passed**, **Passed with observations**, or **Not passed**. 
 - No paid services, external malware feeds or source uploads are enabled by this workflow.
 - CI uses GitHub-hosted runners and the repository's existing free-tier controls.
 - No malware samples are executed. No destructive tests are run against live systems.
-- Artifacts contain test reports/benchmarks only and have a 14-day retention period.
+- Artifacts contain test reports/benchmarks only. Standard artifacts use 14-day retention; the unified Threat Lab reports and Resilience OS service-manager lab evidence use 30-day retention.
 
 ## Security assessment scope
 

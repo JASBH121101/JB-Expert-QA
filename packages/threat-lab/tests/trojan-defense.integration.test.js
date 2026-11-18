@@ -1,4 +1,5 @@
 import test from "node:test";
+import { persistThreatLabReport } from "./helpers/persist-report.js";
 import assert from "node:assert/strict";
 import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -151,6 +152,7 @@ test("JB Threat Lab validates Trojan-oriented static triage and conservative han
       productionTargets: false
     }
   });
+  await persistThreatLabReport(report, "trojan-defense");
 
   assert.equal(report.totals.fail, 0, JSON.stringify(report.results.filter((item) => item.status === "fail"), null, 2));
   assert.equal(report.totals.pass, scenarios.length);

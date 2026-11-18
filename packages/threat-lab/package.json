@@ -8,7 +8,8 @@
   },
   "exports": {
     ".": "./src/index.js",
-    "./fixtures": "./src/fixtures.js"
+    "./fixtures": "./src/fixtures.js",
+    "./certification-report": "./src/certification-report.js"
   },
   "files": [
     "src/**",
@@ -16,7 +17,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/fixtures.js && node --check src/difficulty.js && node --test"
+    "check": "node --check src/index.js && node --check src/fixtures.js && node --check src/difficulty.js && node --check src/certification-report.js && node --check tests/helpers/persist-report.js && node --check ../../scripts/build-threat-lab-certification-report.mjs && node --test"
   },
   "license": "UNLICENSED"
 }

@@ -185,7 +185,24 @@ jobs:
       - name: Install repository dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Run safe local Threat Lab certification matrix
+        env:
+          JB_THREAT_LAB_REPORT_DIR: ${{ runner.temp }}/jb-threat-lab-source-reports
         run: npm run test:threat-lab
+      - name: Build unified Threat Lab certification report
+        env:
+          JB_THREAT_LAB_REPORT_DIR: ${{ runner.temp }}/jb-threat-lab-source-reports
+          JB_THREAT_LAB_CERTIFICATION_OUTPUT: ${{ runner.temp }}/jb-threat-lab-unified-certification-report.v1.json
+        run: node scripts/build-threat-lab-certification-report.mjs
+      - name: Upload unified multi-engine certification evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jb-threat-lab-unified-certification-${{ matrix.os }}-node-${{ matrix.node }}
+          path: |
+            ${{ runner.temp }}/jb-threat-lab-unified-certification-report.v1.json
+            ${{ runner.temp }}/jb-threat-lab-source-reports/*.json
+          if-no-files-found: error
+          retention-days: 30
 
   security-guard:
     name: Security Guard tests / ${{ matrix.os }} / Node ${{ matrix.node }}

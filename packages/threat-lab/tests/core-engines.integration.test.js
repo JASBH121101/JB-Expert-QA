@@ -1,4 +1,5 @@
 import test from "node:test";
+import { persistThreatLabReport } from "./helpers/persist-report.js";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -749,6 +750,7 @@ return [
       productionTargets: false
     }
   });
+  await persistThreatLabReport(report, "core-engines");
 
   assert.equal(report.totals.fail, 0, JSON.stringify(report.results.filter((item) => item.status === "fail"), null, 2));
   assert.equal(report.totals.pass, scenarios.length);

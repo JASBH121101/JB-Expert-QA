@@ -1,4 +1,5 @@
 import test from "node:test";
+import { persistThreatLabReport } from "./helpers/persist-report.js";
 import assert from "node:assert/strict";
 import { createThreatLab } from "../src/index.js";
 import {
@@ -371,6 +372,7 @@ test("JB Threat Lab validates Advisor Engine against deterministic offline fixtu
     ],
     metadata: { profile: "advisor-local-fixtures", networkRequests: 0 }
   });
+  await persistThreatLabReport(report, "advisor-engine");
 
   assert.deepEqual(report.totals, { pass: 6, fail: 0, skip: 0 });
   assert.equal(report.results.length, 6);
