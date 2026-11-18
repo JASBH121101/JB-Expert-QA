@@ -167,6 +167,24 @@ async function main() {
   assert.equal(revisionAnchorFirst.durable, true);
   assert.equal(revisionAnchorFirst.atomicCompareAndSwap, true);
 
+  await runCase("PostgreSQL A2 revision anchor rejects a replaced monotonicity trigger function", async () => {
+    await pool.query(
+      "CREATE OR REPLACE FUNCTION public.jb_resilience_a2_anchor_guard_mutation() " +
+      "RETURNS trigger LANGUAGE plpgsql AS $a2tamper$ BEGIN RETURN NEW; END; $a2tamper$"
+    );
+    await assert.rejects(
+      revisionAnchorSecond.verify(),
+      /trigger function is missing or incompatible/,
+      "an enabled trigger pointing to a no-op body must not be accepted"
+    );
+
+    // initialize() owns the canonical function definition and repairs it before
+    // subsequent cases continue; verify() must then accept the restored body.
+    await revisionAnchorFirst.initialize();
+    const restored = await revisionAnchorSecond.verify();
+    assert.equal(restored.verified, true);
+  });
+
   await runCase("PostgreSQL A2 external revision anchor uses atomic cross-Pool compare-and-swap", async () => {
     const ledgerId = "a2-anchor-" + randomUUID();
     const firstInitial = {

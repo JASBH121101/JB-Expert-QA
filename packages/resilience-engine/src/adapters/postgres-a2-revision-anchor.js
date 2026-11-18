@@ -1,5 +1,6 @@
 const REVISION_ANCHOR_SCHEMA = "jb.resilience.a2-revision-anchor/v1";
 const REVISION_ANCHOR_TABLE = "public.jb_resilience_a2_revision_anchors";
+const REVISION_ANCHOR_TRIGGER_FUNCTION = "jb_resilience_a2_anchor_guard_mutation";
 const LEDGER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -201,6 +202,12 @@ export function createPostgresA2RevisionAnchor({
     if (!primaryKey.includes("primarykey(ledger_id)")) {
       throw new Error("A2 PostgreSQL revision-anchor primary key must bind ledger_id");
     }
+    const ledgerIdDefinition = constraints.get("jb_resilience_a2_anchor_ledger_id_check").definition
+      .toLowerCase().replace(/\s+/g, "");
+    if (!ledgerIdDefinition.includes("^[a-za-z0-9][a-za-z0-9_.:@/-]{0,127}$")) {
+      throw new Error("A2 PostgreSQL revision-anchor ledger ID constraint is incompatible");
+    }
+
     const schemaDefinition = constraints.get("jb_resilience_a2_anchor_schema_check").definition;
     if (!schemaDefinition.includes(REVISION_ANCHOR_SCHEMA)) {
       throw new Error("A2 PostgreSQL revision-anchor schema constraint is incompatible");
@@ -232,6 +239,42 @@ export function createPostgresA2RevisionAnchor({
         !triggerDefinition.includes("delete") ||
         !triggerDefinition.includes("jb_resilience_a2_anchor_guard_mutation")) {
       throw new Error("A2 PostgreSQL revision-anchor monotonic tombstone trigger is missing or disabled");
+    }
+
+    // A trigger can remain enabled and keep the expected name while its
+    // underlying function has been replaced with a permissive no-op. Verify
+    // the deployed PL/pgSQL body as well as the trigger metadata.
+    const guardFunctionResult = await client.query(
+      "SELECT l.lanname, p.prorettype = 'trigger'::regtype AS returns_trigger, " +
+      "p.prosecdef, p.prosrc " +
+      "FROM pg_proc p " +
+      "JOIN pg_namespace n ON n.oid=p.pronamespace " +
+      "JOIN pg_language l ON l.oid=p.prolang " +
+      "WHERE n.nspname='public' AND p.proname=$1 AND p.pronargs=0",
+      [REVISION_ANCHOR_TRIGGER_FUNCTION]
+    );
+    if (guardFunctionResult.rowCount !== 1) {
+      throw new Error("A2 PostgreSQL revision-anchor trigger function is missing or ambiguous");
+    }
+    const guardFunction = guardFunctionResult.rows[0];
+    const guardSource = typeof guardFunction.prosrc === "string"
+      ? guardFunction.prosrc.toLowerCase().replace(/\s+/g, " ")
+      : "";
+    const requiredGuardFragments = [
+      "if tg_op = 'delete' then",
+      "elsif tg_op = 'insert' then",
+      "new.revision <> 0",
+      "new.ledger_id <> old.ledger_id",
+      "new.state_schema <> old.state_schema",
+      "new.revision <> old.revision + 1",
+      "raise exception",
+      "return new"
+    ];
+    if (guardFunction.lanname !== "plpgsql" ||
+        guardFunction.returns_trigger !== true ||
+        guardFunction.prosecdef !== false ||
+        requiredGuardFragments.some((fragment) => !guardSource.includes(fragment))) {
+      throw new Error("A2 PostgreSQL revision-anchor trigger function is missing or incompatible");
     }
   }
 
