@@ -123,9 +123,8 @@ test("unsupported signatures are rejected and never promoted", async () => {
     (error) => error instanceof UploadInspectionError && error.code === "UNSUPPORTED_TYPE"
   );
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 1);
-  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
-  assert.equal(store.calls.some(([name]) => name === "delete"), false);
+  assert.equal(store.quarantine.size, 0);
+  assert.ok(store.calls.some(([name]) => name === "delete"));
 });
 
 test("declared MIME type and filename extension must agree with detected bytes", async () => {
@@ -649,8 +648,9 @@ test("a stalled security bridge cannot delay local rejection of a malicious uplo
   );
 
   assert.equal(store.approved.size, 0);
-  assert.equal(store.quarantine.size, 0);
-  assert.ok(store.calls.some(([name]) => name === "delete"));
+  assert.equal(store.quarantine.size, 1);
+  assert.equal([...store.quarantine.values()][0].equals(PNG), true);
+  assert.equal(store.calls.some(([name]) => name === "delete"), false);
 });
 
 
