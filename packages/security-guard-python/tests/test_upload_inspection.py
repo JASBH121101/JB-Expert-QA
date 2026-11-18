@@ -120,6 +120,7 @@ class UploadInspectionTests(unittest.TestCase):
         self.assertGreaterEqual(attestation["scannedAtMs"], 0)
         self.assertRegex(result["scannedAt"], r"^\d{4}-\d{2}-\d{2}T.*Z$")
         self.assertEqual(storage.approved[result["uploadId"]], PNG)
+        self.assertEqual(storage.approved_attestations[result["uploadId"]], attestation)
         self.assertEqual(storage.quarantine, {})
 
     def test_extension_and_declared_mime_mismatches_are_rejected(self):
