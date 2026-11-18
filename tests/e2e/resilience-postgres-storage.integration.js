@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import {
   createPostgresResilienceStorageAdapter,
-  createPostgresA2ActionLedger
+  createPostgresA2ActionLedger,
+  createPostgresA2RevisionAnchor
 } from "../../packages/resilience-engine/src/adapters/postgres-storage.js";
 import {
   createTrustedSignalGateway,
@@ -134,6 +135,123 @@ async function main() {
     { initialized: true, dialect: "postgresql", schemaVersion: 1 },
     { initialized: true, dialect: "postgresql", schemaVersion: 1 }
   ]);
+
+  const revisionAnchorFirst = createPostgresA2RevisionAnchor({ pool });
+  const revisionAnchorSecond = createPostgresA2RevisionAnchor({ pool: a2SecondaryPool });
+  assert.throws(() => createPostgresA2RevisionAnchor({ pool, connectionTimeoutMs: 50 }),
+    /connectionTimeoutMs is invalid/);
+  await assert.rejects(
+    revisionAnchorFirst.read({ ledgerId: "a2-anchor-before-init" }),
+    /not initialized/
+  );
+  const revisionAnchorInitialization = await Promise.all([
+    revisionAnchorFirst.initialize(),
+    revisionAnchorSecond.initialize()
+  ]);
+  assert.deepEqual(revisionAnchorInitialization.map((value) => ({
+    initialized: value.initialized,
+    dialect: value.dialect,
+    schemaVersion: value.schemaVersion
+  })), [
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 },
+    { initialized: true, dialect: "postgresql", schemaVersion: 1 }
+  ]);
+  assert.equal(revisionAnchorFirst.durable, true);
+
+  await runCase("PostgreSQL A2 external revision anchor uses atomic cross-Pool compare-and-swap", async () => {
+    const ledgerId = "a2-anchor-" + randomUUID();
+    const firstInitial = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 0,
+      ledgerSha256: "a".repeat(64)
+    };
+    const secondInitial = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 0,
+      ledgerSha256: "b".repeat(64)
+    };
+    assert.equal(await revisionAnchorFirst.read({ ledgerId }), null);
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: null,
+        next: { ...firstInitial, revision: 1 }
+      }),
+      /start at revision zero/
+    );
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: null,
+        next: { ...firstInitial, ledgerSha256: "invalid" }
+      }),
+      /malformed/
+    );
+    await assert.rejects(
+      revisionAnchorFirst.read({ ledgerId: "../escape" }),
+      /invalid/
+    );
+
+    const initialResults = await Promise.all([
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId, expected: null, next: firstInitial
+      }),
+      revisionAnchorSecond.compareAndSwap({
+        ledgerId, expected: null, next: secondInitial
+      })
+    ]);
+    assert.equal(initialResults.filter(Boolean).length, 1,
+      "only one concurrent initializer may create a revision-zero anchor");
+    const initialState = await revisionAnchorSecond.read({ ledgerId });
+    assert.ok(canonicalA2(initialState) === canonicalA2(firstInitial) ||
+      canonicalA2(initialState) === canonicalA2(secondInitial));
+
+    const nextA = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 1,
+      ledgerSha256: "c".repeat(64)
+    };
+    const nextB = {
+      schema: "jb.resilience.a2-revision-anchor/v1",
+      revision: 1,
+      ledgerSha256: "d".repeat(64)
+    };
+    await assert.rejects(
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId,
+        expected: initialState,
+        next: { ...nextA, revision: 2 }
+      }),
+      /advance exactly one revision/
+    );
+    const updateResults = await Promise.all([
+      revisionAnchorFirst.compareAndSwap({
+        ledgerId, expected: initialState, next: nextA
+      }),
+      revisionAnchorSecond.compareAndSwap({
+        ledgerId, expected: initialState, next: nextB
+      })
+    ]);
+    assert.equal(updateResults.filter(Boolean).length, 1,
+      "only one concurrent writer may advance a matching anchor revision");
+    const finalState = await revisionAnchorFirst.read({ ledgerId });
+    assert.equal(finalState.revision, 1);
+    assert.ok(canonicalA2(finalState) === canonicalA2(nextA) ||
+      canonicalA2(finalState) === canonicalA2(nextB));
+    assert.equal(await revisionAnchorSecond.compareAndSwap({
+      ledgerId, expected: initialState, next: {
+        schema: "jb.resilience.a2-revision-anchor/v1",
+        revision: 1,
+        ledgerSha256: "e".repeat(64)
+      }
+    }), false, "a stale expected state must not advance the anchor");
+    assert.deepEqual(await revisionAnchorSecond.read({ ledgerId }), finalState);
+    await pool.query(
+      "DELETE FROM public.jb_resilience_a2_revision_anchors WHERE ledger_id=$1",
+      [ledgerId]
+    );
+  });
+
 
   await runCase("PostgreSQL A2 Pool connection wait timeout releases a late client", async () => {
     let lateClientReleased = 0;
