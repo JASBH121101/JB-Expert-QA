@@ -49,6 +49,15 @@ function extractProtectedTokens(value) {
   return { urls, emails, markup, numbers };
 }
 
+function suspiciousUnicode(value) {
+  const replacement = [...value].filter((character) => character === "\\uFFFD").length;
+  const controls = [...value.matchAll(CONTROL_CHARACTER_PATTERN)].map((match) =>
+    "U+" + match[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")
+  );
+  const mojibake = MOJIBAKE_PATTERNS.some((pattern) => pattern.test(value));
+  return { replacement, controls, mojibake };
+}
+
 function makeMismatch(key, id, label, sourceTokens, targetTokens, severity = "medium") {
   return Object.freeze({
     id,
@@ -92,6 +101,45 @@ export function auditTranslationSemantics(sourceMap, targetMap, {
     const targetText = targetEntries.get(key);
     const sourceTokens = extractProtectedTokens(sourceText);
     const targetTokens = extractProtectedTokens(targetText);
+
+    const sourceEncoding = suspiciousUnicode(sourceText);
+    const targetEncoding = suspiciousUnicode(targetText);
+    if (targetEncoding.replacement > sourceEncoding.replacement) {
+      findings.push(Object.freeze({
+        id: "corrupted-replacement-character",
+        key,
+        severity: "high",
+        confidence: "mechanical-signal",
+        message: "Target text contains an unexpected Unicode replacement character (U+FFFD), which usually indicates decoding or copy corruption.",
+        details: Object.freeze({
+          sourceCount: sourceEncoding.replacement,
+          targetCount: targetEncoding.replacement
+        })
+      }));
+    }
+    if (targetEncoding.controls.length > sourceEncoding.controls.length) {
+      findings.push(Object.freeze({
+        id: "corrupted-control-character",
+        key,
+        severity: "medium",
+        confidence: "mechanical-signal",
+        message: "Target text contains unexpected non-whitespace control characters.",
+        details: Object.freeze({
+          sourceCodes: Object.freeze(sourceEncoding.controls),
+          targetCodes: Object.freeze(targetEncoding.controls)
+        })
+      }));
+    }
+    if (!sourceEncoding.mojibake && targetEncoding.mojibake) {
+      findings.push(Object.freeze({
+        id: "suspicious-encoding-sequence",
+        key,
+        severity: "medium",
+        confidence: "heuristic-signal",
+        message: "Target text contains a common mojibake pattern; verify its character encoding and original source.",
+        details: Object.freeze({ sourceDetected: false, targetDetected: true })
+      }));
+    }
 
     if (!allowed.has(key) &&
         comparableText(sourceText) === comparableText(targetText) &&
