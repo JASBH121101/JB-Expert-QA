@@ -95,7 +95,8 @@ export function validateSccmInventory(inventory) {
   const nodeById = new Map();
   const expectedNodeKeys = ["id", "name", "level", "parentId", "sourceId", "version", "critical", "dependencies"];
   for (const [index, node] of inventory.nodes.entries()) {
-    if (!exactKeys(node, expectedNodeKeys)) {
+    const scopedNodeKeys = [...expectedNodeKeys, "inScope"];
+    if (!exactKeys(node, expectedNodeKeys) && !exactKeys(node, scopedNodeKeys)) {
       addError(errors, "nodes[" + index + "] has missing or unknown fields");
       continue;
     }
@@ -116,6 +117,9 @@ export function validateSccmInventory(inventory) {
       addError(errors, "nodes[" + index + "].version is invalid");
     }
     if (typeof node.critical !== "boolean") addError(errors, "nodes[" + index + "].critical must be boolean");
+    if (Object.hasOwn(node, "inScope") && typeof node.inScope !== "boolean") {
+      addError(errors, "nodes[" + index + "].inScope must be boolean when provided");
+    }
     if (!Array.isArray(node.dependencies) || node.dependencies.length > 100) {
       addError(errors, "nodes[" + index + "].dependencies must be an array with at most 100 entries");
     } else if (node.dependencies.some((dependency) => typeof dependency !== "string" || !ID_PATTERN.test(dependency))) {
@@ -325,39 +329,45 @@ export function evaluateSccmNode(inventory, history, nodeId) {
     if (cache.has(id)) return cache.get(id);
     if (stack.has(id)) throw new TypeError("SCCM dependency cycle detected during evaluation");
     const node = nodeById.get(id);
+    const inScope = node.inScope !== false;
     const nextStack = new Set(stack).add(id);
     const assessment = latestByNode.get(id) ?? null;
-    const ownStatus = assessment?.status ?? "PENDING";
+    const ownStatus = inScope ? (assessment?.status ?? "PENDING") : "OUT_OF_SCOPE";
     const children = (childrenByParent.get(id) ?? []).map((child) => evaluate(child.id, nextStack));
     const dependencies = node.dependencies.map((dependency) => evaluate(dependency, nextStack));
 
-    const criticalChildFailure = children.some((child) => child.criticalFailure);
-    const criticalChildPending = children.some((child) => child.criticalPending);
-    const dependencyFailure = dependencies.some((dependency) => dependency.status === "FAIL");
-    const dependencyPending = dependencies.some((dependency) => dependency.status !== "PASS");
-    const status = ownStatus === "FAIL" || criticalChildFailure || dependencyFailure
-      ? "FAIL"
-      : ownStatus !== "PASS" || criticalChildPending || dependencyPending
-        ? "PENDING"
-        : "PASS";
+    const scopedChildren = children.filter((child) => child.inScope);
+    const scopedDependencies = dependencies.filter((dependency) => dependency.inScope);
+    const criticalChildFailure = scopedChildren.some((child) => child.criticalFailure);
+    const criticalChildPending = scopedChildren.some((child) => child.criticalPending);
+    const dependencyFailure = scopedDependencies.some((dependency) => dependency.status === "FAIL");
+    const dependencyPending = scopedDependencies.some((dependency) => dependency.status !== "PASS");
+    const status = !inScope
+      ? "OUT_OF_SCOPE"
+      : ownStatus === "FAIL" || criticalChildFailure || dependencyFailure
+        ? "FAIL"
+        : ownStatus !== "PASS" || criticalChildPending || dependencyPending
+          ? "PENDING"
+          : "PASS";
 
     const result = deepFreeze({
       id: node.id,
       name: node.name,
       level: node.level,
       critical: node.critical,
+      inScope,
       status,
       ownStatus,
       version: assessment?.version ?? node.version,
       commitSha: assessment?.commitSha ?? inventory.sources.find((source) => source.id === node.sourceId).commitSha,
       lastAssessmentId: assessment?.assessmentId ?? null,
       evidenceCount: assessment?.evidence.length ?? 0,
-      blockingChildren: children.filter((child) => child.critical && child.status !== "PASS").map((child) => ({ id: child.id, status: child.status })),
-      blockingDependencies: dependencies.filter((dependency) => dependency.status !== "PASS").map((dependency) => ({ id: dependency.id, status: dependency.status })),
-      warnings: children.filter((child) => !child.critical && child.status !== "PASS").map((child) => ({ id: child.id, status: child.status })),
+      blockingChildren: scopedChildren.filter((child) => child.critical && child.status !== "PASS").map((child) => ({ id: child.id, status: child.status })),
+      blockingDependencies: scopedDependencies.filter((dependency) => dependency.status !== "PASS").map((dependency) => ({ id: dependency.id, status: dependency.status })),
+      warnings: scopedChildren.filter((child) => !child.critical && child.status !== "PASS").map((child) => ({ id: child.id, status: child.status })),
       children,
-      criticalFailure: (node.critical && ownStatus === "FAIL") || criticalChildFailure || dependencyFailure,
-      criticalPending: (node.critical && ownStatus === "PENDING") || criticalChildPending || dependencyPending
+      criticalFailure: inScope && ((node.critical && ownStatus === "FAIL") || criticalChildFailure || dependencyFailure),
+      criticalPending: inScope && ((node.critical && ownStatus === "PENDING") || criticalChildPending || dependencyPending)
     });
     cache.set(id, result);
     return result;
@@ -371,23 +381,29 @@ export function buildSccmReport(inventory, history) {
   if (!historyValidation.valid) throw new TypeError("Invalid SCCM history: " + historyValidation.errors.join("; "));
   const roots = inventory.nodes.filter((node) => node.parentId === null);
   const evaluatedRoots = roots.map((node) => evaluateSccmNode(inventory, history, node.id));
-  const counts = Object.fromEntries(LEVELS.map((level) => [level, { PASS: 0, FAIL: 0, PENDING: 0, total: 0 }]));
+  const counts = Object.fromEntries(LEVELS.map((level) => [level, {
+    PASS: 0, FAIL: 0, PENDING: 0, OUT_OF_SCOPE: 0, total: 0, inScope: 0
+  }]));
   function count(node) {
     const bucket = counts[node.level];
     bucket[node.status] += 1;
     bucket.total += 1;
+    if (node.inScope) bucket.inScope += 1;
     for (const child of node.children) count(child);
   }
   for (const root of evaluatedRoots) count(root);
-  const allNodes = LEVELS.reduce((total, level) => total + counts[level].total, 0);
+  const allInScope = LEVELS.reduce((total, level) => total + counts[level].inScope, 0);
   const passed = LEVELS.reduce((total, level) => total + counts[level].PASS, 0);
+  const pending = LEVELS.reduce((total, level) => total + counts[level].PENDING, 0);
+  const failed = LEVELS.reduce((total, level) => total + counts[level].FAIL, 0);
+  const outOfScope = LEVELS.reduce((total, level) => total + counts[level].OUT_OF_SCOPE, 0);
   return deepFreeze({
     schema: "jb.sccm.report/v1",
     inventoryVersion: inventory.inventoryVersion,
     generatedAt: new Date().toISOString(),
     status: evaluatedRoots.every((root) => root.status === "PASS") ? "PASS" :
       evaluatedRoots.some((root) => root.status === "FAIL") ? "FAIL" : "PENDING",
-    progress: { total: allNodes, passed, pending: allNodes - passed - LEVELS.reduce((total, level) => total + counts[level].FAIL, 0), failed: LEVELS.reduce((total, level) => total + counts[level].FAIL, 0) },
+    progress: { total: allInScope, passed, pending, failed, outOfScope },
     counts,
     roots: evaluatedRoots,
     historyEntries: history.length
