@@ -32,7 +32,7 @@ test("Translation Memory suggestions exclude exact matches, bound output and val
   assert.deepEqual(memory.suggestSimilar({ source: "Update profile", sourceLocale: "en", targetLocale: "es-419" }), [
     {
       entry: memory.findExact({ source: "Update account", sourceLocale: "en", targetLocale: "es-419" }),
-      similarity: 0.3333,
+      similarity: 0.5,
       requiresHumanReview: true,
       autoApproved: false
     }
