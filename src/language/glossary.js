@@ -47,12 +47,12 @@ function escapeRegExp(value) {
 function compileTerm(term) {
   return Object.freeze({
     term,
-    pattern: new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(term.toLocaleLowerCase()) + "($|[^\\p{L}\\p{N}])", "u")
+    pattern: new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(term.toLowerCase()) + "($|[^\\p{L}\\p{N}])", "u")
   });
 }
 
 function findTerm(text, compiledTerms) {
-  const normalized = text.toLocaleLowerCase();
+  const normalized = text.toLowerCase();
   return compiledTerms.find((entry) => entry.pattern.test(normalized))?.term ?? null;
 }
 
@@ -69,18 +69,58 @@ export class LanguageLibrary {
     if (!Array.isArray(glossary) || glossary.length > 1000) {
       throw new TypeError("glossary must be an array of at most 1000 terms");
     }
+    const ids = new Set();
     this.glossary = Object.freeze(glossary.map((entry) => {
-      if (!entry || typeof entry.id !== "string" || !entry.id.trim()) {
-        throw new TypeError("each glossary entry requires a non-empty id");
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new TypeError("each glossary entry requires a plain record");
       }
-      const snapshot = { ...entry };
-      for (const key of ["en", "es419"]) {
-        const terms = entry[key] ?? [];
-        if (!Array.isArray(terms) || terms.length > 100 ||
-            terms.some((term) => typeof term !== "string" || !term.trim())) {
-          throw new TypeError("glossary " + key + " terms must be non-empty strings");
+      const idDescriptor = Object.getOwnPropertyDescriptor(entry, "id");
+      if (!idDescriptor || !Object.hasOwn(idDescriptor, "value") ||
+          typeof idDescriptor.value !== "string" || !idDescriptor.value.trim()) {
+        throw new TypeError("each glossary entry requires a data-property id");
+      }
+      if (ids.has(idDescriptor.value)) throw new TypeError("glossary entry ids must be unique");
+      ids.add(idDescriptor.value);
+      if (typeof entry !== "object" || Array.isArray(entry)) {
+        throw new TypeError("each glossary entry must be a plain record");
+      }
+      const prototype = Object.getPrototypeOf(entry);
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new TypeError("each glossary entry must be a plain record");
+      }
+      if (Object.getOwnPropertySymbols(entry).length > 0) {
+        throw new TypeError("glossary entries must not contain symbol keys");
+      }
+      const descriptors = Object.getOwnPropertyDescriptors(entry);
+      const snapshot = Object.create(null);
+      for (const property of Object.keys(descriptors)) {
+        const descriptor = descriptors[property];
+        if (!descriptor.enumerable) continue;
+        if (!Object.hasOwn(descriptor, "value")) {
+          throw new TypeError("glossary entries must not contain accessor properties");
         }
-        snapshot[key] = Object.freeze(terms.map((term) => term.trim()));
+        if (property === "__proto__" || property === "prototype" || property === "constructor") {
+          throw new TypeError("glossary entries cannot contain prototype-sensitive keys");
+        }
+        snapshot[property] = descriptor.value;
+      }
+      for (const key of ["en", "es419"]) {
+        const terms = snapshot[key] ?? [];
+        if (!Array.isArray(terms) || terms.length > 100 || Object.getOwnPropertySymbols(terms).length > 0) {
+          throw new TypeError("glossary " + key + " terms must be a safe array of at most 100 terms");
+        }
+        const copiedTerms = [];
+        for (let index = 0; index < terms.length; index += 1) {
+          const descriptor = Object.getOwnPropertyDescriptor(terms, String(index));
+          if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+            throw new TypeError("glossary " + key + " terms must not contain holes or accessor properties");
+          }
+          if (typeof descriptor.value !== "string" || !descriptor.value.trim() || descriptor.value.length > 120) {
+            throw new TypeError("glossary " + key + " terms must be non-empty strings of at most 120 characters");
+          }
+          copiedTerms.push(descriptor.value.trim());
+        }
+        snapshot[key] = Object.freeze(copiedTerms);
       }
       return Object.freeze(snapshot);
     }));

@@ -47,3 +47,39 @@ test("glossary suggestion and consistency checks remain deterministic after cach
   const findings = library.validateTermConsistency("Save invoice", "Guardar factura", options);
   assert.deepEqual(findings, []);
 });
+
+
+test("glossary snapshots reject accessor-backed entries and term arrays without invoking getters", () => {
+  let entryInvoked = false;
+  const accessorEntry = { es419: ["guardar"] };
+  Object.defineProperty(accessorEntry, "en", {
+    enumerable: true,
+    get() { entryInvoked = true; return ["save"]; }
+  });
+  assert.throws(() => new LanguageLibrary({ glossary: [{ id: "safe", en: ["save"], es419: ["guardar"] }, accessorEntry] }),
+    /data-property id|accessor properties/);
+  assert.equal(entryInvoked, false);
+
+  let termInvoked = false;
+  const accessorTerms = [];
+  Object.defineProperty(accessorTerms, "0", {
+    enumerable: true,
+    configurable: true,
+    get() { termInvoked = true; return "save"; }
+  });
+  accessorTerms.length = 1;
+  assert.throws(() => new LanguageLibrary({ glossary: [{ id: "safe", en: accessorTerms, es419: ["guardar"] }] }),
+    /holes or accessor properties/);
+  assert.equal(termInvoked, false);
+});
+
+test("glossary locale matching is independent of host default locale and ids are unique", () => {
+  assert.throws(() => new LanguageLibrary({ glossary: [
+    { id: "duplicate", en: ["save"], es419: ["guardar"] },
+    { id: "duplicate", en: ["update"], es419: ["actualizar"] }
+  ] }), /ids must be unique/);
+  const library = new LanguageLibrary();
+  assert.ok(library.suggestTranslation("UPDATE customer order", {
+    sourceLocale: "en-US", targetLocale: "es-NI"
+  }).suggestions.some(item => item.termId === "update"));
+});
