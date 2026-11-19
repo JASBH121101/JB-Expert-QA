@@ -57,7 +57,7 @@ test("glossary snapshots reject accessor-backed entries and term arrays without 
     get() { entryInvoked = true; return ["save"]; }
   });
   assert.throws(() => new LanguageLibrary({ glossary: [{ id: "safe", en: ["save"], es419: ["guardar"] }, accessorEntry] }),
-    /non-empty id|accessor properties/);
+    /data-property id|accessor properties/);
   assert.equal(entryInvoked, false);
 
   let termInvoked = false;
