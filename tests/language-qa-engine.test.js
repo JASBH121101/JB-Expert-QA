@@ -650,3 +650,42 @@ test("glossary review avoids false language findings when no locale pair diction
     targetLocale: "fr-FR"
   }), []);
 });
+
+test("locale canonicalization is stable across case, separators and safe fallback", () => {
+  assert.equal(normalizeLocale("ES_ni"), "es-NI");
+  assert.equal(normalizeLocale("pt_br"), "pt-BR");
+  assert.equal(normalizeLocale("EN_gb"), "en-GB");
+  assert.equal(normalizeLocale("fr-ca"), "fr-FR");
+  assert.equal(normalizeLocale("es-US"), null);
+  assert.equal(normalizeLocale("zh-Hans-CN"), null);
+  assert.equal(normalizeLocale("en-US-u-ca-gregory"), null);
+  assert.equal(normalizeLocale(""), null);
+  assert.equal(normalizeLocale(null), null);
+  assert.equal(resolveLocale("fr-CA", "en-GB"), "fr-FR");
+  assert.equal(resolveLocale("zh-Hans-CN", "en-GB"), "en-GB");
+});
+
+test("glossary suggestions and consistency checks support regional English and Spanish aliases", () => {
+  const library = new LanguageLibrary();
+  const regionalSuggestion = library.suggestTranslation("Update the product price", {
+    sourceLocale: "en-GB",
+    targetLocale: "es-NI"
+  });
+  assert.ok(regionalSuggestion.suggestions.some((item) => item.termId === "product"));
+  assert.ok(regionalSuggestion.suggestions.some((item) => item.termId === "price"));
+  assert.equal(regionalSuggestion.autoApproved, false);
+
+  const regionalConsistency = library.validateTermConsistency("Actualizar el producto", "Update the product", {
+    sourceLocale: "es-MX",
+    targetLocale: "en-GB"
+  });
+  assert.deepEqual(regionalConsistency, []);
+
+  const unsupportedPair = library.suggestTranslation("Update product", {
+    sourceLocale: "pt-BR",
+    targetLocale: "fr-FR"
+  });
+  assert.deepEqual(unsupportedPair.suggestions, []);
+  assert.equal(unsupportedPair.requiresHumanReview, true);
+  assert.equal(unsupportedPair.autoApproved, false);
+});
