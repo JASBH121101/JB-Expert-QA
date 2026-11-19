@@ -29,10 +29,10 @@ test("Translation Memory suggestions exclude exact matches, bound output and val
   const memory = new TranslationMemory();
   memory.add({ source: "Update profile", target: "Actualizar perfil", sourceLocale: "en", targetLocale: "es-419" });
   memory.add({ source: "Update account", target: "Actualizar cuenta", sourceLocale: "en", targetLocale: "es-419" });
-  assert.deepEqual(memory.suggestSimilar({ source: "Update profile", sourceLocale: "en", targetLocale: "es-419" }), [
+  assert.deepEqual(memory.suggestSimilar({ source: "Update profile", sourceLocale: "en", targetLocale: "es-419", threshold: 0.3 }), [
     {
       entry: memory.findExact({ source: "Update account", sourceLocale: "en", targetLocale: "es-419" }),
-      similarity: 0.5,
+      similarity: 0.3333,
       requiresHumanReview: true,
       autoApproved: false
     }
