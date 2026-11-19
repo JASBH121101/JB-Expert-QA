@@ -189,7 +189,7 @@ export class TranslationMemory {
       for (const token of queryTokens) if (candidateTokens.has(token)) intersection += 1;
       const union = queryTokens.size + candidateTokens.size - intersection;
       const similarity = union ? intersection / union : 0;
-      if (similarity >= threshold && similarity < 1) {
+      if (similarity > 0 && similarity >= threshold && similarity < 1) {
         candidates.push({
           entry,
           similarity: Number(similarity.toFixed(4)),
