@@ -1,6 +1,7 @@
 function severityFor(id, fallback = "medium") {
   if (id === "missing-key" || id === "placeholder-mismatch" || id === "resource-parse-error" || id === "missing-locale-file") return "high";
-  if (id === "empty-value" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence") return "medium";
+  if (id === "empty-value" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence" || id === "untranslated-marker" || id === "mojibake") return "medium";
+  if (id === "repeated-function-word") return "low";
   if (id === "corrupted-replacement-character") return "high";
   if (id === "glossary-review" || id === "obsolete-key" || id === "target-file-without-source") return "low";
   return fallback;
@@ -42,6 +43,9 @@ function titleFor(id) {
     "protected-email-mismatch": "Translation email differs from source",
     "protected-markup-mismatch": "Translation markup structure differs",
     "protected-number-mismatch": "Translation numeric literal differs",
+    "repeated-function-word": "Repeated function word may be a typo",
+    "untranslated-marker": "Translation contains an unfinished marker",
+    "mojibake": "Translation text may have encoding corruption",
     "corrupted-replacement-character": "Translation contains a Unicode replacement character",
     "corrupted-control-character": "Translation contains an unexpected control character",
     "suspicious-encoding-sequence": "Translation may contain mojibake or encoding corruption",
@@ -70,6 +74,9 @@ function recommendationFor(id) {
   if (id === "protected-url-mismatch" || id === "protected-email-mismatch") return "Verify the link or email destination before approving the localized message.";
   if (id === "protected-markup-mismatch") return "Restore equivalent HTML structure and validate nesting before approval.";
   if (id === "protected-number-mismatch") return "Check the numeric value and use locale-aware formatting where appropriate.";
+  if (id === "repeated-function-word") return "Check whether the repeated common word is a typing error; the signal is advisory and may be intentional.";
+  if (id === "untranslated-marker") return "Replace the unfinished marker with reviewed localized content before release.";
+  if (id === "mojibake") return "Verify the file encoding and repair the corrupted text; preserve the source content for human review.";
   if (id === "corrupted-replacement-character" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence") return "Inspect the original resource encoding and source content, then restore the intended characters. Treat this as a corruption signal, not an automatic rewrite.";
   return "Review the locale resource pair and confirm that public-facing text is complete and appropriate.";
 }
