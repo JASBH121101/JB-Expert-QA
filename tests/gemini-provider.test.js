@@ -14,6 +14,7 @@ test("Gemini text provider sends JSON-mode request and parses the response", asy
   const provider = createGeminiProvider({
     apiKey: "test-secret-key",
     model: "gemini-test-model",
+    billingApproved: true,
     fetchImpl: async (url, options) => {
       capturedUrl = String(url);
       capturedOptions = options;
@@ -37,6 +38,7 @@ test("Gemini provider encodes image bytes only in the request body", async () =>
   let captured;
   const provider = createGeminiProvider({
     apiKey: "test-key",
+    freeTierConfirmed: true,
     fetchImpl: async (_url, options) => {
       captured = JSON.parse(options.body);
       return okResponse({ reviewed: true });
@@ -56,6 +58,7 @@ test("Gemini provider encodes image bytes only in the request body", async () =>
 test("Gemini provider classifies quota failures without retrying", async () => {
   const provider = createGeminiProvider({
     apiKey: "test-key",
+    freeTierConfirmed: true,
     fetchImpl: async () => new Response("{}", { status: 429 })
   });
   await assert.rejects(
@@ -84,6 +87,7 @@ test("Gemini provider blocks missing credentials before making a request", async
 test("Gemini provider rejects malformed JSON output and unsupported image media", async () => {
   const invalidJson = createGeminiProvider({
     apiKey: "test-key",
+    freeTierConfirmed: true,
     fetchImpl: async () => new Response(JSON.stringify({
       candidates: [{ content: { parts: [{ text: "not json" }] } }]
     }), { status: 200 })
@@ -93,7 +97,7 @@ test("Gemini provider rejects malformed JSON output and unsupported image media"
     /not valid JSON/
   );
 
-  const imageProvider = createGeminiProvider({ apiKey: "test-key" });
+  const imageProvider = createGeminiProvider({ apiKey: "test-key", freeTierConfirmed: true });
   await assert.rejects(
     imageProvider.generateJson({
       systemInstruction: "JSON",
@@ -110,6 +114,7 @@ test("Gemini provider uses the configured vision model for image requests", asyn
     apiKey: "test-key",
     model: "gemini-text-test",
     visionModel: "gemini-vision-test",
+    billingApproved: true,
     fetchImpl: async (url) => {
       capturedUrl = String(url);
       return okResponse({ reviewed: true });
@@ -126,4 +131,57 @@ test("Gemini provider uses the configured vision model for image requests", asyn
   assert.match(capturedUrl, /gemini-vision-test:generateContent$/);
   assert.equal(provider.model, "gemini-text-test");
   assert.equal(provider.visionModel, "gemini-vision-test");
+});
+
+
+test("Gemini provider requires an explicit free-tier confirmation or billing approval", async () => {
+  let requests = 0;
+  const unconfirmed = createGeminiProvider({
+    apiKey: "test-key",
+    fetchImpl: async () => {
+      requests += 1;
+      return okResponse({ shouldNotRun: true });
+    }
+  });
+  assert.equal(unconfirmed.isConfigured, false);
+  await assert.rejects(
+    unconfirmed.generateJson({ systemInstruction: "JSON", prompt: "Test" }),
+    (error) => error.code === "provider_not_configured" && /GEMINI_FREE_TIER_CONFIRMED/.test(error.message)
+  );
+  assert.equal(requests, 0);
+
+  const unapprovedOverride = createGeminiProvider({
+    apiKey: "test-key",
+    model: "gemini-custom-paid-model",
+    freeTierConfirmed: true,
+    fetchImpl: async () => {
+      requests += 1;
+      return okResponse({ shouldNotRun: true });
+    }
+  });
+  assert.equal(unapprovedOverride.isConfigured, false);
+  await assert.rejects(
+    unapprovedOverride.generateJson({ systemInstruction: "JSON", prompt: "Test" }),
+    (error) => error.code === "provider_not_configured" && /free-tier allowlist/.test(error.message)
+  );
+  assert.equal(requests, 0);
+});
+
+test("Gemini provider permits a non-allowlisted model only after explicit billing approval", async () => {
+  let requests = 0;
+  const provider = createGeminiProvider({
+    apiKey: "test-key",
+    model: "gemini-custom-model",
+    billingApproved: true,
+    fetchImpl: async () => {
+      requests += 1;
+      return okResponse({ authorized: true });
+    }
+  });
+  assert.equal(provider.isConfigured, true);
+  assert.deepEqual(await provider.generateJson({
+    systemInstruction: "JSON",
+    prompt: "Test"
+  }), { authorized: true });
+  assert.equal(requests, 1);
 });

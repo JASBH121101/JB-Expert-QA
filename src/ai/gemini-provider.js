@@ -1,5 +1,6 @@
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models/";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
+const FREE_TIER_MODELS = new Set([DEFAULT_MODEL]);
 
 function responseText(payload) {
   const parts = payload && payload.candidates && payload.candidates[0] &&
@@ -34,7 +35,9 @@ export function createGeminiProvider({
   visionModel = process.env.GEMINI_VISION_MODEL || model,
   fetchImpl = globalThis.fetch,
   timeoutMs = 30000,
-  maxImageBytes = 5200000
+  maxImageBytes = 5200000,
+  freeTierConfirmed = process.env.GEMINI_FREE_TIER_CONFIRMED === "true",
+  billingApproved = process.env.GEMINI_BILLING_APPROVED === "true"
 } = {}) {
   const key = String(apiKey || "").trim();
   const selectedModel = String(model || "").trim();
@@ -53,11 +56,16 @@ export function createGeminiProvider({
     throw new TypeError("maxImageBytes must be at least 1024");
   }
 
+  const freeTierModelAllowed = FREE_TIER_MODELS.has(selectedModel) &&
+    FREE_TIER_MODELS.has(selectedVisionModel);
+  const usageAuthorized = Boolean(billingApproved || (freeTierConfirmed && freeTierModelAllowed));
+  const isConfigured = Boolean(key && usageAuthorized);
+
   return Object.freeze({
     provider: "google-gemini",
     model: selectedModel,
     visionModel: selectedVisionModel,
-    isConfigured: Boolean(key),
+    isConfigured,
     async generateJson({
       systemInstruction,
       prompt,
@@ -65,8 +73,13 @@ export function createGeminiProvider({
       maxOutputTokens = 1200,
       temperature = 0.15
     } = {}) {
-      if (!key) {
-        const error = new Error("GEMINI_API_KEY is not configured");
+      if (!key || !usageAuthorized) {
+        const reason = !key
+          ? "GEMINI_API_KEY is not configured"
+          : !billingApproved && !freeTierConfirmed
+            ? "Gemini usage requires GEMINI_FREE_TIER_CONFIRMED=true or explicit GEMINI_BILLING_APPROVED=true"
+            : "The selected Gemini model is not in the free-tier allowlist; explicit billing approval is required";
+        const error = new Error(reason);
         error.provider = "google-gemini";
         error.code = "provider_not_configured";
         throw error;
