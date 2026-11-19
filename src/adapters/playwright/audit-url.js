@@ -173,7 +173,7 @@ export async function auditUrl(url, {
 } = {}) {
   if (!["light", "dark"].includes(colorScheme)) throw new TypeError("colorScheme must be light or dark");
   if (targetLanguage !== null &&
-      (typeof targetLanguage !== "string" || !/^(?:es|en)(?:[-_][a-z0-9]+)?$/i.test(targetLanguage.trim()))) {
+      (typeof targetLanguage !== "string" || !/^(?:es|en|ar)(?:[-_][a-z0-9]+)?$/i.test(targetLanguage.trim()))) {
     throw new TypeError("targetLanguage must be es, en, or a supported locale such as es-NI or en-US");
   }
   if (typeof themeTransitionAudit !== "boolean") throw new TypeError("themeTransitionAudit must be a boolean");

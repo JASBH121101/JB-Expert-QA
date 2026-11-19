@@ -10,6 +10,12 @@ const LANGUAGE_MARKERS = Object.freeze({
     "track order", "order history", "shipping address", "payment method",
     "reset password", "your profile"
   ]),
+  ar: Object.freeze([
+    "تسجيل الدخول", "إنشاء حساب", "تسجيل الخروج", "إضافة إلى السلة", "عرض السلة",
+    "إتمام الشراء", "متابعة التسوق", "لا توجد نتائج", "عرض التفاصيل", "اتصل بنا",
+    "حسابي", "حفظ التغييرات", "حذف الحساب", "تأكيد كلمة المرور", "البريد الإلكتروني",
+    "اختر خيارًا", "إعادة تعيين كلمة المرور", "تتبع الطلب", "سجل الطلبات", "طريقة الدفع"
+  ]),
   es: Object.freeze([
     "iniciar sesión", "iniciar sesion", "registrarse", "crear cuenta",
     "cerrar sesión", "cerrar sesion", "agregar al carrito", "añadir al carrito",
@@ -36,7 +42,7 @@ const UI_TEXT_SELECTOR = [
 function normalizeLanguage(value) {
   if (typeof value !== "string") return null;
   const primary = value.trim().toLowerCase().replace("_", "-").split("-")[0];
-  return primary === "en" || primary === "es" ? primary : null;
+  return ["en", "es", "ar"].includes(primary) ? primary : null;
 }
 
 function validatePreservedTerms(value) {
@@ -72,9 +78,17 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
     const language = requested || (() => {
       const declared = document.documentElement.getAttribute("lang") || "";
       const primary = declared.toLowerCase().replace("_", "-").split("-")[0];
-      return primary === "es" || primary === "en" ? primary : null;
+      return primary === "es" || primary === "en" || primary === "ar" ? primary : null;
     })();
     const languageSource = requested ? "option" : (language ? "document-lang" : "undetermined");
+    const expectedDirection = language === "ar" ? "rtl" : "ltr";
+    const computedDirection = getComputedStyle(document.documentElement).direction;
+    const directionAudit = {
+      expected: expectedDirection,
+      declared: document.documentElement.getAttribute("dir") || null,
+      computed: computedDirection,
+      status: language ? (computedDirection === expectedDirection ? "passed" : "review-required") : "skipped"
+    };
     const ignored = (element) =>
       element.closest("[data-localization-ignore],pre,code,kbd,samp,script,style,noscript") !== null;
     const stripTerms = (value) => {
@@ -84,11 +98,12 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
     };
     const findMarker = (value) => {
       const candidate = stripTerms(clean(value));
-      const opposite = language === "es" ? "en" : "es";
-      const phrases = markerMap[opposite] || [];
-      return phrases.find((phrase) => candidate.includes(phrase))
-        ? { language: opposite, marker: phrases.find((phrase) => candidate.includes(phrase)) }
-        : null;
+      for (const [candidateLanguage, phrases] of Object.entries(markerMap)) {
+        if (candidateLanguage === language) continue;
+        const marker = phrases.find((phrase) => candidate.includes(phrase));
+        if (marker) return { language: candidateLanguage, marker };
+      }
+      return null;
     };
 
     const localizationFindings = [];
@@ -239,11 +254,11 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
       viewport: { width: window.innerWidth, height: window.innerHeight },
       localizationAudit: {
         status: language ? "checked" : "skipped",
-        language, languageSource, supportedLanguages: ["es", "en"],
-        preservedTerms, textsInspected, findings: localizationFindings,
+        language, languageSource, supportedLanguages: ["es", "en", "ar"],
+        preservedTerms, textsInspected, findings: localizationFindings, directionAudit,
         note: language
           ? "Deterministic phrase matching flags high-confidence opposite-language UI strings; ambiguous wording requires review."
-          : "Set html lang to es or en, or pass targetLanguage to audit localization."
+          : "Set html lang to es, en or ar, or pass targetLanguage to audit localization."
       },
       layoutIntegrity: {
         clippedText, clippedByAncestor, containerMetrics,

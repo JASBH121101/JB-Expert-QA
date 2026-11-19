@@ -89,6 +89,29 @@ export const layoutIntegrityRules = [
   }
   ,
   {
+    id: "ui-ux.localization-direction",
+    specialist: "ui-ux",
+    evaluate(context) {
+      const audit = context.localizationAudit?.directionAudit;
+      if (!audit || audit.status !== "review-required") return [];
+      return [{
+        id: "UIUX-013",
+        title: "Document text direction does not match the selected language",
+        description: "The selected language expects " + audit.expected.toUpperCase() +
+          " text direction, but the document computes to " + audit.computed.toUpperCase() + ".",
+        severity: "high",
+        location: "html",
+        evidence: {
+          kind: "localization-direction",
+          expectedDirection: audit.expected,
+          computedDirection: audit.computed,
+          declaredDirection: audit.declared
+        },
+        recommendation: "Set lang=ar and dir=rtl on the html element for Arabic, then review text alignment, reading order, navigation and mixed-direction numbers/URLs."
+      }];
+    }
+  },
+  {
     id: "ui-ux.constrained-primary-container",
     specialist: "ui-ux",
     evaluate(context) {
