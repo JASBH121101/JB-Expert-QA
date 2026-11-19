@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 91);
+  assert.equal(history.length, 103);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const sourceId = node && (entry.sourceId ?? node.sourceId);
@@ -279,7 +279,7 @@ test("Localization Engine branch and subbranch are PASS with historical CLDR dep
   assert.equal(engine.status, "PASS");
 });
 
-test("Visual QA branch and module pass while uncertified sibling branches keep Expert QA pending", () => {
+test("Expert QA is PASS after all critical branches pass while the wider ecosystem remains pending", () => {
   const visual = evaluateSccmNode(inventory, history, "jb.expert-qa.visual.module");
   const visualBranch = evaluateSccmNode(inventory, history, "jb.expert-qa.visual");
   const expert = evaluateSccmNode(inventory, history, "jb.expert-qa");
@@ -289,7 +289,7 @@ test("Visual QA branch and module pass while uncertified sibling branches keep E
   assert.equal(visualBranch.children[0].status, "PASS");
   assert.equal(visual.blockingChildren.length, 0);
   assert.equal(expert.ownStatus, "PASS");
-  assert.equal(expert.status, "PENDING");
+  assert.equal(expert.status, "PASS");
   assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
 });
 
@@ -302,7 +302,7 @@ test("Security QA branch, static-analysis subbranch and module are PASS within t
   assert.equal(module.status, "PASS");
   assert.equal(module.children.length, 3);
   assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
-  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
 });
 
 test("Resilience A2 subbranch passes while the whole engine remains pending for other branches", () => {
@@ -336,7 +336,7 @@ test("Currency QA hierarchy passes at component, module, subbranch and branch le
   assert.equal(branch.status, "PASS");
   assert.equal(module.children.length, 3);
   assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
-  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
 });
 
 test("Database QA PostgreSQL integration hierarchy passes without certifying unsupported adapters", () => {
@@ -348,7 +348,7 @@ test("Database QA PostgreSQL integration hierarchy passes without certifying uns
   assert.equal(branch.status, "PASS");
   assert.equal(module.children.length, 3);
   assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
-  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
   assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
 });
 
@@ -361,7 +361,7 @@ test("Package QA distribution hierarchy is PASS on the clean consumer install ma
   assert.equal(branch.status, "PASS");
   assert.equal(module.children.length, 3);
   assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
-  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
 });
 
 test("Resilience A1 is certified while A2 and A3 stay bounded to laboratory components", () => {
@@ -437,10 +437,37 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 44);
+  assert.equal(report.counts.component.PASS, 50);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
+});
+
+ 
+test("Regression and Core QA hierarchies pass within their declared parser and fixture coverage", () => {
+  const regression = evaluateSccmNode(inventory, history, "jb.expert-qa.regression");
+  const regressionModule = evaluateSccmNode(inventory, history, "jb.expert-qa.regression.module");
+  const regressionComponents = regressionModule.children;
+  assert.equal(regression.status, "PASS");
+  assert.equal(regression.children[0].status, "PASS");
+  assert.equal(regressionModule.status, "PASS");
+  assert.equal(regressionComponents.length, 3);
+  assert.ok(regressionComponents.every((component) =>
+    component.status === "PASS" && component.ownStatus === "PASS"
+  ));
+
+  const core = evaluateSccmNode(inventory, history, "jb.expert-qa.core");
+  const coreSubbranch = evaluateSccmNode(inventory, history, "jb.expert-qa.core.analysis-core");
+  const coreModule = evaluateSccmNode(inventory, history, "jb.expert-qa.core.module");
+  const coreRules = evaluateSccmNode(inventory, history, "jb.expert-qa.core.rules");
+  const coreFindings = evaluateSccmNode(inventory, history, "jb.expert-qa.core.findings");
+  const coreParser = evaluateSccmNode(inventory, history, "jb.expert-qa.core.parser");
+  assert.equal(coreRules.status, "PASS");
+  assert.equal(coreFindings.status, "PASS");
+  assert.equal(coreParser.status, "PASS");
+  assert.equal(coreModule.status, "PASS");
+  assert.equal(coreSubbranch.status, "PASS");
+  assert.equal(core.status, "PASS");
 });
 
 test("history validation fails closed on malformed entries rather than throwing", () => {
