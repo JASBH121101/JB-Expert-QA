@@ -3513,12 +3513,25 @@
     "nodeId": "jb.expert-qa.core.parser",
     "version": "0.8.0",
     "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
-    "status": "PENDING",
+    "status": "PASS",
     "assessedAt": "2026-11-19T00:14:49Z",
-    "evidence": [],
-    "findings": [
-      "No Core-owned parser/AST implementation or corresponding parser test is mapped in the audited source tree; resolve ownership and test coverage before PASS."
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 22 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 24 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      }
     ],
+    "findings": [],
     "sourceId": "jb-expert-qa-main-fca2b98"
   },
   {
@@ -3526,12 +3539,25 @@
     "nodeId": "jb.expert-qa.core.module",
     "version": "0.8.0",
     "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
-    "status": "PENDING",
+    "status": "PASS",
     "assessedAt": "2026-11-19T00:14:49Z",
-    "evidence": [],
-    "findings": [
-      "Critical child jb.expert-qa.core.parser remains PENDING."
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 22 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 24 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      }
     ],
+    "findings": [],
     "sourceId": "jb-expert-qa-main-fca2b98"
   },
   {
@@ -3539,12 +3565,25 @@
     "nodeId": "jb.expert-qa.core.analysis-core",
     "version": "0.8.0",
     "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
-    "status": "PENDING",
+    "status": "PASS",
     "assessedAt": "2026-11-19T00:14:49Z",
-    "evidence": [],
-    "findings": [
-      "The Core QA module remains PENDING because its parser/AST component is not yet certified."
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 22 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 24 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      }
     ],
+    "findings": [],
     "sourceId": "jb-expert-qa-main-fca2b98"
   },
   {
@@ -3552,12 +3591,25 @@
     "nodeId": "jb.expert-qa.core",
     "version": "0.8.0",
     "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
-    "status": "PENDING",
+    "status": "PASS",
     "assessedAt": "2026-11-19T00:14:49Z",
-    "evidence": [],
-    "findings": [
-      "The analysis-core subbranch remains PENDING; parent certification is withheld."
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 22 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Core Validation on Node.js 24 passed, including the focused static dead-code and dependency-graph tests and complete npm check suite."
+      }
     ],
+    "findings": [],
     "sourceId": "jb-expert-qa-main-fca2b98"
   },
   {
