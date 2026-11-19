@@ -70,7 +70,13 @@ export class LanguageLibrary {
       throw new TypeError("glossary must be an array of at most 1000 terms");
     }
     const ids = new Set();
-    this.glossary = Object.freeze(glossary.map((entry) => {
+    const glossarySnapshot = [];
+    for (let index = 0; index < glossary.length; index += 1) {
+      const entryDescriptor = Object.getOwnPropertyDescriptor(glossary, String(index));
+      if (!entryDescriptor || !Object.hasOwn(entryDescriptor, "value")) {
+        throw new TypeError("glossary must not contain holes or accessor properties");
+      }
+      const entry = entryDescriptor.value;
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
         throw new TypeError("each glossary entry requires a plain record");
       }
@@ -122,8 +128,9 @@ export class LanguageLibrary {
         }
         snapshot[key] = Object.freeze(copiedTerms);
       }
-      return Object.freeze(snapshot);
-    }));
+      glossarySnapshot.push(Object.freeze(snapshot));
+    }
+    this.glossary = Object.freeze(glossarySnapshot);
   }
 
   #compiledTerms(fromKey, toKey) {
