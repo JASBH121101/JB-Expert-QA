@@ -1,4 +1,4 @@
-name: Language QA glossary performance validation
+name: Language QA glossary coverage and performance validation
 
 on:
   pull_request:
@@ -6,14 +6,14 @@ on:
     paths:
       - "src/language/glossary.js"
       - "tests/language-qa-glossary-performance.test.js"
-      - "bench/language-qa.js"
+      - "bench/glossary-matchers.js"
       - ".github/workflows/language-qa-glossary.yml"
   push:
-    branches: [main, "feature/language-qa-glossary-performance-v1"]
+    branches: [main, "feature/language-qa-glossary-performance-v2"]
     paths:
       - "src/language/glossary.js"
       - "tests/language-qa-glossary-performance.test.js"
-      - "bench/language-qa.js"
+      - "bench/glossary-matchers.js"
       - ".github/workflows/language-qa-glossary.yml"
 
 permissions:
@@ -31,5 +31,5 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - run: node --test tests/language-qa-glossary-performance.test.js tests/language-qa-engine.test.js
+      - run: npm run test:language-qa
       - run: npm run benchmark:language-qa -- --iterations=25
