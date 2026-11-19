@@ -6054,5 +6054,31 @@
     ],
     "findings": [],
     "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.jb.expert-qa.language.linguistic-signals.20261119",
+    "nodeId": "jb.expert-qa.language.linguistic-signals",
+    "version": "0.8.0",
+    "sourceId": "jb-expert-qa-pr208-language-signals",
+    "commitSha": "ab6072e3d2404c30b39381e378a029fb22847f20",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:15:41.886Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44625540682",
+        "commitSha": "ab6072e3d2404c30b39381e378a029fb22847f20",
+        "outcome": "success",
+        "summary": "Dedicated Language QA validation passed on Node.js 22 and 24, including linguistic-signal regression tests and deterministic benchmark."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44625540437",
+        "commitSha": "ab6072e3d2404c30b39381e378a029fb22847f20",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed across the engine matrix, package boundaries, Resilience lab and six-tier Threat Lab certification."
+      }
+    ],
+    "findings": []
   }
 ]
