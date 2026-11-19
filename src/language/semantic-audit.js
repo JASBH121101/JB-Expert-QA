@@ -4,6 +4,8 @@ const URL_PATTERN = /https?:\/\/[^\s<>"']+/giu;
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu;
 const MARKUP_PATTERN = /<\s*(\/?)\s*([A-Z][\w:-]*)\b[^>]*>/giu;
 const NUMBER_PATTERN = /(?<![\p{L}\p{N}_])[-+]?\d+(?:[.,]\d+)*(?:\s?%)?(?![\p{L}\p{N}_])/gu;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
+const MOJIBAKE_PATTERNS = Object.freeze([/Ã[\u0080-\u00BF]/u, /Â[\u0080-\u00BF]/u, /â€[™œž]/u, /ðŸ/u]);
 
 function readFlatEntries(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
