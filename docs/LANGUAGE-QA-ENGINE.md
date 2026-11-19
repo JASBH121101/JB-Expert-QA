@@ -45,7 +45,7 @@ The PHP parser accepts only a static returned associative array made of literal 
 
 The tool does not translate arbitrary text with an AI provider. Glossary suggestions are terminology hints, not complete translations. Glossary mismatch findings are low-confidence advisory findings and require review.
 
-Structural and semantic-integrity checks never certify meaning, tone, legal wording or cultural suitability. The new semantic checks are deterministic signals: identical source/target copy can be intentional (for example, a brand name), and numeric formatting may legitimately vary. Findings therefore require human review and are not proof of a mistranslation. A translation is only marked **approved** when a named human reviewer explicitly records approval. A later source/target change must be reviewed again.
+Structural and semantic-integrity checks never certify meaning, tone, legal wording or cultural suitability. The new semantic checks are deterministic signals: identical source/target copy can be intentional (for example, a brand name), and numeric formatting may legitimately vary. Findings therefore require human review and are not proof of a mistranslation. A translation is only marked **approved** when a named human reviewer explicitly records approval against the exact SHA-256 fingerprints of both the flattened source and target maps. The fingerprints are canonicalized by key order, so equivalent maps produce the same digest regardless of insertion order. Approval without both fingerprints, an approval for different content, missing keys, empty values, placeholder mismatches, obsolete keys or message-shape mismatches cannot produce an approved result. Any source or target content change invalidates the prior approval and requires a new review.
 
 The initial TranslationMemory implementation is an in-memory API. Durable storage, collaborative review UI, TM import/export and per-key persisted approvals are follow-up work; no database schema is silently added in this phase.
 
@@ -81,3 +81,8 @@ Nested leaf-versus-object changes are reported as `message-shape-mismatch` rathe
 This bridge is an audit integration, not a translation provider. Findings remain review-required and are never auto-approved. The runtime relies on Node's built-in `Intl`/ICU data; it adds no third-party dependency or network call.
 
 The bridge snapshots input catalogs using own-property descriptors before delegation. Accessors, symbol keys, prototype-sensitive keys, unsupported object types, excessive nesting and catalogs above 10,000 entries are rejected without executing getters. This protects the shared Localization Engine from unsafe caller-supplied objects.
+
+
+## Content-bound translation approval
+
+`recordTranslationReview({ state: "approved", reviewer, reviewedAt, sourceHash, targetHash })` requires the two SHA-256 fingerprints returned by `auditTranslationMaps`. `resolveTranslationState` gives structural integrity findings precedence over human approval and returns `review-required` when fingerprints do not match the current maps. Semantic findings may still be accepted only by a named reviewer against that exact content snapshot. These hashes are integrity bindings, not cryptographic reviewer signatures or an identity provider.

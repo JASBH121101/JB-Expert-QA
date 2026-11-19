@@ -7,7 +7,7 @@ import {
   DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, resolveLocale,
   comparePlaceholders, parsePhpTranslationArray, LanguageLibrary,
   TranslationMemory, recordTranslationReview, resolveTranslationState,
-  auditTranslationMaps, flattenTranslationMap, auditTranslationSemantics
+  auditTranslationMaps, flattenTranslationMap, auditTranslationSemantics, stableTranslationHash
 } from "../src/language/index.js";
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -72,11 +72,52 @@ test("translation memory requires human review metadata for approved entries", (
   assert.equal(memory.findExact({ source: "Sign in", sourceLocale: "en", targetLocale: "es" }).status, "stale");
 });
 
-test("approval state requires a named reviewer and structural checks never auto-approve", () => {
+test("approval state requires a named reviewer and exact source/target fingerprints", () => {
+  const sourceHash = "a".repeat(64);
+  const targetHash = "b".repeat(64);
   assert.throws(() => recordTranslationReview({ state: "approved", reviewer: " " }), /reviewer identity/);
+  assert.throws(() => recordTranslationReview({
+    state: "approved", reviewer: "Steven", reviewedAt: "2026-11-14T10:00:00Z"
+  }), /sourceHash\/targetHash/);
   assert.equal(resolveTranslationState({}), "review-required");
   assert.equal(resolveTranslationState({ missingKeys: 1 }), "partial");
-  assert.equal(resolveTranslationState({ humanApproval: { state: "approved", reviewer: "Steven", reviewedAt: "2026-11-14" } }), "approved");
+
+  const approval = recordTranslationReview({
+    state: "approved",
+    reviewer: "Steven",
+    reviewedAt: "2026-11-14T10:00:00Z",
+    sourceHash,
+    targetHash
+  });
+  assert.equal(resolveTranslationState({ humanApproval: approval }), "review-required");
+  assert.equal(resolveTranslationState({ humanApproval: approval, sourceHash, targetHash }), "approved");
+  assert.equal(resolveTranslationState({
+    missingKeys: 1, humanApproval: approval, sourceHash, targetHash
+  }), "partial");
+  assert.equal(resolveTranslationState({
+    placeholderMismatches: 1, humanApproval: approval, sourceHash, targetHash
+  }), "review-required");
+  assert.equal(resolveTranslationState({
+    humanApproval: approval,
+    sourceHash,
+    targetHash: "c".repeat(64)
+  }), "review-required");
+
+  let getterCalled = false;
+  const unsafeApproval = {};
+  Object.defineProperty(unsafeApproval, "state", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "approved";
+    }
+  });
+  assert.equal(resolveTranslationState({
+    humanApproval: unsafeApproval,
+    sourceHash,
+    targetHash
+  }), "review-required");
+  assert.equal(getterCalled, false);
 });
 
 test("translation maps identify missing, obsolete and placeholder-mismatched keys", () => {
@@ -395,4 +436,73 @@ test("complete CLDR plural catalogs pass structural audit without becoming human
   assert.equal(result.status, "passed");
   assert.equal(result.reviewRequired, false);
   assert.equal(result.autoApproved, false);
+});
+
+
+test("translation fingerprints are deterministic across object key order", () => {
+  const first = Object.assign(Object.create(null), { "settings.title": "Settings", greeting: "Hello" });
+  const second = Object.create(null);
+  second.greeting = "Hello";
+  second["settings.title"] = "Settings";
+  assert.equal(stableTranslationHash(first), stableTranslationHash(second));
+  assert.notEqual(
+    stableTranslationHash(first),
+    stableTranslationHash({ greeting: "Hello", "settings.title": "Preferences" })
+  );
+  assert.throws(() => stableTranslationHash({ unsafe: 42 }), /flattened string map/);
+  assert.throws(() => stableTranslationHash(["not", "a", "map"]), /plain flattened string map/);
+
+  let getterCalled = false;
+  const accessorMap = {};
+  Object.defineProperty(accessorMap, "label", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "unsafe";
+    }
+  });
+  assert.throws(() => stableTranslationHash(accessorMap), /accessor properties/);
+  assert.equal(getterCalled, false);
+});
+
+test("human approvals are bound to exact translation content and cannot mask structural defects", () => {
+  const source = { greeting: "Hello :name" };
+  const target = { greeting: "Hola :name" };
+  const initial = auditTranslationMaps(source, target, { sourceLocale: "en", targetLocale: "es-419" });
+  const approval = recordTranslationReview({
+    state: "approved",
+    reviewer: "Steven",
+    reviewedAt: "2026-11-19T02:30:00Z",
+    sourceHash: initial.sourceHash,
+    targetHash: initial.targetHash
+  });
+
+  const unchanged = auditTranslationMaps(source, target, {
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    humanApproval: approval
+  });
+  assert.equal(unchanged.reviewStatus, "approved");
+
+  const changed = auditTranslationMaps(source, { greeting: "Qué tal :name" }, {
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    humanApproval: approval
+  });
+  assert.equal(changed.reviewStatus, "review-required");
+  assert.notEqual(changed.targetHash, approval.targetHash);
+
+  const missing = auditTranslationMaps(source, {}, {
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    humanApproval: approval
+  });
+  assert.equal(missing.reviewStatus, "partial");
+
+  const brokenPlaceholder = auditTranslationMaps(source, { greeting: "Hola" }, {
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    humanApproval: approval
+  });
+  assert.equal(brokenPlaceholder.reviewStatus, "review-required");
 });

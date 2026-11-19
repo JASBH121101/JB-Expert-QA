@@ -63,7 +63,20 @@ export function flattenTranslationMap(value, prefix = "", output = Object.create
 }
 
 export function stableTranslationHash(value) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  if (!isPlainTranslationRecord(value)) {
+    throw new TypeError("translation hash requires a plain flattened string map");
+  }
+  const entries = getTranslationEntries(value);
+  for (const [key, item] of entries) {
+    if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
+      throw new TypeError("translation map contains a prototype-sensitive key");
+    }
+    if (typeof item !== "string") {
+      throw new TypeError("translation hash requires a flattened string map");
+    }
+  }
+  entries.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  return createHash("sha256").update(JSON.stringify(entries)).digest("hex");
 }
 
 function findShapeMismatchPath(path, otherKeys) {
@@ -152,13 +165,17 @@ export function auditTranslationMaps(sourceMap, targetMap, {
     }
   }
 
+  const sourceHash = stableTranslationHash(source);
+  const targetHash = stableTranslationHash(target);
   const state = resolveTranslationState({
     missingKeys,
     emptyValues,
     placeholderMismatches,
     obsoleteKeys,
     messageShapeMismatches,
-    humanApproval
+    humanApproval,
+    sourceHash,
+    targetHash
   });
   return Object.freeze({
     status: "checked",
@@ -177,8 +194,8 @@ export function auditTranslationMaps(sourceMap, targetMap, {
       unchangedSourceText: semanticFindings.filter((item) => item.id === "unchanged-source-text").length,
       protectedTokenMismatches: semanticFindings.filter((item) => item.id.startsWith("protected-")).length
     }),
-    sourceHash: stableTranslationHash(source),
-    targetHash: stableTranslationHash(target),
+    sourceHash,
+    targetHash,
     findings: Object.freeze(findings)
   });
 }
