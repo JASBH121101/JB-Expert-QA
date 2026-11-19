@@ -18,6 +18,7 @@
     "autopilot": "node src/autopilot-cli.js",
     "audit:security:url": "node src/security-url-cli.js",
     "benchmark:qa": "node bench/run.js",
+    "benchmark:language-qa": "node bench/language-qa.js",
     "test:security-guard": "node --test tests/security-guard.test.js tests/account-recovery.test.js tests/security-guard-recovery-core-v1.test.js tests/security-headers.test.js tests/node-server-hardening.test.js tests/origin-protection.test.js tests/csrf-protection.test.js tests/distributed-rate-limit.test.js tests/distributed-auth-protection.test.js tests/upload-inspector.test.js tests/rate-limit-contract.test.js tests/security-guard-core-v1-bridge.test.js tests/security-guard-core-v1-contracts.test.js tests/security-guard-threat-assessment.test.js tests/security-guard-auth-core-v1.test.js tests/cloudflare-worker-rate-limit.test.js tests/cloudflare-pages-rate-limit.test.js tests/universal-rate-limit-service.test.js tests/security-guard-core-v1.test.js tests/postgres-rate-limit-store.test.js",
     "benchmark:guard": "node bench/security-guard.js",
     "test:dead-code": "node --test tests/dead-code-rules.test.js",
