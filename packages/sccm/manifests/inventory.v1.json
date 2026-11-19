@@ -184,7 +184,7 @@
       "name": "Language QA",
       "level": "branch",
       "parentId": "jb.expert-qa",
-      "sourceId": "jb-expert-qa-main-9907c394",
+      "sourceId": "jb-expert-qa-main",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -194,7 +194,7 @@
       "name": "Translation integrity",
       "level": "subbranch",
       "parentId": "jb.expert-qa.language",
-      "sourceId": "jb-expert-qa-main-9907c394",
+      "sourceId": "jb-expert-qa-main",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -204,7 +204,7 @@
       "name": "Language QA module",
       "level": "module",
       "parentId": "jb.expert-qa.language.translation-integrity",
-      "sourceId": "jb-expert-qa-main-9907c394",
+      "sourceId": "jb-expert-qa-main",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
@@ -296,7 +296,7 @@
       "name": "Human review state",
       "level": "component",
       "parentId": "jb.expert-qa.language.module",
-      "sourceId": "jb-expert-qa-main-9907c394",
+      "sourceId": "jb-expert-qa-main",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []
