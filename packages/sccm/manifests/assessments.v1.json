@@ -5940,5 +5940,119 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-icu-pr201"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.1",
+    "nodeId": "jb.resilience-engine.orchestration.a2-readonly",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.2",
+    "nodeId": "jb.resilience-engine.orchestration.a2-module",
+    "version": "0.1.0",
+    "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "bb74c2215bef9e8dd7cd138c108dc7b4510cd50c",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.3",
+    "nodeId": "jb.resilience-engine.containment.a2-actions",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.4",
+    "nodeId": "jb.resilience-engine.containment.a2-module",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.5",
+    "nodeId": "jb.resilience-engine.failover.a3",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.6",
+    "nodeId": "jb.resilience-engine.failover.a3-module",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:07:36Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/certification/resilience-a2-a3-out-of-scope/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: user approved excluding A2/A3 from implementation and certification. This is not technical capability certification."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
   }
 ]
