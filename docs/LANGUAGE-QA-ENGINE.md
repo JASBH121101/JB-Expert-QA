@@ -58,7 +58,10 @@ Durable storage, collaborative review UI, TM import/export and per-key persisted
 - Maximum: 500 files per locale and 2 MB per individual resource.
 - The glossary is an initial curated set and can produce false positives; its findings are advisory.
 - Semantic checks protect measurable content and flag likely untranslated copy, but do not infer meaning or assess fluency; identical words and numeric representations may be valid in context.
-- No AI, online translation API, paid key, network transmission or external provider is used.
+- No AI provider is called by the deterministic Language QA audit. The optional AI router remains disabled by default.
+- Gemini requires an explicit `GEMINI_FREE_TIER_CONFIRMED=true` for the allowlisted `gemini-3.1-flash-lite` model, or `GEMINI_BILLING_APPROVED=true` for any other model. A key alone is insufficient. Do not set either flag without checking the Google AI Studio project's actual billing tier.
+- Google's published Gemini API pricing distinguishes Free and Paid tiers; its Free tier states that submitted content may be used to improve products. Do not send sensitive or confidential catalogs under that tier unless the data-use terms have been approved. See [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
+- Cloudflare Workers AI likewise requires an explicit free-tier confirmation and is limited to its allowlisted free-tier models and local per-run request budget; the service documents a daily free allocation and charges on Workers Paid above that allocation. See [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/).
 - The auditor checks structure and a limited glossary. It does not claim native-speaker quality assurance.
 
 ## Ownership
