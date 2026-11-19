@@ -27,9 +27,28 @@ function escapeRegExp(value) {
   return value.replace(/([\\^$.*+?()[\]{}|])/g, "\\$1");
 }
 
+const TERM_PATTERN_CACHE_LIMIT = 512;
+const termPatternCache = new Map();
+
+function getTermPattern(term) {
+  const normalized = term.toLocaleLowerCase();
+  let pattern = termPatternCache.get(normalized);
+  if (pattern) {
+    // Refresh insertion order so frequently used glossary terms remain cached.
+    termPatternCache.delete(normalized);
+    termPatternCache.set(normalized, pattern);
+    return pattern;
+  }
+  pattern = new RegExp("(^|[^\\\\p{L}\\\\p{N}])" + escapeRegExp(normalized) + "($|[^\\\\p{L}\\\\p{N}])", "u");
+  termPatternCache.set(normalized, pattern);
+  if (termPatternCache.size > TERM_PATTERN_CACHE_LIMIT) {
+    termPatternCache.delete(termPatternCache.keys().next().value);
+  }
+  return pattern;
+}
+
 function containsTerm(text, term) {
-  const pattern = new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(term.toLocaleLowerCase()) + "($|[^\\p{L}\\p{N}])", "u");
-  return pattern.test(text.toLocaleLowerCase());
+  return getTermPattern(term).test(text.toLocaleLowerCase());
 }
 
 function glossaryLocaleKey(locale) {
