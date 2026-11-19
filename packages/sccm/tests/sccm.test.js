@@ -438,10 +438,10 @@ test("SCCM report separates certified scope from explicitly excluded capabilitie
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PASS");
-  assert.equal(report.counts.component.total, 72);
+  assert.equal(report.counts.component.total, 73);
   assert.equal(report.counts.component.OUT_OF_SCOPE, 10);
-  assert.equal(report.counts.component.inScope, 62);
-  assert.equal(report.progress.total, 123);
+  assert.equal(report.counts.component.inScope, 63);
+  assert.equal(report.progress.total, 124);
   assert.equal(report.progress.passed, 123);
   assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
@@ -519,7 +519,7 @@ test("all in-scope recently assessed modules pass and A2/A3 are excluded without
   const report = buildSccmReport(inventory, history);
   assert.equal(report.status, "PASS");
   assert.equal(report.historyEntries, history.length);
-  assert.equal(report.progress.total, 123);
+  assert.equal(report.progress.total, 124);
   assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
   assert.equal(report.progress.outOfScope, 18);
