@@ -16,7 +16,7 @@ import {
 const ITERATIONS = Number(process.env.JB_LANGUAGE_QA_BENCH_ITERATIONS ?? 8);
 const WARMUPS = 2;
 const OUTPUT_DIR = path.resolve(
-  process.env.JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR ?? "benchmark-results-language-qa"
+  process.env.JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR ?? path.join(os.tmpdir(), "jb-language-qa-benchmark")
 );
 const LOCALE_CALLS = 12000;
 const SMALL_KEY_COUNT = 100;
