@@ -12,6 +12,7 @@ on:
       - "src/specialists/language/**"
       - "src/index.js"
       - "tests/language-qa-engine.test.js"
+      - "bench/language-qa.js"
       - ".github/workflows/language-qa.yml"
   pull_request:
     branches: [main, "integration/**"]
@@ -64,3 +65,5 @@ jobs:
           node --check src/index.js
       - name: Run Language QA regression tests
         run: node --test tests/language-qa-engine.test.js
+      - name: Run deterministic Language QA benchmark baseline
+        run: npm run benchmark:language-qa -- --iterations=25
