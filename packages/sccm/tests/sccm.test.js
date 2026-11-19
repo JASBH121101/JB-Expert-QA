@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 110);
+  assert.equal(history.length, 145);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const sourceId = node && (entry.sourceId ?? node.sourceId);
@@ -437,7 +437,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 54);
+  assert.equal(report.counts.component.PASS, 71);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
@@ -486,4 +486,42 @@ test("Security Guard runtime request-defense hierarchy passes within exact-SHA N
   assert.equal(module.status, "PASS");
   assert.equal(module.children.length, 4);
   assert.ok(module.children.every((component) => component.status === "PASS" && component.ownStatus === "PASS"));
+});
+
+
+test("newly assessed critical modules pass while unavailable A2/A3 operational capabilities remain pending", () => {
+  const certified = [
+    "jb.security-guard.adapters.php", "jb.security-guard.adapters.python", "jb.security-guard.adapters.contracts",
+    "jb.security-guard.adapters.module", "jb.security-guard.adapters.php-python", "jb.security-guard.adapters",
+    "jb.malware-engine.analysis.archive", "jb.malware-engine.analysis.patterns", "jb.malware-engine.analysis.calibration",
+    "jb.malware-engine.safety.size-limits", "jb.malware-engine.safety.object-safety", "jb.malware-engine.safety.temp-files",
+    "jb.malware-engine.analysis.static-inspection", "jb.malware-engine.safety.resource-bounds",
+    "jb.malware-engine.analysis", "jb.malware-engine.safety",
+    "jb.threat-lab.simulation.isolation", "jb.threat-lab.simulation.safety-policy", "jb.threat-lab.simulation.coverage",
+    "jb.threat-lab.simulation.evidence", "jb.threat-lab.simulation.six-tier", "jb.threat-lab.simulation",
+    "jb.advisor-engine.recommendation.identity", "jb.advisor-engine.recommendation.ranking",
+    "jb.advisor-engine.recommendation.explanation", "jb.advisor-engine.recommendation.domain-adapter",
+    "jb.advisor-engine.recommendation.fragrance", "jb.advisor-engine.recommendation"
+  ];
+  for (const id of certified) {
+    const result = evaluateSccmNode(inventory, history, id);
+    assert.equal(result.ownStatus, "PASS", id);
+    assert.equal(result.status, "PASS", id);
+  }
+  const deliberatelyPending = [
+    "jb.resilience-engine.containment", "jb.resilience-engine.containment.a2-actions",
+    "jb.resilience-engine.containment.a2-module", "jb.resilience-engine.failover",
+    "jb.resilience-engine.failover.a3", "jb.resilience-engine.failover.a3-module",
+    "jb.resilience-engine.failover.leader-election"
+  ];
+  for (const id of deliberatelyPending) {
+    const result = evaluateSccmNode(inventory, history, id);
+    assert.equal(result.ownStatus, "PENDING", id);
+    assert.equal(result.status, "PENDING", id);
+  }
+  const report = buildSccmReport(inventory, history);
+  assert.equal(report.status, "PENDING");
+  assert.equal(report.historyEntries, 145);
+  assert.equal(report.progress.total, 141);
+  assert.equal(report.progress.failed, 0);
 });

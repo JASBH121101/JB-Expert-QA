@@ -4131,5 +4131,1454 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-php-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters.php",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195112",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "PHP 8.2 adapter lint and shared HMAC/PHP integration tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-python-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters.python",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194988",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Python 3.11 FastAPI adapter compile and ASGI/HMAC tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-contracts-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters.contracts",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195112",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "PHP 8.2 adapter lint and shared HMAC/PHP integration tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194988",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Python 3.11 FastAPI adapter compile and ASGI/HMAC tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-module-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters.module",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195112",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "PHP 8.2 adapter lint and shared HMAC/PHP integration tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194988",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Python 3.11 FastAPI adapter compile and ASGI/HMAC tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-php-python-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters.php-python",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195112",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "PHP 8.2 adapter lint and shared HMAC/PHP integration tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194988",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Python 3.11 FastAPI adapter compile and ASGI/HMAC tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-security-guard-adapters-20261119-fa29f",
+    "nodeId": "jb.security-guard.adapters",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195112",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "PHP 8.2 adapter lint and shared HMAC/PHP integration tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194988",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Python 3.11 FastAPI adapter compile and ASGI/HMAC tests"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195524",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195659",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "JB Engine integration, compatibility and isolation contracts on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-analysis-archive-20261119-fa29f",
+    "nodeId": "jb.malware-engine.analysis.archive",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-analysis-patterns-20261119-fa29f",
+    "nodeId": "jb.malware-engine.analysis.patterns",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-analysis-calibration-20261119-fa29f",
+    "nodeId": "jb.malware-engine.analysis.calibration",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-safety-size-limits-20261119-fa29f",
+    "nodeId": "jb.malware-engine.safety.size-limits",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-safety-object-safety-20261119-fa29f",
+    "nodeId": "jb.malware-engine.safety.object-safety",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-safety-temp-files-20261119-fa29f",
+    "nodeId": "jb.malware-engine.safety.temp-files",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-analysis-static-inspection-20261119-fa29f",
+    "nodeId": "jb.malware-engine.analysis.static-inspection",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-safety-resource-bounds-20261119-fa29f",
+    "nodeId": "jb.malware-engine.safety.resource-bounds",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-analysis-20261119-fa29f",
+    "nodeId": "jb.malware-engine.analysis",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-malware-engine-safety-20261119-fa29f",
+    "nodeId": "jb.malware-engine.safety",
+    "version": "0.6.2",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195088",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195184",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195247",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195252",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Full Malware Engine suite, parser/bounds, matching, calibration, object and temporary-file safety checks"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-isolation-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation.isolation",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-safety-policy-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation.safety-policy",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-coverage-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation.coverage",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-evidence-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation.evidence",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-six-tier-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation.six-tier",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-threat-lab-simulation-20261119-fa29f",
+    "nodeId": "jb.threat-lab.simulation",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195248",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195274",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195356",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195360",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Threat Lab safe local six-tier matrix, disposable isolation, policy boundaries, reproducibility and unified report generation"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-identity-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation.identity",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-ranking-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation.ranking",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-explanation-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation.explanation",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-domain-adapter-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation.domain-adapter",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-fragrance-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation.fragrance",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-advisor-engine-recommendation-20261119-fa29f",
+    "nodeId": "jb.advisor-engine.recommendation",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246194995",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195137",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195267",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195323",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Advisor Engine syntax, domain, evidence and recommendation suite including identity, ranking, explanations and fragrance adapter contracts"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-containment-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.containment",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM component-certification scope; explicitly requires external production provider/verifier/store and operational fault-injection before A2 can pass."
+      }
+    ],
+    "findings": [
+      "Only the A2 containment-safety laboratory contracts are implemented and tested. A concrete host provider, independently operated verifier, production-grade durable stores, restart/release recovery, rollback and end-to-end fault-injection remain absent. A2 must remain disabled by policy."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-containment-a2-actions-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.containment.a2-actions",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM component-certification scope; explicitly requires external production provider/verifier/store and operational fault-injection before A2 can pass."
+      }
+    ],
+    "findings": [
+      "Only the A2 containment-safety laboratory contracts are implemented and tested. A concrete host provider, independently operated verifier, production-grade durable stores, restart/release recovery, rollback and end-to-end fault-injection remain absent. A2 must remain disabled by policy."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-containment-a2-module-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.containment.a2-module",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM component-certification scope; explicitly requires external production provider/verifier/store and operational fault-injection before A2 can pass."
+      }
+    ],
+    "findings": [
+      "Only the A2 containment-safety laboratory contracts are implemented and tested. A concrete host provider, independently operated verifier, production-grade durable stores, restart/release recovery, rollback and end-to-end fault-injection remain absent. A2 must remain disabled by policy."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-failover-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.failover",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM A3 scope; required independent quorum, target fencing, replication/RPO, cutover and rollback evidence is incomplete."
+      }
+    ],
+    "findings": [
+      "A3 is not certified for deployment. Independent monitoring/quorum, target-enforced fencing across execution targets, replication/RPO, traffic cutover, rollback and independent post-failover verification are not yet proven. Keep A3 denied."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-failover-a3-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.failover.a3",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM A3 scope; required independent quorum, target fencing, replication/RPO, cutover and rollback evidence is incomplete."
+      }
+    ],
+    "findings": [
+      "A3 is not certified for deployment. Independent monitoring/quorum, target-enforced fencing across execution targets, replication/RPO, traffic cutover, rollback and independent post-failover verification are not yet proven. Keep A3 denied."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-failover-a3-module-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.failover.a3-module",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Reviewed SCCM A3 scope; required independent quorum, target fencing, replication/RPO, cutover and rollback evidence is incomplete."
+      }
+    ],
+    "findings": [
+      "A3 is not certified for deployment. Independent monitoring/quorum, target-enforced fencing across execution targets, replication/RPO, traffic cutover, rollback and independent post-failover verification are not yet proven. Keep A3 denied."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-jb-resilience-engine-failover-leader-election-20261119-fa29f",
+    "nodeId": "jb.resilience-engine.failover.leader-election",
+    "version": "0.1.0",
+    "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:38:53Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195458",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195473",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195487",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44430457106/job/135246195618",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "success",
+        "summary": "Resilience Engine policy/recovery suite including A2 containment safety contracts and A3 readiness gates; lab scope only"
+      },
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4/packages/resilience-engine/docs/SCCM-COMPONENT-CERTIFICATION-2026-11.md",
+        "commitSha": "fa29f647ceb9c7cbb329fde34d1493e5ad50aaa4",
+        "outcome": "incomplete",
+        "summary": "Certification scope explicitly states PostgreSQL single-primary lease acquisition is not quorum-based leader election or split-brain resolution."
+      }
+    ],
+    "findings": [
+      "No quorum-based leader election or split-brain protection exists. A lease on a single PostgreSQL primary does not establish distributed consensus or multi-region failover."
+    ],
+    "sourceId": "jb-expert-qa-main-fa29f"
   }
 ]
