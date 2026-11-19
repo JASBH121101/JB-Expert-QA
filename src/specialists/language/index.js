@@ -1,6 +1,7 @@
 function severityFor(id, fallback = "medium") {
   if (id === "missing-key" || id === "placeholder-mismatch" || id === "resource-parse-error" || id === "missing-locale-file") return "high";
-  if (id === "empty-value") return "medium";
+  if (id === "empty-value" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence") return "medium";
+  if (id === "corrupted-replacement-character") return "high";
   if (id === "glossary-review" || id === "obsolete-key" || id === "target-file-without-source") return "low";
   return fallback;
 }
@@ -41,6 +42,9 @@ function titleFor(id) {
     "protected-email-mismatch": "Translation email differs from source",
     "protected-markup-mismatch": "Translation markup structure differs",
     "protected-number-mismatch": "Translation numeric literal differs",
+    "corrupted-replacement-character": "Translation contains a Unicode replacement character",
+    "corrupted-control-character": "Translation contains an unexpected control character",
+    "suspicious-encoding-sequence": "Translation may contain mojibake or encoding corruption",
     "missing-locale-file": "Translation resource is missing",
     "target-file-without-source": "Target resource has no source file",
     "resource-parse-error": "Translation resource could not be parsed safely"
@@ -66,5 +70,6 @@ function recommendationFor(id) {
   if (id === "protected-url-mismatch" || id === "protected-email-mismatch") return "Verify the link or email destination before approving the localized message.";
   if (id === "protected-markup-mismatch") return "Restore equivalent HTML structure and validate nesting before approval.";
   if (id === "protected-number-mismatch") return "Check the numeric value and use locale-aware formatting where appropriate.";
+  if (id === "corrupted-replacement-character" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence") return "Inspect the original resource encoding and source content, then restore the intended characters. Treat this as a corruption signal, not an automatic rewrite.";
   return "Review the locale resource pair and confirm that public-facing text is complete and appropriate.";
 }
