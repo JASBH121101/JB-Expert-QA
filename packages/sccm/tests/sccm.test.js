@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 103);
+  assert.equal(history.length, 110);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const sourceId = node && (entry.sourceId ?? node.sourceId);
@@ -437,7 +437,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PENDING");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 50);
+  assert.equal(report.counts.component.PASS, 54);
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
@@ -474,4 +474,16 @@ test("history validation fails closed on malformed entries rather than throwing"
   const result = validateSccmHistory(inventory, [null, {}]);
   assert.equal(result.valid, false);
   assert.ok(result.errors.length > 0);
+});
+
+
+test("Security Guard runtime request-defense hierarchy passes within exact-SHA Node.js 22/24 evidence", () => {
+  const runtime = evaluateSccmNode(inventory, history, "jb.security-guard.runtime");
+  const requestDefense = evaluateSccmNode(inventory, history, "jb.security-guard.runtime.request-defense");
+  const module = evaluateSccmNode(inventory, history, "jb.security-guard.runtime.module");
+  assert.equal(runtime.status, "PASS");
+  assert.equal(requestDefense.status, "PASS");
+  assert.equal(module.status, "PASS");
+  assert.equal(module.children.length, 4);
+  assert.ok(module.children.every((component) => component.status === "PASS" && component.ownStatus === "PASS"));
 });

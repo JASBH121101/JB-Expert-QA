@@ -3851,5 +3851,285 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.authentication.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.authentication",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Authentication/session boundary: session identity, recovery and protection checks (Node.js 22 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Authentication/session boundary: session identity, recovery and protection checks (Node.js 24 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Authentication/session boundary: session identity, recovery and protection checks (Node.js 22 complete tests)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Authentication/session boundary: session identity, recovery and protection checks (Node.js 24 complete tests)"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.rate-limit.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.rate-limit",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Rate-limit enforcement: policy contracts, distributed stores and abuse controls (Node.js 22 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Rate-limit enforcement: policy contracts, distributed stores and abuse controls (Node.js 24 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Rate-limit enforcement: policy contracts, distributed stores and abuse controls (Node.js 22 complete tests)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Rate-limit enforcement: policy contracts, distributed stores and abuse controls (Node.js 24 complete tests)"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.csrf.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.csrf",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "CSRF token and strict Origin defense: unsafe methods rejected, safe-method behavior and telemetry failure containment (Node.js 22 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "CSRF token and strict Origin defense: unsafe methods rejected, safe-method behavior and telemetry failure containment (Node.js 24 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "CSRF token and strict Origin defense: unsafe methods rejected, safe-method behavior and telemetry failure containment (Node.js 22 complete tests)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "CSRF token and strict Origin defense: unsafe methods rejected, safe-method behavior and telemetry failure containment (Node.js 24 complete tests)"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.upload.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.upload",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Upload inspection: quarantine, bounded streams, scanner verdicts, timeout and late adapter cleanup (Node.js 22 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Upload inspection: quarantine, bounded streams, scanner verdicts, timeout and late adapter cleanup (Node.js 24 Security QA)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Upload inspection: quarantine, bounded streams, scanner verdicts, timeout and late adapter cleanup (Node.js 22 complete tests)"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Upload inspection: quarantine, bounded streams, scanner verdicts, timeout and late adapter cleanup (Node.js 24 complete tests)"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.module.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.module",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:01Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Security Guard runtime module tests passed on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Security Guard runtime module tests passed on Node.js 24"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Complete runtime regression suite passed on Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Complete runtime regression suite passed on Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.request-defense.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime.request-defense",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:02Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "All runtime request-defense components passed Node.js 22 Security QA"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "All runtime request-defense components passed Node.js 24 Security QA"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Full Core validation tests passed Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Full Core validation tests passed Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
+  },
+  {
+    "assessmentId": "asmt.jb.security-guard.runtime.20261119.aa3eddd",
+    "nodeId": "jb.security-guard.runtime",
+    "version": "0.1.0",
+    "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:28:03Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240508579",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Runtime request-defense hierarchy passed Security QA Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800258/job/135240509638",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Runtime request-defense hierarchy passed Security QA Node.js 24"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240509177",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Complete validation passed Node.js 22"
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44428800299/job/135240508633",
+        "commitSha": "aa3eddd62e187f6b632f2075660109a6cfc8f99f",
+        "outcome": "success",
+        "summary": "Complete validation passed Node.js 24"
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-aa3eddd"
   }
 ]
