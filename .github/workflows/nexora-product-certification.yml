@@ -72,7 +72,7 @@ jobs:
           package-manager-cache: false
 
       - name: Set up PHP 8.3 and Composer
-        uses: shivammathur/setup-php@0f7f1d08e3e32076e51cae65eb0b0c871405b16e
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
         with:
           php-version: "8.3"
           extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, openssl, pdo_pgsql, pdo_sqlite, xml, zip
