@@ -5,24 +5,24 @@ on:
     branches: [main]
     paths:
       - "src/language/glossary.js"
+      - "bench/glossary-matchers.js"
       - "tests/language-qa-glossary-performance.test.js"
-      - "bench/language-qa.js"
       - ".github/workflows/language-qa-glossary.yml"
   push:
     branches: [main, "feature/language-qa-glossary-performance-v1"]
     paths:
       - "src/language/glossary.js"
+      - "bench/glossary-matchers.js"
       - "tests/language-qa-glossary-performance.test.js"
-      - "bench/language-qa.js"
       - ".github/workflows/language-qa-glossary.yml"
 
 permissions:
   contents: read
 
 jobs:
-  glossary-tests-and-benchmark:
+  glossary-tests-and-comparative-benchmark:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,5 +31,17 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - run: node --test tests/language-qa-glossary-performance.test.js tests/language-qa-engine.test.js
-      - run: npm run benchmark:language-qa -- --iterations=25
+      - name: Run glossary and Language QA regression tests
+        run: node --test tests/language-qa-glossary-performance.test.js tests/language-qa-engine.test.js
+      - name: Fetch baseline source revision
+        env:
+          BASELINE_SHA: c5869b4c40218c8401e59db7b04bf6d19c5dcccd
+        run: |
+          git fetch origin "$BASELINE_SHA" --depth=1
+          git worktree add --detach "$RUNNER_TEMP/jb-language-qa-baseline" "$BASELINE_SHA"
+      - name: Benchmark baseline and optimized glossary on the same runner
+        run: |
+          echo "=== BASELINE: c5869b4c40218c8401e59db7b04bf6d19c5dcccd ==="
+          node bench/glossary-matchers.js --root="$RUNNER_TEMP/jb-language-qa-baseline"
+          echo "=== HEAD: $GITHUB_SHA ==="
+          node bench/glossary-matchers.js --root="$GITHUB_WORKSPACE"
