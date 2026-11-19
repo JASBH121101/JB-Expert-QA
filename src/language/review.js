@@ -10,14 +10,32 @@ function isValidReviewTimestamp(value) {
 }
 
 function hasBoundApproval(humanApproval, sourceHash, targetHash) {
-  return humanApproval?.state === "approved" &&
-    typeof humanApproval.reviewer === "string" &&
-    Boolean(humanApproval.reviewer.trim()) &&
-    isValidReviewTimestamp(humanApproval.reviewedAt) &&
+  if (humanApproval === null || typeof humanApproval !== "object" || Array.isArray(humanApproval)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(humanApproval);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  if (Object.getOwnPropertySymbols(humanApproval).length > 0) return false;
+
+  const descriptors = Object.getOwnPropertyDescriptors(humanApproval);
+  const valueOf = (key) => {
+    const descriptor = descriptors[key];
+    return descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined;
+  };
+  const state = valueOf("state");
+  const reviewer = valueOf("reviewer");
+  const reviewedAt = valueOf("reviewedAt");
+  const reviewedSourceHash = valueOf("sourceHash");
+  const reviewedTargetHash = valueOf("targetHash");
+
+  return state === "approved" &&
+    typeof reviewer === "string" &&
+    Boolean(reviewer.trim()) &&
+    isValidReviewTimestamp(reviewedAt) &&
     SHA256_PATTERN.test(sourceHash ?? "") &&
     SHA256_PATTERN.test(targetHash ?? "") &&
-    humanApproval.sourceHash === sourceHash &&
-    humanApproval.targetHash === targetHash;
+    reviewedSourceHash === sourceHash &&
+    reviewedTargetHash === targetHash;
 }
 
 export function recordTranslationReview({
