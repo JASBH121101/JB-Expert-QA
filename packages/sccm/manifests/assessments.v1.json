@@ -6054,5 +6054,62 @@
     ],
     "findings": [],
     "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.7",
+    "nodeId": "jb.resilience-engine.containment",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:20:00Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/77fce5c9f22e68de3fcf5d1616bd9c3b018c6a15/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: A2 containment branch is excluded from implementation and certification by the approved A2/A3 decision. It remains inScope:false, unavailable for production and not technically certified. This record closes scope tracking only."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.8",
+    "nodeId": "jb.resilience-engine.failover",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:20:00Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/77fce5c9f22e68de3fcf5d1616bd9c3b018c6a15/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: A3 distributed failover branch is excluded from implementation and certification by the approved A2/A3 decision. It remains inScope:false, unavailable for production and not technically certified. This record closes scope tracking only."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
+  },
+  {
+    "assessmentId": "asmt.resilience.scope-exclusion.20261119.9",
+    "nodeId": "jb.resilience-engine.failover.leader-election",
+    "version": "0.1.0",
+    "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:20:00Z",
+    "evidence": [
+      {
+        "kind": "manual-review",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/blob/77fce5c9f22e68de3fcf5d1616bd9c3b018c6a15/docs/RESILIENCE-A2-A3-SCOPE-DECISION.md",
+        "commitSha": "71fae09ba888eb4b53345ff5499577f9e6cd86b2",
+        "outcome": "success",
+        "summary": "Scope decision only: A3 leader-election component is excluded from implementation and certification by the approved A2/A3 decision. It remains inScope:false, unavailable for production and not technically certified. This record closes scope tracking only."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-resilience-certification-snapshot"
   }
 ]
