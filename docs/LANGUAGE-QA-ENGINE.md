@@ -108,3 +108,22 @@ The initial two-locale policy above is historical. The current supported set is 
 The default and safe fallback remain `es-419`. Canonical tags and underscore-separated aliases are normalized. Exact supported regional variants are preserved; approved Latin-American Spanish regions not individually represented in the set normalize to `es-419`. Base language aliases map deterministically to `en-US`, `pt-BR`, `fr-FR`, `de-DE`, `it-IT` or `ar`. `es-ES` remains distinct from Latin-American Spanish. Unsupported languages, unsupported Spanish regions, malformed tags, script subtags and Unicode extensions are rejected.
 
 The curated bilingual glossary currently covers English and the Spanish glossary family (`es-419`, `es-NI`, `es-MX`). It does not claim to provide translated glossary dictionaries for Portuguese, French, German, Italian or Arabic. For locale pairs without a dictionary, it returns no suggestion, sets `requiresHumanReview` and never auto-approves. CLDR catalog validation uses the shared Localization Engine for the supported locale set; passing structural validation does not certify translation meaning, fluency or cultural suitability.
+
+
+## Deterministic performance baseline
+
+Run the Language QA microbenchmark locally with:
+
+~~~sh
+npm run benchmark:language-qa
+~~~
+
+Optional controls:
+
+~~~sh
+JB_LANGUAGE_QA_BENCH_ITERATIONS=100 JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR=/tmp/jb-language-qa-benchmark npm run benchmark:language-qa
+~~~
+
+The benchmark measures locale normalization, nested translation-map flattening, source/target audits at two sizes, CLDR catalog auditing across the 12 supported locales, and exact Translation Memory lookup. It records mean, median, p95, p99, throughput, CPU time, RSS and heap deltas. Synthetic local data is used; no AI provider, network request, paid service or third-party benchmark dependency is involved.
+
+The benchmark uses 100 measured samples per scenario by default (minimum 20), after two warmups, so its p95/p99 estimates are more useful than a handful of runs. The engine certification workflow executes it on Ubuntu and Windows with Node.js 22 and 24 and uploads JSON/Markdown evidence per matrix job. Results are informational rather than machine-dependent pass/fail thresholds. Compare only equivalent runner images, Node versions and workloads; a successful benchmark validates its functional invariants but does not by itself certify translation fluency or cultural quality.
