@@ -45,12 +45,12 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout JB Expert QA and Threat Lab
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
       - name: Checkout pinned NEXORA Configurable Catalog prototype
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout pinned NEXORA Laravel Site Engine
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: afa0572d35f94b5c02a40d75001a2b2acd7f8b66
