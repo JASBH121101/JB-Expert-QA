@@ -442,7 +442,7 @@ test("SCCM report separates certified scope from explicitly excluded capabilitie
   assert.equal(report.counts.component.OUT_OF_SCOPE, 10);
   assert.equal(report.counts.component.inScope, 63);
   assert.equal(report.progress.total, 124);
-  assert.equal(report.progress.passed, 123);
+  assert.equal(report.progress.passed, 124);
   assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
   assert.equal(report.progress.outOfScope, 18);
