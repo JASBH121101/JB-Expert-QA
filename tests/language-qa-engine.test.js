@@ -622,3 +622,31 @@ test("human approvals are bound to exact translation content and cannot mask str
   });
   assert.equal(brokenPlaceholder.reviewStatus, "review-required");
 });
+
+test("Language QA catalog bridge accepts all registered Localization Engine locales", () => {
+  const catalogs = Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, { title: "Title" }]));
+  const requiredLocales = SUPPORTED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE);
+  const result = auditTranslationCatalogs(catalogs, {
+    sourceLocale: DEFAULT_LOCALE,
+    requiredLocales
+  });
+  assert.equal(result.status, "passed");
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoApproved, false);
+  assert.equal(result.engine, "jb-localization-engine");
+});
+
+test("glossary review avoids false language findings when no locale pair dictionary exists", () => {
+  const library = new LanguageLibrary();
+  const suggestions = library.suggestTranslation("Product price settings", {
+    sourceLocale: "en-US",
+    targetLocale: "fr-FR"
+  });
+  assert.equal(suggestions.suggestions.length, 0);
+  assert.equal(suggestions.requiresHumanReview, true);
+  assert.equal(suggestions.autoApproved, false);
+  assert.deepEqual(library.validateTermConsistency("Product price", "Prix du produit", {
+    sourceLocale: "en-US",
+    targetLocale: "fr-FR"
+  }), []);
+});
