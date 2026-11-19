@@ -39,7 +39,7 @@ function getTermPattern(term) {
     termPatternCache.set(normalized, pattern);
     return pattern;
   }
-  pattern = new RegExp("(^|[^\\\\p{L}\\\\p{N}])" + escapeRegExp(normalized) + "($|[^\\\\p{L}\\\\p{N}])", "u");
+  pattern = new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(normalized) + "($|[^\\p{L}\\p{N}])", "u");
   termPatternCache.set(normalized, pattern);
   if (termPatternCache.size > TERM_PATTERN_CACHE_LIMIT) {
     termPatternCache.delete(termPatternCache.keys().next().value);
