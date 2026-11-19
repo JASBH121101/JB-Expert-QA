@@ -192,7 +192,8 @@ export function auditTranslationMaps(sourceMap, targetMap, {
       messageShapeMismatches,
       glossaryReview: findings.filter((item) => item.id === "glossary-review").length,
       unchangedSourceText: semanticFindings.filter((item) => item.id === "unchanged-source-text").length,
-      protectedTokenMismatches: semanticFindings.filter((item) => item.id.startsWith("protected-")).length
+      protectedTokenMismatches: semanticFindings.filter((item) => item.id.startsWith("protected-")).length,
+      corruptedText: semanticFindings.filter((item) => item.id.startsWith("corrupted-") || item.id === "suspicious-encoding-sequence").length
     }),
     sourceHash,
     targetHash,
