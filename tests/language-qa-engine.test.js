@@ -102,6 +102,22 @@ test("approval state requires a named reviewer and exact source/target fingerpri
     sourceHash,
     targetHash: "c".repeat(64)
   }), "review-required");
+
+  let getterCalled = false;
+  const unsafeApproval = {};
+  Object.defineProperty(unsafeApproval, "state", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "approved";
+    }
+  });
+  assert.equal(resolveTranslationState({
+    humanApproval: unsafeApproval,
+    sourceHash,
+    targetHash
+  }), "review-required");
+  assert.equal(getterCalled, false);
 });
 
 test("translation maps identify missing, obsolete and placeholder-mismatched keys", () => {
