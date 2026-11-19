@@ -13,7 +13,7 @@ import {
   TranslationMemory
 } from "../src/language/index.js";
 
-const ITERATIONS = Number(process.env.JB_LANGUAGE_QA_BENCH_ITERATIONS ?? 8);
+const ITERATIONS = Number(process.env.JB_LANGUAGE_QA_BENCH_ITERATIONS ?? 100);
 const WARMUPS = 2;
 const OUTPUT_DIR = path.resolve(
   process.env.JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR ?? path.join(os.tmpdir(), "jb-language-qa-benchmark")
@@ -25,8 +25,8 @@ const CATALOG_KEY_COUNT = 500;
 const MEMORY_ENTRY_COUNT = 1000;
 const MEMORY_LOOKUPS = 2000;
 
-if (!Number.isSafeInteger(ITERATIONS) || ITERATIONS < 5 || ITERATIONS > 30) {
-  throw new Error("JB_LANGUAGE_QA_BENCH_ITERATIONS must be an integer from 5 to 30");
+if (!Number.isSafeInteger(ITERATIONS) || ITERATIONS < 20 || ITERATIONS > 200) {
+  throw new Error("JB_LANGUAGE_QA_BENCH_ITERATIONS must be an integer from 20 to 200");
 }
 
 function percentile(values, fraction) {
