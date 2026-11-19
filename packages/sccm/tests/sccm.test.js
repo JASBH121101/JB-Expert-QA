@@ -138,7 +138,8 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 145);
+  assert.ok(history.length >= 145, "append-only history must retain its certified baseline");
+  assert.equal(history.filter((entry) => entry.sourceId === "jb-expert-qa-main-0c3bef31").length, 4);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const sourceId = node && (entry.sourceId ?? node.sourceId);
@@ -521,7 +522,7 @@ test("newly assessed critical modules pass while unavailable A2/A3 operational c
   }
   const report = buildSccmReport(inventory, history);
   assert.equal(report.status, "PENDING");
-  assert.equal(report.historyEntries, 145);
+  assert.equal(report.historyEntries, history.length);
   assert.equal(report.progress.total, 141);
   assert.equal(report.progress.failed, 0);
 });
