@@ -47,7 +47,9 @@ The tool does not translate arbitrary text with an AI provider. Glossary suggest
 
 Structural and semantic-integrity checks never certify meaning, tone, legal wording or cultural suitability. The new semantic checks are deterministic signals: identical source/target copy can be intentional (for example, a brand name), and numeric formatting may legitimately vary. Findings therefore require human review and are not proof of a mistranslation. A translation is only marked **approved** when a named human reviewer explicitly records approval against the exact SHA-256 fingerprints of both the flattened source and target maps. The fingerprints are canonicalized by key order, so equivalent maps produce the same digest regardless of insertion order. Approval without both fingerprints, an approval for different content, missing keys, empty values, placeholder mismatches, obsolete keys or message-shape mismatches cannot produce an approved result. Any source or target content change invalidates the prior approval and requires a new review.
 
-The initial TranslationMemory implementation is an in-memory API. Durable storage, collaborative review UI, TM import/export and per-key persisted approvals are follow-up work; no database schema is silently added in this phase.
+TranslationMemory remains an in-memory API. An entry is pending by default. The legacy `approved: true`, `reviewer` and `reviewedAt` flags are rejected because they are not bound to the reviewed text. To approve an entry, call `fingerprintTranslationMemoryEntry` with its source, target, locale pair and context, create a review with `recordTranslationReview` using both returned hashes, then pass that review record to `memory.add({ ...entry, review })`. Changing either string, locale or context invalidates the review. Entry and review inputs are inspected through own data descriptors; accessors and symbol keys are rejected without invoking getters.
+
+Durable storage, collaborative review UI, TM import/export and per-key persisted approvals are follow-up work; no database schema is silently added in this phase.
 
 ## Current limits
 
