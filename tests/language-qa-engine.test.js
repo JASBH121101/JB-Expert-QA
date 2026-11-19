@@ -7,7 +7,8 @@ import {
   DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, resolveLocale,
   comparePlaceholders, parsePhpTranslationArray, LanguageLibrary,
   TranslationMemory, recordTranslationReview, resolveTranslationState,
-  auditTranslationMaps, flattenTranslationMap, auditTranslationSemantics, stableTranslationHash
+  auditTranslationMaps, flattenTranslationMap, auditTranslationSemantics, stableTranslationHash,
+  fingerprintTranslationMemoryEntry
 } from "../src/language/index.js";
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -55,21 +56,122 @@ test("glossary suggestions are deterministic, provider-free and never auto-appro
   assert.equal(suggestion.providerUsed, null);
 });
 
-test("translation memory requires human review metadata for approved entries", () => {
+test("Translation Memory pending and approved entries carry exact content fingerprints", () => {
   const memory = new TranslationMemory();
-  const pending = memory.add({ source: "Sign in", target: "Iniciar sesión", sourceLocale: "en", targetLocale: "es" });
+  const pendingInput = {
+    source: "Sign in",
+    target: "Iniciar sesión",
+    sourceLocale: "en",
+    targetLocale: "es"
+  };
+  const pending = memory.add(pendingInput);
   assert.equal(pending.status, "pending");
+  assert.match(pending.sourceHash, /^[a-f0-9]{64}$/u);
+  assert.match(pending.targetHash, /^[a-f0-9]{64}$/u);
   assert.equal(memory.findExact({ source: "Sign in", sourceLocale: "en", targetLocale: "es" }).status, "pending");
+
   assert.throws(() => memory.add({
     source: "Save", target: "Guardar", sourceLocale: "en", targetLocale: "es", approved: true
-  }), /reviewer and reviewedAt/);
-  const approved = memory.add({
+  }), /content-bound review record/);
+  assert.throws(() => memory.add({
     source: "Save", target: "Guardar", sourceLocale: "en", targetLocale: "es",
-    approved: true, reviewer: "human-reviewer", reviewedAt: "2026-11-14T10:00:00Z"
+    reviewer: "human-reviewer", reviewedAt: "2026-11-14T10:00:00Z"
+  }), /content-bound review record/);
+
+  const reviewedInput = {
+    source: "Save",
+    target: "Guardar",
+    sourceLocale: "en",
+    targetLocale: "es",
+    context: "button.label"
+  };
+  const fingerprints = fingerprintTranslationMemoryEntry(reviewedInput);
+  const review = recordTranslationReview({
+    state: "approved",
+    reviewer: "human-reviewer",
+    reviewedAt: "2026-11-14T10:00:00Z",
+    ...fingerprints
   });
+  const approved = memory.add({ ...reviewedInput, review });
   assert.equal(approved.status, "approved");
+  assert.equal(approved.reviewer, "human-reviewer");
+  assert.equal(approved.sourceHash, fingerprints.sourceHash);
+  assert.equal(approved.targetHash, fingerprints.targetHash);
+
   assert.equal(memory.markStale({ source: "Sign in", sourceLocale: "en", targetLocale: "es" }), true);
   assert.equal(memory.findExact({ source: "Sign in", sourceLocale: "en", targetLocale: "es" }).status, "stale");
+});
+
+test("Translation Memory rejects stale or context-mismatched approvals", () => {
+  const input = {
+    source: "Delete account",
+    target: "Eliminar cuenta",
+    sourceLocale: "en",
+    targetLocale: "es-419",
+    context: "destructive.confirmation"
+  };
+  const hashes = fingerprintTranslationMemoryEntry(input);
+  const review = recordTranslationReview({
+    state: "approved",
+    reviewer: "human-reviewer",
+    reviewedAt: "2026-11-19T02:50:00Z",
+    ...hashes
+  });
+  const memory = new TranslationMemory();
+  assert.throws(() => memory.add({
+    ...input,
+    target: "Eliminar perfil",
+    review
+  }), /does not approve the exact source/);
+  assert.throws(() => memory.add({
+    ...input,
+    context: "neutral.label",
+    review
+  }), /does not approve the exact source/);
+});
+
+test("Translation Memory rejects accessor-backed entries and review records without executing getters", () => {
+  const memory = new TranslationMemory();
+  let inputGetterCalled = false;
+  const unsafeInput = {
+    source: "Save",
+    target: "Guardar",
+    sourceLocale: "en",
+    targetLocale: "es"
+  };
+  Object.defineProperty(unsafeInput, "context", {
+    enumerable: true,
+    get() {
+      inputGetterCalled = true;
+      return "unsafe";
+    }
+  });
+  assert.throws(() => memory.add(unsafeInput), /accessor properties/);
+  assert.equal(inputGetterCalled, false);
+
+  const valid = {
+    source: "Save",
+    target: "Guardar",
+    sourceLocale: "en",
+    targetLocale: "es"
+  };
+  const hashes = fingerprintTranslationMemoryEntry(valid);
+  let reviewGetterCalled = false;
+  const unsafeReview = {
+    reviewer: "human-reviewer",
+    reviewedAt: "2026-11-19T02:50:00Z",
+    sourceHash: hashes.sourceHash,
+    targetHash: hashes.targetHash
+  };
+  Object.defineProperty(unsafeReview, "state", {
+    enumerable: true,
+    get() {
+      reviewGetterCalled = true;
+      return "approved";
+    }
+  });
+  assert.throws(() => memory.add({ ...valid, review: unsafeReview }), /accessor properties/);
+  assert.equal(reviewGetterCalled, false);
 });
 
 test("approval state requires a named reviewer and exact source/target fingerprints", () => {
