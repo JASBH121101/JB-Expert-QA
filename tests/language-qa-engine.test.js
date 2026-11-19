@@ -496,7 +496,7 @@ test("Language QA catalog bridge rejects invalid required locale sets", () => {
   assert.throws(() => auditTranslationCatalogs({
     "es-419": { title: "Hola" },
     en: { title: "Hello" }
-  }, { sourceLocale: "es-419", requiredLocales: ["es-NI"] }), /must not include the source locale|duplicate/);
+  }, { sourceLocale: "es-419", requiredLocales: ["es"] }), /must not include the source locale|duplicate/);
 });
 
 test("Language QA catalog bridge rejects accessors without executing them", () => {
