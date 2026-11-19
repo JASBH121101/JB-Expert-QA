@@ -40,7 +40,7 @@
     "playwright": "1.65.0",
     "pixelmatch": "8.0.0",
     "pngjs": "7.0.0",
-    "acorn": "8.15.0"
+    "acorn": "8.19.0"
   },
   "license": "UNLICENSED",
   "workspaces": [
