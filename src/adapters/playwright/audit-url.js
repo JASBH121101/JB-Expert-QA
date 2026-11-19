@@ -369,7 +369,14 @@ export async function auditUrl(url, {
 
     if (runAxe) {
       try {
-        await page.addScriptTag({ path: axeScriptPath });
+        const axeScriptUrl = new URL("/__jb-expert-qa-axe.min.js", parsed.href).href;
+        const axeScriptContent = await readFile(axeScriptPath, "utf8");
+        await page.route(axeScriptUrl, (route) => route.fulfill({
+          status: 200,
+          contentType: "application/javascript; charset=utf-8",
+          body: axeScriptContent
+        }));
+        await page.addScriptTag({ url: axeScriptUrl });
         context.axeViolations = await page.evaluate(async (tags) => {
           const result = await window.axe.run(document, {
             runOnly: { type: "tag", values: tags }
