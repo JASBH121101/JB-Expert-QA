@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.2.1",
-  "generatedAt": "2026-11-19T02:34:00Z",
+  "inventoryVersion": "1.2.2",
+  "generatedAt": "2026-11-19T20:16:33Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -998,8 +998,9 @@
       "parentId": "jb.resilience-engine.orchestration",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.a2-module",
@@ -1008,8 +1009,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-readonly",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.expired-claims",
@@ -1018,8 +1020,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-module",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.bounded-results",
@@ -1028,8 +1031,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-module",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.incident-context",
@@ -1038,8 +1042,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-module",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.ledger-readonly",
@@ -1048,8 +1053,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-module",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.orchestration.no-auto-resolution",
@@ -1058,8 +1064,9 @@
       "parentId": "jb.resilience-engine.orchestration.a2-module",
       "sourceId": "jb-expert-qa-main",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.policy",
@@ -1118,8 +1125,9 @@
       "parentId": "jb.resilience-engine",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.containment.a2-actions",
@@ -1128,8 +1136,9 @@
       "parentId": "jb.resilience-engine.containment",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.containment.a2-module",
@@ -1138,8 +1147,9 @@
       "parentId": "jb.resilience-engine.containment.a2-actions",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.containment.action-safety",
@@ -1148,8 +1158,9 @@
       "parentId": "jb.resilience-engine.containment.a2-module",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.containment.operator-verification",
@@ -1158,8 +1169,9 @@
       "parentId": "jb.resilience-engine.containment.a2-module",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover",
@@ -1168,8 +1180,9 @@
       "parentId": "jb.resilience-engine",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover.a3",
@@ -1178,8 +1191,9 @@
       "parentId": "jb.resilience-engine.failover",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover.a3-module",
@@ -1188,8 +1202,9 @@
       "parentId": "jb.resilience-engine.failover.a3",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover.fencing",
@@ -1198,8 +1213,9 @@
       "parentId": "jb.resilience-engine.failover.a3-module",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover.leader-election",
@@ -1208,8 +1224,9 @@
       "parentId": "jb.resilience-engine.failover.a3-module",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.resilience-engine.failover.replay",
@@ -1218,8 +1235,9 @@
       "parentId": "jb.resilience-engine.failover.a3-module",
       "sourceId": "jb-resilience-certification-snapshot",
       "version": "0.1.0",
-      "critical": true,
-      "dependencies": []
+      "critical": false,
+      "dependencies": [],
+      "inScope": false
     },
     {
       "id": "jb.threat-lab.simulation",
