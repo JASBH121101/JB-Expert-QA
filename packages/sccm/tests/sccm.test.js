@@ -444,7 +444,7 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
 });
 
  
-test("Regression QA is PASS across Node, platform and fixture components while Core QA stays gated by parser coverage", () => {
+test("Regression and Core QA hierarchies pass within their declared parser and fixture coverage", () => {
   const regression = evaluateSccmNode(inventory, history, "jb.expert-qa.regression");
   const regressionModule = evaluateSccmNode(inventory, history, "jb.expert-qa.regression.module");
   const regressionComponents = regressionModule.children;
@@ -464,10 +464,10 @@ test("Regression QA is PASS across Node, platform and fixture components while C
   const coreParser = evaluateSccmNode(inventory, history, "jb.expert-qa.core.parser");
   assert.equal(coreRules.status, "PASS");
   assert.equal(coreFindings.status, "PASS");
-  assert.equal(coreParser.ownStatus, "PENDING");
-  assert.equal(coreModule.status, "PENDING");
-  assert.equal(coreSubbranch.status, "PENDING");
-  assert.equal(core.status, "PENDING");
+  assert.equal(coreParser.status, "PASS");
+  assert.equal(coreModule.status, "PASS");
+  assert.equal(coreSubbranch.status, "PASS");
+  assert.equal(core.status, "PASS");
 });
 
 test("history validation fails closed on malformed entries rather than throwing", () => {
