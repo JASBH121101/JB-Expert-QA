@@ -434,6 +434,19 @@ test("translation fingerprints are deterministic across object key order", () =>
     stableTranslationHash({ greeting: "Hello", "settings.title": "Preferences" })
   );
   assert.throws(() => stableTranslationHash({ unsafe: 42 }), /flattened string map/);
+  assert.throws(() => stableTranslationHash(["not", "a", "map"]), /plain flattened string map/);
+
+  let getterCalled = false;
+  const accessorMap = {};
+  Object.defineProperty(accessorMap, "label", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "unsafe";
+    }
+  });
+  assert.throws(() => stableTranslationHash(accessorMap), /accessor properties/);
+  assert.equal(getterCalled, false);
 });
 
 test("human approvals are bound to exact translation content and cannot mask structural defects", () => {
