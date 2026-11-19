@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.2.3",
-  "generatedAt": "2026-11-19T21:11:39.780Z",
+  "inventoryVersion": "1.2.4",
+  "generatedAt": "2026-11-19T22:15:41.886Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -92,6 +92,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "refs/pull/201/head",
       "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8"
+    },
+    {
+      "id": "jb-expert-qa-pr208-language-signals",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "refs/pull/208/head",
+      "commitSha": "ab6072e3d2404c30b39381e378a029fb22847f20"
     }
   ],
   "nodes": [
@@ -1522,6 +1528,16 @@
       "parentId": "jb.currency-engine.money.module",
       "sourceId": "jb-internationalization-certification-snapshot",
       "version": "0.1.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.linguistic-signals",
+      "name": "Linguistic review signals",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-pr208-language-signals",
+      "version": "0.8.0",
       "critical": true,
       "dependencies": []
     }
