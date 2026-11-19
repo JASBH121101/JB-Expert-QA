@@ -5712,5 +5712,193 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-main-0c3bef31"
+  },
+  {
+    "assessmentId": "asmt-jb-language-qa-branch-20261119-9907c394",
+    "nodeId": "jb.expert-qa.language",
+    "version": "0.8.0",
+    "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T02:33:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068206/job/135295103214",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22, including exact-content review approvals, canonical source/target fingerprints, approval invalidation and accessor-safe review records."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103293",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103529",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068104",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs across Ubuntu and Windows, Node.js 22/24 and the language, security, package, Resilience and other engine regression suites."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068375",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Security QA passed its Node.js 22/24 validation matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-9907c394"
+  },
+  {
+    "assessmentId": "asmt-jb-language-qa-translation-integrity-20261119-9907c394",
+    "nodeId": "jb.expert-qa.language.translation-integrity",
+    "version": "0.8.0",
+    "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T02:33:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068206/job/135295103214",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22, including exact-content review approvals, canonical source/target fingerprints, approval invalidation and accessor-safe review records."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103293",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103529",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068104",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs across Ubuntu and Windows, Node.js 22/24 and the language, security, package, Resilience and other engine regression suites."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068375",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Security QA passed its Node.js 22/24 validation matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-9907c394"
+  },
+  {
+    "assessmentId": "asmt-jb-language-qa-module-20261119-9907c394",
+    "nodeId": "jb.expert-qa.language.module",
+    "version": "0.8.0",
+    "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T02:33:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068206/job/135295103214",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22, including exact-content review approvals, canonical source/target fingerprints, approval invalidation and accessor-safe review records."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103293",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103529",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068104",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs across Ubuntu and Windows, Node.js 22/24 and the language, security, package, Resilience and other engine regression suites."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068375",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Security QA passed its Node.js 22/24 validation matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-9907c394"
+  },
+  {
+    "assessmentId": "asmt-jb-language-qa-review-state-20261119-9907c394",
+    "nodeId": "jb.expert-qa.language.review-state",
+    "version": "0.8.0",
+    "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T02:33:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068206/job/135295103214",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22, including exact-content review approvals, canonical source/target fingerprints, approval invalidation and accessor-safe review records."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103293",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 24 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068291/job/135295103529",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 for the complete repository test suite."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068104",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs across Ubuntu and Windows, Node.js 22/24 and the language, security, package, Resilience and other engine regression suites."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44445068375",
+        "commitSha": "9907c3949602c31753e59ee948ef565d197e7a1e",
+        "outcome": "success",
+        "summary": "Security QA passed its Node.js 22/24 validation matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-9907c394"
   }
 ]
