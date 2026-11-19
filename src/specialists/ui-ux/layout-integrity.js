@@ -107,7 +107,7 @@ export const layoutIntegrityRules = [
           computedDirection: audit.computed,
           declaredDirection: audit.declared
         },
-        recommendation: "Set the document direction for the active locale (for Arabic, use <html lang=\\"ar\\" dir=\\"rtl\\">) and review text alignment, reading order, navigation and mixed-direction numbers/URLs."
+        recommendation: "Set lang=ar and dir=rtl on the html element for Arabic, then review text alignment, reading order, navigation and mixed-direction numbers/URLs."
       }];
     }
   },
