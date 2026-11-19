@@ -20,35 +20,40 @@ export const DEFAULT_GLOSSARY = Object.freeze([
   { id: "unit", en: ["unit", "units"], es419: ["unidad", "unidades"] },
   { id: "upload", en: ["upload", "uploads"], es419: ["subir", "cargar"] },
   { id: "image", en: ["image", "images"], es419: ["imagen", "imágenes"] },
-  { id: "employee", en: ["employee", "employees"], es419: ["empleado", "empleados"] }
+  { id: "employee", en: ["employee", "employees"], es419: ["empleado", "empleados"] },
+  { id: "dashboard", en: ["dashboard", "dashboards"], es419: ["panel", "tablero"] },
+  { id: "report", en: ["report", "reports"], es419: ["informe", "reporte"] },
+  { id: "customer", en: ["customer", "customers"], es419: ["cliente", "clientes"] },
+  { id: "supplier", en: ["supplier", "suppliers", "vendor", "vendors"], es419: ["proveedor", "proveedores"] },
+  { id: "order", en: ["order", "orders"], es419: ["pedido", "pedidos", "orden", "órdenes"] },
+  { id: "delivery", en: ["delivery", "deliveries"], es419: ["entrega", "entregas", "domicilio"] },
+  { id: "warehouse", en: ["warehouse", "warehouses"], es419: ["bodega", "bodegas", "almacén", "almacenes"] },
+  { id: "purchase", en: ["purchase", "purchases"], es419: ["compra", "compras"] },
+  { id: "sale", en: ["sale", "sales"], es419: ["venta", "ventas"] },
+  { id: "invoice", en: ["invoice", "invoices"], es419: ["factura", "facturas"] },
+  { id: "discount", en: ["discount", "discounts"], es419: ["descuento", "descuentos"] },
+  { id: "tax", en: ["tax", "taxes"], es419: ["impuesto", "impuestos"] },
+  { id: "save", en: ["save"], es419: ["guardar"] },
+  { id: "cancel", en: ["cancel", "cancelled", "canceled"], es419: ["cancelar", "cancelado"] },
+  { id: "delete", en: ["delete", "remove"], es419: ["eliminar", "borrar"] },
+  { id: "update", en: ["update", "updates"], es419: ["actualizar", "actualización", "actualizaciones"] },
+  { id: "create", en: ["create", "new"], es419: ["crear", "nuevo", "nueva"] }
 ]);
 
 function escapeRegExp(value) {
   return value.replace(/([\\^$.*+?()[\]{}|])/g, "\\$1");
 }
 
-const TERM_PATTERN_CACHE_LIMIT = 512;
-const termPatternCache = new Map();
-
-function getTermPattern(term) {
-  const normalized = term.toLocaleLowerCase();
-  let pattern = termPatternCache.get(normalized);
-  if (pattern) {
-    // Refresh insertion order so frequently used glossary terms remain cached.
-    termPatternCache.delete(normalized);
-    termPatternCache.set(normalized, pattern);
-    return pattern;
-  }
-  pattern = new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(normalized) + "($|[^\\p{L}\\p{N}])", "u");
-  termPatternCache.set(normalized, pattern);
-  if (termPatternCache.size > TERM_PATTERN_CACHE_LIMIT) {
-    termPatternCache.delete(termPatternCache.keys().next().value);
-  }
-  return pattern;
+function compileTerm(term) {
+  return Object.freeze({
+    term,
+    pattern: new RegExp("(^|[^\\p{L}\\p{N}])" + escapeRegExp(term.toLowerCase()) + "($|[^\\p{L}\\p{N}])", "u")
+  });
 }
 
-function containsTerm(text, term) {
-  return getTermPattern(term).test(text.toLocaleLowerCase());
+function findTerm(text, compiledTerms) {
+  const normalized = text.toLowerCase();
+  return compiledTerms.find((entry) => entry.pattern.test(normalized))?.term ?? null;
 }
 
 function glossaryLocaleKey(locale) {
@@ -58,8 +63,80 @@ function glossaryLocaleKey(locale) {
 }
 
 export class LanguageLibrary {
+  #compiledPairs = new Map();
+
   constructor({ glossary = DEFAULT_GLOSSARY } = {}) {
-    this.glossary = Object.freeze([...glossary]);
+    if (!Array.isArray(glossary) || glossary.length > 1000) {
+      throw new TypeError("glossary must be an array of at most 1000 terms");
+    }
+    const ids = new Set();
+    this.glossary = Object.freeze(glossary.map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new TypeError("each glossary entry requires a plain record");
+      }
+      const idDescriptor = Object.getOwnPropertyDescriptor(entry, "id");
+      if (!idDescriptor || !Object.hasOwn(idDescriptor, "value") ||
+          typeof idDescriptor.value !== "string" || !idDescriptor.value.trim()) {
+        throw new TypeError("each glossary entry requires a data-property id");
+      }
+      if (ids.has(idDescriptor.value)) throw new TypeError("glossary entry ids must be unique");
+      ids.add(idDescriptor.value);
+      if (typeof entry !== "object" || Array.isArray(entry)) {
+        throw new TypeError("each glossary entry must be a plain record");
+      }
+      const prototype = Object.getPrototypeOf(entry);
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new TypeError("each glossary entry must be a plain record");
+      }
+      if (Object.getOwnPropertySymbols(entry).length > 0) {
+        throw new TypeError("glossary entries must not contain symbol keys");
+      }
+      const descriptors = Object.getOwnPropertyDescriptors(entry);
+      const snapshot = Object.create(null);
+      for (const property of Object.keys(descriptors)) {
+        const descriptor = descriptors[property];
+        if (!descriptor.enumerable) continue;
+        if (!Object.hasOwn(descriptor, "value")) {
+          throw new TypeError("glossary entries must not contain accessor properties");
+        }
+        if (property === "__proto__" || property === "prototype" || property === "constructor") {
+          throw new TypeError("glossary entries cannot contain prototype-sensitive keys");
+        }
+        snapshot[property] = descriptor.value;
+      }
+      for (const key of ["en", "es419"]) {
+        const terms = snapshot[key] ?? [];
+        if (!Array.isArray(terms) || terms.length > 100 || Object.getOwnPropertySymbols(terms).length > 0) {
+          throw new TypeError("glossary " + key + " terms must be a safe array of at most 100 terms");
+        }
+        const copiedTerms = [];
+        for (let index = 0; index < terms.length; index += 1) {
+          const descriptor = Object.getOwnPropertyDescriptor(terms, String(index));
+          if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+            throw new TypeError("glossary " + key + " terms must not contain holes or accessor properties");
+          }
+          if (typeof descriptor.value !== "string" || !descriptor.value.trim() || descriptor.value.length > 120) {
+            throw new TypeError("glossary " + key + " terms must be non-empty strings of at most 120 characters");
+          }
+          copiedTerms.push(descriptor.value.trim());
+        }
+        snapshot[key] = Object.freeze(copiedTerms);
+      }
+      return Object.freeze(snapshot);
+    }));
+  }
+
+  #compiledTerms(fromKey, toKey) {
+    const pairKey = fromKey + "->" + toKey;
+    if (!this.#compiledPairs.has(pairKey)) {
+      const compiled = this.glossary.map((entry) => Object.freeze({
+        entry,
+        source: Object.freeze((entry[fromKey] ?? []).map(compileTerm)),
+        target: Object.freeze((entry[toKey] ?? []).map(compileTerm))
+      }));
+      this.#compiledPairs.set(pairKey, Object.freeze(compiled));
+    }
+    return this.#compiledPairs.get(pairKey);
   }
 
   terms() {
@@ -82,11 +159,11 @@ export class LanguageLibrary {
         providerUsed: null
       });
     }
-    for (const entry of this.glossary) {
-      const from = entry[fromKey] ?? [];
-      const to = entry[toKey] ?? [];
-      const matched = from.find((term) => containsTerm(sourceText, term));
-      if (matched && to.length) suggestions.push({ termId: entry.id, matched, suggestions: [...to] });
+    for (const { entry, source, target } of this.#compiledTerms(fromKey, toKey)) {
+      const matched = findTerm(sourceText, source);
+      if (matched && target.length) {
+        suggestions.push({ termId: entry.id, matched, suggestions: target.map((item) => item.term) });
+      }
     }
     return Object.freeze({
       suggestions: Object.freeze(suggestions),
@@ -104,13 +181,15 @@ export class LanguageLibrary {
     const toKey = glossaryLocaleKey(target);
     const findings = [];
     if (!fromKey || !toKey) return findings;
-    for (const entry of this.glossary) {
-      const sourceTerms = entry[fromKey] ?? [];
-      const targetTerms = entry[toKey] ?? [];
-      const foundSource = sourceTerms.find((term) => containsTerm(sourceText, term));
+    for (const { entry, source, target } of this.#compiledTerms(fromKey, toKey)) {
+      const foundSource = findTerm(sourceText, source);
       if (!foundSource) continue;
-      if (!targetTerms.some((term) => containsTerm(targetText, term))) {
-        findings.push({ termId: entry.id, sourceTerm: foundSource, expectedTargetTerms: [...targetTerms] });
+      if (!findTerm(targetText, target)) {
+        findings.push({
+          termId: entry.id,
+          sourceTerm: foundSource,
+          expectedTargetTerms: target.map((item) => item.term)
+        });
       }
     }
     return findings;
