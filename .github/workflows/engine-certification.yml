@@ -138,6 +138,19 @@ jobs:
           node --check src/index.js
       - name: Run Language QA regression tests
         run: node --test tests/language-qa-engine.test.js
+      - name: Run deterministic Language QA performance baseline
+        env:
+          JB_LANGUAGE_QA_BENCH_ITERATIONS: 100
+          JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR: ${{ runner.temp }}/jb-language-qa-benchmark
+        run: npm run benchmark:language-qa
+      - name: Upload Language QA benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: language-qa-benchmark-${{ matrix.os }}-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/jb-language-qa-benchmark/
+          if-no-files-found: warn
+          retention-days: 14
 
   expert-qa-package-cross-platform:
     name: Expert QA package / ${{ matrix.os }} / Node ${{ matrix.node }}
