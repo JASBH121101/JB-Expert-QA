@@ -5580,5 +5580,137 @@
       "No quorum-based leader election or split-brain protection exists. A lease on a single PostgreSQL primary does not establish distributed consensus or multi-region failover."
     ],
     "sourceId": "jb-expert-qa-main-fa29f"
+  },
+  {
+    "assessmentId": "asmt-security-qa-branch-20261119-0c3bef31",
+    "nodeId": "jb.expert-qa.security",
+    "version": "0.8.0",
+    "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T01:14:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023975",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Security QA checks passed on Node.js 22 and 24 on the exact merged main commit; includes the XML namespace HTTP false-positive regression."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023971",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Complete Core validation passed on Node.js 22 and 24 after the security QA correction."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023861",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30 jobs across the integrated engine test matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-0c3bef31"
+  },
+  {
+    "assessmentId": "asmt-security-qa-static-analysis-20261119-0c3bef31",
+    "nodeId": "jb.expert-qa.security.static-analysis",
+    "version": "0.8.0",
+    "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T01:14:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023975",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Security QA checks passed on Node.js 22 and 24 on the exact merged main commit; includes the XML namespace HTTP false-positive regression."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023971",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Complete Core validation passed on Node.js 22 and 24 after the security QA correction."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023861",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30 jobs across the integrated engine test matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-0c3bef31"
+  },
+  {
+    "assessmentId": "asmt-security-qa-module-20261119-0c3bef31",
+    "nodeId": "jb.expert-qa.security.module",
+    "version": "0.8.0",
+    "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T01:14:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023975",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Security QA checks passed on Node.js 22 and 24 on the exact merged main commit; includes the XML namespace HTTP false-positive regression."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023971",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Complete Core validation passed on Node.js 22 and 24 after the security QA correction."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023861",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30 jobs across the integrated engine test matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-0c3bef31"
+  },
+  {
+    "assessmentId": "asmt-security-qa-rule-integrity-20261119-0c3bef31",
+    "nodeId": "jb.expert-qa.security.rule-integrity",
+    "version": "0.8.0",
+    "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T01:14:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023975",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Security QA checks passed on Node.js 22 and 24 on the exact merged main commit; includes the XML namespace HTTP false-positive regression."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023971",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "Complete Core validation passed on Node.js 22 and 24 after the security QA correction."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44435023861",
+        "commitSha": "0c3bef31e9f31d5fb859a23b96ed609940dd1234",
+        "outcome": "success",
+        "summary": "JB Engines Certification passed all 30 jobs across the integrated engine test matrix on the exact merged main commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-0c3bef31"
   }
 ]
