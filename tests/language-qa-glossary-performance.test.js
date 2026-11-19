@@ -83,3 +83,20 @@ test("glossary locale matching is independent of host default locale and ids are
     sourceLocale: "en-US", targetLocale: "es-NI"
   }).suggestions.some(item => item.termId === "update"));
 });
+
+
+test("glossary snapshots reject accessor-backed glossary arrays without invoking getters", () => {
+  let invoked = false;
+  const entries = [];
+  Object.defineProperty(entries, "0", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      invoked = true;
+      return { id: "unsafe", en: ["save"], es419: ["guardar"] };
+    }
+  });
+  entries.length = 1;
+  assert.throws(() => new LanguageLibrary({ glossary: entries }), /holes or accessor properties/);
+  assert.equal(invoked, false);
+});
