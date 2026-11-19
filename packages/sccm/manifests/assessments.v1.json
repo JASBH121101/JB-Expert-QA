@@ -6080,5 +6080,385 @@
       }
     ],
     "findings": []
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.ecosystem.20261119",
+    "nodeId": "jb.ecosystem",
+    "version": "1.0.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610203",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Security QA validation passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.20261119",
+    "nodeId": "jb.expert-qa",
+    "version": "0.2.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.security-guard.20261119",
+    "nodeId": "jb.security-guard",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610308",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Security Guard multi-runtime validation passed on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610203",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Security QA validation passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.malware-engine.20261119",
+    "nodeId": "jb.malware-engine",
+    "version": "0.6.2",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.resilience-engine.20261119",
+    "nodeId": "jb.resilience-engine",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.threat-lab.20261119",
+    "nodeId": "jb.threat-lab",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.advisor-engine.20261119",
+    "nodeId": "jb.advisor-engine",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.localization-engine.20261119",
+    "nodeId": "jb.localization-engine",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.currency-engine.20261119",
+    "nodeId": "jb.currency-engine",
+    "version": "0.1.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610545",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Core repository validation passed on Node.js 22 and Node.js 24 on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.20261119",
+    "nodeId": "jb.expert-qa.language",
+    "version": "0.8.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610216",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Language QA regression tests passed on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610211",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Glossary snapshot hardening tests and same-runner comparative benchmark passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.module.20261119",
+    "nodeId": "jb.expert-qa.language.module",
+    "version": "0.8.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610216",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Language QA regression tests passed on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610211",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Glossary snapshot hardening tests and same-runner comparative benchmark passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.glossary.20261119",
+    "nodeId": "jb.expert-qa.language.glossary",
+    "version": "0.8.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610216",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Language QA regression tests passed on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610211",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Glossary snapshot hardening tests and same-runner comparative benchmark passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.linguistic-signals.20261119",
+    "nodeId": "jb.expert-qa.language.linguistic-signals",
+    "version": "0.8.0",
+    "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T22:31:12.222Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610272",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30 jobs on the exact assessed commit, including the Windows/Linux, Node.js 22/24, Security Guard, Malware, Advisor, Threat Lab, Resilience, Language QA, localization/currency and package test matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610216",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Language QA regression tests passed on the exact assessed commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44628610211",
+        "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66",
+        "outcome": "success",
+        "summary": "Glossary snapshot hardening tests and same-runner comparative benchmark passed on the exact assessed commit."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr222-closeout"
   }
 ]
