@@ -689,3 +689,24 @@ test("glossary suggestions and consistency checks support regional English and S
   assert.equal(unsupportedPair.requiresHumanReview, true);
   assert.equal(unsupportedPair.autoApproved, false);
 });
+
+
+test("glossary cached term matching keeps Unicode-aware boundaries and escaped literals", () => {
+  const library = new LanguageLibrary({ glossary: [
+    { id: "cplusplus", en: ["c++"], es419: ["c++"] },
+    { id: "art", en: ["art"], es419: ["arte"] }
+  ] });
+  const matches = library.suggestTranslation("C++ is art; cart is not artful", {
+    sourceLocale: "en-US",
+    targetLocale: "es-NI"
+  });
+  assert.deepEqual(matches.suggestions.map((item) => item.termId), ["cplusplus", "art"]);
+  assert.equal(matches.autoApproved, false);
+  assert.equal(matches.requiresHumanReview, true);
+  const consistency = library.validateTermConsistency("art", "cart", {
+    sourceLocale: "en-US",
+    targetLocale: "es-NI"
+  });
+  assert.equal(consistency.length, 1);
+  assert.equal(consistency[0].termId, "art");
+});
