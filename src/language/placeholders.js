@@ -1,4 +1,4 @@
-const PLACEHOLDER_PATTERN = /:([A-Za-z_][A-Za-z0-9_]*)|\\{\\{\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}|\\{\\s*([A-Za-z_][A-Za-z0-9_]*)(?:\\s*,\\s*([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*[,}])|%([0-9]+\\$)?([sd])/g;
+const PLACEHOLDER_PATTERN = /:([A-Za-z_][A-Za-z0-9_]*)|\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}|\{\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s*,\s*([A-Za-z_][A-Za-z0-9_-]*))?(?=\s*[,}])|%([0-9]+\$)?([sd])/g;
 
 function formatBracePlaceholder(name, format) {
   return format ? "{" + name + "," + format + "}" : "{" + name + "}";
