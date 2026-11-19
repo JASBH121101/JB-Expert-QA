@@ -151,6 +151,12 @@ export function auditTranslationSemantics(sourceMap, targetMap, {
   const sourceEntries = readFlatEntries(sourceMap, "sourceMap");
   const targetEntries = new Map(readFlatEntries(targetMap, "targetMap"));
   const findings = [];
+  const sourceKeys = new Set(sourceEntries.map(([key]) => key));
+  const emptyEncoding = Object.freeze({ replacement: 0, controls: [], mojibake: false });
+  for (const [key, targetText] of targetEntries) {
+    if (sourceKeys.has(key)) continue;
+    appendEncodingFindings(key, emptyEncoding, suspiciousUnicode(targetText), findings);
+  }
 
   for (const [key, sourceText] of sourceEntries) {
     if (!targetEntries.has(key)) continue;
@@ -209,13 +215,6 @@ export function auditTranslationSemantics(sourceMap, targetMap, {
         "low"
       ));
     }
-  }
-
-  const sourceKeys = new Set(sourceEntries.map(([key]) => key));
-  const emptyEncoding = Object.freeze({ replacement: 0, controls: [], mojibake: false });
-  for (const [key, targetText] of targetEntries) {
-    if (sourceKeys.has(key)) continue;
-    appendEncodingFindings(key, emptyEncoding, suspiciousUnicode(targetText), findings);
   }
 
   return Object.freeze(findings);
