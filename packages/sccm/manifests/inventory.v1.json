@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.0.7",
-  "generatedAt": "2026-11-18T23:45:57Z",
+  "inventoryVersion": "1.0.8",
+  "generatedAt": "2026-11-19T00:14:49Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -56,6 +56,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "main",
       "commitSha": "fd510de51b61222bd63beb98a3ce0d5c189a6a01"
+    },
+    {
+      "id": "jb-expert-qa-main-fca2b98",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "main",
+      "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf"
     }
   ],
   "nodes": [
