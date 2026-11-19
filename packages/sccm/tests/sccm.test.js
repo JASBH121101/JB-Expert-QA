@@ -138,7 +138,7 @@ test("inventory rejects accessor properties without executing them", () => {
 test("the append-only evidence ledger contains valid per-source exact-SHA assessments", () => {
   const result = validateSccmHistory(inventory, history);
   assert.equal(result.valid, true, result.errors.join("; "));
-  assert.equal(history.length, 91);
+  assert.equal(history.length, 103);
   assert.ok(history.every((entry) => {
     const node = inventory.nodes.find((item) => item.id === entry.nodeId);
     const sourceId = node && (entry.sourceId ?? node.sourceId);
@@ -441,6 +441,33 @@ test("SCCM report counts aggregate statuses instead of trusting raw CI totals", 
   assert.ok(report.progress.passed > 0);
   assert.ok(report.progress.pending > 0);
   assert.equal(report.progress.total, 141);
+});
+
+ 
+test("Regression QA is PASS across Node, platform and fixture components while Core QA stays gated by parser coverage", () => {
+  const regression = evaluateSccmNode(inventory, history, "jb.expert-qa.regression");
+  const regressionModule = evaluateSccmNode(inventory, history, "jb.expert-qa.regression.module");
+  const regressionComponents = regressionModule.children;
+  assert.equal(regression.status, "PASS");
+  assert.equal(regression.children[0].status, "PASS");
+  assert.equal(regressionModule.status, "PASS");
+  assert.equal(regressionComponents.length, 3);
+  assert.ok(regressionComponents.every((component) =>
+    component.status === "PASS" && component.ownStatus === "PASS"
+  ));
+
+  const core = evaluateSccmNode(inventory, history, "jb.expert-qa.core");
+  const coreSubbranch = evaluateSccmNode(inventory, history, "jb.expert-qa.core.analysis-core");
+  const coreModule = evaluateSccmNode(inventory, history, "jb.expert-qa.core.module");
+  const coreRules = evaluateSccmNode(inventory, history, "jb.expert-qa.core.rules");
+  const coreFindings = evaluateSccmNode(inventory, history, "jb.expert-qa.core.findings");
+  const coreParser = evaluateSccmNode(inventory, history, "jb.expert-qa.core.parser");
+  assert.equal(coreRules.status, "PASS");
+  assert.equal(coreFindings.status, "PASS");
+  assert.equal(coreParser.ownStatus, "PENDING");
+  assert.equal(coreModule.status, "PENDING");
+  assert.equal(coreSubbranch.status, "PENDING");
+  assert.equal(core.status, "PENDING");
 });
 
 test("history validation fails closed on malformed entries rather than throwing", () => {
