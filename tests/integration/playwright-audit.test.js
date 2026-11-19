@@ -5,7 +5,7 @@ import { auditUrl } from "../../src/adapters/playwright/audit-url.js";
 
 const html = `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>JB Expert QA fixture</title></head>
+<head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"><title>JB Expert QA fixture</title></head>
 <body style="margin:0">
   <div class="wide-panel" style="width:600px;height:20px">Wide panel</div>
   <p class="tiny-copy" style="font-size:10px">Small text sample</p>

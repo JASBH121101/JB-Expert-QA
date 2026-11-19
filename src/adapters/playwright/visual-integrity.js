@@ -136,7 +136,8 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
 
     const textTargets = [...document.querySelectorAll(
       "button,a,[role='button'],[role='link'],label,h1,h2,h3,h4,h5,h6,p,li,summary,[data-qa-text]"
-    )].filter((element) => visible(element) && !ignored(element)).slice(0, 1800);
+    )].filter((element) => visible(element) && !ignored(element) &&
+      !element.matches(".sr-only,.visually-hidden,.screen-reader-only")).slice(0, 1800);
     const clippedText = [];
     const clippedByAncestor = [];
     const seenClipping = new Set();

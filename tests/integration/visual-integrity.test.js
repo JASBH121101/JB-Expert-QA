@@ -73,3 +73,33 @@ test("does not treat an unclamped webkit box with visible overflow as clipped te
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("does not flag intentionally visually-hidden accessible headings as clipped text", { timeout: 30000 }, async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Screen reader text</title></head><body>
+      <h1 class="sr-only" style="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">Accessible heading</h1>
+      <main><p>Visible page content</p></main>
+    </body></html>`);
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const url = "http://127.0.0.1:" + server.address().port + "/";
+  try {
+    const report = await auditUrl(url, {
+      config,
+      viewport: { width: 390, height: 844 },
+      timeout: 10000,
+      runAxe: false,
+      allowPrivateNetworks: true,
+      targetLanguage: "en"
+    });
+    const clipping = report.diagnostics.filter((item) => item.id.startsWith("UIUX-008-"));
+    assert.equal(clipping.some((item) => item.location === "h1.sr-only"), false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
