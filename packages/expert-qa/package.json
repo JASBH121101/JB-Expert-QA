@@ -38,7 +38,7 @@
     "setup:browser": "node cli/package-cli.js setup --browser chromium"
   },
   "dependencies": {
-    "acorn": "8.15.0",
+    "acorn": "8.19.0",
     "axe-core": "4.14.0",
     "pixelmatch": "8.0.0",
     "playwright": "1.65.0",
