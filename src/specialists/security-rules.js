@@ -52,6 +52,13 @@ export const securityDefenseRules = Object.freeze([
           if (isCommentLine(line)) continue;
           const matches = [...line.matchAll(/\bhttp:\/\/([a-z0-9.-]+)(?::\d+)?/gi)];
           for (const match of matches) {
+            const namespaceAttributes = [...line.matchAll(/\bxmlns(?::[a-z0-9_.-]+)?\s*=\s*(["'])(.*?)\1/gi)];
+            const isXmlNamespaceReference = namespaceAttributes.some((attribute) => {
+              const valueStart = attribute.index + attribute[0].indexOf(attribute[2]);
+              return match.index >= valueStart && match.index < valueStart + attribute[2].length;
+            });
+            if (isXmlNamespaceReference) continue;
+
             const host = match[1].toLowerCase();
             if (
               host === "localhost" || host === "127.0.0.1" ||

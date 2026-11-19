@@ -83,6 +83,24 @@ test("safe configuration patterns do not trigger the added security rules", asyn
   });
 });
 
+test("HTTP URLs inside XML namespace attributes are identifiers, not outbound endpoints", async () => {
+  await withProject(async (root) => {
+    await writeFile(join(root, "src", "sitemap.php"), [
+      "<?php",
+      'const sitemap = \'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\';',
+      'const endpoint = "http://api.example.com/v1";'
+    ].join("\n"));
+
+    const report = await auditSecurityProject(root);
+    const findings = report.diagnostics.filter((item) => item.id.startsWith("SEC-HTTP-"));
+
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].location, "src/sitemap.php:3");
+    assert.equal(findings[0].severity, "high");
+    assert.equal(findings[0].metadata.hostname, "api.example.com");
+  });
+});
+
 test("commented-out examples are not reported by the added line-based checks", async () => {
   await withProject(async (root) => {
     await writeFile(join(root, "src", "comments.js"), [
