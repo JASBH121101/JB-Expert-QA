@@ -93,12 +93,12 @@ function createMemory(entryCount) {
 function makeCases() {
   const smallMaps = createTranslationMaps(SMALL_KEY_COUNT);
   const largeMaps = createTranslationMaps(LARGE_KEY_COUNT);
-  const nestedMap = Object.fromEntries(
-    Array.from({ length: LARGE_KEY_COUNT }, (_, index) => [
-      "group_" + Math.floor(index / 25),
-      Object.fromEntries([[ "label_" + index, "Sample label " + index ]])
-    ])
-  );
+  const nestedMap = Object.create(null);
+  for (let index = 0; index < LARGE_KEY_COUNT; index += 1) {
+    const group = "group_" + Math.floor(index / 25);
+    if (!Object.hasOwn(nestedMap, group)) nestedMap[group] = Object.create(null);
+    nestedMap[group]["label_" + index] = "Sample label " + index;
+  }
   const catalogs = createCatalogs(CATALOG_KEY_COUNT);
   const memory = createMemory(MEMORY_ENTRY_COUNT);
   const aliases = [
