@@ -34,12 +34,12 @@ jobs:
       NEXORA_CATALOG_REVISION: 88c4876c9678b93dadde55f79fe9d04890900741
     steps:
       - name: Checkout JB Threat Lab
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
       - name: Checkout the pinned NEXORA catalog prototype
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: 88c4876c9678b93dadde55f79fe9d04890900741
@@ -47,7 +47,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           package-manager-cache: false
@@ -78,12 +78,12 @@ jobs:
       NEXORA_SITE_ENGINE_REVISION: 3f68126ecc58b088c071007c5116bc95426d159b
     steps:
       - name: Checkout JB Threat Lab
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
       - name: Checkout the canonical approved NEXORA Site Engine revision
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: 3f68126ecc58b088c071007c5116bc95426d159b
@@ -115,7 +115,7 @@ jobs:
         run: composer lint
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           package-manager-cache: false
