@@ -3427,5 +3427,377 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-currency-pr175"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core-rules.20261119.pr180",
+    "nodeId": "jb.expert-qa.core.rules",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Complete Core Validation passed on Node.js 22; includes core engine, rule registry, scoring, config and diagnostic regressions."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Complete Core Validation passed on Node.js 24; includes core engine, rule registry, scoring, config and diagnostic regressions."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051546/job/135234491501",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Expert QA regression integration checks passed on the merged main revision with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051546/job/135234491906",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Expert QA regression integration checks passed on the merged main revision with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core-findings.20261119.pr180",
+    "nodeId": "jb.expert-qa.core.findings",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491034",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Complete Core Validation passed on Node.js 22; includes core engine, rule registry, scoring, config and diagnostic regressions."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051559/job/135234491365",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Complete Core Validation passed on Node.js 24; includes core engine, rule registry, scoring, config and diagnostic regressions."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051546/job/135234491501",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Expert QA regression integration checks passed on the merged main revision with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051546/job/135234491906",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Expert QA regression integration checks passed on the merged main revision with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core-parser.20261119.pr180",
+    "nodeId": "jb.expert-qa.core.parser",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [],
+    "findings": [
+      "No Core-owned parser/AST implementation or corresponding parser test is mapped in the audited source tree; resolve ownership and test coverage before PASS."
+    ],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core-module.20261119.pr180",
+    "nodeId": "jb.expert-qa.core.module",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [],
+    "findings": [
+      "Critical child jb.expert-qa.core.parser remains PENDING."
+    ],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core-analysis-core.20261119.pr180",
+    "nodeId": "jb.expert-qa.core.analysis-core",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [],
+    "findings": [
+      "The Core QA module remains PENDING because its parser/AST component is not yet certified."
+    ],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-core.20261119.pr180",
+    "nodeId": "jb.expert-qa.core",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PENDING",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [],
+    "findings": [
+      "The analysis-core subbranch remains PENDING; parent certification is withheld."
+    ],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression-node-matrix.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression.node-matrix",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression-platform-matrix.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression.platform-matrix",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression-fixture-integrity.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression.fixture-integrity",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression-module.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression.module",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression-matrix.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression.matrix",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
+  },
+  {
+    "assessmentId": "asmt.jb-expert-qa-regression.20261119.pr180",
+    "nodeId": "jb.expert-qa.regression",
+    "version": "0.8.0",
+    "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T00:14:49Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492862",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492506",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Ubuntu 24.04 with Node.js 24."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492836",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44427051525/job/135234492864",
+        "commitSha": "fca2b98bac81abe553c8748e8dee96bae1a8bfcf",
+        "outcome": "success",
+        "summary": "Regression matrix passed on Windows Server 2022 with Node.js 24."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-main-fca2b98"
   }
 ]
