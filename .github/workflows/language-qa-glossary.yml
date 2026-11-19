@@ -9,7 +9,7 @@ on:
       - "bench/glossary-matchers.js"
       - ".github/workflows/language-qa-glossary.yml"
   push:
-    branches: [main, "feature/language-qa-glossary-performance-v3"]
+    branches: [main, "feature/language-qa-glossary-performance-v2"]
     paths:
       - "src/language/glossary.js"
       - "tests/language-qa-glossary-performance.test.js"
@@ -20,9 +20,9 @@ permissions:
   contents: read
 
 jobs:
-  glossary-tests-and-comparative-benchmark:
+  glossary-tests-and-benchmark:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,17 +31,5 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
-      - name: Run complete Language QA regression suite
-        run: npm run test:language-qa
-      - name: Fetch baseline source revision
-        env:
-          BASELINE_SHA: c5869b4c40218c8401e59db7b04bf6d19c5dcccd
-        run: |
-          git fetch origin "$BASELINE_SHA" --depth=1
-          git worktree add --detach "$RUNNER_TEMP/jb-language-qa-baseline" "$BASELINE_SHA"
-      - name: Compare glossary baseline and candidate on the same runner
-        run: |
-          echo "=== BASELINE: c5869b4c40218c8401e59db7b04bf6d19c5dcccd ==="
-          node bench/glossary-matchers.js --root="$RUNNER_TEMP/jb-language-qa-baseline"
-          echo "=== HEAD: $GITHUB_SHA ==="
-          node bench/glossary-matchers.js --root="$GITHUB_WORKSPACE"
+      - run: npm run test:language-qa
+      - run: npm run benchmark:language-qa -- --iterations=25
