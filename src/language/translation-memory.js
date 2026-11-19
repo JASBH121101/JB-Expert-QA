@@ -156,6 +156,53 @@ export class TranslationMemory {
     return true;
   }
 
+  suggestSimilar({
+    source,
+    sourceLocale,
+    targetLocale,
+    context = "",
+    threshold = 0.5,
+    limit = 5
+  } = {}) {
+    if (typeof source !== "string" || !source.trim() || typeof context !== "string") return [];
+    const from = normalizeLocale(sourceLocale);
+    const to = normalizeLocale(targetLocale);
+    if (!from || !to || from === to) return [];
+    if (typeof threshold !== "number" || !Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+      throw new RangeError("Translation Memory similarity threshold must be between 0 and 1");
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new RangeError("Translation Memory suggestion limit must be an integer from 1 to 50");
+    }
+
+    const tokenize = (value) => new Set(
+      value.normalize("NFKC").toLocaleLowerCase("en").match(/[\p{L}\p{N}]+/gu) ?? []
+    );
+    const queryTokens = tokenize(source);
+    if (queryTokens.size === 0) return [];
+    const candidates = [];
+    for (const entry of this.#entries.values()) {
+      if (entry.sourceLocale !== from || entry.targetLocale !== to || entry.context !== context) continue;
+      const candidateTokens = tokenize(entry.source);
+      if (candidateTokens.size === 0) continue;
+      let intersection = 0;
+      for (const token of queryTokens) if (candidateTokens.has(token)) intersection += 1;
+      const union = queryTokens.size + candidateTokens.size - intersection;
+      const similarity = union ? intersection / union : 0;
+      if (similarity > 0 && similarity >= threshold && similarity < 1) {
+        candidates.push({
+          entry,
+          similarity: Number(similarity.toFixed(4)),
+          requiresHumanReview: true,
+          autoApproved: false
+        });
+      }
+    }
+    candidates.sort((left, right) => right.similarity - left.similarity ||
+      left.entry.source.localeCompare(right.entry.source));
+    return candidates.slice(0, limit);
+  }
+
   list() {
     return [...this.#entries.values()];
   }

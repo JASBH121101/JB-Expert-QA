@@ -12,6 +12,7 @@ on:
       - "src/specialists/language/**"
       - "src/index.js"
       - "tests/language-qa-engine.test.js"
+      - "tests/language-qa-translation-memory-suggestions.test.js"
       - "bench/language-qa.js"
       - ".github/workflows/language-qa.yml"
   pull_request:
@@ -25,6 +26,7 @@ on:
       - "src/specialists/language/**"
       - "src/index.js"
       - "tests/language-qa-engine.test.js"
+      - "tests/language-qa-translation-memory-suggestions.test.js"
       - ".github/workflows/language-qa.yml"
 
 permissions:
@@ -64,6 +66,6 @@ jobs:
           node --check src/adapters/filesystem/audit-project.js
           node --check src/index.js
       - name: Run Language QA regression tests
-        run: node --test tests/language-qa-engine.test.js
+        run: npm run test:language-qa
       - name: Run deterministic Language QA benchmark baseline
         run: npm run benchmark:language-qa -- --iterations=25
