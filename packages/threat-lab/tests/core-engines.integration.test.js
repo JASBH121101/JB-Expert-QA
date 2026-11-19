@@ -566,7 +566,7 @@ return [
           );
           const passed = languageAudit?.status === "checked"
             && languageAudit.sourceLocale === "es-419"
-            && languageAudit.targetLocale === "en"
+            && languageAudit.targetLocale === "en-US"
             && missingKey
             && placeholderMismatch
             && specialistFinding;
