@@ -97,7 +97,7 @@ test("the versioned hierarchy inventory validates with all six certification lev
     [...new Set(inventory.nodes.map((node) => node.level))].sort(),
     ["branch", "component", "ecosystem", "engine", "module", "subbranch"]
   );
-  assert.equal(inventory.nodes.length, 141);
+  assert.equal(inventory.nodes.length, 142);
   assert.equal(inventory.nodes.filter((node) => node.level === "engine").length, 8);
 });
 
@@ -260,8 +260,9 @@ test("Language QA is PASS at component, module, subbranch and branch levels", ()
   assert.equal(branch.status, "PASS");
   assert.equal(branch.children[0].status, "PASS");
   assert.equal(module.status, "PASS");
-  assert.equal(components.length, 9);
+  assert.equal(components.length, 10);
   assert.ok(components.every((component) => component.status === "PASS"));
+  assert.equal(components.find((component) => component.id === "jb.expert-qa.language.linguistic-signals").ownStatus, "PASS");
   assert.equal(components.find((component) => component.id === "jb.expert-qa.language.cldr-catalog-audit").ownStatus, "PASS");
 });
 
@@ -437,11 +438,11 @@ test("SCCM report separates certified scope from explicitly excluded capabilitie
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
   assert.equal(report.status, "PASS");
-  assert.equal(report.counts.component.total, 72);
+  assert.equal(report.counts.component.total, 73);
   assert.equal(report.counts.component.OUT_OF_SCOPE, 10);
-  assert.equal(report.counts.component.inScope, 62);
-  assert.equal(report.progress.total, 123);
-  assert.equal(report.progress.passed, 123);
+  assert.equal(report.counts.component.inScope, 63);
+  assert.equal(report.progress.total, 124);
+  assert.equal(report.progress.passed, 124);
   assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
   assert.equal(report.progress.outOfScope, 18);
@@ -518,7 +519,7 @@ test("all in-scope recently assessed modules pass and A2/A3 are excluded without
   const report = buildSccmReport(inventory, history);
   assert.equal(report.status, "PASS");
   assert.equal(report.historyEntries, history.length);
-  assert.equal(report.progress.total, 123);
+  assert.equal(report.progress.total, 124);
   assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
   assert.equal(report.progress.outOfScope, 18);
