@@ -176,7 +176,7 @@ export class TranslationMemory {
     }
 
     const tokenize = (value) => new Set(
-      value.normalize("NFKC").toLocaleLowerCase("en").match(/[\\p{L}\\p{N}]+/gu) ?? []
+      value.normalize("NFKC").toLocaleLowerCase("en").match(/[\p{L}\p{N}]+/gu) ?? []
     );
     const queryTokens = tokenize(source);
     if (queryTokens.size === 0) return [];
