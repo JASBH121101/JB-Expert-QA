@@ -13,14 +13,28 @@ import {
 import { auditLanguageFiles } from "../src/adapters/filesystem/audit-language.js";
 import { languageRules } from "../src/specialists/language/index.js";
 
-test("normalizes legacy Spanish and regional English to the approved locale set", () => {
+test("normalizes aliases to the 12 locales supported by Localization Engine", () => {
   assert.equal(DEFAULT_LOCALE, "es-419");
-  assert.deepEqual(SUPPORTED_LOCALES, ["es-419", "en"]);
+  assert.deepEqual(SUPPORTED_LOCALES, [
+    "es-NI", "es-419", "es-MX", "es-ES",
+    "en-US", "en-GB", "pt-BR", "pt-PT",
+    "fr-FR", "de-DE", "it-IT", "ar"
+  ]);
   assert.equal(normalizeLocale("es"), "es-419");
-  assert.equal(normalizeLocale("es_MX"), "es-419");
-  assert.equal(normalizeLocale("en-GB"), "en");
-  assert.equal(normalizeLocale("fr"), null);
-  assert.equal(resolveLocale("fr"), "es-419");
+  assert.equal(normalizeLocale("es_NI"), "es-NI");
+  assert.equal(normalizeLocale("es_MX"), "es-MX");
+  assert.equal(normalizeLocale("es-CO"), "es-419");
+  assert.equal(normalizeLocale("es-ES"), "es-ES");
+  assert.equal(normalizeLocale("en"), "en-US");
+  assert.equal(normalizeLocale("en-GB"), "en-GB");
+  assert.equal(normalizeLocale("pt"), "pt-BR");
+  assert.equal(normalizeLocale("fr"), "fr-FR");
+  assert.equal(normalizeLocale("de-DE"), "de-DE");
+  assert.equal(normalizeLocale("it"), "it-IT");
+  assert.equal(normalizeLocale("ar"), "ar");
+  assert.equal(normalizeLocale("fr-CA"), "fr-FR");
+  assert.equal(normalizeLocale("zh-CN"), null);
+  assert.equal(resolveLocale("zh-CN"), "es-419");
 });
 
 test("compares named, brace and positional placeholders without losing duplicates", () => {
@@ -293,15 +307,15 @@ test("unsafe or dynamic PHP translation resources become parse findings instead 
 });
 
 
-test("locale aliases are canonical and reject unsupported or malformed regional tags", () => {
-  assert.equal(normalizeLocale("es-NI"), "es-419");
-  assert.equal(normalizeLocale("es-MX"), "es-419");
+test("locale normalization preserves approved variants and rejects unsupported or malformed tags", () => {
+  assert.equal(normalizeLocale("es-NI"), "es-NI");
+  assert.equal(normalizeLocale("es-MX"), "es-MX");
   assert.equal(normalizeLocale("es_419"), "es-419");
-  assert.equal(normalizeLocale("es-ES"), null);
+  assert.equal(normalizeLocale("es-ES"), "es-ES");
   assert.equal(normalizeLocale("es-XY"), null);
   assert.equal(normalizeLocale("es-MX-u-ca-gregory"), null);
-  assert.equal(normalizeLocale("en-US"), "en");
-  assert.equal(normalizeLocale("en-GB"), "en");
+  assert.equal(normalizeLocale("en-US"), "en-US");
+  assert.equal(normalizeLocale("en-GB"), "en-GB");
   assert.equal(normalizeLocale("en-not-a-region"), null);
   assert.equal(normalizeLocale("en-US-u-ca-gregory"), null);
 });
@@ -461,15 +475,15 @@ test("Language QA delegates CLDR plural categories and placeholder parity to the
   assert.equal(result.autoApproved, false);
   assert.equal(result.reviewRequired, true);
   assert.ok(result.findings.some((item) =>
-    item.code === "plural-category-missing" && item.locale === "en" && item.category === "one"
+    item.code === "plural-category-missing" && item.locale === "en-US" && item.category === "one"
   ));
 });
 
 test("Language QA catalog bridge rejects unsupported locales and duplicate aliases", () => {
   assert.throws(() => auditTranslationCatalogs({
     "es-419": { title: "Hola" },
-    "fr-FR": { title: "Bonjour" }
-  }, { sourceLocale: "es-419", requiredLocales: ["fr-FR"] }), /not supported|unsupported/);
+    "zh-CN": { title: "你好" }
+  }, { sourceLocale: "es-419", requiredLocales: ["zh-CN"] }), /not supported|unsupported/);
 
   assert.throws(() => auditTranslationCatalogs({
     es: { title: "Hola" },
@@ -482,7 +496,7 @@ test("Language QA catalog bridge rejects invalid required locale sets", () => {
   assert.throws(() => auditTranslationCatalogs({
     "es-419": { title: "Hola" },
     en: { title: "Hello" }
-  }, { sourceLocale: "es-419", requiredLocales: ["es-NI"] }), /must not include the source locale|duplicate/);
+  }, { sourceLocale: "es-419", requiredLocales: ["es"] }), /must not include the source locale|duplicate/);
 });
 
 test("Language QA catalog bridge rejects accessors without executing them", () => {
@@ -607,4 +621,32 @@ test("human approvals are bound to exact translation content and cannot mask str
     humanApproval: approval
   });
   assert.equal(brokenPlaceholder.reviewStatus, "review-required");
+});
+
+test("Language QA catalog bridge accepts all registered Localization Engine locales", () => {
+  const catalogs = Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, { title: "Title" }]));
+  const requiredLocales = SUPPORTED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE);
+  const result = auditTranslationCatalogs(catalogs, {
+    sourceLocale: DEFAULT_LOCALE,
+    requiredLocales
+  });
+  assert.equal(result.status, "passed");
+  assert.equal(result.reviewRequired, false);
+  assert.equal(result.autoApproved, false);
+  assert.equal(result.engine, "jb-localization-engine");
+});
+
+test("glossary review avoids false language findings when no locale pair dictionary exists", () => {
+  const library = new LanguageLibrary();
+  const suggestions = library.suggestTranslation("Product price settings", {
+    sourceLocale: "en-US",
+    targetLocale: "fr-FR"
+  });
+  assert.equal(suggestions.suggestions.length, 0);
+  assert.equal(suggestions.requiresHumanReview, true);
+  assert.equal(suggestions.autoApproved, false);
+  assert.deepEqual(library.validateTermConsistency("Product price", "Prix du produit", {
+    sourceLocale: "en-US",
+    targetLocale: "fr-FR"
+  }), []);
 });

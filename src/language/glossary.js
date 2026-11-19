@@ -32,6 +32,12 @@ function containsTerm(text, term) {
   return pattern.test(text.toLocaleLowerCase());
 }
 
+function glossaryLocaleKey(locale) {
+  if (locale === "en-US" || locale === "en-GB") return "en";
+  if (locale === "es-419" || locale === "es-NI" || locale === "es-MX") return "es419";
+  return null;
+}
+
 export class LanguageLibrary {
   constructor({ glossary = DEFAULT_GLOSSARY } = {}) {
     this.glossary = Object.freeze([...glossary]);
@@ -46,9 +52,17 @@ export class LanguageLibrary {
     const source = normalizeLocale(sourceLocale);
     const target = normalizeLocale(targetLocale);
     if (!source || !target || source === target) throw new TypeError("Two different supported locales are required");
-    const fromKey = source === "es-419" ? "es419" : "en";
-    const toKey = target === "es-419" ? "es419" : "en";
+    const fromKey = glossaryLocaleKey(source);
+    const toKey = glossaryLocaleKey(target);
     const suggestions = [];
+    if (!fromKey || !toKey) {
+      return Object.freeze({
+        suggestions: Object.freeze(suggestions),
+        requiresHumanReview: true,
+        autoApproved: false,
+        providerUsed: null
+      });
+    }
     for (const entry of this.glossary) {
       const from = entry[fromKey] ?? [];
       const to = entry[toKey] ?? [];
@@ -67,9 +81,10 @@ export class LanguageLibrary {
     const source = normalizeLocale(sourceLocale);
     const target = normalizeLocale(targetLocale);
     if (!source || !target || source === target) throw new TypeError("Two different supported locales are required");
-    const fromKey = source === "es-419" ? "es419" : "en";
-    const toKey = target === "es-419" ? "es419" : "en";
+    const fromKey = glossaryLocaleKey(source);
+    const toKey = glossaryLocaleKey(target);
     const findings = [];
+    if (!fromKey || !toKey) return findings;
     for (const entry of this.glossary) {
       const sourceTerms = entry[fromKey] ?? [];
       const targetTerms = entry[toKey] ?? [];
