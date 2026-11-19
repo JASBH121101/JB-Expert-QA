@@ -63,6 +63,9 @@ export function flattenTranslationMap(value, prefix = "", output = Object.create
 }
 
 export function stableTranslationHash(value) {
+  if (!isPlainTranslationRecord(value)) {
+    throw new TypeError("translation hash requires a plain flattened string map");
+  }
   const entries = getTranslationEntries(value);
   for (const [key, item] of entries) {
     if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
