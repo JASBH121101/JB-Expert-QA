@@ -140,7 +140,7 @@ jobs:
         run: node --test tests/language-qa-engine.test.js
       - name: Run deterministic Language QA performance baseline
         env:
-          JB_LANGUAGE_QA_BENCH_ITERATIONS: 8
+          JB_LANGUAGE_QA_BENCH_ITERATIONS: 100
           JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR: ${{ runner.temp }}/jb-language-qa-benchmark
         run: npm run benchmark:language-qa
       - name: Upload Language QA benchmark evidence
