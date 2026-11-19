@@ -78,7 +78,7 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
     const language = requested || (() => {
       const declared = document.documentElement.getAttribute("lang") || "";
       const primary = declared.toLowerCase().replace("_", "-").split("-")[0];
-      return primary === "es" || primary === "en" ? primary : null;
+      return primary === "es" || primary === "en" || primary === "ar" ? primary : null;
     })();
     const languageSource = requested ? "option" : (language ? "document-lang" : "undetermined");
     const expectedDirection = language === "ar" ? "rtl" : "ltr";
@@ -254,11 +254,11 @@ export async function collectVisualIntegrity(page, { targetLanguage = null, pres
       viewport: { width: window.innerWidth, height: window.innerHeight },
       localizationAudit: {
         status: language ? "checked" : "skipped",
-        language, languageSource, supportedLanguages: ["es", "en"],
+        language, languageSource, supportedLanguages: ["es", "en", "ar"],
         preservedTerms, textsInspected, findings: localizationFindings, directionAudit,
         note: language
           ? "Deterministic phrase matching flags high-confidence opposite-language UI strings; ambiguous wording requires review."
-          : "Set html lang to es or en, or pass targetLanguage to audit localization."
+          : "Set html lang to es, en or ar, or pass targetLanguage to audit localization."
       },
       layoutIntegrity: {
         clippedText, clippedByAncestor, containerMetrics,
