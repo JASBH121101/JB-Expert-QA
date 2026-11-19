@@ -45,12 +45,12 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout JB Expert QA and Threat Lab
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
       - name: Checkout pinned NEXORA Configurable Catalog prototype
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout pinned NEXORA Laravel Site Engine
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
           ref: afa0572d35f94b5c02a40d75001a2b2acd7f8b66
@@ -66,7 +66,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           package-manager-cache: false
@@ -125,7 +125,7 @@ jobs:
 
       - name: Upload separate NEXORA certification reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: nexora-threat-lab-certification-reports
           path: nexora-certification-reports/
