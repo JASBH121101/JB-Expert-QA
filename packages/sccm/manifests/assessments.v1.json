@@ -5900,5 +5900,45 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-main-9907c394"
+  },
+  {
+    "assessmentId": "asmt-jb-language-qa-icu-placeholder-20261119",
+    "nodeId": "jb.expert-qa.language.placeholder-parity",
+    "version": "0.8.0",
+    "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8",
+    "status": "PASS",
+    "assessedAt": "2026-11-19T21:11:39.780Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44595520979",
+        "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8",
+        "outcome": "success",
+        "summary": "Dedicated ICU placeholder workflow passed the new parser regression tests on this exact PR head."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44595520906",
+        "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8",
+        "outcome": "success",
+        "summary": "Language QA regression workflow passed on the exact PR head."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44595520964",
+        "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8",
+        "outcome": "success",
+        "summary": "Complete repository core validation passed on the exact PR head."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44595520927",
+        "commitSha": "569c43fb81bc516a057b055e99348b69711b50b8",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification workflow passed on the exact PR head."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-icu-pr201"
   }
 ]
