@@ -91,3 +91,20 @@ The bridge snapshots input catalogs using own-property descriptors before delega
 ## Content-bound translation approval
 
 `recordTranslationReview({ state: "approved", reviewer, reviewedAt, sourceHash, targetHash })` requires the two SHA-256 fingerprints returned by `auditTranslationMaps`. `resolveTranslationState` gives structural integrity findings precedence over human approval and returns `review-required` when fingerprints do not match the current maps. Semantic findings may still be accepted only by a named reviewer against that exact content snapshot. These hashes are integrity bindings, not cryptographic reviewer signatures or an identity provider.
+
+
+## Current regional locale policy
+
+The initial two-locale policy above is historical. The current supported set is aligned with the shared Localization Engine and contains these 12 canonical locales:
+
+- Spanish: `es-NI`, `es-419`, `es-MX`, `es-ES`.
+- English: `en-US`, `en-GB`.
+- Portuguese: `pt-BR`, `pt-PT`.
+- French: `fr-FR`.
+- German: `de-DE`.
+- Italian: `it-IT`.
+- Arabic: `ar`.
+
+The default and safe fallback remain `es-419`. Canonical tags and underscore-separated aliases are normalized. Exact supported regional variants are preserved; approved Latin-American Spanish regions not individually represented in the set normalize to `es-419`. Base language aliases map deterministically to `en-US`, `pt-BR`, `fr-FR`, `de-DE`, `it-IT` or `ar`. `es-ES` remains distinct from Latin-American Spanish. Unsupported languages, unsupported Spanish regions, malformed tags, script subtags and Unicode extensions are rejected.
+
+The curated bilingual glossary currently covers English and the Spanish glossary family (`es-419`, `es-NI`, `es-MX`). It does not claim to provide translated glossary dictionaries for Portuguese, French, German, Italian or Arabic. For locale pairs without a dictionary, it returns no suggestion, sets `requiresHumanReview` and never auto-approves. CLDR catalog validation uses the shared Localization Engine for the supported locale set; passing structural validation does not certify translation meaning, fluency or cultural suitability.
