@@ -260,8 +260,9 @@ test("Language QA is PASS at component, module, subbranch and branch levels", ()
   assert.equal(branch.status, "PASS");
   assert.equal(branch.children[0].status, "PASS");
   assert.equal(module.status, "PASS");
-  assert.equal(components.length, 9);
+  assert.equal(components.length, 10);
   assert.ok(components.every((component) => component.status === "PASS"));
+  assert.equal(components.find((component) => component.id === "jb.expert-qa.language.linguistic-signals").ownStatus, "PASS");
   assert.equal(components.find((component) => component.id === "jb.expert-qa.language.cldr-catalog-audit").ownStatus, "PASS");
 });
 
