@@ -52,7 +52,7 @@ function extractProtectedTokens(value) {
 }
 
 function suspiciousUnicode(value) {
-  const replacement = [...value].filter((character) => character === "\\uFFFD").length;
+  const replacement = [...value].filter((character) => character.codePointAt(0) === 0xFFFD).length;
   const controls = [...value.matchAll(CONTROL_CHARACTER_PATTERN)].map((match) =>
     "U+" + match[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")
   );
