@@ -156,6 +156,156 @@ export class TranslationMemory {
     return true;
   }
 
+  suggestSimilar({
+    source,
+    sourceLocale,
+    targetLocale,
+    context = "",
+    threshold = 0.5,
+    limit = 5
+  } = {}) {
+    if (typeof source !== "string" || !source.trim() || typeof context !== "string") return [];
+    const from = normalizeLocale(sourceLocale);
+    const to = normalizeLocale(targetLocale);
+    if (!from || !to || from === to) return [];
+    if (typeof threshold !== "number" || !Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+      throw new RangeError("Translation Memory similarity threshold must be between 0 and 1");
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new RangeError("Translation Memory suggestion limit must be an integer from 1 to 50");
+    }
+
+    const tokenize = (value) => new Set(
+      value.normalize("NFKC").toLocaleLowerCase("en").match(/[\p{L}\p{N}]+/gu) ?? []
+    );
+    const queryTokens = tokenize(source);
+    if (queryTokens.size === 0) return [];
+    const candidates = [];
+    for (const entry of this.#entries.values()) {
+      if (entry.sourceLocale !== from || entry.targetLocale !== to || entry.context !== context) continue;
+      const candidateTokens = tokenize(entry.source);
+      if (candidateTokens.size === 0) continue;
+      let intersection = 0;
+      for (const token of queryTokens) if (candidateTokens.has(token)) intersection += 1;
+      const union = queryTokens.size + candidateTokens.size - intersection;
+      const similarity = union ? intersection / union : 0;
+      if (similarity > 0 && similarity >= threshold && similarity < 1) {
+        candidates.push({
+          entry,
+          similarity: Number(similarity.toFixed(4)),
+          requiresHumanReview: true,
+          autoApproved: false
+        });
+      }
+    }
+    candidates.sort((left, right) => right.similarity - left.similarity ||
+      left.entry.source.localeCompare(right.entry.source));
+    return candidates.slice(0, limit);
+  }
+
+  exportSnapshot() {
+    const entries = [...this.#entries.values()]
+      .sort((left, right) => this.#key(left).localeCompare(this.#key(right)))
+      .map((entry) => Object.freeze({ ...entry }));
+    return Object.freeze({
+      schemaVersion: 1,
+      entries: Object.freeze(entries)
+    });
+  }
+
+  /**
+   * Imports a versioned snapshot atomically. Every entry is re-fingerprinted;
+   * approved entries must carry a matching reviewer record, and conflicts
+   * with existing keys are rejected unless replace=true is explicit.
+   */
+  importSnapshot(snapshot, { replace = false } = {}) {
+    if (typeof replace !== "boolean") {
+      throw new TypeError("replace must be a boolean");
+    }
+    const input = snapshotPlainRecord(snapshot, "Translation memory snapshot");
+    if (input.schemaVersion !== 1) {
+      throw new TypeError("Unsupported translation memory snapshot schemaVersion");
+    }
+    if (!Array.isArray(input.entries)) {
+      throw new TypeError("Translation memory snapshot entries must be an array");
+    }
+
+    const allowedFields = new Set([
+      "source", "target", "sourceLocale", "targetLocale", "context",
+      "status", "reviewer", "reviewedAt", "sourceHash", "targetHash"
+    ]);
+    const staged = new TranslationMemory();
+    const seenKeys = new Set();
+    for (const rawEntry of input.entries) {
+      const entry = snapshotPlainRecord(rawEntry, "Translation memory snapshot entry");
+      for (const key of Object.keys(entry)) {
+        if (!allowedFields.has(key)) {
+          throw new TypeError("Translation memory snapshot contains an unknown entry field: " + key);
+        }
+      }
+      if (!["pending", "approved", "stale"].includes(entry.status)) {
+        throw new TypeError("Translation memory snapshot contains an unsupported entry status");
+      }
+      if (typeof entry.sourceHash !== "string" || typeof entry.targetHash !== "string") {
+        throw new TypeError("Translation memory snapshot entry is missing content fingerprints");
+      }
+
+      const memoryInput = {
+        source: entry.source,
+        target: entry.target,
+        sourceLocale: entry.sourceLocale,
+        targetLocale: entry.targetLocale,
+        context: entry.context
+      };
+      const hasReview = entry.reviewer !== null && entry.reviewer !== undefined &&
+        entry.reviewedAt !== null && entry.reviewedAt !== undefined;
+      if ((entry.status === "approved" || (entry.status === "stale" && hasReview)) && !hasReview) {
+        throw new TypeError("Approved snapshot entries require reviewer and reviewedAt metadata");
+      }
+      if (entry.status === "pending" && (entry.reviewer != null || entry.reviewedAt != null)) {
+        throw new TypeError("Pending snapshot entries must not contain approval metadata");
+      }
+      if ((entry.reviewer == null) !== (entry.reviewedAt == null)) {
+        throw new TypeError("Snapshot review metadata must include both reviewer and reviewedAt");
+      }
+
+      const review = hasReview ? {
+        state: "approved",
+        reviewer: entry.reviewer,
+        reviewedAt: entry.reviewedAt,
+        sourceHash: entry.sourceHash,
+        targetHash: entry.targetHash
+      } : null;
+      const restored = staged.add({ ...memoryInput, ...(review ? { review } : {}) });
+      if (restored.sourceHash !== entry.sourceHash || restored.targetHash !== entry.targetHash) {
+        throw new TypeError("Translation memory snapshot fingerprints do not match the stored content");
+      }
+      const key = staged.#key(restored);
+      if (seenKeys.has(key)) {
+        throw new Error("Translation memory snapshot contains duplicate keys");
+      }
+      seenKeys.add(key);
+      if (entry.status === "stale") staged.markStale(memoryInput);
+    }
+
+    const next = replace ? new Map() : new Map(this.#entries);
+    for (const entry of staged.#entries.values()) {
+      const key = this.#key(entry);
+      const current = next.get(key);
+      if (current && JSON.stringify(current) !== JSON.stringify(entry)) {
+        throw new Error("Translation memory snapshot conflicts with an existing entry");
+      }
+      next.set(key, entry);
+    }
+    this.#entries = next;
+    return Object.freeze({
+      schemaVersion: 1,
+      imported: staged.#entries.size,
+      total: this.#entries.size,
+      replaced: replace
+    });
+  }
+
   exportSnapshot() {
     const entries = [...this.#entries.values()]
       .sort((left, right) => this.#key(left).localeCompare(this.#key(right)))
