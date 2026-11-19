@@ -280,7 +280,7 @@ test("Localization Engine branch and subbranch are PASS with historical CLDR dep
   assert.equal(engine.status, "PASS");
 });
 
-test("Expert QA is PASS after all critical branches pass while the wider ecosystem remains pending", () => {
+test("Expert QA is PASS after all in-scope critical branches pass", () => {
   const visual = evaluateSccmNode(inventory, history, "jb.expert-qa.visual.module");
   const visualBranch = evaluateSccmNode(inventory, history, "jb.expert-qa.visual");
   const expert = evaluateSccmNode(inventory, history, "jb.expert-qa");
@@ -291,7 +291,7 @@ test("Expert QA is PASS after all critical branches pass while the wider ecosyst
   assert.equal(visual.blockingChildren.length, 0);
   assert.equal(expert.ownStatus, "PASS");
   assert.equal(expert.status, "PASS");
-  assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PASS");
 });
 
 test("Security QA branch, static-analysis subbranch and module are PASS within their declared scope", () => {
@@ -306,13 +306,17 @@ test("Security QA branch, static-analysis subbranch and module are PASS within t
   assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
 });
 
-test("Resilience A2 subbranch passes while the whole engine remains pending for other branches", () => {
-  const a2 = evaluateSccmNode(inventory, history, "jb.resilience-engine.orchestration.a2-readonly");
+test("Resilience A2 and A3 capabilities are explicitly out of scope and do not block the engine", () => {
+  const excludedIds = inventory.nodes.filter((node) => node.inScope === false).map((node) => node.id);
+  assert.equal(excludedIds.length, 18);
+  for (const id of excludedIds) {
+    const result = evaluateSccmNode(inventory, history, id);
+    assert.equal(result.status, "OUT_OF_SCOPE", id);
+    assert.equal(result.inScope, false, id);
+  }
   const engine = evaluateSccmNode(inventory, history, "jb.resilience-engine");
-  assert.equal(a2.status, "PASS");
-  assert.ok(a2.children[0].children.every((component) => component.status === "PASS"));
-  assert.equal(engine.status, "PENDING");
-  assert.ok(engine.blockingChildren.some((child) => child.status === "PENDING"));
+  assert.equal(engine.status, "PASS");
+  assert.equal(engine.blockingChildren.length, 0);
 });
 
 test("Currency Engine branch, precision subbranch and curated components are PASS", () => {
@@ -350,7 +354,7 @@ test("Database QA PostgreSQL integration hierarchy passes without certifying uns
   assert.equal(module.children.length, 3);
   assert.ok(module.children.every((component) => component.ownStatus === "PASS" && component.status === "PASS"));
   assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
-  assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PENDING");
+  assert.equal(evaluateSccmNode(inventory, history, "jb.ecosystem").status, "PASS");
 });
 
 test("Package QA distribution hierarchy is PASS on the clean consumer install matrix", () => {
@@ -365,29 +369,25 @@ test("Package QA distribution hierarchy is PASS on the clean consumer install ma
   assert.equal(evaluateSccmNode(inventory, history, "jb.expert-qa").status, "PASS");
 });
 
-test("Resilience A1 is certified while A2 and A3 stay bounded to laboratory components", () => {
+test("Resilience A1 remains certified while A2 and A3 are excluded from certification scope", () => {
   const policy = evaluateSccmNode(inventory, history, "jb.resilience-engine.policy");
   assert.equal(policy.status, "PASS");
   assert.equal(policy.children[0].status, "PASS");
   assert.equal(policy.children[0].children[0].status, "PASS");
   assert.ok(policy.children[0].children[0].children.every((component) => component.status === "PASS"));
 
-  const containment = evaluateSccmNode(inventory, history, "jb.resilience-engine.containment");
-  const a2Module = evaluateSccmNode(inventory, history, "jb.resilience-engine.containment.a2-module");
-  assert.equal(containment.status, "PENDING");
-  assert.equal(a2Module.status, "PENDING");
-  assert.ok(a2Module.children.every((component) => component.ownStatus === "PASS"));
-
-  const failover = evaluateSccmNode(inventory, history, "jb.resilience-engine.failover");
-  const a3Module = evaluateSccmNode(inventory, history, "jb.resilience-engine.failover.a3-module");
-  assert.equal(failover.status, "PENDING");
-  assert.equal(a3Module.status, "PENDING");
-  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.leader-election").status, "PENDING");
-  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.fencing").ownStatus, "PASS");
-  assert.equal(a3Module.children.find((component) => component.id === "jb.resilience-engine.failover.replay").ownStatus, "PASS");
-  assert.equal(evaluateSccmNode(inventory, history, "jb.resilience-engine").status, "PENDING");
+  const excludedRoots = [
+    "jb.resilience-engine.orchestration.a2-readonly",
+    "jb.resilience-engine.containment",
+    "jb.resilience-engine.failover"
+  ];
+  for (const id of excludedRoots) {
+    const result = evaluateSccmNode(inventory, history, id);
+    assert.equal(result.status, "OUT_OF_SCOPE", id);
+    assert.equal(result.inScope, false, id);
+  }
+  assert.equal(evaluateSccmNode(inventory, history, "jb.resilience-engine").status, "PASS");
 });
-
 test("a critical component failure propagates through every ancestor", () => {
   const failure = assessment("jb.expert-qa.language.semantic-integrity", {
     assessmentId: "asmt.language.semantic-integrity.failure",
@@ -433,15 +433,18 @@ test("required dependencies block certification until the dependency is PASS", (
   assert.deepEqual(module.blockingDependencies, [{ id: "fixture.dependency-component", status: "PENDING" }]);
 });
 
-test("SCCM report counts aggregate statuses instead of trusting raw CI totals", () => {
+test("SCCM report separates certified scope from explicitly excluded capabilities", () => {
   const report = buildSccmReport(inventory, history);
   assert.equal(report.schema, "jb.sccm.report/v1");
-  assert.equal(report.status, "PENDING");
+  assert.equal(report.status, "PASS");
   assert.equal(report.counts.component.total, 72);
-  assert.equal(report.counts.component.PASS, 71);
-  assert.ok(report.progress.passed > 0);
-  assert.ok(report.progress.pending > 0);
-  assert.equal(report.progress.total, 141);
+  assert.equal(report.counts.component.OUT_OF_SCOPE, 10);
+  assert.equal(report.counts.component.inScope, 62);
+  assert.equal(report.progress.total, 123);
+  assert.equal(report.progress.passed, 123);
+  assert.equal(report.progress.pending, 0);
+  assert.equal(report.progress.failed, 0);
+  assert.equal(report.progress.outOfScope, 18);
 });
 
  
@@ -490,7 +493,7 @@ test("Security Guard runtime request-defense hierarchy passes within exact-SHA N
 });
 
 
-test("newly assessed critical modules pass while unavailable A2/A3 operational capabilities remain pending", () => {
+test("all in-scope recently assessed modules pass and A2/A3 are excluded without erasing history", () => {
   const certified = [
     "jb.security-guard.adapters.php", "jb.security-guard.adapters.python", "jb.security-guard.adapters.contracts",
     "jb.security-guard.adapters.module", "jb.security-guard.adapters.php-python", "jb.security-guard.adapters",
@@ -509,20 +512,14 @@ test("newly assessed critical modules pass while unavailable A2/A3 operational c
     assert.equal(result.ownStatus, "PASS", id);
     assert.equal(result.status, "PASS", id);
   }
-  const deliberatelyPending = [
-    "jb.resilience-engine.containment", "jb.resilience-engine.containment.a2-actions",
-    "jb.resilience-engine.containment.a2-module", "jb.resilience-engine.failover",
-    "jb.resilience-engine.failover.a3", "jb.resilience-engine.failover.a3-module",
-    "jb.resilience-engine.failover.leader-election"
-  ];
-  for (const id of deliberatelyPending) {
-    const result = evaluateSccmNode(inventory, history, id);
-    assert.equal(result.ownStatus, "PENDING", id);
-    assert.equal(result.status, "PENDING", id);
-  }
+  const excluded = inventory.nodes.filter((node) => node.inScope === false);
+  assert.equal(excluded.length, 18);
+  assert.ok(excluded.every((node) => node.critical === false));
   const report = buildSccmReport(inventory, history);
-  assert.equal(report.status, "PENDING");
+  assert.equal(report.status, "PASS");
   assert.equal(report.historyEntries, history.length);
-  assert.equal(report.progress.total, 141);
+  assert.equal(report.progress.total, 123);
+  assert.equal(report.progress.pending, 0);
   assert.equal(report.progress.failed, 0);
+  assert.equal(report.progress.outOfScope, 18);
 });
