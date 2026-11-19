@@ -7,3 +7,4 @@ export { TRANSLATION_REVIEW_STATES, recordTranslationReview, resolveTranslationS
 export { flattenTranslationMap, stableTranslationHash, auditTranslationMaps } from "./audit.js";
 export { auditTranslationSemantics } from "./semantic-audit.js";
 export { auditTranslationCatalogs } from "./catalog-audit.js";
+export { auditTranslationLinguisticSignals } from "./linguistic-signals.js";
