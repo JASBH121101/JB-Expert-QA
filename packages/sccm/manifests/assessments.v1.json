@@ -6460,5 +6460,761 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-pr222-closeout"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.ecosystem.20261120",
+    "nodeId": "jb.ecosystem",
+    "version": "1.0.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.20261120",
+    "nodeId": "jb.expert-qa",
+    "version": "0.2.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.security-guard.20261120",
+    "nodeId": "jb.security-guard",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.malware-engine.20261120",
+    "nodeId": "jb.malware-engine",
+    "version": "0.6.2",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.resilience-engine.20261120",
+    "nodeId": "jb.resilience-engine",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.threat-lab.20261120",
+    "nodeId": "jb.threat-lab",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.advisor-engine.20261120",
+    "nodeId": "jb.advisor-engine",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.localization-engine.20261120",
+    "nodeId": "jb.localization-engine",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.currency-engine.20261120",
+    "nodeId": "jb.currency-engine",
+    "version": "0.1.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.20261120",
+    "nodeId": "jb.expert-qa.language",
+    "version": "0.8.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.translation-integrity.20261120",
+    "nodeId": "jb.expert-qa.language.translation-integrity",
+    "version": "0.8.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.module.20261120",
+    "nodeId": "jb.expert-qa.language.module",
+    "version": "0.8.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.regional-style-signals.20261120",
+    "nodeId": "jb.expert-qa.language.regional-style-signals",
+    "version": "0.8.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.expert-qa.language.register-signals.20261120",
+    "nodeId": "jb.expert-qa.language.register-signals",
+    "version": "0.8.0",
+    "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+    "status": "PASS",
+    "assessedAt": "2026-11-20T12:15:00Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed 30/30 jobs across Linux/Windows and Node.js 22/24, including both Language QA signals."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Dedicated Language QA regression suite passed on Node.js 22."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security QA passed on Node.js 22 and 24 (2/2 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Security Guard PHP/Python multi-runtime and clean package distribution validation passed (4/4 jobs)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181",
+        "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499",
+        "outcome": "success",
+        "summary": "Text encoding integrity validation passed."
+      }
+    ],
+    "findings": [],
+    "sourceId": "jb-expert-qa-pr225-language-signals"
   }
 ]
