@@ -4,6 +4,7 @@ import { LanguageLibrary } from "./glossary.js";
 import { resolveTranslationState } from "./review.js";
 import { auditTranslationSemantics } from "./semantic-audit.js";
 import { auditTranslationLinguisticSignals } from "./linguistic-signals.js";
+import { auditTranslationRegionalStyle } from "./regional-style.js";
 
 function isPlainTranslationRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
@@ -118,6 +119,8 @@ export function auditTranslationMaps(sourceMap, targetMap, {
   findings.push(...semanticFindings);
   const linguisticFindings = auditTranslationLinguisticSignals(target, { targetLocale });
   findings.push(...linguisticFindings);
+  const regionalStyleFindings = auditTranslationRegionalStyle(target, { targetLocale });
+  findings.push(...regionalStyleFindings);
 
   const reportShapeMismatch = (key) => {
     if (reportedShapeMismatches.has(key)) return;
@@ -197,7 +200,8 @@ export function auditTranslationMaps(sourceMap, targetMap, {
       unchangedSourceText: semanticFindings.filter((item) => item.id === "unchanged-source-text").length,
       protectedTokenMismatches: semanticFindings.filter((item) => item.id.startsWith("protected-")).length,
       corruptedText: semanticFindings.filter((item) => item.id.startsWith("corrupted-") || item.id === "suspicious-encoding-sequence").length,
-      linguisticSignals: linguisticFindings.length
+      linguisticSignals: linguisticFindings.length,
+      regionalStyleSignals: regionalStyleFindings.length
     }),
     sourceHash,
     targetHash,
