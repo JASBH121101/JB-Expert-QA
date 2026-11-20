@@ -7,7 +7,7 @@ import {
 const base = { source: "Save changes", sourceLocale: "en-US", targetLocale: "es-NI", context: "button", intendedRegister: "informal" };
 function candidate(id, text, extra = {}) { return recordTranslationVariant({ ...base, variantId: id, text, ...extra }); }
 function reviews(text, ratings) { return ratings.map(rating => recordNativeAcceptanceFeedback({ source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, rating, reviewer:"native-reviewer" })); }
-function dimensions(variantId, ratings) { return ratings.map(rating => ({ variantId, reviewer:"human-reviewer", naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
+function dimensions(variantId, text, ratings) { return ratings.map(rating => ({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, reviewer:"human-reviewer", naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
 
 test("variant records validate and bind source, locale, context and register", () => {
   const v = candidate("v1", "Guardá los cambios");
@@ -36,7 +36,7 @@ test("terminology coverage is mechanical and scores stay withheld without suffic
 test("five native-acceptance and dimension reviews enable advisory ranking scoped per variant", () => {
   const a="Guardá los cambios", b="Guardá los cambios y continuá";
   const variants=[candidate("v1",a),candidate("v2",b)];
-  const dimensionFeedback=[...dimensions("v1",[3,3,3,3,3]),...dimensions("v2",[5,5,5,5,5])];
+  const dimensionFeedback=[...dimensions("v1",a,[3,3,3,3,3]),...dimensions("v2",b,[5,5,5,5,5])];
   const feedbackRecords=[...reviews(a,[3,3,3,3,3]),...reviews(b,[5,5,5,5,5])];
   const result=compareTranslationVariants({ ...base, variants, requiredTerms:["cambios","continuá"], feedbackRecords, dimensionFeedback });
   assert.equal(result.status,"comparative-review-available"); assert.equal(result.evaluations[0].variantId,"v2");
@@ -47,11 +47,11 @@ test("five native-acceptance and dimension reviews enable advisory ranking scope
 
 test("dimension feedback requires valid scope, reviewer ratings and sample threshold", () => {
   const variants=[candidate("v1","Guardar"),candidate("v2","Guardá")];
-  const result=compareTranslationVariants({ ...base, variants, dimensionFeedback:dimensions("v1",[5,5,5,5,5]) });
+  const result=compareTranslationVariants({ ...base, variants, dimensionFeedback:dimensions("v1","Guardar",[5,5,5,5,5]) });
   assert.equal(result.evaluations.find(v=>v.variantId==="v1").humanDimensions.naturalness.score,1);
   assert.equal(result.evaluations.find(v=>v.variantId==="v2").humanDimensions.naturalness.status,"insufficient-feedback");
-  assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"missing",naturalness:5,contextualAdequacy:5,terminologyConsistency:5}] }),/unknown variantId/);
-  assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"v1",naturalness:6,contextualAdequacy:5,terminologyConsistency:5}] }),/integer from 1 to 5/);
+  assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"missing",source:base.source,target:"?",sourceLocale:base.sourceLocale,targetLocale:base.targetLocale,context:base.context,intendedRegister:base.intendedRegister,reviewer:"x",naturalness:5,contextualAdequacy:5,terminologyConsistency:5}] }),/unknown variantId/);
+  assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"v1",source:base.source,target:"Guardar",sourceLocale:base.sourceLocale,targetLocale:base.targetLocale,context:base.context,intendedRegister:base.intendedRegister,reviewer:"x",naturalness:6,contextualAdequacy:5,terminologyConsistency:5}] }),/integer from 1 to 5/);
 });
 
 test("comparison rejects accessor objects and invalid term lists", () => {
