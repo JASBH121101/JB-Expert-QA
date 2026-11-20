@@ -2,7 +2,7 @@ name: Language QA validation
 
 on:
   push:
-    branches: [main, "integration/**", "feature/language-qa-engine"]
+    branches: [main, "integration/**", "feature/language-qa-engine", "feature/language-qa-native-acceptance-v1"]
     paths:
       - "package.json"
       - "src/language/**"
