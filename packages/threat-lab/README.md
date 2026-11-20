@@ -131,8 +131,8 @@ A missing tier is an explicit testing gap, not a pass. Each four-engine footprin
 
 Threat Lab has two independent, immutable NEXORA product targets:
 
-- **Configurable Catalog:** `JASBH121101/Nexora@63f0608d0b00d633b1ad147ab2318fc099b8a99e`. Six tiers exercise sample data, setup/templates, localStorage/escaping, responsive admin, full demo regression and explicit prototype-only boundaries. It is not real authentication or server persistence.
-- **Laravel Site Engine:** `JASBH121101/Nexora@afa0572d35f94b5c02a40d75001a2b2acd7f8b66`, proposed PR #14 stacked on PR #13. Ten scenarios across six tiers exercise installation, public catalogue, permissions, currency precision, locale/country catalogues, exports, private images, MFA/TOTP, domain/TLS fake-adapter boundaries and the full Laravel suite.
+- **Configurable Catalog:** `JASBH121101/Nexora@b546c2c64dffd311770ac455867fe5dd3e245138` (`main`, `demo/` scope). Six tiers exercise sample data, setup/templates, localStorage/escaping, responsive admin, full demo regression and explicit prototype-only boundaries. It is not real authentication or server persistence.
+- **Laravel Site Engine:** `JASBH121101/Nexora@b546c2c64dffd311770ac455867fe5dd3e245138` (`main`). Eleven scenarios across six tiers exercise installation, public catalogue, permissions, currency precision, locale/country catalogues, exports, private images, MFA/TOTP, active-session listing/revocation, domain/TLS fake-adapter boundaries and the full Laravel suite.
 
 The official runner is `tests/nexora-profiles.integration.test.js`, invoked by `.github/workflows/nexora-product-certification.yml`. It verifies each checked-out Git HEAD against the exact SHA before running; missing checkouts fail in the dedicated workflow rather than being silently skipped.
 
