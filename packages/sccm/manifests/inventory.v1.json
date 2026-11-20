@@ -1,7 +1,7 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.2.5",
-  "generatedAt": "2026-11-19T22:31:12.219Z",
+  "inventoryVersion": "1.2.6",
+  "generatedAt": "2026-11-20T12:15:00.000Z",
   "sources": [
     {
       "id": "jb-expert-qa-main",
@@ -104,6 +104,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "refs/pull/222/head",
       "commitSha": "f58fbe43935a1417e29658c321368b10c05bbe66"
+    },
+    {
+      "id": "jb-expert-qa-pr225-language-signals",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "refs/pull/225/head",
+      "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499"
     }
   ],
   "nodes": [
@@ -1543,6 +1549,26 @@
       "level": "component",
       "parentId": "jb.expert-qa.language.module",
       "sourceId": "jb-expert-qa-pr208-language-signals",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.regional-style-signals",
+      "name": "Regional style review signals",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-pr225-language-signals",
+      "version": "0.8.0",
+      "critical": true,
+      "dependencies": []
+    },
+    {
+      "id": "jb.expert-qa.language.register-signals",
+      "name": "Contextual register review signals",
+      "level": "component",
+      "parentId": "jb.expert-qa.language.module",
+      "sourceId": "jb-expert-qa-pr225-language-signals",
       "version": "0.8.0",
       "critical": true,
       "dependencies": []

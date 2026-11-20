@@ -42,9 +42,9 @@ The first command validates the registry and gate behavior. The second prints a 
 
 ## Current baseline
 
-The versioned inventory contains 142 registered nodes across eight engines. The approved certification scope explicitly excludes the Resilience A2 read-only reconciliation, A2 containment and A3 failover subtrees: 18 nodes in total. These nodes carry `inScope: false`, are reported as `OUT_OF_SCOPE`, and do not contribute to the in-scope denominator or block JB Resilience. This is a project scope decision, not a certification claim and not a request to implement those capabilities.
+The versioned inventory contains 144 registered nodes across eight engines. The approved certification scope explicitly excludes the Resilience A2 read-only reconciliation, A2 containment and A3 failover subtrees: 18 nodes in total. These nodes carry `inScope: false`, are reported as `OUT_OF_SCOPE`, and do not contribute to the in-scope denominator or block JB Resilience. This is a project scope decision, not a certification claim and not a request to implement those capabilities.
 
-The 174-entry assessment ledger remains append-only. No historical PASS or PENDING evidence is deleted or rewritten; the evaluator simply separates those historical entries from the active scope. Resilience A1 policy/authorization remains in scope. The remaining 124 in-scope nodes are evaluated normally against their latest exact-SHA evidence. The SCCM workflow report is the authoritative result for any candidate commit; this document does not substitute prose for CI evidence.
+The 188-entry assessment ledger remains append-only. No historical PASS or PENDING evidence is deleted or rewritten; the evaluator simply separates those historical entries from the active scope. Resilience A1 policy/authorization remains in scope. The remaining 126 in-scope nodes are evaluated normally against their latest exact-SHA evidence. The SCCM workflow report is the authoritative result for any candidate commit; this document does not substitute prose for CI evidence.
 
 All engine certifications remain bounded by their documented test matrices and adapters. A PASS for a test scope is not a guarantee of penetration-test coverage, external provider availability, live exchange-rate feeds, production deployment or operational performance outside the tested environment.
 SCCM does not deploy software, access production services, perform recovery actions, call external translation services or require paid providers.
@@ -63,3 +63,18 @@ The deterministic linguistic review signals are registered as component `jb.expe
 ## Final engine closeout — 2026-11-19
 
 The final closeout source `refs/pull/222/head` (`f58fbe43935a1417e29658c321368b10c05bbe66`) is recorded in inventory v1.2.5. New exact-SHA PASS assessments cover the ecosystem root, all eight engines, and Language QA branch/module/glossary/linguistic-signals nodes. Evidence includes the 30/30 integrated engine matrix, Node.js 22/24 core validation, Security QA, Security Guard multi-runtime, Language QA regression and glossary comparative benchmark. The effective SCCM report evaluates 124 in-scope nodes: 124 PASS, 0 PENDING, 0 FAIL; 18 nodes are OUT_OF_SCOPE, including the approved Resilience A2/A3 subtrees. A2/A3 are not implemented or technically certified.
+
+
+## Language QA closeout update — 2026-11-20
+
+PR #224 added deterministic regional-style review signals and PR #225 added contextual Spanish register signals. Both changes are present in the tested PR #225 head `65e8b19eecd42145b90e5f627bccd5f2c76d9499` and were merged to `main` through PR #225 (merge commit `18ec756c76ec7bf4ac7bdc35387d56ac2e0bc06b`).
+
+The inventory now registers separate critical components for regional-style and contextual-register review signals. Exact-SHA PASS assessments cover the two components, Language QA module/subbranch/branch, ecosystem root and all eight engines. Evidence on the tested PR #225 head:
+- [JB Engines Certification — 30/30 jobs](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978092)
+- [Language QA validation](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978187)
+- [Core validation — Node.js 22/24](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978112)
+- [Security QA — Node.js 22/24](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978122)
+- [Security Guard multi-runtime — 4/4 jobs](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978054)
+- [Text encoding integrity](https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44677978181)
+
+The current report evaluates 126 in-scope nodes: 126 PASS, 0 PENDING, 0 FAIL; 18 nodes remain OUT_OF_SCOPE. The 18 excluded Resilience A2/A3 nodes remain unimplemented and uncertified.
