@@ -12,6 +12,7 @@ test("context inference maps translation keys to deterministic UI contexts", () 
   assert.equal(inferTranslationContext("button.save"), "button");
   assert.equal(inferTranslationContext("navigation.primary.home"), "navigation");
   assert.equal(inferTranslationContext("validation.email.required"), "validation");
+  assert.equal(inferTranslationContext("errors.payment.failed"), "error");
   assert.equal(inferTranslationContext("legal.privacy.notice"), "legal");
   assert.equal(inferTranslationContext("checkout.payment.status"), "transactional");
   assert.equal(inferTranslationContext("profile.title"), "general");
@@ -151,4 +152,20 @@ test("contextual audits reject symbol keys and accessors without executing gette
     { contextMap: unsafeContextMap }
   ), /accessor properties/);
   assert.equal(invoked, false);
+});
+
+
+test("context map lookup does not inherit object prototype properties", () => {
+  const findings = auditTranslationContextualProfiles({
+    toString: "A simple label"
+  }, {
+    targetLocale: "en-US",
+    contextMap: Object.create(null)
+  });
+  assert.deepEqual(findings, []);
+});
+
+test("contextual profile records reject prototype-sensitive keys", () => {
+  const unsafeMap = JSON.parse('{"__proto__":"unexpected"}');
+  assert.throws(() => auditTranslationContextualProfiles(unsafeMap), /prototype-sensitive key/);
 });
