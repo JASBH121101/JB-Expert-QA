@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   auditTranslationLinguisticSignals,
   auditTranslationRegionalStyle,
+  auditTranslationRegisterSignals,
   auditTranslationMaps
 } from "../src/language/index.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -129,4 +130,42 @@ test("regional style signals are included in Language QA counts and safely inspe
   assert.throws(() => auditTranslationRegionalStyle(unsafe, { targetLocale: "es-NI" }), /accessor properties/);
   assert.equal(invoked, false);
   assert.throws(() => auditTranslationRegionalStyle({ title: "color" }, { targetLocale: "zh-CN" }), /supported target locale/);
+});
+
+
+test("register signals detect mixed and declared-context mismatches as advisory", () => {
+  const mixed = auditTranslationRegisterSignals({
+    message: "Tú puedes solicitar ayuda; usted puede contactar soporte."
+  }, { targetLocale: "es-NI" });
+  assert.equal(mixed.length, 1);
+  assert.equal(mixed[0].id, "mixed-register-signals");
+  assert.equal(mixed[0].severity, "low");
+  assert.equal(mixed[0].confidence, "review-signal");
+
+  const formalMismatch = auditTranslationRegisterSignals({
+    message: "Tú puedes cambiar tu contraseña."
+  }, { targetLocale: "es-419", intendedRegister: "formal" });
+  assert.equal(formalMismatch[0].id, "register-context-mismatch");
+
+  const informalMismatch = auditTranslationRegisterSignals({
+    message: "Usted puede cambiar su contraseña."
+  }, { targetLocale: "es-MX", intendedRegister: "informal" });
+  assert.equal(informalMismatch[0].id, "register-context-mismatch");
+
+  assert.deepEqual(auditTranslationRegisterSignals({ message: "Welcome" }, { targetLocale: "en-US" }), []);
+  assert.throws(() => auditTranslationRegisterSignals({ message: "Hola" }, { intendedRegister: "casual" }), /intendedRegister/);
+});
+
+test("register signals are counted in audit and accessor maps remain safe", () => {
+  const audit = auditTranslationMaps(
+    { message: "Support" },
+    { message: "Tú puedes contactar soporte; usted puede contactar soporte." },
+    { sourceLocale: "en-US", targetLocale: "es-NI" }
+  );
+  assert.equal(audit.counts.registerSignals, 1);
+  let called = false;
+  const unsafe = {};
+  Object.defineProperty(unsafe, "message", { enumerable: true, get() { called = true; return "usted"; } });
+  assert.throws(() => auditTranslationRegisterSignals(unsafe, { targetLocale: "es-NI" }), /accessor properties/);
+  assert.equal(called, false);
 });
