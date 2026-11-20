@@ -1,5 +1,5 @@
 import { normalizeLocale } from "./locale.js";
-import { summarizeNativeAcceptanceFeedback } from "./native-acceptance.js";
+import { recordNativeAcceptanceFeedback, summarizeNativeAcceptanceFeedback } from "./native-acceptance.js";
 
 const REGISTERS = new Set(["neutral", "formal", "informal"]);
 const CONTEXTS = new Set(["general", "button", "navigation", "field-label", "validation", "error", "success", "notification", "help", "onboarding", "marketing", "legal", "transactional"]);
@@ -64,6 +64,26 @@ function checkVariant(variant, identity) {
   requiredString(variant.variantId, "variantId", 120);
   requiredString(variant.text, "text");
 }
+
+/** Record a Native Acceptance vote explicitly linked to one variant ID and register. */
+export function recordTranslationVariantAcceptanceFeedback({
+  variantId, source, target, sourceLocale, targetLocale,
+  context = "general", intendedRegister = "neutral", rating, reviewer = "anonymous"
+} = {}) {
+  const identity = normalizeIdentity({ source, sourceLocale, targetLocale, context, intendedRegister });
+  requiredString(variantId, "variantId", 120);
+  const feedback = recordNativeAcceptanceFeedback({
+    source: identity.source,
+    target,
+    sourceLocale: identity.sourceLocale,
+    targetLocale: identity.targetLocale,
+    context: identity.context,
+    rating,
+    reviewer
+  });
+  return Object.freeze({ ...feedback, variantId: variantId.trim(), intendedRegister: identity.intendedRegister });
+}
+
 /**
  * Compares alternatives scoped to identical source/locale/context/register.
  * Human naturalness, contextual adequacy, terminology consistency and native
@@ -81,13 +101,15 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
   for (const record of feedbackRecords) {
     safeRecord(record, "native acceptance feedback record");
     if (!Number.isInteger(record.rating) || record.rating < 1 || record.rating > 5) throw new RangeError("native acceptance rating must be an integer from 1 to 5");
+    if (!ids.has(record.variantId)) throw new TypeError("native acceptance feedback references an unknown variantId");
+    if (!REGISTERS.has(record.intendedRegister)) throw new TypeError("native acceptance feedback must declare its intendedRegister");
     requiredString(record.reviewer, "native acceptance reviewer", 80);
     requiredString(record.sourceHash, "native acceptance sourceHash", 128);
     requiredString(record.targetHash, "native acceptance targetHash", 128);
     requiredString(record.sourceLocale, "native acceptance sourceLocale", 35);
     requiredString(record.targetLocale, "native acceptance targetLocale", 35);
     if (typeof record.context !== "string") throw new TypeError("native acceptance context must be a string");
-    const reviewerKey = [record.sourceHash, record.targetHash, record.sourceLocale, record.targetLocale, record.context, record.reviewer.trim().toLowerCase()].join(":");
+    const reviewerKey = [record.variantId, record.intendedRegister, record.sourceHash, record.targetHash, record.sourceLocale, record.targetLocale, record.context, record.reviewer.trim().toLowerCase()].join(":");
     if (nativeReviewerKeys.has(reviewerKey)) throw new TypeError("each reviewer may submit only one Native Acceptance rating per exact variant");
     nativeReviewerKeys.add(reviewerKey);
   }
@@ -110,7 +132,8 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
     }
   }
   const evaluations = variants.map(variant => {
-    const nativeAcceptance = summarizeNativeAcceptanceFeedback(feedbackRecords, { source: identity.source, target: variant.text, sourceLocale: identity.sourceLocale, targetLocale: identity.targetLocale, context: identity.context });
+    const scopedNativeFeedback = feedbackRecords.filter(record => record.variantId === variant.variantId && record.intendedRegister === identity.intendedRegister);
+    const nativeAcceptance = summarizeNativeAcceptanceFeedback(scopedNativeFeedback, { source: identity.source, target: variant.text, sourceLocale: identity.sourceLocale, targetLocale: identity.targetLocale, context: identity.context });
     const dimensions = Object.fromEntries(DIMENSIONS.map(dimension => [dimension, summarizeDimension(dimensionFeedback, variant.variantId, dimension)]));
     const matchedTerms = terms.filter(term => variant.text.toLocaleLowerCase(identity.targetLocale).includes(term.toLocaleLowerCase(identity.targetLocale)));
     const terminologyCoverage = terms.length ? matchedTerms.length / terms.length : null;
