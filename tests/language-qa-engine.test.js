@@ -710,3 +710,36 @@ test("glossary cached term matching keeps Unicode-aware boundaries and escaped l
   assert.equal(consistency.length, 1);
   assert.equal(consistency[0].termId, "art");
 });
+
+test("filesystem auditor forwards regional context profiles to translation-map audits", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jb-language-context-profile-"));
+  try {
+    await mkdir(join(root, "lang", "en-US"), { recursive: true });
+    await mkdir(join(root, "lang", "es-NI"), { recursive: true });
+    await writeFile(join(root, "lang", "en-US", "buttons.json"), JSON.stringify({
+      "button.save": "Save"
+    }));
+    await writeFile(join(root, "lang", "es-NI", "buttons.json"), JSON.stringify({
+      "button.save": "Puedes guardar todos los cambios de configuración de tu cuenta"
+    }));
+
+    const result = await auditLanguageFiles(root, {
+      sourceLocale: "en-US",
+      targetLocale: "es-NI",
+      contextMap: {
+        "button.save": { context: "button", intendedRegister: "informal" }
+      }
+    });
+
+    assert.equal(result.status, "checked");
+    assert.ok(result.findings.some(item =>
+      item.id === "context-copy-too-long" && item.key === "button.save"
+    ));
+    assert.ok(result.findings.some(item =>
+      item.id === "regional-address-form-review" && item.key === "button.save"
+    ));
+    assert.ok(result.files[0].counts.contextualProfileSignals >= 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
