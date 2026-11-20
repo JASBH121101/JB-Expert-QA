@@ -45,6 +45,16 @@ test("five native-acceptance and dimension reviews enable advisory ranking scope
   assert.equal(result.autoApproved,false); assert.equal(result.autoRewritten,false); assert.equal(result.recommendation,null);
 });
 
+test("Native Acceptance feedback is not reused across variant IDs or address registers", () => {
+  const text="Guardá los cambios", variants=[candidate("v1",text),candidate("v2","Guardá y seguí")];
+  const otherRegister=recordTranslationVariantAcceptanceFeedback({ variantId:"v1", source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:"formal", rating:5, reviewer:"reviewer-formal" });
+  const result=compareTranslationVariants({ ...base, variants, feedbackRecords:[otherRegister] });
+  assert.equal(result.evaluations.find(v=>v.variantId==="v1").nativeAcceptance.count,0);
+  assert.equal(result.evaluations.find(v=>v.variantId==="v1").comparativeScore,null);
+  const wrongVariant=recordTranslationVariantAcceptanceFeedback({ variantId:"not-in-comparison", source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, rating:5, reviewer:"reviewer" });
+  assert.throws(()=>compareTranslationVariants({ ...base, variants, feedbackRecords:[wrongVariant] }),/unknown variantId/);
+});
+
 test("dimension feedback requires valid scope, reviewer ratings and sample threshold", () => {
   const variants=[candidate("v1","Guardar"),candidate("v2","Guardá")];
   const result=compareTranslationVariants({ ...base, variants, dimensionFeedback:dimensions("v1","Guardar",[5,5,5,5,5]) });
