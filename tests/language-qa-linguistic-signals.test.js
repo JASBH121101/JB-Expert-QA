@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   auditTranslationLinguisticSignals,
+  auditTranslationRegionalStyle,
   auditTranslationMaps
 } from "../src/language/index.js";
 import { languageRules } from "../src/specialists/language/index.js";
@@ -74,4 +75,58 @@ test("Arabic repeated function words are recognized with Unicode-aware matching"
   }, { targetLocale: "ar" });
   assert.equal(findings.length, 1);
   assert.equal(findings[0].details.word, "في");
+});
+
+
+test("regional style signals compare English US/UK spelling without automatic correction", () => {
+  const us = auditTranslationRegionalStyle({
+    first: "Check the colour at the centre and organise the list"
+  }, { targetLocale: "en-US" });
+  assert.deepEqual(us.map(item => item.details.term), ["colour", "centre", "organise"]);
+  assert.ok(us.every(item => item.id === "regional-style-variant" && item.severity === "low"));
+  assert.ok(us.every(item => item.confidence === "review-signal"));
+  assert.equal(us[0].details.suggestedAlternative, "color");
+
+  const gb = auditTranslationRegionalStyle({
+    first: "Check the color at the center and organize the list"
+  }, { targetLocale: "en-GB" });
+  assert.deepEqual(gb.map(item => item.details.term), ["color", "center", "organize"]);
+  assert.deepEqual(auditTranslationRegionalStyle({ first: "Color and center" }, { targetLocale: "en-US" }), []);
+});
+
+test("regional style signals distinguish Latin-American, Mexican and Iberian Spanish", () => {
+  const latam = auditTranslationRegionalStyle({
+    first: "El ordenador y el móvil que vosotros utilizáis"
+  }, { targetLocale: "es-NI" });
+  assert.deepEqual(latam.map(item => item.details.term), ["ordenador", "móvil", "vosotros"]);
+
+  const mexico = auditTranslationRegionalStyle({
+    first: "El ordenador y el móvil que vosotros utilizáis"
+  }, { targetLocale: "es-MX" });
+  assert.equal(mexico.length, 3);
+
+  const spain = auditTranslationRegionalStyle({
+    first: "La computadora y el celular para platicar"
+  }, { targetLocale: "es-ES" });
+  assert.deepEqual(spain.map(item => item.details.term), ["computadora", "celular", "platicar"]);
+});
+
+test("regional style signals are included in Language QA counts and safely inspect maps", () => {
+  const audit = auditTranslationMaps(
+    { title: "Computer and phone" },
+    { title: "El ordenador y el móvil" },
+    { sourceLocale: "en-US", targetLocale: "es-NI" }
+  );
+  assert.equal(audit.counts.regionalStyleSignals, 2);
+  assert.ok(audit.findings.some(item => item.id === "regional-style-variant"));
+
+  let invoked = false;
+  const unsafe = {};
+  Object.defineProperty(unsafe, "title", {
+    enumerable: true,
+    get() { invoked = true; return "ordenador"; }
+  });
+  assert.throws(() => auditTranslationRegionalStyle(unsafe, { targetLocale: "es-NI" }), /accessor properties/);
+  assert.equal(invoked, false);
+  assert.throws(() => auditTranslationRegionalStyle({ title: "color" }, { targetLocale: "zh-CN" }), /supported target locale/);
 });

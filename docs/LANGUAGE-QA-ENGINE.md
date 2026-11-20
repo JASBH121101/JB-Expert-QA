@@ -127,3 +127,10 @@ JB_LANGUAGE_QA_BENCH_ITERATIONS=100 JB_LANGUAGE_QA_BENCHMARK_OUTPUT_DIR=/tmp/jb-
 The benchmark measures locale normalization, nested translation-map flattening, source/target audits at two sizes, CLDR catalog auditing across the 12 supported locales, and exact Translation Memory lookup. It records mean, median, p95, p99, throughput, CPU time, RSS and heap deltas. Synthetic local data is used; no AI provider, network request, paid service or third-party benchmark dependency is involved.
 
 The benchmark uses 100 measured samples per scenario by default (minimum 20), after two warmups, so its p95/p99 estimates are more useful than a handful of runs. The engine certification workflow executes it on Ubuntu and Windows with Node.js 22 and 24 and uploads JSON/Markdown evidence per matrix job. Results are informational rather than machine-dependent pass/fail thresholds. Compare only equivalent runner images, Node versions and workloads; a successful benchmark validates its functional invariants but does not by itself certify translation fluency or cultural quality.
+
+
+## Regional style review signals
+
+The regional-style auditor adds advisory findings for a curated set of visible regional variants: US/UK English spelling, selected Peninsular-Spanish vocabulary in Latin-American targets, and selected Latin-American vocabulary in the `es-ES` target. Findings include the term, target locale and a suggested alternative. They are low-severity review signals only: they do not rewrite copy, prove that a phrase is incorrect, or block a human approval. Product names, quotations, audience, and context may make a variant intentional.
+
+The rules are intentionally conservative and incomplete. A clean result does not certify regional fluency. Regional terminology outside the curated list, register, tone, intent and cultural suitability still require a reviewer familiar with the target audience. This check is deterministic, network-free and has no provider or paid-service dependency.
