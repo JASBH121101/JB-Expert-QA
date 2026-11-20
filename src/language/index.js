@@ -9,3 +9,4 @@ export { auditTranslationSemantics } from "./semantic-audit.js";
 export { auditTranslationCatalogs } from "./catalog-audit.js";
 export { auditTranslationLinguisticSignals } from "./linguistic-signals.js";
 export { auditTranslationRegionalStyle } from "./regional-style.js";
+export { auditTranslationRegisterSignals } from "./register-signals.js";
