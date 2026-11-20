@@ -56,6 +56,15 @@ test("dimension feedback requires valid scope, reviewer ratings and sample thres
   assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[duplicateReview,{...duplicateReview}] }),/only one dimension review/);
 });
 
+test("native acceptance reviews reject duplicate reviewer votes and unsafe records", () => {
+  const text="Guardá los cambios", variants=[candidate("v1",text),candidate("v2","Guardá y seguí")];
+  const duplicate=reviews(text,[5,5]);
+  assert.throws(() => compareTranslationVariants({ ...base, variants, feedbackRecords:duplicate }),/only one Native Acceptance rating/);
+  const unsafe={...duplicate[0]};
+  Object.defineProperty(unsafe,"rating",{enumerable:true,get(){throw new Error("getter invoked");}});
+  assert.throws(() => compareTranslationVariants({ ...base, variants, feedbackRecords:[unsafe] }),/accessor/);
+});
+
 test("comparison rejects accessor objects and invalid term lists", () => {
   const one=candidate("v1","Guardar"), two=candidate("v2","Guardá"), getter={};
   Object.defineProperty(getter,"text",{enumerable:true,get(){throw new Error("getter invoked");}});
