@@ -7,7 +7,7 @@ import {
 const base = { source: "Save changes", sourceLocale: "en-US", targetLocale: "es-NI", context: "button", intendedRegister: "informal" };
 function candidate(id, text, extra = {}) { return recordTranslationVariant({ ...base, variantId: id, text, ...extra }); }
 function reviews(text, ratings) { return ratings.map(rating => recordNativeAcceptanceFeedback({ source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, rating, reviewer:"native-reviewer" })); }
-function dimensions(variantId, text, ratings) { return ratings.map(rating => ({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, reviewer:"human-reviewer", naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
+function dimensions(variantId, text, ratings) { return ratings.map((rating,index) => ({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, reviewer:"human-reviewer-"+index, naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
 
 test("variant records validate and bind source, locale, context and register", () => {
   const v = candidate("v1", "Guardá los cambios");
@@ -52,6 +52,8 @@ test("dimension feedback requires valid scope, reviewer ratings and sample thres
   assert.equal(result.evaluations.find(v=>v.variantId==="v2").humanDimensions.naturalness.status,"insufficient-feedback");
   assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"missing",source:base.source,target:"?",sourceLocale:base.sourceLocale,targetLocale:base.targetLocale,context:base.context,intendedRegister:base.intendedRegister,reviewer:"x",naturalness:5,contextualAdequacy:5,terminologyConsistency:5}] }),/unknown variantId/);
   assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[{variantId:"v1",source:base.source,target:"Guardar",sourceLocale:base.sourceLocale,targetLocale:base.targetLocale,context:base.context,intendedRegister:base.intendedRegister,reviewer:"x",naturalness:6,contextualAdequacy:5,terminologyConsistency:5}] }),/integer from 1 to 5/);
+  const duplicateReview = {variantId:"v1",source:base.source,target:"Guardar",sourceLocale:base.sourceLocale,targetLocale:base.targetLocale,context:base.context,intendedRegister:base.intendedRegister,reviewer:"same",naturalness:5,contextualAdequacy:5,terminologyConsistency:5};
+  assert.throws(() => compareTranslationVariants({ ...base, variants, dimensionFeedback:[duplicateReview,{...duplicateReview}] }),/only one dimension review/);
 });
 
 test("comparison rejects accessor objects and invalid term lists", () => {
