@@ -134,3 +134,8 @@ The benchmark uses 100 measured samples per scenario by default (minimum 20), af
 The regional-style auditor adds advisory findings for a curated set of visible regional variants: US/UK English spelling, selected Peninsular-Spanish vocabulary in Latin-American targets, and selected Latin-American vocabulary in the `es-ES` target. Findings include the term, target locale and a suggested alternative. They are low-severity review signals only: they do not rewrite copy, prove that a phrase is incorrect, or block a human approval. Product names, quotations, audience, and context may make a variant intentional.
 
 The rules are intentionally conservative and incomplete. A clean result does not certify regional fluency. Regional terminology outside the curated list, register, tone, intent and cultural suitability still require a reviewer familiar with the target audience. This check is deterministic, network-free and has no provider or paid-service dependency.
+
+
+## Contextual register review signals
+
+The register auditor detects conservative Spanish-language cues for mixed formal/informal address (for example, explicit tú/te/puedes cues alongside usted/ustedes/dígame cues). The optional intendedRegister setting (neutral, formal, or informal) can also flag a cue that conflicts with the declared register. These are low-severity advisory signals, not a tone classifier: conjugations, quotations, dialogue, audience, region and product context can produce valid exceptions. English and non-Spanish locales return no register findings from this heuristic. No text is rewritten, no approval is granted and no provider/network call is made.
