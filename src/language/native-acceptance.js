@@ -77,7 +77,14 @@ export function recordNativeAcceptanceFeedback({
  */
 export function summarizeNativeAcceptanceFeedback(records = [], identity = {}) {
   if (!Array.isArray(records)) throw new TypeError("records must be an array");
-  if (records.length > 0 && (!identity || typeof identity !== "object" || Array.isArray(identity))) {
+  const hasIdentity = identity &&
+    typeof identity === "object" &&
+    !Array.isArray(identity) &&
+    typeof identity.source === "string" &&
+    typeof identity.target === "string" &&
+    typeof identity.sourceLocale === "string" &&
+    typeof identity.targetLocale === "string";
+  if (records.length > 0 && !hasIdentity) {
     throw new TypeError("A translation identity is required to summarize feedback");
   }
 
