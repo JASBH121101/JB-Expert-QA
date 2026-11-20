@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {
   recordNativeAcceptanceFeedback,
   summarizeNativeAcceptanceFeedback,
-  auditNativeAcceptanceSignals
+  auditNativeAcceptanceSignals,
+  auditTranslationMaps
 } from "../src/language/index.js";
 
 test("native acceptance feedback binds ratings to exact translation, locale and context", () => {
@@ -43,4 +44,11 @@ test("native acceptance signals remain advisory and locale-aware", () => {
   assert.ok(findings.some(item => item.id === "copy-format-naturalness"));
   assert.ok(findings.every(item => item.severity === "low"));
   assert.throws(() => auditNativeAcceptanceSignals({ label: "Hello" }, { targetLocale: "zh-CN" }), /supported target locale/);
+});
+
+test("native acceptance signals are included in translation map audits", () => {
+  const audit = auditTranslationMaps({ login: "Login" }, { login: "Por favor loguearse" }, { sourceLocale: "en-US", targetLocale: "es-NI" });
+  assert.equal(audit.counts.nativeAcceptanceSignals, 1);
+  assert.ok(audit.findings.some(item => item.id === "copy-acceptance-terminology"));
+  assert.equal(audit.reviewStatus, "review-required");
 });
