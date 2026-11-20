@@ -79,8 +79,14 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
   for (const variant of variants) { checkVariant(variant, identity); if (ids.has(variant.variantId)) throw new TypeError("variantId values must be unique"); ids.add(variant.variantId); }
   for (const record of dimensionFeedback) {
     safeRecord(record, "dimensionFeedback record");
-    if (!ids.has(record.variantId)) throw new TypeError("dimension feedback references an unknown variantId");
-    requiredString(record.reviewer ?? "reviewer", "reviewer", 80);
+    const variant = variants.find(item => item.variantId === record.variantId);
+    if (!variant) throw new TypeError("dimension feedback references an unknown variantId");
+    if (record.source !== identity.source || record.target !== variant.text ||
+        record.sourceLocale !== identity.sourceLocale || record.targetLocale !== identity.targetLocale ||
+        record.context !== identity.context || record.intendedRegister !== identity.intendedRegister) {
+      throw new TypeError("dimension feedback fingerprint does not match the exact variant and comparison scope");
+    }
+    requiredString(record.reviewer, "reviewer", 80);
     for (const dimension of DIMENSIONS) {
       if (!Number.isInteger(record[dimension]) || record[dimension] < 1 || record[dimension] > 5) throw new RangeError(dimension + " rating must be an integer from 1 to 5");
     }
