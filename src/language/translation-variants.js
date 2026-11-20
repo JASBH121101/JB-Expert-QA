@@ -77,6 +77,7 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
   if (!Array.isArray(dimensionFeedback)) throw new TypeError("dimensionFeedback must be an array");
   const terms = validateTermList(requiredTerms), ids = new Set();
   for (const variant of variants) { checkVariant(variant, identity); if (ids.has(variant.variantId)) throw new TypeError("variantId values must be unique"); ids.add(variant.variantId); }
+  const dimensionReviewerKeys = new Set();
   for (const record of dimensionFeedback) {
     safeRecord(record, "dimensionFeedback record");
     const variant = variants.find(item => item.variantId === record.variantId);
@@ -87,6 +88,9 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
       throw new TypeError("dimension feedback fingerprint does not match the exact variant and comparison scope");
     }
     requiredString(record.reviewer, "reviewer", 80);
+    const reviewerKey = record.variantId + ":" + record.reviewer.trim().toLowerCase();
+    if (dimensionReviewerKeys.has(reviewerKey)) throw new TypeError("each reviewer may submit only one dimension review per variant");
+    dimensionReviewerKeys.add(reviewerKey);
     for (const dimension of DIMENSIONS) {
       if (!Number.isInteger(record[dimension]) || record[dimension] < 1 || record[dimension] > 5) throw new RangeError(dimension + " rating must be an integer from 1 to 5");
     }
