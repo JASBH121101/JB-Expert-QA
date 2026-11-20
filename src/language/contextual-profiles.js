@@ -198,8 +198,8 @@ export function inferTranslationContext(key) {
   const has = (...tokens) => parts.some(part => tokens.includes(part));
 
   if (has("legal", "privacy", "terms", "consent", "policy", "compliance")) return "legal";
-  if (has("payment", "invoice", "order", "receipt", "checkout", "billing")) return "transactional";
   if (has("error", "errors")) return "error";
+  if (has("payment", "invoice", "order", "receipt", "checkout", "billing")) return "transactional";
   if (has("validation", "invalid", "required", "warning")) return "validation";
   if (has("success", "saved", "completed", "complete", "done")) return "success";
   if (has("notification", "notifications", "toast", "alert", "banner")) return "notification";
