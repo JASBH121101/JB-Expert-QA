@@ -1,5 +1,10 @@
 import { normalizeLocale } from "./locale.js";
-import { stableTranslationHash } from "./audit.js";
+import { createHash } from "node:crypto";
+
+function stableAcceptanceHash(value) {
+  const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+  return createHash("sha256").update(JSON.stringify(entries)).digest("hex");
+}
 
 const ACCEPTANCE_THRESHOLD = 4;
 const MIN_SAMPLE_SIZE = 5;
@@ -28,8 +33,8 @@ export function recordNativeAcceptanceFeedback({
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new RangeError("rating must be an integer from 1 to 5");
   if (typeof reviewer !== "string" || !reviewer.trim() || reviewer.length > 80) throw new TypeError("reviewer must be a non-empty label of at most 80 characters");
 
-  const sourceHash = stableTranslationHash({ locale: from, context, text: source });
-  const targetHash = stableTranslationHash({ locale: to, context, text: target });
+  const sourceHash = stableAcceptanceHash({ locale: from, context, text: source });
+  const targetHash = stableAcceptanceHash({ locale: to, context, text: target });
   return Object.freeze({
     sourceHash,
     targetHash,
