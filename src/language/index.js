@@ -11,3 +11,4 @@ export { auditTranslationLinguisticSignals } from "./linguistic-signals.js";
 export { auditTranslationRegionalStyle } from "./regional-style.js";
 export { auditTranslationRegisterSignals } from "./register-signals.js";
 export { recordNativeAcceptanceFeedback, summarizeNativeAcceptanceFeedback, auditNativeAcceptanceSignals } from "./native-acceptance.js";
+export { LINGUISTIC_CONTEXTS, inferTranslationContext, resolveLinguisticProfile, auditTranslationContextualProfiles } from "./contextual-profiles.js";
