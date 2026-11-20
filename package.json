@@ -31,7 +31,7 @@
     "test:localization-engine": "node --test packages/localization-engine/tests/localization-engine.test.js",
     "test:currency-engine": "node --test packages/currency-engine/tests/currency-engine.test.js",
     "test:internationalization": "npm run test:language-qa && npm run test:localization-engine && npm run test:currency-engine",
-    "test:language-qa": "node --test tests/language-qa-engine.test.js tests/language-qa-translation-memory-suggestions.test.js tests/language-qa-linguistic-signals.test.js tests/language-qa-translation-memory-snapshots.test.js tests/language-qa-glossary-performance.test.js tests/language-qa-native-acceptance.test.js",
+    "test:language-qa": "node --test tests/language-qa-engine.test.js tests/language-qa-translation-memory-suggestions.test.js tests/language-qa-linguistic-signals.test.js tests/language-qa-translation-memory-snapshots.test.js tests/language-qa-glossary-performance.test.js tests/language-qa-native-acceptance.test.js tests/language-qa-contextual-profiles.test.js",
     "sccm:check": "npm --workspace @jb/sccm run test",
     "sccm:report": "node scripts/sccm-report.mjs",
     "benchmark:language-qa": "node bench/language-qa.js"
