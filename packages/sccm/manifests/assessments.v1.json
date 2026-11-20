@@ -7260,7 +7260,9 @@
         "outcome": "success",
         "summary": "NEXORA pinned product profile certification passed on the exact current main commit."
       }
-    ]
+    ],
+    "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
+    "findings": []
   },
   {
     "assessmentId": "asmt.closeout.jb.threat-lab.20261120-main-03596043",
@@ -7291,6 +7293,8 @@
         "outcome": "success",
         "summary": "Pinned NEXORA product profiles passed certification on the exact current main commit."
       }
-    ]
+    ],
+    "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
+    "findings": []
   }
 ]
