@@ -55,6 +55,8 @@ export async function auditLanguageFiles(projectRoot, {
   sourceLocale = DEFAULT_LOCALE,
   targetLocale = "en",
   library,
+  intendedRegister,
+  contextMap = Object.create(null),
   maxFiles = 500
 } = {}) {
   if (typeof projectRoot !== "string" || !projectRoot.trim()) {
@@ -157,6 +159,8 @@ export async function auditLanguageFiles(projectRoot, {
       const result = auditTranslationMaps(sourceResource, targetResource, {
         sourceLocale: source,
         targetLocale: target,
+        intendedRegister,
+        contextMap,
         ...(library ? { library } : {})
       });
       const fileFindings = result.findings.map((item) => ({ ...item, path: relativePath }));
