@@ -739,6 +739,7 @@ test("filesystem auditor forwards regional context profiles to translation-map a
       item.id === "regional-address-form-review" && item.key === "button.save"
     ));
     assert.ok(result.files[0].counts.contextualProfileSignals >= 2);
+    assert.ok(result.summary.contextualProfileSignals >= 2);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
