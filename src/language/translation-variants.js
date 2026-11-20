@@ -77,6 +77,20 @@ export function compareTranslationVariants({ source, sourceLocale, targetLocale,
   if (!Array.isArray(dimensionFeedback)) throw new TypeError("dimensionFeedback must be an array");
   const terms = validateTermList(requiredTerms), ids = new Set();
   for (const variant of variants) { checkVariant(variant, identity); if (ids.has(variant.variantId)) throw new TypeError("variantId values must be unique"); ids.add(variant.variantId); }
+  const nativeReviewerKeys = new Set();
+  for (const record of feedbackRecords) {
+    safeRecord(record, "native acceptance feedback record");
+    if (!Number.isInteger(record.rating) || record.rating < 1 || record.rating > 5) throw new RangeError("native acceptance rating must be an integer from 1 to 5");
+    requiredString(record.reviewer, "native acceptance reviewer", 80);
+    requiredString(record.sourceHash, "native acceptance sourceHash", 128);
+    requiredString(record.targetHash, "native acceptance targetHash", 128);
+    requiredString(record.sourceLocale, "native acceptance sourceLocale", 35);
+    requiredString(record.targetLocale, "native acceptance targetLocale", 35);
+    if (typeof record.context !== "string") throw new TypeError("native acceptance context must be a string");
+    const reviewerKey = [record.sourceHash, record.targetHash, record.sourceLocale, record.targetLocale, record.context, record.reviewer.trim().toLowerCase()].join(":");
+    if (nativeReviewerKeys.has(reviewerKey)) throw new TypeError("each reviewer may submit only one Native Acceptance rating per exact variant");
+    nativeReviewerKeys.add(reviewerKey);
+  }
   const dimensionReviewerKeys = new Set();
   for (const record of dimensionFeedback) {
     safeRecord(record, "dimensionFeedback record");
