@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  recordTranslationVariant, compareTranslationVariants, recordNativeAcceptanceFeedback
+  recordTranslationVariant, recordTranslationVariantAcceptanceFeedback, compareTranslationVariants
 } from "../src/language/index.js";
 
 const base = { source: "Save changes", sourceLocale: "en-US", targetLocale: "es-NI", context: "button", intendedRegister: "informal" };
 function candidate(id, text, extra = {}) { return recordTranslationVariant({ ...base, variantId: id, text, ...extra }); }
-function reviews(text, ratings) { return ratings.map(rating => recordNativeAcceptanceFeedback({ source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, rating, reviewer:"native-reviewer" })); }
+function reviews(variantId, text, ratings) { return ratings.map(rating => recordTranslationVariantAcceptanceFeedback({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, rating, reviewer:"native-reviewer" })); }
 function dimensions(variantId, text, ratings) { return ratings.map((rating,index) => ({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, reviewer:"human-reviewer-"+index, naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
 
 test("variant records validate and bind source, locale, context and register", () => {
@@ -37,7 +37,7 @@ test("five native-acceptance and dimension reviews enable advisory ranking scope
   const a="Guardá los cambios", b="Guardá los cambios y continuá";
   const variants=[candidate("v1",a),candidate("v2",b)];
   const dimensionFeedback=[...dimensions("v1",a,[3,3,3,3,3]),...dimensions("v2",b,[5,5,5,5,5])];
-  const feedbackRecords=[...reviews(a,[3,3,3,3,3]),...reviews(b,[5,5,5,5,5])];
+  const feedbackRecords=[...reviews("v1",a,[3,3,3,3,3]),...reviews("v2",b,[5,5,5,5,5])];
   const result=compareTranslationVariants({ ...base, variants, requiredTerms:["cambios","continuá"], feedbackRecords, dimensionFeedback });
   assert.equal(result.status,"comparative-review-available"); assert.equal(result.evaluations[0].variantId,"v2");
   assert.equal(result.evaluations[0].nativeAcceptance.count,5); assert.equal(result.evaluations[1].nativeAcceptance.count,5);
@@ -58,7 +58,7 @@ test("dimension feedback requires valid scope, reviewer ratings and sample thres
 
 test("native acceptance reviews reject duplicate reviewer votes and unsafe records", () => {
   const text="Guardá los cambios", variants=[candidate("v1",text),candidate("v2","Guardá y seguí")];
-  const duplicate=reviews(text,[5,5]);
+  const duplicate=reviews("v1",text,[5,5]);
   assert.throws(() => compareTranslationVariants({ ...base, variants, feedbackRecords:duplicate }),/only one Native Acceptance rating/);
   const unsafe={...duplicate[0]};
   Object.defineProperty(unsafe,"rating",{enumerable:true,get(){throw new Error("getter invoked");}});
