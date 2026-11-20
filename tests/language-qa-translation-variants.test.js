@@ -6,7 +6,8 @@ import {
 
 const base = { source: "Save changes", sourceLocale: "en-US", targetLocale: "es-NI", context: "button", intendedRegister: "informal" };
 function candidate(id, text, extra = {}) { return recordTranslationVariant({ ...base, variantId: id, text, ...extra }); }
-function reviews(variantId, text, ratings) { return ratings.map(rating => recordTranslationVariantAcceptanceFeedback({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, rating, reviewer:"native-reviewer" })); }
+function nativeReview(variantId, text, rating, reviewer) { return recordTranslationVariantAcceptanceFeedback({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, rating, reviewer }); }
+function reviews(variantId, text, ratings) { return ratings.map((rating,index) => nativeReview(variantId,text,rating,"native-reviewer-"+index)); }
 function dimensions(variantId, text, ratings) { return ratings.map((rating,index) => ({ variantId, source:base.source, target:text, sourceLocale:base.sourceLocale, targetLocale:base.targetLocale, context:base.context, intendedRegister:base.intendedRegister, reviewer:"human-reviewer-"+index, naturalness:rating, contextualAdequacy:rating, terminologyConsistency:rating })); }
 
 test("variant records validate and bind source, locale, context and register", () => {
@@ -68,7 +69,7 @@ test("dimension feedback requires valid scope, reviewer ratings and sample thres
 
 test("native acceptance reviews reject duplicate reviewer votes and unsafe records", () => {
   const text="Guardá los cambios", variants=[candidate("v1",text),candidate("v2","Guardá y seguí")];
-  const duplicate=reviews("v1",text,[5,5]);
+  const duplicate=[nativeReview("v1",text,5,"same-reviewer"),nativeReview("v1",text,5,"same-reviewer")];
   assert.throws(() => compareTranslationVariants({ ...base, variants, feedbackRecords:duplicate }),/only one Native Acceptance rating/);
   const unsafe={...duplicate[0]};
   Object.defineProperty(unsafe,"rating",{enumerable:true,get(){throw new Error("getter invoked");}});
