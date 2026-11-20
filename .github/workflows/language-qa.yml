@@ -14,6 +14,7 @@ on:
       - "tests/language-qa-engine.test.js"
       - "tests/language-qa-translation-memory-suggestions.test.js"
       - "tests/language-qa-linguistic-signals.test.js"
+      - "tests/language-qa-native-acceptance.test.js"
       - "bench/language-qa.js"
       - ".github/workflows/language-qa.yml"
   pull_request:
@@ -62,6 +63,7 @@ jobs:
           node --check src/language/translation-memory.js
           node --check src/language/review.js
           node --check src/language/audit.js
+          node --check src/language/native-acceptance.js
           node --check src/adapters/filesystem/audit-language.js
           node --check src/specialists/language/index.js
           node --check src/language-cli.js
