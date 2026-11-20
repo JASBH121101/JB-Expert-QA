@@ -34,6 +34,7 @@ on:
       - "tests/language-qa-linguistic-signals.test.js"
       - "tests/language-qa-native-acceptance.test.js"
       - "tests/language-qa-contextual-profiles.test.js"
+      - "tests/language-qa-translation-variants.test.js"
       - ".github/workflows/language-qa.yml"
 
 permissions:
