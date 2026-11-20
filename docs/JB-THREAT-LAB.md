@@ -157,15 +157,15 @@ The six-tier footprint is now represented across all four real engine-backed sui
 
 NEXORA has two distinct deliverables and they remain separate certification targets:
 
-- **Configurable Catalog prototype:** pinned to `JASBH121101/Nexora@63f0608d0b00d633b1ad147ab2318fc099b8a99e`. This is an HTML/CSS/JS prototype with browser-localStorage demo persistence, not backend authentication, server persistence or private image delivery.
-- **Laravel Site Engine:** pinned to `JASBH121101/Nexora@afa0572d35f94b5c02a40d75001a2b2acd7f8b66`, the current head of draft PR #14 stacked on draft PR #13. It includes the proposed private-image and TOTP MFA changes for test purposes; the pin is not a merged Nexora release.
+- **Configurable Catalog prototype:** pinned to `JASBH121101/Nexora@b546c2c64dffd311770ac455867fe5dd3e245138` at current `main`; this profile tests only the `demo/` HTML/CSS/JS prototype with browser-localStorage demo persistence, not backend authentication, server persistence or private image delivery.
+- **Laravel Site Engine:** pinned to `JASBH121101/Nexora@b546c2c64dffd311770ac455867fe5dd3e245138` at current `main`, after the configurable catalog/backend integration, owner-state guard, schema-health validation, active-session management and CI permission hardening. It is merged source, not a production deployment.
 
 The official integration is `packages/threat-lab/tests/nexora-profiles.integration.test.js`, executed by `.github/workflows/nexora-product-certification.yml`. Each source is checked out read-only and its actual Git HEAD is compared to the declared SHA before tests run.
 
 ### Coverage
 
 - **Catalog:** six tiers from sample-data integrity through complete demo regression and prototype-boundary assertions.
-- **Site Engine:** ten scenarios across six tiers covering atomic setup, published catalogue, role/permission isolation, currency precision, locale/country catalogues, export authorization, private-image quarantine/publication, MFA/TOTP, domain/TLS boundaries using deterministic fakes, and the full Laravel Feature/Unit suite.
+- **Site Engine:** eleven scenarios across six tiers covering atomic setup, published catalogue, role/permission isolation, currency precision, locale/country catalogues, export authorization, private-image quarantine/publication, MFA/TOTP, active-session listing/revocation, domain/TLS boundaries using deterministic fakes, and the full Laravel Feature/Unit suite.
 - **Database:** targeted Site Engine scenarios use in-memory SQLite; a separate complete Laravel suite runs against an ephemeral PostgreSQL 16 service.
 - **Reports:** Catalog and Site Engine reports are independent JSON artifacts. Readiness for one product never certifies the other.
 
