@@ -12,4 +12,4 @@ export { auditTranslationRegionalStyle } from "./regional-style.js";
 export { auditTranslationRegisterSignals } from "./register-signals.js";
 export { recordNativeAcceptanceFeedback, summarizeNativeAcceptanceFeedback, auditNativeAcceptanceSignals } from "./native-acceptance.js";
 export { LINGUISTIC_CONTEXTS, inferTranslationContext, resolveLinguisticProfile, auditTranslationContextualProfiles } from "./contextual-profiles.js";
-export { recordTranslationVariant, compareTranslationVariants } from "./translation-variants.js";
+export { recordTranslationVariant, recordTranslationVariantAcceptanceFeedback, compareTranslationVariants } from "./translation-variants.js";
