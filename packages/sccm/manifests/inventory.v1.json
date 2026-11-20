@@ -1,6 +1,6 @@
 {
   "schema": "jb.sccm.inventory/v1",
-  "inventoryVersion": "1.2.6",
+  "inventoryVersion": "1.2.7",
   "generatedAt": "2026-11-20T12:15:00.000Z",
   "sources": [
     {
@@ -110,6 +110,12 @@
       "repository": "JASBH121101/JB-Expert-QA",
       "ref": "refs/pull/225/head",
       "commitSha": "65e8b19eecd42145b90e5f627bccd5f2c76d9499"
+    },
+    {
+      "id": "jb-expert-qa-main-2026-11-20-03596043",
+      "repository": "JASBH121101/JB-Expert-QA",
+      "ref": "main",
+      "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc"
     }
   ],
   "nodes": [
@@ -118,7 +124,7 @@
       "name": "JB Engines Ecosystem",
       "level": "ecosystem",
       "parentId": null,
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
       "version": "1.0.0",
       "critical": true,
       "dependencies": []
@@ -168,7 +174,7 @@
       "name": "JB Threat Lab",
       "level": "engine",
       "parentId": "jb.ecosystem",
-      "sourceId": "jb-expert-qa-main",
+      "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
       "version": "0.1.0",
       "critical": true,
       "dependencies": []
