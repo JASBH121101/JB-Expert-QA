@@ -49,19 +49,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout pinned NEXORA Configurable Catalog prototype
+      - name: Checkout NEXORA demo Catalog prototype at current main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
-          ref: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
+          ref: b546c2c64dffd311770ac455867fe5dd3e245138
           path: nexora-catalog
           persist-credentials: false
 
-      - name: Checkout pinned NEXORA Laravel Site Engine
+      - name: Checkout integrated NEXORA Laravel Site Engine at current main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: JASBH121101/Nexora
-          ref: afa0572d35f94b5c02a40d75001a2b2acd7f8b66
+          ref: b546c2c64dffd311770ac455867fe5dd3e245138
           path: nexora-site-engine
           persist-credentials: false
 
@@ -96,8 +96,8 @@ jobs:
         env:
           NEXORA_CATALOG_ROOT: ${{ github.workspace }}/nexora-catalog
           NEXORA_SITE_ENGINE_ROOT: ${{ github.workspace }}/nexora-site-engine
-          NEXORA_CATALOG_SHA: 63f0608d0b00d633b1ad147ab2318fc099b8a99e
-          NEXORA_SITE_ENGINE_SHA: afa0572d35f94b5c02a40d75001a2b2acd7f8b66
+          NEXORA_CATALOG_SHA: b546c2c64dffd311770ac455867fe5dd3e245138
+          NEXORA_SITE_ENGINE_SHA: b546c2c64dffd311770ac455867fe5dd3e245138
           NEXORA_PROFILE_REQUIRED: "true"
           NEXORA_REPORT_DIR: ${{ github.workspace }}/nexora-certification-reports
         run: node --test packages/threat-lab/tests/nexora-profiles.integration.test.js

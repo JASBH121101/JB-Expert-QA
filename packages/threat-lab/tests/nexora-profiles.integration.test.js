@@ -10,8 +10,8 @@ const SITE_ROOT = process.env.NEXORA_SITE_ENGINE_ROOT ?? "";
 const CATALOG_SHA = process.env.NEXORA_CATALOG_SHA ?? "";
 const SITE_SHA = process.env.NEXORA_SITE_ENGINE_SHA ?? "";
 
-const EXPECTED_CATALOG_SHA = "63f0608d0b00d633b1ad147ab2318fc099b8a99e";
-const EXPECTED_SITE_SHA = "afa0572d35f94b5c02a40d75001a2b2acd7f8b66";
+const EXPECTED_CATALOG_SHA = "b546c2c64dffd311770ac455867fe5dd3e245138";
+const EXPECTED_SITE_SHA = "b546c2c64dffd311770ac455867fe5dd3e245138";
 
 const profileEnvironmentReady =
   CATALOG_ROOT !== ""
@@ -206,6 +206,9 @@ function runSiteEngineScenario(scenario) {
     "nexora.site.expert.mfa-totp-security": [
       { binary: "php", args: ["vendor/bin/phpunit", "tests/Feature/MfaTotpSecurityTest.php"] }
     ],
+    "nexora.site.expert.active-session-revocation": [
+      { binary: "php", args: ["vendor/bin/phpunit", "tests/Feature/UserSessionManagementTest.php"] }
+    ],
     "nexora.site.extreme.domain-and-tls-boundaries": [
       { binary: "php", args: ["vendor/bin/phpunit", "tests/Feature/SiteDomainControllerTest.php"] },
       { binary: "php", args: ["vendor/bin/phpunit", "tests/Feature/PublishedDomainMiddlewareTest.php"] }
@@ -223,7 +226,7 @@ function runSiteEngineScenario(scenario) {
   return commandOutcome(commands, SITE_ROOT, timeout);
 }
 
-test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including currency, locale, private images and MFA", {
+test("Threat Lab certifies current-main NEXORA Catalog and Site Engine including currency, locale, private images, MFA and session revocation", {
   skip: !profileEnvironmentReady && !profileRequired
     ? "Dedicated NEXORA profile CI environment is not configured"
     : false
@@ -234,7 +237,7 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
   assertPinnedCheckout(CATALOG_ROOT, CATALOG_SHA, "NEXORA Configurable Catalog");
   assertPinnedCheckout(SITE_ROOT, SITE_SHA, "NEXORA Site Engine");
 
-  const lab = createThreatLab({ name: "JB Threat Lab — NEXORA Profiles", version: "0.3.0" });
+  const lab = createThreatLab({ name: "JB Threat Lab — NEXORA Profiles", version: "0.4.0" });
   lab.registerTarget({
     id: "nexora-configurable-catalog",
     kind: "frontend-catalog-prototype",
@@ -246,7 +249,7 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
     id: "nexora-site-engine",
     kind: "laravel-catalog-application",
     version: SITE_SHA,
-    capabilities: ["owner-installation", "published-site", "authorization", "exports", "verified-domain-boundary", "private-media", "mfa-totp", "currency-catalog", "locale-catalog"],
+    capabilities: ["owner-installation", "published-site", "authorization", "exports", "verified-domain-boundary", "private-media", "mfa-totp", "active-session-revocation", "currency-catalog", "locale-catalog"],
     adapter: { async runScenario({ scenario }) { return runSiteEngineScenario(scenario); } }
   });
 
@@ -275,6 +278,7 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
     ["nexora.site.expert.export-authorization", "expert", "Verify export field visibility and independent create/download authorization."],
     ["nexora.site.expert.private-image-pipeline", "expert", "Verify raster re-encoding, private quarantine/storage, published-only delivery and field-level admin authorization."],
     ["nexora.site.expert.mfa-totp-security", "expert", "Verify encrypted TOTP enrollment, login challenge, replay rejection, one-time recovery codes and protected disable flow."],
+    ["nexora.site.expert.active-session-revocation", "expert", "Verify owner-only active-session listing and individual revocation, current/revoked/expired session denial, tombstone protection and employee access denial."],
     ["nexora.site.extreme.domain-and-tls-boundaries", "extreme", "Verify owner-only domain management, DNS TXT/TLS behavior through deterministic fakes and published-host enforcement."],
     ["nexora.site.superextreme.full-feature-and-unit-suite", "superextreme", "Run the complete Laravel Feature and Unit suite against in-memory SQLite."]
   ];
@@ -291,7 +295,7 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
     scenarioIds: catalogScenarios.map(([id]) => id),
     metadata: {
       source: "JASBH121101/Nexora",
-      ref: "feature/nexora-configurable-catalog",
+      ref: "main",
       sha: CATALOG_SHA,
       profile: "frontend-prototype",
       networkRequests: 0
@@ -302,7 +306,7 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
     scenarioIds: siteScenarios.map(([id]) => id),
     metadata: {
       source: "JASBH121101/Nexora",
-      ref: "feature/nexora-mfa-totp-v1 (PR #14, stacked on PR #13)",
+      ref: "main",
       sha: SITE_SHA,
       profile: "laravel-site-engine",
       database: "sqlite-memory",
@@ -323,9 +327,9 @@ test("Threat Lab certifies pinned NEXORA Catalog and Site Engine including curre
     "basic", "intermediate", "advanced", "expert", "extreme", "superextreme"
   ]);
 
-  assert.deepEqual(siteReport.totals, { pass: 10, fail: 0, skip: 0 });
+  assert.deepEqual(siteReport.totals, { pass: 11, fail: 0, skip: 0 });
   assert.equal(siteReport.assessment.targets[0].ready, true);
-  assert.equal(siteScenarios.length, 10);
+  assert.equal(siteScenarios.length, 11);
   assert.deepEqual(siteReport.assessment.targets[0].coveredLevels, [
     "basic", "intermediate", "advanced", "expert", "extreme", "superextreme"
   ]);
