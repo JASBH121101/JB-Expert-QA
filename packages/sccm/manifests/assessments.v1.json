@@ -7216,5 +7216,85 @@
     ],
     "findings": [],
     "sourceId": "jb-expert-qa-pr225-language-signals"
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.ecosystem.20261120-main-03596043",
+    "nodeId": "jb.ecosystem",
+    "status": "PASS",
+    "version": "1.0.0",
+    "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+    "assessedAt": "2026-11-20T12:30:07Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290376",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "Integrated JB Engines Certification passed all 30/30 jobs on the exact current main commit, covering Expert QA, Security Guard adapters, Malware Engine, Resilience lab, Advisor Engine, Language QA, package boundaries and Threat Lab safety/six-tier matrices."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290104",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "Core validation passed on Node.js 22 and Node.js 24 on the exact current main commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290422",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "Deterministic Security QA profile tests passed on Node.js 22 and 24 on the exact current main commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290267",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "NEXORA product validation passed on the exact current main commit: Configurable Catalog (Node 22) and Site Engine (PHP 8.3, SQLite and PostgreSQL 16)."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290129",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "NEXORA pinned product profile certification passed on the exact current main commit."
+      }
+    ],
+    "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
+    "findings": []
+  },
+  {
+    "assessmentId": "asmt.closeout.jb.threat-lab.20261120-main-03596043",
+    "nodeId": "jb.threat-lab",
+    "status": "PASS",
+    "version": "0.1.0",
+    "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+    "assessedAt": "2026-11-20T12:30:07Z",
+    "evidence": [
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290376",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "Threat Lab safety and six-tier certification passed on both Ubuntu and Windows lanes under the integrated 30/30-job engine certification workflow on the exact current main commit."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290267",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "NEXORA product validation passed on the exact current main commit for both Configurable Catalog and Site Engine profiles."
+      },
+      {
+        "kind": "workflow-run",
+        "reference": "https://github.com/JASBH121101/JB-Expert-QA/actions/runs/44736290129",
+        "commitSha": "035960437100ecba2f7e3183fa44a9bac762eccc",
+        "outcome": "success",
+        "summary": "Pinned NEXORA product profiles passed certification on the exact current main commit."
+      }
+    ],
+    "sourceId": "jb-expert-qa-main-2026-11-20-03596043",
+    "findings": []
   }
 ]
