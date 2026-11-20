@@ -206,7 +206,12 @@ export async function auditLanguageFiles(projectRoot, {
       placeholderMismatches: findings.filter((item) => item.id === "placeholder-mismatch").length,
       glossaryReview: findings.filter((item) => item.id === "glossary-review").length,
       unchangedSourceText: findings.filter((item) => item.id === "unchanged-source-text").length,
-      protectedTokenMismatches: findings.filter((item) => item.id.startsWith("protected-")).length
+      protectedTokenMismatches: findings.filter((item) => item.id.startsWith("protected-")).length,
+      contextualProfileSignals: findings.filter((item) => [
+        "context-copy-too-long",
+        "context-register-review",
+        "regional-address-form-review"
+      ].includes(item.id)).length
     })
   });
 }
