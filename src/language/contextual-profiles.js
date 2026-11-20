@@ -145,7 +145,7 @@ const TUTEO_MARKERS = /\b(?:tú|contigo|puedes|tienes|quieres|eres|haz|dime|ven|
 const VOSEO_MARKERS = /\b(?:vos|podés|tenés|querés|sos|hacé|decime|vení|mirá|usá|seleccioná|ingresá|elegí)\b/iu;
 
 function isPlainRecord(value, label) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+  if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
     throw new TypeError(label + " must be a plain object");
   }
   const prototype = Object.getPrototypeOf(value);
@@ -164,6 +164,9 @@ function readStringEntries(value, label) {
   for (const key of Object.keys(descriptors)) {
     const descriptor = descriptors[key];
     if (!descriptor.enumerable) continue;
+    if (!key || key === "__proto__" || key === "prototype" || key === "constructor") {
+      throw new TypeError(label + " contains a prototype-sensitive key");
+    }
     if (!Object.hasOwn(descriptor, "value")) {
       throw new TypeError(label + " must not contain accessor properties");
     }
@@ -196,7 +199,8 @@ export function inferTranslationContext(key) {
 
   if (has("legal", "privacy", "terms", "consent", "policy", "compliance")) return "legal";
   if (has("payment", "invoice", "order", "receipt", "checkout", "billing")) return "transactional";
-  if (has("validation", "error", "errors", "invalid", "required", "warning")) return "validation";
+  if (has("error", "errors")) return "error";
+  if (has("validation", "invalid", "required", "warning")) return "validation";
   if (has("success", "saved", "completed", "complete", "done")) return "success";
   if (has("notification", "notifications", "toast", "alert", "banner")) return "notification";
   if (has("navigation", "nav", "menu", "breadcrumb", "tab")) return "navigation";
@@ -262,7 +266,7 @@ export function auditTranslationContextualProfiles(targetMap, {
   const findings = [];
 
   for (const [key, text] of entries) {
-    const contextDescriptor = contextDescriptors[key];
+    const contextDescriptor = Object.hasOwn(contextDescriptors, key) ? contextDescriptors[key] : undefined;
     if (contextDescriptor && !Object.hasOwn(contextDescriptor, "value")) {
       throw new TypeError("contextMap must not contain accessor properties");
     }
