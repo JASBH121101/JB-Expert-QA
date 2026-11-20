@@ -30,6 +30,7 @@ on:
       - "tests/language-qa-engine.test.js"
       - "tests/language-qa-translation-memory-suggestions.test.js"
       - "tests/language-qa-linguistic-signals.test.js"
+      - "tests/language-qa-native-acceptance.test.js"
       - ".github/workflows/language-qa.yml"
 
 permissions:
