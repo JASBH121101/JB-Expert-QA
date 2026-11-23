@@ -97,3 +97,12 @@ export {
   STATIC_QA_ADAPTER_VERSION,
   STATIC_QA_ADAPTER_CAPABILITIES
 } from "./engine-registry/adapters/static-qa.js";
+
+export {
+  createStaticSecurityQaEngineAdapter,
+  registerStaticSecurityQaEngine,
+  StaticSecurityQaAdapterError,
+  STATIC_SECURITY_QA_ADAPTER_ID,
+  STATIC_SECURITY_QA_ADAPTER_VERSION,
+  STATIC_SECURITY_QA_ADAPTER_CAPABILITIES
+} from "./engine-registry/adapters/static-security-qa.js";

@@ -34,6 +34,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "createApiTestingEngineAdapter",
     "createStaticQaEngineAdapter",
     "registerStaticQaEngine",
+    "createStaticSecurityQaEngineAdapter",
+    "registerStaticSecurityQaEngine",
+    "StaticSecurityQaAdapterError",
+    "STATIC_SECURITY_QA_ADAPTER_ID",
+    "STATIC_SECURITY_QA_ADAPTER_VERSION",
+    "STATIC_SECURITY_QA_ADAPTER_CAPABILITIES",
     "StaticQaAdapterError",
     "STATIC_QA_ADAPTER_ID",
     "STATIC_QA_ADAPTER_VERSION",
@@ -206,6 +212,41 @@ test("standalone Expert QA package runs the canonical Static QA adapter without 
     assert.equal(result.readOnly, true);
     assert.equal(result.dependencyAdvisories.enabled, false);
     assert.equal(result.dependencyAdvisories.networkRequests, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("standalone Expert QA package runs canonical Static Security QA offline and without source disclosure", async () => {
+  const { mkdtemp, mkdir, rm, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const root = await mkdtemp(join(tmpdir(), "jbqa-static-security-package-"));
+  const sourceSecret = "standalone-private-source-value";
+  const token = "ghp_" + "C".repeat(36);
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "src", "app.js"), [
+      'const endpoint = "http://api.production.example.com/v1";',
+      'const GITHUB_TOKEN = "' + token + '";',
+      'const marker = "' + sourceSecret + '";'
+    ].join("\n"), "utf8");
+    await writeFile(join(root, ".env"), "TOKEN=standalone-env-secret", "utf8");
+
+    const registry = engine.createQaEngineRegistry();
+    const metadata = engine.registerStaticSecurityQaEngine(registry);
+    assert.equal(metadata.id, engine.STATIC_SECURITY_QA_ADAPTER_ID);
+
+    const result = await registry.getRunner(metadata.id)({ path: root });
+    assert.equal(result.readOnly, true);
+    assert.equal(result.securityAssessment.onlineDependencyAdvisories, false);
+    assert.equal(result.securityAssessment.networkRequests, 0);
+    assert.equal(result.securityAssessment.databaseConnections, 0);
+    const output = JSON.stringify(result);
+    assert.equal(output.includes(token), false);
+    assert.equal(output.includes(sourceSecret), false);
+    assert.equal(output.includes("standalone-env-secret"), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

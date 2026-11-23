@@ -43,6 +43,7 @@ const requiredFiles = [
   "src/engine-registry/index.js",
   "src/engine-registry/adapters/api-testing.js",
   "src/engine-registry/adapters/static-qa.js",
+  "src/engine-registry/adapters/static-security-qa.js",
   "src/engine-registry/orchestrator.js",
   "packages/api-testing-engine/src/index.js",
   "src/dashboard/analytics.js",
