@@ -62,7 +62,7 @@ function assertSafeData(value, label, limits = {}) {
       seen.add(item);
       const ownKeys = Reflect.ownKeys(item);
       if (ownKeys.some((key) => typeof key !== "string")) throw new TypeError(label + " arrays cannot contain symbol properties");
-      const keys = ownKeys;
+      const keys = ownKeys.filter((key) => key !== "length");
       if (keys.length !== item.length || keys.some((key) => !/^(0|[1-9]\d*)$/u.test(key) || Number(key) >= item.length)) {
         throw new TypeError(label + " arrays cannot contain holes or custom properties");
       }
