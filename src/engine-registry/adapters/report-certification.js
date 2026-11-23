@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { redactSensitiveText } from "../../core/redaction.js";
+import { ENGINE_VERSION } from "../../core/version.js";
 import { buildDashboardAnalytics, buildConsolidatedReport } from "../../dashboard/analytics.js";
 
 const ADAPTER_ID = "jb.report-certification-engine";
@@ -30,7 +31,7 @@ const CAPABILITIES = Object.freeze([
 ]);
 
 export const REPORT_CERTIFICATION_ADAPTER_ID = ADAPTER_ID;
-export const REPORT_CERTIFICATION_ADAPTER_VERSION = "1.0.0";
+export const REPORT_CERTIFICATION_ADAPTER_VERSION = ENGINE_VERSION;
 export const REPORT_CERTIFICATION_ADAPTER_CAPABILITIES = CAPABILITIES;
 export const REPORT_CERTIFICATION_LIMITS = Object.freeze({
   maxHistoryRecords: MAX_HISTORY_RECORDS,
@@ -333,7 +334,7 @@ function deriveAssessmentExplanation(assessment) {
   }
 }
 
-function createCheckpoint(analytics, generatedAt, idFactory) {
+function createCheckpoint(analytics, generatedAt, idFactory, history, engineDefinitions) {
   const checkpointPayload = {
     generatedAt,
     retainedHistoryCount: analytics.retainedHistoryCount,
@@ -344,7 +345,9 @@ function createCheckpoint(analytics, generatedAt, idFactory) {
     assessment: analytics.assessment,
     currentOutcomes: analytics.currentOutcomes,
     severityCounts: analytics.severityCounts,
-    topFindings: analytics.topFindings
+    topFindings: analytics.topFindings,
+    normalizedHistory: history,
+    engineDefinitions
   };
   const digest = createHash("sha256").update(JSON.stringify(checkpointPayload)).digest("hex");
   return Object.freeze({
@@ -395,7 +398,7 @@ export function createReportCertificationEngineAdapter({
 
     const analytics = buildDashboardAnalytics(history, engineDefinitions);
     const assessment = ASSESSMENTS.has(analytics.assessment) ? analytics.assessment : "NOT_ASSESSED";
-    const checkpoint = createCheckpoint(analytics, generatedAt, () => certificationId);
+    const checkpoint = createCheckpoint(analytics, generatedAt, () => certificationId, history, engineDefinitions);
 
     const certificate = Object.freeze({
       certificationId,
