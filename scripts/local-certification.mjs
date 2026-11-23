@@ -30,6 +30,12 @@ const CORE_TASKS = [
     timeoutMs: 5 * 60 * 1000
   },
   {
+    id: "autonomous-execution",
+    title: "Policy-bounded autonomous execution and audit ledger tests",
+    npmScript: "test:autonomous-execution",
+    timeoutMs: 5 * 60 * 1000
+  },
+  {
     id: "threat-lab",
     title: "Threat Lab safe integration tests",
     npmScript: "test:threat-lab",
@@ -65,12 +71,6 @@ export const LOCAL_CERTIFICATION_PROFILES = Object.freeze({
       npmScript: "test:dead-code",
       timeoutMs: 5 * 60 * 1000
     },
-    {
-      id: "autonomous-execution",
-      title: "Policy-bounded autonomous execution and audit ledger tests",
-      npmScript: "test:autonomous-execution",
-      timeoutMs: 5 * 60 * 1000
-    }
   ].map((task) => Object.freeze({ ...task })))
 });
 
