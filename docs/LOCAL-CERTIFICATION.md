@@ -49,6 +49,7 @@ Runs these repository-owned npm scripts sequentially:
 2. test:package-distributions — independently installable package boundaries.
 3. test:engine-contracts — shared engine contract tests.
 4. test:threat-lab — safe Threat Lab integration tests.
+5. test:autonomous-execution — policy-bounded action authorization, approval gates, execution limits and audit ledger.
 
 ### full
 
@@ -58,7 +59,6 @@ Runs all core checks and adds:
 2. test:resilience-engine.
 3. test:internationalization.
 4. test:dead-code.
-5. test:autonomous-execution — policy-bounded orchestration, approval gates and hash-chained ledger.
 
 The profile is an allowlist of fixed scripts in this repository. User input cannot supply an arbitrary command or shell fragment.
 
