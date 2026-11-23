@@ -123,7 +123,8 @@ async function refreshPhase4Engines() {
   state.phase4Engines = Array.isArray(data.engines) ? data.engines : [];
   renderPhase4Engines();
 }
-\nfunction renderEngines() {
+
+function renderEngines() {
   engineGrid.replaceChildren();
   state.engines.forEach((engine) => {
     const label = document.createElement("label");
