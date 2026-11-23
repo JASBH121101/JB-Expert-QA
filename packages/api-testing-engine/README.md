@@ -51,3 +51,28 @@ npm run test:api-testing
 ```
 
 Tests use ephemeral loopback HTTP servers and do not call production APIs. This block does not discover endpoints, validate API contracts, assert business rules, scan for vulnerabilities, or chain requests.
+
+
+## Phase 3 — Block 2: Assertions & Validation Engine
+
+The assertions engine evaluates an existing response object from the Request Engine. It does not make network requests.
+
+```js
+import { createApiRequestEngine, createApiAssertionsEngine } from "@jb/api-testing-engine";
+
+const api = createApiRequestEngine({ allowedOrigins: ["https://api.example.com"] });
+const response = await api.request({ method: "GET", url: "https://api.example.com/v1/users/7" });
+const assertions = createApiAssertionsEngine();
+const report = assertions.evaluate(response, [
+  { type: "status", expected: 200 },
+  { type: "json", path: "$.data.id", expected: 7 },
+  { type: "type", path: "$.data.active", expected: "boolean" },
+  { type: "number", path: "$.data.score", operator: "greaterThanOrEqual", expected: 0 },
+  { type: "arrayLength", path: "$.data.roles", operator: "greaterThan", expected: 0 }
+]);
+console.log(report.passed, report.passRate, report.results);
+```
+
+Supported assertion types: `status`, `statusRange`, `header`, `json`, `text`, `contains`, `type`, `exists`, `number`, `arrayLength`, and `regex`. JSON paths support safe object properties and numeric array indexes (for example `$.data.items[0]`). No eval or dynamic code execution is used. Assertions are capped at 1000 per evaluation. Use `stopOnFailure: true` to short-circuit.
+
+Reports include individual PASS/FAIL results, actual/expected values, counts, pass rate, and a global verdict. Contract/schema validation and security probes remain separate future blocks.
