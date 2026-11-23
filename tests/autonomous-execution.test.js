@@ -384,19 +384,19 @@ test("a corrupt ledger prevents all execution", async () => {
 
 test("one engine instance runs only one plan at a time", async () => {
   let releaseAction;
-  let actionStarted = false;
+  let signalStarted;
+  const actionStarted = new Promise((resolve) => { signalStarted = resolve; });
   const engine = createAutonomousExecutionEngine({
     actions: [reportAction({
       execute: async () => new Promise((resolve) => {
-        actionStarted = true;
         releaseAction = () => resolve({ saved: "reports/done.json" });
+        signalStarted();
       })
     })],
     policy: reportPolicy()
   });
   const first = engine.execute(reportPlan());
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(actionStarted, true);
+  await actionStarted;
   await assert.rejects(engine.execute(reportPlan()), /already running/u);
   releaseAction();
   const result = await first;
