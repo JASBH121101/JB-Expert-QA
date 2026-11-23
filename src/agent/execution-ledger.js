@@ -176,7 +176,9 @@ export async function createJsonlExecutionLedger(filePath, { now = () => new Dat
     if (error?.code !== "ENOENT") throw error;
   }
 
-  const flags = constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (constants.O_NOFOLLOW || 0);
+  const flags = process.platform === "win32"
+    ? "a+"
+    : constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (constants.O_NOFOLLOW || 0);
   const handle = await open(absolutePath, flags, 0o600);
   try {
     const stats = await handle.stat();
