@@ -85,7 +85,7 @@ Exit codes: 0 means the selected profile passed with no detected test skips; 1 m
 ## Known limitations in v1
 
 - A run checks only the current host operating system and installed Node.js version. It does not reproduce a multi-OS or multi-Node CI matrix.
-- A PASS represents a successful exit code for the selected npm script. Individual test-level skips remain visible in that script's output and are not parsed into task-level statuses.
+- Node.js TAP summaries in the captured output are parsed for skipped-test counts. Any detected skip changes the task status to PARTIAL and prevents the profile from returning a full pass. Non-TAP test reporters and output truncated before the summary cannot be classified this way.
 - Browser binaries are not provisioned by this runner. Install the required Playwright browser separately before executing browser-dependent tests.
 - The core profile intentionally does not execute the additional suites in the full profile. The report lists those omitted checks.
 - This runner replaces the execution entry point for local use; it does not yet replace package publishing, cross-platform certification, browser provisioning, or every specialized workflow.
