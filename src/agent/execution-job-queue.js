@@ -413,6 +413,9 @@ export function createExecutionJobQueue(options = {}) {
       job.state = "queued";
       job.error = null;
       job.finishedAt = null;
+      // Move the recovered job to the tail so FIFO order reflects the retry decision.
+      jobs.delete(job.id);
+      jobs.set(job.id, job);
       fifo.push(job.id);
       return snapshot(job);
     });
