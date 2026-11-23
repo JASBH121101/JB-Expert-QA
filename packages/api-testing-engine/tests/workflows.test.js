@@ -67,6 +67,24 @@ test("engine identity and a single-step workflow produce a safe passing report",
   assert.equal(JSON.stringify(report).includes("bodyText"), false);
 });
 
+test("fails an unasserted non-2xx response but allows an explicitly asserted negative status", async () => {
+  const engine = createEngine(async () => response({ status: 404, ok: false }));
+  const defaultReport = await engine.run(workflow([{
+    id: "not-found",
+    request: { method: "GET", url: "https://api.example.test/missing" }
+  }]));
+  assert.equal(defaultReport.status, "failed");
+  assert.equal(defaultReport.results[0].error.code, "HTTP_STATUS_NOT_OK");
+
+  const expectedNegative = await engine.run(workflow([{
+    id: "expected-404",
+    request: { method: "GET", url: "https://api.example.test/missing" },
+    assertions: [{ type: "status", expected: 404 }]
+  }]));
+  assert.equal(expectedNegative.status, "passed");
+  assert.equal(expectedNegative.results[0].assertions.failedCount, 0);
+});
+
 test("transfers captured variables and previous response paths into later requests", async () => {
   const calls = [];
   const engine = createEngine(async (request) => {
