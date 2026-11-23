@@ -434,8 +434,8 @@ jobs:
           retention-days: 30
 
   api-testing-engine:
-    name: API Testing Engine / \${{ matrix.os }} / Node \${{ matrix.node }}
-    runs-on: \${{ matrix.os }}
+    name: API Testing Engine / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -448,7 +448,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: \${{ matrix.node }}
+          node-version: ${{ matrix.node }}
           package-manager-cache: false
       - name: Install repository dependencies without lifecycle scripts
         run: npm install --ignore-scripts --no-audit --no-fund
