@@ -47,7 +47,7 @@ test("Static QA adapter publishes a stable read-only path manifest", () => {
   ]);
   assert.ok(Object.isFrozen(adapter));
   assert.ok(Object.isFrozen(STATIC_QA_ADAPTER_CAPABILITIES));
-  assert.match(adapter.description, /read-only/u);
+  assert.match(adapter.description, /read-only/iu);
 });
 
 test("registration adds metadata without scanning a project", () => {
