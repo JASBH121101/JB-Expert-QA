@@ -99,8 +99,8 @@ function validateExecutionOptions(value) {
   return options;
 }
 
-function finiteInteger(value, fallback = 0) {
-  return Number.isSafeInteger(value) && value >= 0 ? value : fallback;
+function finiteInteger(value, maximum = Number.MAX_SAFE_INTEGER) {
+  return Number.isSafeInteger(value) && value >= 0 ? Math.min(value, maximum) : 0;
 }
 
 function finiteMetric(value, maximum = 1_000_000_000) {
