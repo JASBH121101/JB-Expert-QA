@@ -191,16 +191,11 @@ test("persistent store rejects symlink job store files", async () => {
     await writeFile(target, "{}", "utf8");
     const { symlink } = await import("node:fs/promises");
     await symlink(target, filePath);
-    const queue = createPersistentExecutionJobQueue({ filePath });
     assert.throws(
-      () => queue.stats(),
-      () => false
+      () => createPersistentExecutionJobQueue({ filePath }),
+      (error) => error instanceof ExecutionJobStoreError && error.code === "UNSAFE_STORE_FILE"
     );
-    assert.throws(
-      () => queue.enqueue({ plan: "unsafe" }),
-      (error) => error.code === "PERSISTENCE_FAILED"
-    );
-    queue.close();
+    await assert.rejects(stat(filePath + ".lock"), (error) => error.code === "ENOENT");
   });
 });
 
