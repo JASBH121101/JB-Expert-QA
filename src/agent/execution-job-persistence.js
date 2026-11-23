@@ -358,7 +358,7 @@ export function createJsonFileExecutionJobStore(options = {}) {
 export function createPersistentExecutionJobQueue(options = {}) {
   const config = readOptions(
     options,
-    new Set(["filePath", "maxQueueSize", "maxJobs", "now"]),
+    new Set(["filePath", "maxQueueSize", "maxJobs", "maxAttempts", "now"]),
     "options"
   );
   const store = createJsonFileExecutionJobStore({ filePath: config.filePath });
@@ -366,6 +366,7 @@ export function createPersistentExecutionJobQueue(options = {}) {
     return createExecutionJobQueue({
       ...(config.maxQueueSize === undefined ? {} : { maxQueueSize: config.maxQueueSize }),
       ...(config.maxJobs === undefined ? {} : { maxJobs: config.maxJobs }),
+      ...(config.maxAttempts === undefined ? {} : { maxAttempts: config.maxAttempts }),
       ...(config.now === undefined ? {} : { now: config.now }),
       persistence: store
     });
