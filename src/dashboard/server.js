@@ -294,10 +294,14 @@ export function createDashboardServer({
     throw new TypeError("maximumBodyBytes must be between 1024 and 65536");
   }
   if (!phase4Registry || typeof phase4Registry.list !== "function") {
-    throw new TypeError("phase4Registry must be a JB QA engine registry or null");
+    throw new TypeError("phase4Registry must be a JB QA engine registry");
+  }
+  if (phase4Execution !== null && !isDashboardPhase4ExecutionBoundTo(phase4Execution, phase4Registry)) {
+    throw new TypeError("phase4Execution must be created for the same sealed phase4Registry");
   }
   const dataDir = resolve(storageDirectory);
   const rateWindow = [];
+  const phase4ExecutionRateWindow = [];
   let busy = false;
 
   const server = createServer(async (request, response) => {
@@ -322,7 +326,14 @@ export function createDashboardServer({
             id: engine.id, name: engine.name, version: engine.version, category: engine.category,
             targetType: engine.targetType, executionMode: engine.executionMode,
             capabilities: [...engine.capabilities], description: engine.description
-          })), executionEnabled: false, approvalRequired: true }); return;
+          })), executionEnabled: Boolean(phase4Execution), approvalRequired: true }); return;
+        }
+        if (pathname === "/api/phase4/execution") {
+          json(response, 200, phase4Execution ? phase4Execution.getStatus() : {
+            enabled: false, policyId: null, approvalRequired: true,
+            permission: "qa:engine-execute", allowedEngineIds: [],
+            reason: "Host policy and external approval provider are not configured"
+          }); return;
         }
         if (pathname === "/api/analytics") {
           const history = await loadHistory(dataDir, maximumHistoryRecords);
