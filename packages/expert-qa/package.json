@@ -39,7 +39,8 @@
     "./performance-qa-adapter": "./src/engine-registry/adapters/performance-qa.js",
     "./visual-qa-adapter": "./src/engine-registry/adapters/visual-qa.js",
     "./report-certification-adapter": "./src/engine-registry/adapters/report-certification.js",
-    "./dashboard-phase4-execution": "./src/dashboard/phase4-execution.js"
+    "./dashboard-phase4-execution": "./src/dashboard/phase4-execution.js",
+    "./dashboard-phase4-catalog": "./src/dashboard/phase4-catalog.js"
   },
   "files": [
     "src/**",
