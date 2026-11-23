@@ -33,7 +33,8 @@
     "./api-testing-adapter": "./src/engine-registry/adapters/api-testing.js",
     "./engine-orchestrator": "./src/engine-registry/orchestrator.js",
     "./static-qa-adapter": "./src/engine-registry/adapters/static-qa.js",
-    "./static-security-qa-adapter": "./src/engine-registry/adapters/static-security-qa.js"
+    "./static-security-qa-adapter": "./src/engine-registry/adapters/static-security-qa.js",
+    "./runtime-security-qa-adapter": "./src/engine-registry/adapters/runtime-security-qa.js"
   },
   "files": [
     "src/**",

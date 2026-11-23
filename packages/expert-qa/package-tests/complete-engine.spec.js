@@ -36,6 +36,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "registerStaticQaEngine",
     "createStaticSecurityQaEngineAdapter",
     "registerStaticSecurityQaEngine",
+    "createRuntimeSecurityQaEngineAdapter",
+    "registerRuntimeSecurityQaEngine",
+    "RuntimeSecurityQaAdapterError",
+    "RUNTIME_SECURITY_QA_ADAPTER_ID",
+    "RUNTIME_SECURITY_QA_ADAPTER_VERSION",
+    "RUNTIME_SECURITY_QA_ADAPTER_CAPABILITIES",
     "StaticSecurityQaAdapterError",
     "STATIC_SECURITY_QA_ADAPTER_ID",
     "STATIC_SECURITY_QA_ADAPTER_VERSION",
@@ -250,4 +256,21 @@ test("standalone Expert QA package runs canonical Static Security QA offline and
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+
+test("standalone Expert QA package exposes Runtime Security QA and blocks private destinations without leaking query data", async () => {
+  const registry = engine.createQaEngineRegistry();
+  const metadata = engine.registerRuntimeSecurityQaEngine(registry);
+  assert.equal(metadata.id, engine.RUNTIME_SECURITY_QA_ADAPTER_ID);
+  assert.equal(metadata.targetType, "url");
+  assert.equal(metadata.executionMode, "browser");
+  const runner = registry.getRunner(metadata.id);
+  const secret = "package-runtime-secret-456";
+  await assert.rejects(
+    runner({ url: "http://127.0.0.1/?token=" + secret }),
+    (error) => error instanceof engine.RuntimeSecurityQaAdapterError &&
+      error.code === "AUDIT_FAILED" &&
+      !error.message.includes(secret)
+  );
 });
