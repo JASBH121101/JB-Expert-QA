@@ -233,11 +233,11 @@ function normalizePolicy(value, engineByAction) {
     throw new DashboardPhase4ExecutionError("INVALID_POLICY_ID", "An explicit valid policy.id is required");
   }
   const grantedPermissions = readArray(policy.grantedPermissions, "policy.grantedPermissions", 100);
-  if (!grantedPermissions.includes(QA_ENGINE_EXECUTION_PERMISSION) ||
-      grantedPermissions.some((permission) => typeof permission !== "string")) {
+  if (grantedPermissions.length !== 1 ||
+      grantedPermissions[0] !== QA_ENGINE_EXECUTION_PERMISSION) {
     throw new DashboardPhase4ExecutionError(
       "MISSING_EXECUTION_PERMISSION",
-      "Policy must explicitly preauthorize qa:engine-execute"
+      "Dashboard policy must grant only the qa:engine-execute permission"
     );
   }
   if (new Set(grantedPermissions).size !== grantedPermissions.length) {
@@ -268,8 +268,8 @@ function normalizePolicy(value, engineByAction) {
         "Every enabled engine rule must explicitly allow high risk; high-risk execution still requires approval"
       );
     }
-    if (rule.requireApproval === false) {
-      throw new DashboardPhase4ExecutionError("APPROVAL_REQUIRED", "Engine approval cannot be disabled");
+    if (rule.requireApproval !== true) {
+      throw new DashboardPhase4ExecutionError("APPROVAL_REQUIRED", "Every engine rule must explicitly set requireApproval: true");
     }
     if (rule.scopes !== undefined && (!Array.isArray(rule.scopes) || rule.scopes.length > 0 || Reflect.ownKeys(rule.scopes).some((key) => key !== "length"))) {
       throw new DashboardPhase4ExecutionError(
