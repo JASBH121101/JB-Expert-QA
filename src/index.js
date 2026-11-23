@@ -75,3 +75,5 @@ export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/ind
 export { createDashboardServer, startDashboard, DEFAULT_DASHBOARD_PORT, DEFAULT_DASHBOARD_HOST } from "./dashboard/server.js";
 
 export { buildDashboardAnalytics, buildConsolidatedReport } from "./dashboard/analytics.js";
+
+export { createQaEngineRegistry, QaEngineRegistryError, QA_ENGINE_ADAPTER_CONTRACT } from "./engine-registry/index.js";
