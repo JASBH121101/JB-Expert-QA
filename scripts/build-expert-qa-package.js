@@ -53,6 +53,7 @@ const requiredFiles = [
   "packages/api-testing-engine/src/index.js",
   "src/dashboard/analytics.js",
   "src/dashboard/server.js",
+  "src/dashboard/phase4-execution.js",
   "src/dashboard-cli.js",
   "src/dashboard/public/index.html",
   "src/dashboard/public/app.css",
