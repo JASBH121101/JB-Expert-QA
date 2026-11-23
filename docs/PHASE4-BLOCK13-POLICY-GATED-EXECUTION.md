@@ -53,7 +53,7 @@ const dashboard = await startDashboard({
 });
 ```
 
-The example assumes that the embedding host provides `hostApprovalService`. No external approval service or auto-approval implementation is supplied by JB Expert QA. A missing provider prevents bridge construction. A provider that denies or times out prevents engine invocation.
+The example assumes that the embedding host provides `hostApprovalService`. No external approval service or auto-approval implementation is supplied by JB Expert QA. A missing provider prevents bridge construction. A provider that denies or times out prevents engine invocation.\n\nThe default catalog keeps API Testing network access inert with the non-routable placeholder origin `https://catalog.invalid`. A host that explicitly enables the API Testing Engine must pass its exact approved origins, for example `createDashboardPhase4Catalog({ apiAllowedOrigins: ["https://api.example.test"] })`. Do not use broad origin patterns or origins the host does not control.
 
 ## Policy contract
 
