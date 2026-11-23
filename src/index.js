@@ -134,3 +134,13 @@ export {
   PERFORMANCE_QA_ADAPTER_VERSION,
   PERFORMANCE_QA_ADAPTER_CAPABILITIES
 } from "./engine-registry/adapters/performance-qa.js";
+
+export {
+  createVisualQaEngineAdapter,
+  registerVisualQaEngine,
+  VisualQaAdapterError,
+  VISUAL_QA_ADAPTER_ID,
+  VISUAL_QA_ADAPTER_VERSION,
+  VISUAL_QA_ADAPTER_CAPABILITIES,
+  VISUAL_QA_LIMITS
+} from "./engine-registry/adapters/visual-qa.js";
