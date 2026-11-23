@@ -15,7 +15,7 @@ import { registerReportCertificationEngine } from "../engine-registry/adapters/r
  */
 export function createDashboardPhase4Catalog() {
   const registry = createQaEngineRegistry();
-  registerApiTestingEngine(registry);
+  registerApiTestingEngine(registry, { allowedOrigins: ["https://catalog.invalid"] });
   registerStaticQaEngine(registry);
   registerStaticSecurityQaEngine(registry);
   registerRuntimeSecurityQaEngine(registry);
