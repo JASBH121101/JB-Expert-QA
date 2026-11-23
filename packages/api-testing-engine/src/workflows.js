@@ -340,15 +340,18 @@ function validateWorkflowDefinition(workflow) {
   });
 }
 
-function resolveBindings(value, responses, variables, label, depth = 0) {
+function resolveBindings(value, responses, variables, stepStates, label, depth = 0) {
   if (depth > 24) throw new ApiWorkflowError("BINDING_DEPTH", label + " exceeds maximum binding depth");
   if (Array.isArray(value)) {
-    return value.map((item, index) => resolveBindings(item, responses, variables, label + "[" + index + "]", depth + 1));
+    return value.map((item, index) => resolveBindings(item, responses, variables, stepStates, label + "[" + index + "]", depth + 1));
   }
   if (!isRecord(value)) return value;
   if (Object.hasOwn(value, "$ref")) {
     const response = responses.get(value.$ref);
-    if (!response) throw new ApiWorkflowError("REFERENCE_UNAVAILABLE", label + " references a response that is unavailable");
+    const state = stepStates.get(value.$ref);
+    if (!response || !state || state.status !== "passed") {
+      throw new ApiWorkflowError("REFERENCE_UNAVAILABLE", label + " references a response from a step that did not pass");
+    }
     const resolved = resolvePath(response, value.path);
     if (!resolved.exists) throw new ApiWorkflowError("REFERENCE_NOT_FOUND", label + " response path was not found");
     return structuredClone(resolved.value);
@@ -360,7 +363,7 @@ function resolveBindings(value, responses, variables, label, depth = 0) {
   const output = {};
   for (const [key, child] of Object.entries(value)) {
     Object.defineProperty(output, key, {
-      value: resolveBindings(child, responses, variables, label + "." + key, depth + 1),
+      value: resolveBindings(child, responses, variables, stepStates, label + "." + key, depth + 1),
       enumerable: true,
       configurable: true,
       writable: true
@@ -480,7 +483,7 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
         }
 
         try {
-          const request = resolveBindings(step.request, responses, variables, "step." + step.id + ".request");
+          const request = resolveBindings(step.request, responses, variables, stepStates, "step." + step.id + ".request");
           const response = validateRequestResponse(await requestEngine.request(request, { signal: signal ?? undefined }));
           responses.set(step.id, response);
 
@@ -490,6 +493,7 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
           }
 
           const captureNames = [];
+          const pendingCaptures = new Map();
           if (step.capture) {
             for (const [name, path] of Object.entries(step.capture)) {
               const resolved = resolvePath(response, path);
@@ -497,7 +501,7 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
                 throw new ApiWorkflowError("CAPTURE_NOT_FOUND", "A declared capture path was not found for step " + step.id);
               }
               assertSafeData(resolved.value, "captured value", { maxNodes: 10000, maxDepth: 24 });
-              variables.set(name, structuredClone(resolved.value));
+              pendingCaptures.set(name, structuredClone(resolved.value));
               captureNames.push(name);
             }
           }
@@ -508,6 +512,9 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
             : response.ok === true;
           const passed = hasAssertions ? assertionResult.passed : defaultHttpOk;
           const status = passed ? "passed" : "failed";
+          if (passed) {
+            for (const [name, value] of pendingCaptures) variables.set(name, value);
+          }
           const details = {
             httpStatus: response.status,
             bytesReceived: Number.isFinite(response.bytesReceived) ? response.bytesReceived : undefined,
