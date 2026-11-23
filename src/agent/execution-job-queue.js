@@ -346,12 +346,12 @@ export function createExecutionJobQueue(options = {}) {
       if (idempotencyKey && idempotency.has(idempotencyKey)) {
         return getJob(idempotency.get(idempotencyKey));
       }
-      if (jobs.size >= maxJobs) {
-        throw new ExecutionJobQueueError("JOB_CAPACITY_REACHED", "job retention capacity reached; clear terminal jobs first");
-      }
       const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
       if (queuedCount >= maxQueueSize) {
         throw new ExecutionJobQueueError("QUEUE_FULL", "execution queue is at capacity");
+      }
+      if (jobs.size >= maxJobs) {
+        throw new ExecutionJobQueueError("JOB_CAPACITY_REACHED", "job retention capacity reached; clear terminal jobs first");
       }
       const jobId = id ?? "job-" + randomUUID();
       if (jobs.has(jobId)) {
