@@ -23,7 +23,9 @@ The server binds only to 127.0.0.1. Open the exact loopback URL printed by the p
 - Supports local project targets for Static QA and static Security QA, and website targets for browser engines and runtime Security QA.
 - Stores compact run metadata, score, findings, outcome and comparison summaries locally.
 - Compares a run with the previous run for the same engine and exact target identity. It reports score change, finding-count change, newly observed findings and resolved findings.
-- Creates a downloadable Markdown internal certification report for each saved run.
+- Creates a downloadable Markdown internal report for each saved run.
+- QA Intelligence aggregates the latest snapshot per engine and target, ranks retained findings by severity, summarizes engine coverage, and shows the latest 12 score observations.
+- Provides a downloadable consolidated Markdown report covering the bounded local history.
 - Visual QA saves per-viewport screenshots for later review from the local dashboard.
 
 The Control Center stores a compact finding list (up to 100 per run) rather than duplicating the entire audit response in history. It does not create visual baselines automatically or overwrite approved baselines.
@@ -56,7 +58,7 @@ Only run the dashboard on a trusted local device. Loopback binding and same-orig
 - **Passed with observations:** the underlying auditor passed, but findings were recorded for review.
 - **Not passed:** the underlying auditor did not pass or reported rule execution errors.
 
-A dashboard certificate is an internal QA report for the selected run. It is not independent third-party certification, a penetration test, an accessibility conformance statement, or proof of production readiness. A first run has no historical comparison; later runs compare only with the most recent record for the same engine and target.
+Individual certificates and consolidated reports are internal QA summaries of the selected or retained local scope. The consolidated posture is based on the newest saved record for each engine/target pair; engine coverage means an engine appears somewhere in history and does not prove all engines assessed the same target. Neither report is independent third-party certification, a penetration test, an accessibility conformance statement, or proof of production readiness. A first run has no historical comparison; later runs compare only with the most recent record for the same engine and target.
 
 ## Verification
 
