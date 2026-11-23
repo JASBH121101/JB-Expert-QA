@@ -8,7 +8,7 @@ const TARGET_TYPES = new Set(["path", "url", "path-or-url", "payload", "none"]);
 const EXECUTION_MODES = new Set(["in-process", "browser", "local-process", "remote"]);
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const LABEL_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
-const VERSION_PATTERN = /^(0|[1-9]\d*)\\.(0|[1-9]\d*)\\.(0|[1-9]\d*)$/;
+const VERSION_PATTERN = /^(0|[1-9]\d*)[.](0|[1-9]\d*)[.](0|[1-9]\d*)$/;
 
 export const QA_ENGINE_ADAPTER_CONTRACT = CONTRACT;
 
