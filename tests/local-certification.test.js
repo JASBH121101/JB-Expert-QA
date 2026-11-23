@@ -174,6 +174,39 @@ test("local certification report keeps selected profile scope and preserves fail
   }
 });
 
+test("a successful command with skipped TAP tests is reported as PARTIAL", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-local-partial-"));
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "jb-expert-qa", version: "0.8.0" }));
+    let calls = 0;
+    const report = await runLocalCertification({
+      profile: "core",
+      cwd: root,
+      writeReports: false,
+      runTask: async () => {
+        calls += 1;
+        return {
+          status: "PASS",
+          exitCode: 0,
+          durationMs: 1,
+          outputTail: calls === 1 ? "# tests 9\\n# pass 8\\n# fail 0\\n# skipped 1\\n" : ""
+        };
+      }
+    });
+    assert.equal(report.result, "PARTIAL");
+    assert.equal(report.summary.partial, 1);
+    assert.equal(report.summary.passed, 3);
+    assert.equal(report.summary.testSkips, 1);
+    assert.equal(report.checks[0].status, "PARTIAL");
+    assert.equal(report.checks[0].skippedTests, 1);
+  } finally {
+    console.log = originalLog;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("markdown report separates passed, failed, timed-out and skipped states", () => {
   const markdown = renderMarkdownReport({
     result: "FAILED",
@@ -183,7 +216,7 @@ test("markdown report separates passed, failed, timed-out and skipped states", (
     startedAt: "2026-11-23T00:00:00.000Z",
     completedAt: "2026-11-23T00:00:01.000Z",
     durationMs: 1000,
-    summary: { total: 2, passed: 1, failed: 0, timedOut: 1, skipped: 0 },
+    summary: { total: 2, passed: 1, partial: 0, failed: 0, timedOut: 1, skipped: 0, testSkips: 0 },
     checks: [
       { title: "Unit tests", status: "PASS", durationMs: 100, exitCode: 0 },
       { title: "Integration tests", status: "TIMEOUT", durationMs: 900, exitCode: null }
@@ -191,5 +224,6 @@ test("markdown report separates passed, failed, timed-out and skipped states", (
   });
   assert.match(markdown, /\*\*Result:\*\* FAILED/u);
   assert.match(markdown, /\*\*TIMEOUT\*\*/u);
-  assert.match(markdown, /Skipped: 0/u);
+  assert.match(markdown, /Skipped checks: 0/u);
+  assert.match(markdown, /Individual tests skipped: 0/u);
 });
