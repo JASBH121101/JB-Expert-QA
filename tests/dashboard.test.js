@@ -49,6 +49,8 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
   assert.equal(page.headers.get("x-frame-options"), "DENY");
   assert.match(await page.text(), /QA Control Center/);
+  assert.match(await page.text(), /Top recurring findings/);
+  assert.match(await page.text(), /analytics-assessment/);
 
   const script = await fetch(origin + "/assets/app.js");
   assert.equal(script.status, 200);
