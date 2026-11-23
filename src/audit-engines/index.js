@@ -1,7 +1,7 @@
 import { auditProject } from "../adapters/filesystem/audit-project.js";
 import { auditSecurityProject } from "../adapters/filesystem/audit-security-project.js";
 import { auditSecurityUrl } from "../adapters/filesystem/audit-security-url.js";
-import { auditUrl, auditViewports } from "../adapters/playwright/audit-url.js";
+import { auditUrl } from "../adapters/playwright/audit-url.js";
 import { runResponsiveQa } from "../adapters/responsive/index.js";
 
 const DEFINITIONS = Object.freeze([
