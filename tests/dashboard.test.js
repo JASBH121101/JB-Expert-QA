@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
 import { createDashboardServer } from "../src/dashboard/server.js";
 import { createQaEngineRegistry } from "../src/engine-registry/index.js";
-import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";
+import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";\nimport { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
 import { getQaEngineActionType, QA_ENGINE_EXECUTION_PERMISSION } from "../src/engine-registry/orchestrator.js";
 
 async function startTestDashboard(t, options = {}) {
@@ -85,6 +85,25 @@ function createPhase4EchoFixture({ requestApproval = async () => ({ approved: tr
   const execution = createDashboardPhase4Execution({ registry, policy, requestApproval });
   return { registry, execution, get runnerCalls() { return runnerCalls; } };
 }
+
+test("Dashboard Phase 4 catalog keeps API network origins inert unless the host explicitly allowlists exact origins", () => {
+  const safeDefault = createDashboardPhase4Catalog();
+  assert.equal(safeDefault.isSealed(), true);
+  assert.equal(safeDefault.has("jb.api-testing-engine"), true);
+  const configured = createDashboardPhase4Catalog({
+    apiAllowedOrigins: ["https://api.example.test"]
+  });
+  assert.equal(configured.isSealed(), true);
+  assert.equal(configured.has("jb.api-testing-engine"), true);
+  assert.throws(
+    () => createDashboardPhase4Catalog({ apiAllowedOrigins: ["https://api.example.test/path"] }),
+    /exact HTTP\(S\) origins/
+  );
+  assert.throws(
+    () => createDashboardPhase4Catalog({ apiAllowedOrigins: ["*"] }),
+    /invalid URL/
+  );
+});
 
 test("Phase 4 execution is disabled by default and POST cannot bypass missing host configuration", async (t) => {
   const { origin } = await startTestDashboard(t);
