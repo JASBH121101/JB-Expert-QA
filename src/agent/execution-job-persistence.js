@@ -55,11 +55,60 @@ function digest(value) {
 }
 
 function safeJson(value) {
+  const seen = new Set();
+
+  function validate(current, depth, arrayElement = false) {
+    if (depth > 32) throw new TypeError("snapshot is too deeply nested");
+    if (current === undefined && !arrayElement) return;
+    if (current === null || typeof current === "string" || typeof current === "boolean") return;
+    if (typeof current === "number") {
+      if (!Number.isFinite(current)) throw new TypeError("snapshot contains a non-finite number");
+      return;
+    }
+    if (Array.isArray(current)) {
+      if (seen.has(current) || current.length > 100000) throw new TypeError("snapshot contains an invalid array");
+      seen.add(current);
+      for (const key of Reflect.ownKeys(current)) {
+        if (key === "length") continue;
+        if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) ||
+            !Number.isSafeInteger(Number(key)) || Number(key) >= current.length) {
+          throw new TypeError("snapshot array contains unsupported properties");
+        }
+      }
+      for (let index = 0; index < current.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(current, String(index));
+        if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+          throw new TypeError("snapshot array contains holes or accessors");
+        }
+        validate(descriptor.value, depth + 1, true);
+      }
+      seen.delete(current);
+      return;
+    }
+    if (typeof current !== "object") throw new TypeError("snapshot contains a non-JSON value");
+    const prototype = Object.getPrototypeOf(current);
+    if (prototype !== Object.prototype && prototype !== null) throw new TypeError("snapshot contains a non-plain object");
+    if (seen.has(current)) throw new TypeError("snapshot contains a circular reference");
+    seen.add(current);
+    for (const key of Reflect.ownKeys(current)) {
+      if (typeof key !== "string" || ["__proto__", "prototype", "constructor"].includes(key)) {
+        throw new TypeError("snapshot contains a forbidden key");
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+        throw new TypeError("snapshot contains accessors or non-enumerable properties");
+      }
+      validate(descriptor.value, depth + 1);
+    }
+    seen.delete(current);
+  }
+
   let serialized;
   try {
+    validate(value, 0);
     serialized = JSON.stringify(value);
   } catch {
-    throw new ExecutionJobStoreError("INVALID_SNAPSHOT", "queue snapshot is not JSON serializable");
+    throw new ExecutionJobStoreError("INVALID_SNAPSHOT", "queue snapshot must contain bounded, plain JSON-compatible data");
   }
   if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > MAX_STORE_BYTES) {
     throw new ExecutionJobStoreError("STORE_SIZE_LIMIT", "queue snapshot exceeds the 32 MiB store limit");
@@ -76,6 +125,9 @@ function readRegularFile(path) {
     }
     if (fileInfo.size > MAX_STORE_BYTES) {
       throw new ExecutionJobStoreError("STORE_SIZE_LIMIT", "job store file exceeds the 32 MiB limit");
+    }
+    if (process.platform !== "win32" && (fileInfo.mode & 0o077) !== 0) {
+      throw new ExecutionJobStoreError("UNSAFE_STORE_PERMISSIONS", "job store file permissions must be private to its owner");
     }
     const noFollow = constants.O_NOFOLLOW ?? 0;
     descriptor = openSync(path, constants.O_RDONLY | noFollow);
@@ -188,6 +240,9 @@ export function createJsonFileExecutionJobStore(options = {}) {
         const info = lstatSync(filePath);
         if (info.isSymbolicLink() || !info.isFile()) {
           throw new ExecutionJobStoreError("UNSAFE_STORE_FILE", "job store path must be a regular, non-symlink file");
+        }
+        if (process.platform !== "win32" && (info.mode & 0o077) !== 0) {
+          throw new ExecutionJobStoreError("UNSAFE_STORE_PERMISSIONS", "job store file permissions must be private to its owner");
         }
       } catch (error) {
         if (error instanceof ExecutionJobStoreError) throw error;
