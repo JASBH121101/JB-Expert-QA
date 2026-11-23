@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   LOCAL_CERTIFICATION_PROFILES,
   parseRunnerArgs,
   renderMarkdownReport,
+  runLocalCertification,
   runProcess
 } from "../scripts/local-certification.mjs";
 
@@ -123,6 +127,34 @@ test("process runner terminates a real process after its timeout", async () => {
   } finally {
     if (previousQuiet === undefined) delete process.env.JB_QA_LOCAL_QUIET;
     else process.env.JB_QA_LOCAL_QUIET = previousQuiet;
+  }
+});
+
+test("local certification report keeps selected profile scope and preserves failures", async () => {
+  const root = await mkdtemp(join(tmpdir(), "jbqa-local-certification-"));
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "jb-expert-qa", version: "0.8.0" }));
+    let calls = 0;
+    const report = await runLocalCertification({
+      profile: "core",
+      cwd: root,
+      writeReports: false,
+      runTask: async () => {
+        calls += 1;
+        return { status: calls === 2 ? "FAIL" : "PASS", exitCode: calls === 2 ? 1 : 0, durationMs: 1 };
+      }
+    });
+    assert.equal(calls, 4);
+    assert.equal(report.result, "FAILED");
+    assert.equal(report.summary.passed, 3);
+    assert.equal(report.summary.failed, 1);
+    assert.equal(report.notIncluded.length, 4);
+    assert.equal(report.coverageLimitations.length >= 3, true);
+  } finally {
+    console.log = originalLog;
+    await rm(root, { recursive: true, force: true });
   }
 });
 
