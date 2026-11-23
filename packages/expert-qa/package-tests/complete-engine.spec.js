@@ -450,4 +450,11 @@ test("standalone package exposes a fail-closed policy-gated Dashboard execution 
   assert.equal(approvalCalls, 1);
   const integrity = await execution.verifyLedger();
   assert.equal(integrity.valid, true);
+  const audit = await execution.getAuditTrail({ limit: 3 });
+  assert.equal(audit.enabled, true);
+  assert.equal(audit.integrity.valid, true);
+  assert.equal(audit.records.length, 3);
+  assert.ok(audit.records.every((record) => !Object.hasOwn(record, "approvalId")));
+  assert.equal(JSON.stringify(audit).includes("package-safe-input"), false);
+  assert.equal(JSON.stringify(audit).includes("package-human-approval"), false);
 });
