@@ -133,7 +133,13 @@ Run the focused suite:
 npm run test:autonomous-execution
 ~~~
 
-Run the expanded local certification profile (includes the autonomous execution suite):
+The core local certification profile also includes this suite:
+
+~~~bash
+npm run qa:local
+~~~
+
+The expanded local profile adds Security Guard, Resilience Engine, internationalization and dead-code checks:
 
 ~~~bash
 npm run qa:local:full
