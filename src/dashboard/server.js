@@ -5,6 +5,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAuditEngineRegistry } from "../audit-engines/index.js";
 import { buildDashboardAnalytics, buildConsolidatedReport } from "./analytics.js";
+import { createDashboardPhase4Catalog } from "./phase4-catalog.js";
 
 export const DEFAULT_DASHBOARD_PORT = 4173;
 export const DEFAULT_DASHBOARD_HOST = "127.0.0.1";
@@ -278,7 +279,8 @@ export function createDashboardServer({
   registry = createAuditEngineRegistry(),
   storageDirectory = resolve(process.cwd(), ".jb-expert-qa", "dashboard"),
   maximumHistoryRecords = DEFAULT_DASHBOARD_HISTORY_LIMIT,
-  maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT
+  maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
+  phase4Registry = createDashboardPhase4Catalog()
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
@@ -288,6 +290,9 @@ export function createDashboardServer({
   }
   if (!Number.isInteger(maximumBodyBytes) || maximumBodyBytes < 1024 || maximumBodyBytes > 65_536) {
     throw new TypeError("maximumBodyBytes must be between 1024 and 65536");
+  }
+  if (!phase4Registry || typeof phase4Registry.list !== "function") {
+    throw new TypeError("phase4Registry must be a JB QA engine registry or null");
   }
   const dataDir = resolve(storageDirectory);
   const rateWindow = [];
@@ -309,6 +314,14 @@ export function createDashboardServer({
         const asset = await publicAsset(pathname);
         if (asset) { send(response, 200, asset.body, asset.type); return; }
         if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }
+        if (pathname === "/api/phase4/engines") {
+          const engines = phase4Registry.list();
+          json(response, 200, { engines: engines.map((engine) => ({
+            id: engine.id, name: engine.name, version: engine.version, category: engine.category,
+            targetType: engine.targetType, executionMode: engine.executionMode,
+            capabilities: [...engine.capabilities], description: engine.description
+          })), executionEnabled: false, approvalRequired: true }); return;
+        }
         if (pathname === "/api/analytics") {
           const history = await loadHistory(dataDir, maximumHistoryRecords);
           json(response, 200, buildDashboardAnalytics(history, registry.list())); return;
@@ -425,9 +438,9 @@ export function createDashboardServer({
   return server;
 }
 
-export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry } = {}) {
+export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new TypeError("port must be an integer between 0 and 65535");
-  const server = createDashboardServer({ storageDirectory, registry });
+  const server = createDashboardServer({ storageDirectory, registry, phase4Registry });
   await new Promise((resolveListen, rejectListen) => {
     const onError = (error) => { server.off("listening", onListening); rejectListen(error); };
     const onListening = () => { server.off("error", onError); resolveListen(); };
