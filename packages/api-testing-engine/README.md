@@ -227,7 +227,7 @@ const report = await workflows.run({
       },
       assertions: [
         { type: "status", expected: 200 },
-        { type: "exists", path: "$.json.access_token" }
+        { type: "exists", path: "$.access_token" }
       ]
     },
     {
@@ -240,7 +240,7 @@ const report = await workflows.run({
       },
       assertions: [
         { type: "status", expected: 200 },
-        { type: "exists", path: "$.json.data.id" }
+        { type: "exists", path: "$.data.id" }
       ]
     }
   ]
