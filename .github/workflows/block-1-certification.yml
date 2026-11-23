@@ -10,6 +10,15 @@ on:
       - 'docs/LOCAL-CERTIFICATION.md'
       - 'package.json'
       - '.github/workflows/block-1-certification.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/local-certification.mjs'
+      - 'tests/local-certification.test.js'
+      - 'docs/LOCAL-CERTIFICATION.md'
+      - 'package.json'
+      - '.github/workflows/block-1-certification.yml'
   workflow_dispatch:
 
 permissions:
