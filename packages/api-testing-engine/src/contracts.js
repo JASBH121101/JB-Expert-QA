@@ -313,7 +313,9 @@ function validateContractDefinition(contract) {
       assertKnownKeys(responseCase, new Set(["headers", "body"]), responseLabel);
       if (responseCase.headers !== undefined) validateHeaderRules(responseCase.headers, responseLabel + ".headers");
       if (responseCase.body !== undefined) {
-        validateSchemaNode(responseCase.body, responseLabel + ".body", { get nodes() { return schemaNodes; }, set nodes(value) { schemaNodes = value; } });
+        const schemaState = { nodes: schemaNodes };
+        validateSchemaNode(responseCase.body, responseLabel + ".body", schemaState);
+        schemaNodes = schemaState.nodes;
       }
     }
   }
@@ -521,7 +523,7 @@ function validateResponse(compiledContract, operation, response) {
     code: "PATH_MATCH",
     path: "$.url.pathname",
     expected: operation.path,
-    actual: actualPath === null ? "invalid-or-missing" : actualPath,
+    actual: actualPath === null ? "invalid-or-missing" : "pathname-present",
     passed: pathOk,
     message: pathOk ? "Request path matches the contract template" : "Request path does not match the contract template"
   });
@@ -542,13 +544,33 @@ function validateResponse(compiledContract, operation, response) {
   if (!responseCase) return makeResult(compiledContract.contractId, compiledContract.version, operation.operationId, checks);
 
   if (responseCase.headers) {
-    const headers = isRecord(response.headers) ? response.headers : {};
+    let headers = {};
+    let headersValid = true;
+    try {
+      if (response.headers !== undefined && !isRecord(response.headers)) {
+        throw new TypeError("response.headers must be a plain object");
+      }
+      headers = response.headers || {};
+      assertJsonSafe(headers, "response.headers", { maximumDepth: 2, maximumNodes: 500 });
+    } catch {
+      headersValid = false;
+      add({
+        category: "headers",
+        code: "INVALID_RESPONSE_HEADERS",
+        path: "$.headers",
+        expected: "plain string header map",
+        actual: "invalid-or-unsafe",
+        passed: false,
+        message: "Response headers must be a safe plain object of string values"
+      });
+      headers = {};
+    }
     const lookup = new Map(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]));
     for (const [name, rule] of Object.entries(responseCase.headers)) {
       const actual = lookup.get(name.toLowerCase());
       const present = typeof actual === "string";
       const required = typeof rule === "string" ? true : rule.required !== false;
-      let passed = true;
+      let passed = headersValid;
       if (required && !present) passed = false;
       if (present && typeof rule === "string" && actual !== rule) passed = false;
       if (present && isRecord(rule) && rule.equals !== undefined && actual !== rule.equals) passed = false;
@@ -616,7 +638,11 @@ export function createApiContractTestingEngine() {
         if (!isRecord(options) || Object.keys(options).some((key) => key !== "operationId")) {
           throw new TypeError("Contract validation options only support operationId");
         }
-        const operationId = options.operationId;
+        const operationDescriptor = Object.getOwnPropertyDescriptor(options, "operationId");
+        if (operationDescriptor && !Object.hasOwn(operationDescriptor, "value")) {
+          throw new TypeError("Contract validation options cannot contain accessors");
+        }
+        const operationId = operationDescriptor?.value;
         if (typeof operationId !== "string" || !operations.has(operationId)) {
           throw new ApiContractError("UNKNOWN_OPERATION", "operationId is not declared in this contract");
         }
