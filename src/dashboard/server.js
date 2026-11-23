@@ -355,7 +355,7 @@ export function createDashboardServer({
             fail(response, 400, "invalid_audit_query", "Audit pagination parameters must not be repeated"); return;
           }
           const limitText = limitValues[0] ?? "50";
-          const limit = /^(?:[1-9][0-9]?)$/u.test(limitText) ? Number(limitText) : NaN;
+          const limit = /^(?:[1-9][0-9]?|100)$/u.test(limitText) ? Number(limitText) : NaN;
           const beforeText = cursorValues[0];
           const beforeSequence = beforeText === undefined ? undefined :
             (/^[1-9][0-9]*$/u.test(beforeText) ? Number(beforeText) : NaN);
