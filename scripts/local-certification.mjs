@@ -64,8 +64,8 @@ export const LOCAL_CERTIFICATION_PROFILES = Object.freeze({
       title: "Static dead-code analysis regression tests",
       npmScript: "test:dead-code",
       timeoutMs: 5 * 60 * 1000
-    }
-,    {
+    },
+    {
       id: "autonomous-execution",
       title: "Policy-bounded autonomous execution and audit ledger tests",
       npmScript: "test:autonomous-execution",
