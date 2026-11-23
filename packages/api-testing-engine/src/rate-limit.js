@@ -145,7 +145,9 @@ function validateResponse(response) {
       !Number.isSafeInteger(statusDescriptor.value) || statusDescriptor.value < 100 || statusDescriptor.value > 599) {
     throw new ApiRateLimitError("INVALID_RESPONSE", "Request Engine returned an invalid HTTP status");
   }
-  if (headersDescriptor && !Object.hasOwn(headersDescriptor, "value")) {\n    throw new ApiRateLimitError("INVALID_RESPONSE", "Response headers cannot be an accessor");\n  }\n  const headers = headersDescriptor?.value ?? {};
+  if (headersDescriptor && !Object.hasOwn(headersDescriptor, "value")) {
+    throw new ApiRateLimitError("INVALID_RESPONSE", "Response headers cannot be an accessor");
+  }\n  const headers = headersDescriptor?.value ?? {};
   if (!isPlainRecord(headers)) throw new ApiRateLimitError("INVALID_RESPONSE", "Request Engine returned invalid response headers");
   const normalizedHeaders = new Map();
   for (const key of Reflect.ownKeys(headers)) {
@@ -334,25 +336,36 @@ export function createApiRateLimitTestingEngine({ requestEngine, activeTesting =
     }
 
     const samples = [];
-    if (options.signal?.aborted) return makeReport(probe, samples, "cancelled", "REQUEST_ABORTED");
-    try {
-      for (let index = 0; index < probe.samples; index += 1) {
-        if (options.signal?.aborted) throw new ApiRateLimitError("REQUEST_ABORTED", "Rate-limit probe was cancelled");
-        attemptedRequests += 1;\n        const response = await requestEngine.request(probe.request, options.signal ? { signal: options.signal } : {});
-        const normalized = validateResponse(response);
-        const signals = detectRateLimit(normalized);
-        samples.push({ ...normalized, ...signals });
-        if (probe.stopOnThrottle && signals.throttled) break;
-        if (index < probe.samples - 1) await wait(probe.intervalMs, options.signal);
-      }
-      const throttled = samples.some((item) => item.throttled);
-      return makeReport(probe, samples, throttled ? "throttled" : "completed", null, attemptedRequests);
-    } catch (error) {
-      const cancelled = options.signal?.aborted || error?.code === "REQUEST_ABORTED";
-      const code = cancelled ? "REQUEST_ABORTED" :
-        typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "REQUEST_FAILED";
-      return makeReport(probe, samples, cancelled ? "cancelled" : "failed", code);
+    if (options.signal?.aborted) {
+      return Promise.resolve(makeReport(probe, samples, "cancelled", "REQUEST_ABORTED", 0));
     }
+    let attemptedRequests = 0;
+    return (async () => {
+      try {
+        for (let index = 0; index < probe.samples; index += 1) {
+          if (options.signal?.aborted) {
+            throw new ApiRateLimitError("REQUEST_ABORTED", "Rate-limit probe was cancelled");
+          }
+          attemptedRequests += 1;
+          const response = await requestEngine.request(
+            probe.request,
+            options.signal ? { signal: options.signal } : {}
+          );
+          const normalized = validateResponse(response);
+          const signals = detectRateLimit(normalized);
+          samples.push({ ...normalized, ...signals });
+          if (probe.stopOnThrottle && signals.throttled) break;
+          if (index < probe.samples - 1) await wait(probe.intervalMs, options.signal);
+        }
+        const throttled = samples.some((item) => item.throttled);
+        return makeReport(probe, samples, throttled ? "throttled" : "completed", null, attemptedRequests);
+      } catch (error) {
+        const cancelled = options.signal?.aborted || error?.code === "REQUEST_ABORTED";
+        const code = cancelled ? "REQUEST_ABORTED" :
+          typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "REQUEST_FAILED";
+        return makeReport(probe, samples, cancelled ? "cancelled" : "failed", code, attemptedRequests);
+      }
+    })();
   }
 
   return Object.freeze({
