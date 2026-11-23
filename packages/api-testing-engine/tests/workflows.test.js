@@ -199,7 +199,7 @@ test("a condition is skipped when its dependency failed", async () => {
       when: { stepId: "first", status: 200 },
       request: { method: "GET", url: "https://api.example.test/second" }
     }
-  ]));
+  ], { stopOnFailure: false }));
   assert.equal(report.status, "failed");
   assert.equal(report.results[0].status, "failed");
   assert.equal(report.results[1].status, "skipped");
@@ -443,14 +443,14 @@ test("does not evaluate template-like strings or execute dynamic code", async ()
   });
 });
 
-test("rejects overlarge workflows and invalid options", () => {
+test("rejects overlarge workflows and invalid options", async () => {
   const engine = createEngine(async () => response());
   const steps = Array.from({ length: 101 }, (_, index) => ({
     id: "step-" + index,
     request: { method: "GET", url: "https://api.example.test/" + index }
   }));
   assert.throws(() => engine.compile(workflow(steps)), /between 1 and 100/u);
-  assert.throws(() => engine.run(workflow([
+  await assert.rejects(engine.run(workflow([
     { id: "one", request: { method: "GET", url: "https://api.example.test/one" } }
   ]), { retries: 10 }), /only support an AbortSignal/u);
 });
