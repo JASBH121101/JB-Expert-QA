@@ -161,3 +161,12 @@ test("ignores query credential parameters through the request engine's sanitized
   assert.equal(JSON.stringify(baseline).includes("access_token"), false);
   assert.match(baseline.request.endpointHash, /^[a-f0-9]{64}$/u);
 });
+
+test("handles sensitive field names in JSON structure without retaining their values", () => {
+  const api = engine();
+  const baseline = api.createBaseline(response({ json: { user: { password: "secret-1", access_token: "token-1" } } }));
+  const report = api.compare(baseline, response({ json: { user: { password: "secret-2", access_token: "token-2" } } }));
+  assert.equal(report.status, "passed");
+  assert.equal(JSON.stringify(baseline).includes("secret-1"), false);
+  assert.equal(JSON.stringify(report).includes("password"), false);
+});
