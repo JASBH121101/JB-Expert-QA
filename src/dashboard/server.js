@@ -278,7 +278,8 @@ export function createDashboardServer({
   registry = createAuditEngineRegistry(),
   storageDirectory = resolve(process.cwd(), ".jb-expert-qa", "dashboard"),
   maximumHistoryRecords = DEFAULT_DASHBOARD_HISTORY_LIMIT,
-  maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT
+  maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
+  phase4Registry = null
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
@@ -289,7 +290,7 @@ export function createDashboardServer({
   if (!Number.isInteger(maximumBodyBytes) || maximumBodyBytes < 1024 || maximumBodyBytes > 65_536) {
     throw new TypeError("maximumBodyBytes must be between 1024 and 65536");
   }
-  const dataDir = resolve(storageDirectory);
+  if (phase4Registry !== null && (!phase4Registry || typeof phase4Registry.list !== "function")) {\n    throw new TypeError("phase4Registry must be a JB QA engine registry or null");\n  }\n  const dataDir = resolve(storageDirectory);
   const rateWindow = [];
   let busy = false;
 
@@ -308,7 +309,7 @@ export function createDashboardServer({
       if (request.method === "GET") {
         const asset = await publicAsset(pathname);
         if (asset) { send(response, 200, asset.body, asset.type); return; }
-        if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }
+        if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }\n        if (pathname === "/api/phase4/engines") {\n          const engines = phase4Registry ? phase4Registry.list() : [];\n          json(response, 200, { engines: engines.map((engine) => ({\n            id: engine.id, name: engine.name, version: engine.version, category: engine.category,\n            targetType: engine.targetType, executionMode: engine.executionMode,\n            capabilities: [...engine.capabilities], description: engine.description\n          })), executionEnabled: false, approvalRequired: true }); return;\n        }
         if (pathname === "/api/analytics") {
           const history = await loadHistory(dataDir, maximumHistoryRecords);
           json(response, 200, buildDashboardAnalytics(history, registry.list())); return;
