@@ -268,16 +268,32 @@ test("a missing capture path fails the step and stops by default", async () => {
   assert.equal(calls, 1);
 });
 
-test("request errors are summarized without exposing arbitrary error messages", async () => {
-  const engine = createEngine(async () => {
-    throw new Error("sensitive-token-should-not-appear");
+test("request errors preserve only known codes and never expose arbitrary error messages", async () => {
+  const knownCodeEngine = createEngine(async () => {
+    throw Object.assign(new Error("sensitive-token-should-not-appear"), {
+      name: "ApiTestingError",
+      code: "NETWORK_ERROR"
+    });
   });
-  const report = await engine.run(workflow([
-    { id: "failed", request: { method: "GET", url: "https://api.example.test/fail" } }
+  const knownCodeReport = await knownCodeEngine.run(workflow([
+    { id: "failed-known", request: { method: "GET", url: "https://api.example.test/fail" } }
   ]));
-  assert.equal(report.status, "failed");
-  assert.equal(report.results[0].error.code, "STEP_EXECUTION_FAILED");
-  assert.equal(JSON.stringify(report).includes("sensitive-token"), false);
+  assert.equal(knownCodeReport.status, "failed");
+  assert.equal(knownCodeReport.results[0].error.code, "NETWORK_ERROR");
+  assert.equal(knownCodeReport.results[0].error.message, "Request Engine rejected or failed this step.");
+  assert.equal(JSON.stringify(knownCodeReport).includes("sensitive-token"), false);
+
+  const unknownCodeEngine = createEngine(async () => {
+    throw Object.assign(new Error("credential-value-must-not-leak"), {
+      name: "ApiTestingError",
+      code: "credential-value-must-not-leak"
+    });
+  });
+  const unknownCodeReport = await unknownCodeEngine.run(workflow([
+    { id: "failed-unknown", request: { method: "GET", url: "https://api.example.test/fail" } }
+  ]));
+  assert.equal(unknownCodeReport.results[0].error.code, "STEP_EXECUTION_FAILED");
+  assert.equal(JSON.stringify(unknownCodeReport).includes("credential-value"), false);
 });
 
 test("an already-aborted signal cancels all steps without making a request", async () => {
