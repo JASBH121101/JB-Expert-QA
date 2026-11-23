@@ -8,6 +8,12 @@ const MAX_ASSERTIONS_PER_STEP = 100;
 const MAX_WORKFLOW_NODES = 50000;
 const MAX_WORKFLOW_DEPTH = 32;
 const MAX_REPORT_STEPS = 100;
+const SAFE_STEP_ERROR_CODES = new Set([
+  "CAPTURE_NOT_FOUND", "INVALID_REQUEST_RESPONSE", "INVALID_ASSERTION_REPORT",
+  "BINDING_DEPTH", "REFERENCE_UNAVAILABLE", "REFERENCE_NOT_FOUND", "VARIABLE_UNAVAILABLE",
+  "ORIGIN_NOT_ALLOWED", "REQUEST_TOO_LARGE", "RESPONSE_TOO_LARGE",
+  "REQUEST_TIMEOUT", "REQUEST_ABORTED", "NETWORK_ERROR"
+]);
 
 export const API_WORKFLOW_TESTING_ENGINE_ID = "jb.api-workflow-testing-engine";
 export const API_WORKFLOW_TESTING_ENGINE_VERSION = "0.1.0";
@@ -522,10 +528,13 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
             break;
           }
         } catch (error) {
-          const code = typeof error?.code === "string" ? error.code : "STEP_EXECUTION_FAILED";
-          const message = error instanceof ApiWorkflowError || error?.name === "ApiTestingError"
+          const candidateCode = typeof error?.code === "string" ? error.code : "";
+          const code = SAFE_STEP_ERROR_CODES.has(candidateCode) ? candidateCode : "STEP_EXECUTION_FAILED";
+          const message = error instanceof ApiWorkflowError
             ? error.message
-            : "Step execution failed; inspect the error code and request-engine logs.";
+            : SAFE_STEP_ERROR_CODES.has(candidateCode)
+              ? "Request Engine rejected or failed this step."
+              : "Step execution failed; inspect the error code and Request Engine logs.";
           results.push(makeStepResult(step, "failed", stepStarted, {
             error: { code, message: String(message).slice(0, 300) }
           }));
