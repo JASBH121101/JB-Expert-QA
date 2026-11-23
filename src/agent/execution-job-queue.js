@@ -90,6 +90,7 @@ function copyJob(job) {
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
     nextAttemptAt: job.nextAttemptAt ?? null,
+    maxAttempts: job.maxAttempts,
     payload: cloneJson(job.payload, "job payload"),
     result: job.result === undefined ? undefined : cloneJson(job.result, "job result"),
     error: job.error,
@@ -270,6 +271,7 @@ export function createExecutionJobQueue(options = {}) {
           !(record.finishedAt === null || typeof record.finishedAt === "string") ||
           !(record.nextAttemptAt === undefined || record.nextAttemptAt === null ||
             (typeof record.nextAttemptAt === "string" && Number.isFinite(Date.parse(record.nextAttemptAt)))) ||
+          !(record.maxAttempts === undefined || (Number.isSafeInteger(record.maxAttempts) && record.maxAttempts >= 1 && record.maxAttempts <= 10)) ||
           !(record.error === null || typeof record.error === "string") ||
           !(record.idempotencyKey === null || (typeof record.idempotencyKey === "string" && ID_PATTERN.test(record.idempotencyKey))) ||
           !Number.isSafeInteger(record.attempts) || record.attempts < 0 ||
@@ -288,6 +290,7 @@ export function createExecutionJobQueue(options = {}) {
         startedAt: record.startedAt,
         finishedAt: record.finishedAt,
         nextAttemptAt: record.nextAttemptAt ?? null,
+        maxAttempts: record.maxAttempts ?? maxAttempts,
         payload: cloneJson(record.payload, "persisted job payload"),
         result: record.result === undefined ? undefined : cloneJson(record.result, "persisted job result"),
         error: record.error,
@@ -374,6 +377,7 @@ export function createExecutionJobQueue(options = {}) {
         startedAt: null,
         finishedAt: null,
         nextAttemptAt: null,
+        maxAttempts,
         payload: clonedPayload,
         result: undefined,
         error: null,
@@ -486,7 +490,7 @@ export function createExecutionJobQueue(options = {}) {
       if (job.state !== "failed") {
         throw new ExecutionJobQueueError("INVALID_TRANSITION", "only failed jobs can be retried");
       }
-      if (job.attempts >= maxAttempts) {
+      if (job.attempts >= job.maxAttempts) {
         throw new ExecutionJobQueueError("ATTEMPT_LIMIT_REACHED", "job has reached its configured attempt limit");
       }
       const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
@@ -518,7 +522,7 @@ export function createExecutionJobQueue(options = {}) {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "interrupted") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only interrupted jobs can be recovered");
-      if (job.attempts >= maxAttempts) {
+      if (job.attempts >= job.maxAttempts) {
         throw new ExecutionJobQueueError("ATTEMPT_LIMIT_REACHED", "job has reached its configured attempt limit");
       }
       const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
