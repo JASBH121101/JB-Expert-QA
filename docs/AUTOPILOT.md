@@ -105,6 +105,12 @@ Protected areas include credentials, environment files, Git metadata, CI/deploym
 
 A successful result is left in the local worktree for manual inspection. JB Expert QA does not commit, push, open a pull request, merge or deploy. A failed attempt removes the temporary worktree and local repair branch.
 
+## 6. Separate policy-bounded execution engine
+
+The Autonomous Execution Engine is a separate orchestration API for trusted handlers registered by the host application. It does not replace the supervised AI autopilot and does not register shell, patch, Git, deployment or production actions. Plans cannot grant themselves permissions, risk levels, scopes or approval receipts.
+
+The engine executes only action types explicitly allowlisted by a policy, with preauthorized permissions, resource-scope checks, bounded action/runtime/payload limits, sequential execution, cancellation and an audit ledger. Medium- and high-risk actions always require an external approval callback. See [AUTONOMOUS-EXECUTION.md](AUTONOMOUS-EXECUTION.md) for the API, example and safety contract.
+
 ## Important execution and privacy boundaries
 
 A Git worktree is change isolation, not an operating-system security sandbox. Running `node --test` executes the target project's test code on the local machine. Tests may have side effects, access files or use the network. Use auto-repair only for a trusted repository in an environment where running its tests is acceptable. JB Expert QA does not install packages or alter test scripts to make them pass.
