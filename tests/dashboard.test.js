@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
@@ -67,10 +68,21 @@ test("dashboard rejects untrusted host headers, cross-origin requests and malfor
   }, { Origin: "https://outside.example" });
   assert.equal(wrongOrigin.status, 403);
 
-  const wrongHost = await fetch(origin + "/api/engines", {
-    headers: { Host: "outside.example" }
+  const wrongHost = await new Promise((resolve, reject) => {
+    const address = new URL(origin);
+    const request = httpRequest({
+      hostname: "127.0.0.1",
+      port: Number(address.port),
+      path: "/api/engines",
+      headers: { Host: "outside.example" }
+    }, (response) => {
+      response.resume();
+      response.once("end", () => resolve(response.statusCode));
+    });
+    request.once("error", reject);
+    request.end();
   });
-  assert.equal(wrongHost.status, 421);
+  assert.equal(wrongHost, 421);
 
   const extraField = await postRun(origin, {
     engineId: "static",
