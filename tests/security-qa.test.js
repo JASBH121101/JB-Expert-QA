@@ -357,6 +357,30 @@ test("production-only security assessment excludes test fixtures and this reposi
   });
 });
 
+
+
+test("production-only security assessment excludes standalone package test fixtures but still scans application source", async () => {
+  await withProject(async (root) => {
+    const packageTests = join(root, "packages", "expert-qa", "package-tests");
+    await mkdir(packageTests, { recursive: true });
+    await writeFile(join(packageTests, "complete-engine.spec.js"), [
+      'const endpoint = "http://api.production.example.com/v1";',
+      'const GITHUB_TOKEN = "ghp_' + "A".repeat(36) + '";'
+    ].join("\\n"));
+    await writeFile(join(root, "src", "app.js"),
+      'const endpoint = "http://api.application.example.com/v1";');
+
+    const report = await auditSecurityProject(root, { productionOnly: true });
+    const httpFindings = report.diagnostics.filter((item) => item.id.startsWith("SEC-HTTP-"));
+
+    assert.equal(report.securityAssessment.scope, "production-source");
+    assert.equal(report.securityAssessment.excludedNonProductionFiles, 1);
+    assert.equal(httpFindings.length, 1);
+    assert.equal(httpFindings[0].location, "src/app.js:1");
+    assert.equal(report.diagnostics.some((item) => item.id.startsWith("SEC-SECRET-")), false);
+  });
+});
+
 test("production-only scope still audits application code in an unrelated project", async () => {
   await withProject(async (root) => {
     await mkdir(join(root, "src"), { recursive: true });
