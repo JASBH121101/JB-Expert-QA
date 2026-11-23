@@ -97,7 +97,7 @@ function readArray(value, label, maximum) {
   const values = [];
   for (const key of Reflect.ownKeys(value)) {
     if (key === "length") continue;
-    if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) || Number(key) >= value.length) {
+    if (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= value.length) {
       throw new DashboardPhase4ExecutionError("INVALID_ARRAY", label + " contains an unsupported property");
     }
   }
