@@ -28,7 +28,8 @@
     "./autonomous-execution": "./src/agent/autonomous-execution.js",
     "./security-bridge": "./src/security-bridge/index.js",
     "./version": "./package-version.js",
-    "./database": "./src/adapters/filesystem/audit-database.js"
+    "./database": "./src/adapters/filesystem/audit-database.js",
+    "./engine-registry": "./src/engine-registry/index.js"
   },
   "files": [
     "src/**",

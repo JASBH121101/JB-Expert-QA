@@ -34,6 +34,7 @@ await writeFile(
 const requiredFiles = [
   "src/index.js",
   "src/audit-engines/index.js",
+  "src/engine-registry/index.js",
   "src/dashboard/analytics.js",
   "src/dashboard/server.js",
   "src/dashboard-cli.js",

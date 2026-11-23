@@ -30,6 +30,9 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "auditUrl",
     "auditViewports",
     "createAuditEngineRegistry",
+    "createQaEngineRegistry",
+    "QaEngineRegistryError",
+    "QA_ENGINE_ADAPTER_CONTRACT",
     "buildDashboardAnalytics",
     "buildConsolidatedReport",
     "createDashboardServer",
@@ -61,6 +64,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   assert.equal(typeof engine.auditUrl, "function");
   assert.equal(typeof engine.auditViewports, "function");
   assert.equal(typeof engine.createAuditEngineRegistry, "function");
+  assert.equal(typeof engine.createQaEngineRegistry, "function");
+  assert.equal(engine.QA_ENGINE_ADAPTER_CONTRACT, "jb.qa-engine-adapter/v1");
   assert.equal(typeof engine.buildDashboardAnalytics, "function");
   assert.equal(typeof engine.buildConsolidatedReport, "function");
   assert.equal(typeof engine.createDashboardServer, "function");
