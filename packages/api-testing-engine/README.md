@@ -222,7 +222,6 @@ const report = await workflows.run({
         json: { username: "demo" }
       },
       capture: {
-        authToken: "$.json.access_token",
         userId: "$.json.user.id"
       },
       assertions: [
@@ -234,9 +233,9 @@ const report = await workflows.run({
       id: "profile",
       when: { stepId: "login", status: 200 },
       request: {
-        method: "GET",
+        method: "POST",
         url: "https://api.example.com/profile",
-        headers: { authorization: { "$var": "authToken" } }
+        json: { userId: { "$var": "userId" } }
       },
       assertions: [
         { type: "status", expected: 200 },
