@@ -128,3 +128,7 @@ The standalone package exports the scope-aware report and certification adapter 
 ## Policy-Gated Phase 4 Dashboard Execution
 
 The package exports `createDashboardPhase4Catalog` and `createDashboardPhase4Execution`. The Dashboard execution bridge is disabled unless the host supplies a sealed engine registry, an exact high-risk allowlist policy with `qa:engine-execute`, and a real external `requestApproval` provider. The browser cannot submit or override policy, permissions, risk, action IDs or approval receipts. See [Phase 4 Block 13 — Policy-Gated Dashboard Execution](../../docs/PHASE4-BLOCK13-POLICY-GATED-EXECUTION.md).
+
+## Phase 4 Execution Audit & Evidence
+
+The policy-gated Dashboard bridge exposes `getAuditTrail({ limit, beforeSequence })` and the local Dashboard serves the read-only `GET /api/phase4/audit` endpoint. Audit records are explicitly projected: event identifiers, timestamps, policy/action metadata, SHA-256 input/output/scope digests and hash-chain links are retained, while raw inputs, outputs, approval receipts and secrets are excluded. Results are paginated (1–100 records), and the chain verification status is reported independently of the page. See [Phase 4 Block 14 — Execution Audit & Evidence](../../docs/PHASE4-BLOCK14-EXECUTION-AUDIT-EVIDENCE.md).

@@ -47,7 +47,7 @@ const passingReport = {
   diagnostics: []
 };
 
-function createPhase4EchoFixture({ requestApproval = async () => ({ approved: true, approvalId: "human-approval-1" }), policyOverrides = {}, run = async (input) => ({ echoed: input.value }) } = {}) {
+function createPhase4EchoFixture({ requestApproval = async () => ({ approved: true, approvalId: "human-approval-1" }), policyOverrides = {}, run = async (input) => ({ echoed: input.value }), ledger } = {}) {
   let runnerCalls = 0;
   const registry = createQaEngineRegistry();
   registry.register({
@@ -83,7 +83,10 @@ function createPhase4EchoFixture({ requestApproval = async () => ({ approved: tr
     },
     ...policyOverrides
   };
-  const execution = createDashboardPhase4Execution({ registry, policy, requestApproval });
+  const execution = createDashboardPhase4Execution({
+    registry, policy, requestApproval,
+    ...(ledger === undefined ? {} : { ledger })
+  });
   return { registry, execution, get runnerCalls() { return runnerCalls; } };
 }
 
@@ -210,6 +213,111 @@ test("Dashboard creates a policy-gated request and executes only after external 
   });
   assert.equal(JSON.stringify(approvals).includes("review-secret"), false);
   assert.equal(JSON.stringify(approvals).includes("approved-input"), false);
+});
+
+test("Phase 4 audit endpoint exposes redacted evidence and verifies the ledger chain", async (t) => {
+  const fixture = createPhase4EchoFixture();
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  const run = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({
+      engineId: "jb.test.echo",
+      input: { value: "private-audit-input", url: "https://example.test/private?token=never-expose-this" }
+    })
+  });
+  assert.equal(run.status, 200);
+
+  const response = await fetch(origin + "/api/phase4/audit?limit=100");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const audit = await response.json();
+  assert.equal(audit.enabled, true);
+  assert.equal(audit.integrity.valid, true);
+  assert.equal(audit.integrity.entries, audit.records.length);
+  assert.equal(audit.pagination.total, audit.records.length);
+  assert.ok(audit.records.some((record) => record.event === "action.approval-requested" && record.approvalOutcome === "requested"));
+  assert.ok(audit.records.some((record) => record.event === "action.approved" && record.approvalOutcome === "approved"));
+  assert.ok(audit.records.some((record) => record.event === "action.succeeded" && /^[a-f0-9]{64}$/u.test(record.outputDigest)));
+  assert.ok(audit.records.every((record) => !Object.hasOwn(record, "approvalId")));
+  const serialized = JSON.stringify(audit);
+  for (const secret of ["private-audit-input", "never-expose-this", "human-approval-1", "echoed"]) {
+    assert.equal(serialized.includes(secret), false, "audit endpoint leaked " + secret);
+  }
+  assert.ok(audit.records.every((record) => !Object.hasOwn(record, "input") && !Object.hasOwn(record, "output")));
+});
+
+test("Phase 4 audit pagination is bounded, stable and rejects invalid cursors", async (t) => {
+  const fixture = createPhase4EchoFixture();
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  for (let index = 0; index < 2; index += 1) {
+    const response = await fetch(origin + "/api/phase4/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Origin": origin },
+      body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "run-" + index } })
+    });
+    assert.equal(response.status, 200);
+  }
+  const first = await fetch(origin + "/api/phase4/audit?limit=3");
+  const pageOne = await first.json();
+  assert.equal(pageOne.records.length, 3);
+  assert.equal(pageOne.pagination.hasMore, true);
+  assert.ok(Number.isSafeInteger(pageOne.pagination.nextBeforeSequence));
+  const second = await fetch(origin + "/api/phase4/audit?limit=3&before=" + pageOne.pagination.nextBeforeSequence);
+  const pageTwo = await second.json();
+  assert.equal(pageTwo.records.length, 3);
+  assert.ok(pageTwo.records.at(-1).sequence < pageOne.records[0].sequence);
+  const invalid = await fetch(origin + "/api/phase4/audit?limit=101");
+  assert.equal(invalid.status, 400);
+  const repeated = await fetch(origin + "/api/phase4/audit?limit=2&limit=3");
+  assert.equal(repeated.status, 400);
+});
+
+test("Phase 4 audit reports an invalid hash chain without suppressing redacted evidence", async (t) => {
+  let corrupted = false;
+  const { createInMemoryExecutionLedger } = await import("../src/agent/execution-ledger.js");
+  const baseLedger = createInMemoryExecutionLedger();
+  const ledger = {
+    append: (...args) => baseLedger.append(...args),
+    snapshot: () => baseLedger.snapshot(),
+    canAppend: (...args) => baseLedger.canAppend(...args),
+    verify: () => corrupted
+      ? { valid: false, entries: baseLedger.snapshot().length, reason: "hash-mismatch" }
+      : baseLedger.verify()
+  };
+  const fixture = createPhase4EchoFixture({ ledger });
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  const run = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "verified-before-tamper" } })
+  });
+  assert.equal(run.status, 200);
+  corrupted = true;
+  const response = await fetch(origin + "/api/phase4/audit");
+  const audit = await response.json();
+  assert.equal(audit.integrity.valid, false);
+  assert.equal(audit.integrity.reason, "hash-mismatch");
+  assert.ok(audit.records.length > 0);
+});
+
+test("Phase 4 audit remains unavailable while policy-gated execution is disabled", async (t) => {
+  const { origin } = await startTestDashboard(t);
+  const response = await fetch(origin + "/api/phase4/audit");
+  assert.equal(response.status, 200);
+  const audit = await response.json();
+  assert.equal(audit.enabled, false);
+  assert.equal(audit.approvalRequired, true);
+  assert.deepEqual(audit.records, []);
 });
 
 test("Dashboard never runs an engine after external approval is denied", async (t) => {
@@ -371,6 +479,8 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.match(pageHtml, /QA Control Center/);
   assert.match(pageHtml, /Policy-gated engine runner/);
   assert.match(pageHtml, /Request approved execution/);
+  assert.match(pageHtml, /Execution Audit &amp; Evidence/);
+  assert.match(pageHtml, /Refresh evidence/);
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
 

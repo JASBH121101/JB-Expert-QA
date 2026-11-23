@@ -121,6 +121,14 @@
         <pre id="phase4-execution-result" class="phase4-execution-result" hidden></pre>
         <p class="insight-footnote">The browser cannot submit or override policy, permissions, risk ceilings, scopes or approval receipts. Every registered engine remains high-risk. The host approval provider must make the real human approval decision; absence, denial or timeout blocks execution.</p>
       </section>
+      <section class="panel phase4-audit-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">PHASE 4 / AUDIT EVIDENCE</p><h2>Execution Audit &amp; Evidence</h2><p class="section-subtitle">Read-only timeline of approval outcomes, policy decisions, engine results and hash-chain evidence.</p></div>
+          <div class="history-actions"><span id="phase4-audit-state" class="assessment-tag">UNAVAILABLE</span><button type="button" id="phase4-audit-refresh" class="secondary-button">Refresh evidence</button></div>
+        </div>
+        <pre id="phase4-audit-result" class="phase4-execution-result" aria-live="polite">Execution ledger is unavailable until the host configures Phase 4 execution.</pre>
+        <p class="insight-footnote">Evidence is redacted and view-only. Raw inputs, outputs, approval receipts and secrets are never exposed by this endpoint. Hash-chain verification detects tampering but does not replace OS-level or remote immutable storage controls.</p>
+      </section>
       <section class="panel intelligence-panel">
         <div class="panel-heading intelligence-heading">
           <div><p class="eyebrow">04 / INTELLIGENCE</p><h2>QA Intelligence &amp; Certification</h2><p class="section-subtitle">Portfolio-level trends across the latest saved engine and target snapshots.</p></div>

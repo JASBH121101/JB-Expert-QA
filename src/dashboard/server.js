@@ -315,7 +315,8 @@ export function createDashboardServer({
       if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
         fail(response, 403, "cross_origin_blocked", "Cross-origin dashboard requests are not allowed"); return;
       }
-      const pathname = new URL(request.url ?? "/", "http://" + request.headers.host).pathname;
+      const requestUrl = new URL(request.url ?? "/", "http://" + request.headers.host);
+      const pathname = requestUrl.pathname;
 
       if (request.method === "GET") {
         const asset = await publicAsset(pathname);
@@ -335,6 +336,42 @@ export function createDashboardServer({
             permission: "qa:engine-execute", allowedEngineIds: [],
             reason: "Host policy and external approval provider are not configured"
           }); return;
+        }
+        if (pathname === "/api/phase4/audit") {
+          if (!phase4Execution) {
+            json(response, 200, {
+              enabled: false,
+              approvalRequired: true,
+              reason: "Execution ledger is unavailable until the host configures the Phase 4 policy and approval provider",
+              integrity: null,
+              pagination: { limit: 50, total: 0, hasMore: false, nextBeforeSequence: null },
+              records: []
+            });
+            return;
+          }
+          const limitValues = requestUrl.searchParams.getAll("limit");
+          const cursorValues = requestUrl.searchParams.getAll("before");
+          if (limitValues.length > 1 || cursorValues.length > 1) {
+            fail(response, 400, "invalid_audit_query", "Audit pagination parameters must not be repeated"); return;
+          }
+          const limitText = limitValues[0] ?? "50";
+          const limit = /^(?:[1-9][0-9]?|100)$/u.test(limitText) ? Number(limitText) : NaN;
+          const beforeText = cursorValues[0];
+          const beforeSequence = beforeText === undefined ? undefined :
+            (/^[1-9][0-9]*$/u.test(beforeText) ? Number(beforeText) : NaN);
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+              (beforeSequence !== undefined && (!Number.isSafeInteger(beforeSequence) || beforeSequence < 2))) {
+            fail(response, 400, "invalid_audit_query", "Use limit 1–100 and an optional before cursor of 2 or greater"); return;
+          }
+          try {
+            json(response, 200, await phase4Execution.getAuditTrail({
+              limit,
+              ...(beforeSequence === undefined ? {} : { beforeSequence })
+            }));
+          } catch {
+            fail(response, 500, "audit_unavailable", "The Phase 4 execution evidence could not be read safely"); 
+          }
+          return;
         }
         if (pathname === "/api/analytics") {
           const history = await loadHistory(dataDir, maximumHistoryRecords);

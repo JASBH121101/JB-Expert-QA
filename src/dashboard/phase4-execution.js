@@ -303,6 +303,54 @@ function normalizePolicy(value, engineByAction) {
  * a sealed registry, an exact allowlist policy, qa:engine-execute permission,
  * and a real approval provider. No approval is synthesized by this module.
  */
+
+const AUDIT_EVENT_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/u;
+const AUDIT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
+const AUDIT_DIGEST_PATTERN = /^[a-f0-9]{64}$/u;
+const AUDIT_STATUSES = new Set(["succeeded", "partial", "blocked", "failed", "timed-out", "cancelled"]);
+const AUDIT_STOP_REASONS = new Set(["blocked", "failed", "timed-out", "cancelled"]);
+
+function sanitizeAuditRecord(record) {
+  const output = Object.create(null);
+  if (Number.isSafeInteger(record.sequence) && record.sequence > 0) output.sequence = record.sequence;
+  if (typeof record.timestamp === "string" && Number.isFinite(Date.parse(record.timestamp))) output.timestamp = record.timestamp;
+  if (typeof record.event === "string" && AUDIT_EVENT_PATTERN.test(record.event)) output.event = record.event;
+  if (typeof record.hash === "string" && AUDIT_DIGEST_PATTERN.test(record.hash)) output.hash = record.hash;
+  if (record.previousHash === "GENESIS" ||
+      (typeof record.previousHash === "string" && AUDIT_DIGEST_PATTERN.test(record.previousHash))) {
+    output.previousHash = record.previousHash;
+  }
+  for (const key of ["executionId", "planId", "actionId", "actionType", "policyId"]) {
+    if (typeof record[key] === "string" && AUDIT_ID_PATTERN.test(record[key])) output[key] = record[key];
+  }
+  for (const key of ["inputDigest", "outputDigest", "scopeDigest"]) {
+    if (typeof record[key] === "string" && AUDIT_DIGEST_PATTERN.test(record[key])) output[key] = record[key];
+  }
+  if (["low", "medium", "high"].includes(record.risk)) output.risk = record.risk;
+  if (AUDIT_STATUSES.has(record.status)) output.status = record.status;
+  if (AUDIT_STOP_REASONS.has(record.stopReason)) output.stopReason = record.stopReason;
+  for (const key of ["durationMs", "plannedActions", "succeededActions", "totalActions"]) {
+    if (Number.isSafeInteger(record[key]) && record[key] >= 0 && record[key] <= 1000000) output[key] = record[key];
+  }
+  if (typeof record.reason === "string") {
+    const reason = redactSensitiveText(record.reason);
+    output.reason = [...reason].filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    }).join("").trim().slice(0, 360);
+  }
+  if (record.event === "action.approval-requested") output.approvalOutcome = "requested";
+  else if (record.event === "action.approved") output.approvalOutcome = "approved";
+  else if (record.event === "action.blocked" &&
+      /explicit approval was not granted|approval provider failed/iu.test(output.reason ?? "")) {
+    output.approvalOutcome = "denied";
+  } else if (record.event === "action.timed-out" &&
+      /approval request timed out/iu.test(output.reason ?? "")) {
+    output.approvalOutcome = "timed-out";
+  }
+  return Object.freeze(output);
+}
+
 export function createDashboardPhase4Execution(options = {}) {
   const config = readRecord(options, "options", new Set([
     "registry", "policy", "requestApproval", "ledger", "clock", "idFactory"
@@ -381,7 +429,48 @@ export function createDashboardPhase4Execution(options = {}) {
         executionActive = false;
       }
     },
-    verifyLedger: orchestrator.verifyLedger
+    verifyLedger: orchestrator.verifyLedger,
+    async getAuditTrail(options = {}) {
+      const supplied = readRecord(options, "audit options", new Set(["limit", "beforeSequence"]));
+      const limit = supplied.limit ?? 50;
+      const beforeSequence = supplied.beforeSequence;
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        throw new DashboardPhase4ExecutionError("INVALID_AUDIT_LIMIT", "audit limit must be between 1 and 100");
+      }
+      if (beforeSequence !== undefined &&
+          (!Number.isSafeInteger(beforeSequence) || beforeSequence < 2)) {
+        throw new DashboardPhase4ExecutionError("INVALID_AUDIT_CURSOR", "beforeSequence must be a positive ledger sequence cursor");
+      }
+      const records = orchestrator.getLedger();
+      const verification = await orchestrator.verifyLedger();
+      if (!Array.isArray(records)) {
+        throw new DashboardPhase4ExecutionError("INVALID_AUDIT_LEDGER", "Execution ledger returned an invalid record collection");
+      }
+      const eligible = beforeSequence === undefined
+        ? records
+        : records.filter((record) => Number.isSafeInteger(record.sequence) && record.sequence < beforeSequence);
+      const page = eligible.slice(Math.max(0, eligible.length - limit));
+      const hasMore = eligible.length > page.length;
+      const safeVerification = Object.freeze({
+        valid: verification?.valid === true,
+        entries: Number.isSafeInteger(verification?.entries) ? verification.entries : records.length,
+        ...(typeof verification?.lastHash === "string" && AUDIT_DIGEST_PATTERN.test(verification.lastHash)
+          ? { lastHash: verification.lastHash } : {}),
+        ...(!verification?.valid && typeof verification?.reason === "string"
+          ? { reason: verification.reason.replace(/[^a-z0-9-]/gi, "").slice(0, 48) || "verification-failed" } : {})
+      });
+      return Object.freeze({
+        enabled: true,
+        integrity: safeVerification,
+        pagination: Object.freeze({
+          limit,
+          total: records.length,
+          hasMore,
+          nextBeforeSequence: hasMore && page.length ? page[0].sequence : null
+        }),
+        records: Object.freeze(page.map(sanitizeAuditRecord))
+      });
+    }
   });
 
   EXECUTION_REGISTRY.set(execution, registry);

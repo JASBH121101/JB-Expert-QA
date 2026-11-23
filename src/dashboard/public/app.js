@@ -6,7 +6,8 @@ const state = {
   analytics: null,
   running: false,
   activity: [],
-  toastTimer: null
+  toastTimer: null,
+  phase4Audit: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -111,6 +112,25 @@ function renderPhase4Execution() {
     ? "Policy: " + status.policyId + " · Permission: " + status.permission + " · High-risk execution requires external approval."
     : (status.reason || "Execution is disabled. Configure an exact host policy and external approval provider.");
   if (!enabled) $("phase4-execution-message").textContent = "No execution request can be submitted from this Dashboard instance.";
+}
+function renderPhase4Audit() {
+  const audit = state.phase4Audit || { enabled: false, records: [] };
+  const tag = $("phase4-audit-state");
+  const view = $("phase4-audit-result");
+  const refresh = $("phase4-audit-refresh");
+  const enabled = audit.enabled === true;
+  const integrityValid = audit.integrity?.valid === true;
+  tag.textContent = !enabled ? "UNAVAILABLE" : (integrityValid ? "CHAIN VERIFIED" : "INTEGRITY WARNING");
+  tag.className = "assessment-tag " + (enabled && integrityValid ? "pass" : (enabled ? "fail" : ""));
+  view.textContent = JSON.stringify(audit, null, 2);
+  refresh.disabled = false;
+}
+async function refreshPhase4Audit() {
+  const response = await fetch("/api/phase4/audit?limit=50");
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Could not load Phase 4 execution evidence.");
+  state.phase4Audit = data;
+  renderPhase4Audit();
 }
 async function refreshPhase4Execution() {
   const response = await fetch("/api/phase4/execution");
@@ -776,12 +796,17 @@ $("close-detail").addEventListener("click", () => { $("detail-panel").hidden = t
 $("download-consolidated").addEventListener("click", downloadConsolidatedReport);
 runButton.addEventListener("click", runSelected);
 $("phase4-execute-button").addEventListener("click", runPhase4Engine);
+$("phase4-audit-refresh").addEventListener("click", async () => {
+  try { await refreshPhase4Audit(); }
+  catch (error) { $("phase4-audit-result").textContent = error.message; }
+});
 
 async function initialize() {
   try {
     await refreshEngines();
     await refreshPhase4Engines();
     await refreshPhase4Execution();
+    await refreshPhase4Audit();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");

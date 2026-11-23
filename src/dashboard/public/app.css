@@ -191,4 +191,7 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; } .panel-index { borde
 .phase4-execution-footer { align-items:flex-start; }
 .phase4-execution-footer p { max-width:520px; }
 .phase4-execution-result { max-height:420px; overflow:auto; margin-top:12px; padding:13px; border:1px solid var(--line); border-radius:9px; background:#0b1320; color:#c8d5ea; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+.phase4-audit-panel { margin-top:20px; }
+.phase4-audit-panel .panel-heading { align-items:flex-start; }
+#phase4-audit-result { max-height:480px; }
 @media(max-width:760px) { .phase4-execution-grid { grid-template-columns:1fr; } .phase4-execution-footer { flex-direction:column; align-items:stretch; } }
