@@ -125,3 +125,12 @@ export {
   ACCESSIBILITY_QA_ADAPTER_VERSION,
   ACCESSIBILITY_QA_ADAPTER_CAPABILITIES
 } from "./engine-registry/adapters/accessibility-qa.js";
+
+export {
+  createPerformanceQaEngineAdapter,
+  registerPerformanceQaEngine,
+  PerformanceQaAdapterError,
+  PERFORMANCE_QA_ADAPTER_ID,
+  PERFORMANCE_QA_ADAPTER_VERSION,
+  PERFORMANCE_QA_ADAPTER_CAPABILITIES
+} from "./engine-registry/adapters/performance-qa.js";
