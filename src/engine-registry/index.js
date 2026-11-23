@@ -8,7 +8,7 @@ const TARGET_TYPES = new Set(["path", "url", "path-or-url", "payload", "none"]);
 const EXECUTION_MODES = new Set(["in-process", "browser", "local-process", "remote"]);
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const LABEL_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
-const VERSION_PATTERN = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$/;
+const VERSION_PATTERN = /^(0|[1-9]\d*)\\.(0|[1-9]\d*)\\.(0|[1-9]\d*)$/;
 
 export const QA_ENGINE_ADAPTER_CONTRACT = CONTRACT;
 
@@ -50,7 +50,7 @@ function requiredString(value, label, maxLength, pattern) {
     throw new QaEngineRegistryError("INVALID_FIELD", label + " must be a string");
   }
   const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength || /[\\u0000-\\u001f\\u007f]/.test(normalized)) {
+  if (!normalized || normalized.length > maxLength || /[\u0000-\u001f\u007f]/.test(normalized)) {
     throw new QaEngineRegistryError("INVALID_FIELD", label + " is empty or exceeds its safe length");
   }
   if (pattern && !pattern.test(normalized)) {
@@ -65,8 +65,12 @@ function normalizeCapabilities(value) {
   }
   const capabilities = [];
   const seen = new Set();
-  for (const capability of value) {
-    const normalized = requiredString(capability, "capability", 64, LABEL_PATTERN);
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new QaEngineRegistryError("ACCESSOR_NOT_ALLOWED", "capabilities cannot contain holes or accessors");
+    }
+    const normalized = requiredString(descriptor.value, "capability", 64, LABEL_PATTERN);
     if (seen.has(normalized)) {
       throw new QaEngineRegistryError("DUPLICATE_CAPABILITY", "capabilities cannot contain duplicates");
     }
@@ -134,7 +138,9 @@ function normalizeAdapter(input) {
  * Execution, permissions, scheduling and cancellation belong to later host
  * orchestration layers. No adapter is loaded from disk or discovered implicitly.
  */
-export function createQaEngineRegistry({ adapters = [] } = {}) {
+export function createQaEngineRegistry(options = {}) {
+  const config = readRecord(options, "options", new Set(["adapters"]));
+  const adapters = Object.hasOwn(config, "adapters") ? config.adapters : [];
   if (!Array.isArray(adapters) || adapters.length > MAX_ADAPTERS) {
     throw new QaEngineRegistryError("INVALID_ADAPTERS", "adapters must be an array of at most 256 entries");
   }

@@ -155,8 +155,31 @@ test("rejects symbol keys and non-plain adapter records", () => {
 });
 
 test("registry limits adapter count and validates constructor input", () => {
+  assert.throws(() => createQaEngineRegistry(null), /plain object/u);
+  assert.throws(() => createQaEngineRegistry({ unexpected: true }), /unsupported field/u);
   assert.throws(() => createQaEngineRegistry({ adapters: {} }), /array/u);
   assert.throws(() => createQaEngineRegistry({ adapters: new Array(257).fill(adapter()) }), /256/u);
+});
+
+test("capability validation rejects sparse arrays and accessors without invoking them", () => {
+  const sparse = new Array(1);
+  assert.throws(() => createQaEngineRegistry().register(adapter({ capabilities: sparse })), /holes or accessors/u);
+
+  let invoked = false;
+  const accessor = [];
+  Object.defineProperty(accessor, "0", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return "unsafe";
+    }
+  });
+  accessor.length = 1;
+  assert.throws(
+    () => createQaEngineRegistry().register(adapter({ capabilities: accessor })),
+    (error) => error instanceof QaEngineRegistryError && error.code === "ACCESSOR_NOT_ALLOWED"
+  );
+  assert.equal(invoked, false);
 });
 
 test("seal prevents later registration while preserving discovery", () => {
