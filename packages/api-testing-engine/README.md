@@ -189,3 +189,74 @@ Run the API testing package suite with:
 npm --workspace @jb/api-testing-engine run check
 npm run test:api-testing
 ~~~
+
+
+## Phase 3 — Block 5: API Workflow Testing Engine
+
+The workflow engine executes a local, declarative sequence of API requests using an existing API Request Engine instance. Steps run sequentially. It does not evaluate JavaScript, execute shell commands, create arbitrary functions or send requests outside the Request Engine origin allowlist.
+
+~~~js
+import {
+  createApiRequestEngine,
+  createApiWorkflowTestingEngine
+} from "@jb/api-testing-engine";
+
+const requests = createApiRequestEngine({
+  allowedOrigins: ["https://api.example.com"]
+});
+const workflows = createApiWorkflowTestingEngine({
+  requestEngine: requests
+});
+
+const report = await workflows.run({
+  schema: "jb.api-workflow/v1",
+  workflowId: "users.login-and-profile",
+  version: "1.0.0",
+  stopOnFailure: true,
+  steps: [
+    {
+      id: "login",
+      request: {
+        method: "POST",
+        url: "https://api.example.com/login",
+        json: { username: "demo" }
+      },
+      capture: {
+        userId: "$.json.user.id"
+      },
+      assertions: [
+        { type: "status", expected: 200 },
+        { type: "exists", path: "$.access_token" }
+      ]
+    },
+    {
+      id: "profile",
+      when: { stepId: "login", status: 200 },
+      request: {
+        method: "POST",
+        url: "https://api.example.com/profile",
+        json: { userId: { "$var": "userId" } }
+      },
+      assertions: [
+        { type: "status", expected: 200 },
+        { type: "exists", path: "$.data.id" }
+      ]
+    }
+  ]
+});
+
+console.log(report.status, report.passRate, report.results);
+~~~
+
+A workflow uses jb.api-workflow/v1, a stable workflow ID, semantic version and 1–100 ordered steps. Each step defines an ID and an API Request Engine request. Optional capture maps private variable names to response paths. Later request values can use a reference object with a prior step ID and JSON path, or a variable object containing a previously captured variable name. References must point backward; forward references and unknown variables are rejected during compilation.
+
+Optional when conditions support a prior step's HTTP status (one code or a bounded range) and a JSON response path with equals or exists. A condition runs only after its dependency passed. Steps are sequential; no parallel fan-out or implicit retries are performed. stopOnFailure defaults to true. Set it to false to continue independent steps after a failure. An AbortSignal can cancel an in-flight request and skip remaining steps.
+
+The report contains step statuses, HTTP status, duration, received byte count, assertion summaries, capture names and sanitized error codes. It never includes complete response bodies or captured values. Captures and response data are cleared from the run context when the workflow finishes. String values that resemble templates remain literal; only the explicit reference and variable objects are resolved.
+
+Run the complete API Testing Engine suite with:
+
+~~~sh
+npm --workspace @jb/api-testing-engine run check
+npm run test:api-testing
+~~~

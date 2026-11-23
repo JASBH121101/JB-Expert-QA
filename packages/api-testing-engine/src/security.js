@@ -211,6 +211,10 @@ function normalizeResponse(response) {
   return Object.freeze({ method: response.method.toUpperCase(), url, status: response.status, headers, jsonParsed: response.jsonParsed === true, json: response.json });
 }
 
+function isWildcardOrigin(origin) {
+  return typeof origin === "string" && origin.length === 1 && origin.charCodeAt(0) === 42;
+}
+
 function isLocalhost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
@@ -338,37 +342,37 @@ function analyzeResponse(normalized, policy) {
     } else if (normalizedAllowOrigin && normalizedAllowOrigin.includes(",")) {
       corsStatus = "fail";
       corsMessage = "Access-Control-Allow-Origin contains multiple origins; browsers require one serialized origin or wildcard.";
-    } else if (normalizedAllowOrigin === "*" && allowCredentials) {
+    } else if (isWildcardOrigin(normalizedAllowOrigin) && allowCredentials) {
       corsStatus = "fail";
       corsCode = "cors.wildcard-credentials";
       corsMessage = "Wildcard CORS is combined with credentialed access.";
-    } else if (normalizedAllowOrigin === "*" && policy.allowedCorsOrigins !== undefined) {
+    } else if (isWildcardOrigin(normalizedAllowOrigin) && policy.allowedCorsOrigins !== undefined) {
       corsStatus = "fail";
       corsMessage = "Wildcard CORS cannot satisfy an explicit origin allowlist.";
-    } else if (normalizedAllowOrigin === "*" && policy.disallowWildcardCors) {
+    } else if (isWildcardOrigin(normalizedAllowOrigin) && policy.disallowWildcardCors) {
       corsStatus = "fail";
       corsMessage = "Wildcard CORS is disallowed by the active policy.";
     } else if (policy.requestOrigin !== undefined &&
-      normalizedAllowOrigin !== policy.requestOrigin && normalizedAllowOrigin !== "*") {
+      normalizedAllowOrigin !== policy.requestOrigin && !isWildcardOrigin(normalizedAllowOrigin)) {
       corsStatus = "fail";
       corsMessage = "Access-Control-Allow-Origin does not match the supplied request origin.";
     } else if (normalizedAllowOrigin === null && policy.requestOrigin !== undefined) {
       corsStatus = "fail";
       corsMessage = "A cross-origin request was supplied but the response does not declare Access-Control-Allow-Origin.";
-    } else if (policy.allowedCorsOrigins && normalizedAllowOrigin !== "*" &&
+    } else if (policy.allowedCorsOrigins && !isWildcardOrigin(normalizedAllowOrigin) &&
       (!normalizedAllowOrigin || !policy.allowedCorsOrigins.includes(normalizedAllowOrigin))) {
       corsStatus = "fail";
       corsMessage = "Access-Control-Allow-Origin is not in the configured origin allowlist.";
-    } else if (normalizedAllowOrigin === "*" && !policy.disallowWildcardCors) {
+    } else if (isWildcardOrigin(normalizedAllowOrigin) && !policy.disallowWildcardCors) {
       corsStatus = "warning";
       corsMessage = "Wildcard CORS is enabled by policy; review whether public cross-origin access is intentional.";
     }
 
-    addCheck(checks, corsCode, "cors", allowCredentials && normalizedAllowOrigin === "*" ? "critical" : "high",
+    addCheck(checks, corsCode, "cors", allowCredentials && isWildcardOrigin(normalizedAllowOrigin) ? "critical" : "high",
       corsStatus, "CORS origin policy", corsMessage, recommendation,
-      { allowOriginPresent: normalizedAllowOrigin !== null, wildcard: normalizedAllowOrigin === "*", credentials: allowCredentials });
+      { allowOriginPresent: normalizedAllowOrigin !== null, wildcard: isWildcardOrigin(normalizedAllowOrigin), credentials: allowCredentials });
 
-    if (normalizedAllowOrigin && normalizedAllowOrigin !== "*" && !vary.includes("origin")) {
+    if (normalizedAllowOrigin && !isWildcardOrigin(normalizedAllowOrigin) && !vary.includes("origin")) {
       addCheck(checks, "cors.vary-origin", "cors", "low", "warning",
         "CORS cache variation",
         "A specific Access-Control-Allow-Origin is returned without Vary: Origin.",

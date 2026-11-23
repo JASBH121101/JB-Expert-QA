@@ -312,3 +312,11 @@ export {
   ApiSecurityError,
   createApiSecurityTestingEngine
 } from "./security.js";
+
+
+export {
+  API_WORKFLOW_TESTING_ENGINE_ID,
+  API_WORKFLOW_TESTING_ENGINE_VERSION,
+  ApiWorkflowError,
+  createApiWorkflowTestingEngine
+} from "./workflows.js";
