@@ -55,17 +55,17 @@ test("requires an existing Request Engine and an explicit active-testing switch"
   assert.equal(disabled.activeTesting, false);
   assert.throws(
     () => disabled.run(probe()),
-    (error) => error instanceof TypeError
+    (error) => error instanceof ApiRateLimitError && error.code === "ACTIVE_TESTING_DISABLED"
   );
 });
 
-test("requires active-testing opt-in before sending any request", async () => {
+test("requires active-testing opt-in before sending any request", () => {
   let calls = 0;
   const subject = createApiRateLimitTestingEngine({
     requestEngine: { request: async () => { calls += 1; return response(); } }
   });
-  await assert.rejects(
-    subject.run(probe()),
+  assert.throws(
+    () => subject.run(probe()),
     (error) => error instanceof ApiRateLimitError && error.code === "ACTIVE_TESTING_DISABLED"
   );
   assert.equal(calls, 0);
@@ -137,7 +137,8 @@ test("detects HTTP 429, normalizes Retry-After and stops by default", async () =
   assert.deepEqual(report.signals, [
     "http-429",
     "rate-limit-remaining-zero",
-    "retry-after-observed"
+    "retry-after-observed",
+    "rate-limit-limit-observed"
   ]);
   assert.equal(report.summary.retryAfterSeconds, 3);
   assert.equal(report.checks.find((item) => item.id === "retry-after").status, "passed");
