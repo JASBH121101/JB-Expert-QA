@@ -343,7 +343,7 @@ export function createAutonomousExecutionEngine({
   const normalizedPolicy = createPolicy(policy, registry);
   const now = makeClock(clock);
   if (!ledger || typeof ledger.append !== "function" || typeof ledger.verify !== "function" ||
-      typeof ledger.snapshot !== "function") {
+      typeof ledger.snapshot !== "function" || typeof ledger.canAppend !== "function") {
     throw new TypeError("A compatible execution ledger is required");
   }
   if (requestApproval !== null && typeof requestApproval !== "function") {
@@ -351,6 +351,7 @@ export function createAutonomousExecutionEngine({
   }
   if (typeof idFactory !== "function") throw new TypeError("idFactory must be a function");
   const usedExecutionIds = new Set();
+  let executionActive = false;
 
   async function record(event, details = {}) {
     return ledger.append({
@@ -361,7 +362,7 @@ export function createAutonomousExecutionEngine({
     });
   }
 
-  async function execute(planInput, options = {}) {
+  async function executePlan(planInput, options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options)) {
       throw new TypeError("Execution options must be an object");
     }
@@ -381,6 +382,10 @@ export function createAutonomousExecutionEngine({
     const verification = await ledger.verify();
     if (!verification || verification.valid !== true) {
       throw new Error("Execution blocked because the audit ledger failed integrity verification");
+    }
+    const requiredLedgerRecords = 2 + (plan.actions.length * 4);
+    if (!ledger.canAppend(requiredLedgerRecords)) {
+      throw new Error("Execution blocked because the audit ledger has insufficient record capacity");
     }
     usedExecutionIds.add(executionId);
 
@@ -720,6 +725,16 @@ export function createAutonomousExecutionEngine({
         lastHash: ledgerVerification.lastHash
       }
     });
+  }
+
+  async function execute(planInput, options = {}) {
+    if (executionActive) throw new Error("Another autonomous execution is already running in this engine instance");
+    executionActive = true;
+    try {
+      return await executePlan(planInput, options);
+    } finally {
+      executionActive = false;
+    }
   }
 
   return Object.freeze({
