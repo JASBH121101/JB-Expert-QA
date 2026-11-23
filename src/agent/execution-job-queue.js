@@ -12,16 +12,67 @@ export class ExecutionJobQueueError extends Error {
 }
 
 function cloneJson(value, label) {
-  let serialized;
+  const seen = new Set();
+
+  function validate(current, depth) {
+    if (depth > 24) throw new TypeError("value is too deeply nested");
+    if (current === null || typeof current === "string" || typeof current === "boolean") return;
+    if (typeof current === "number") {
+      if (!Number.isFinite(current)) throw new TypeError("value contains a non-finite number");
+      return;
+    }
+    if (Array.isArray(current)) {
+      if (seen.has(current)) throw new TypeError("value contains a circular reference");
+      if (current.length > 10000) throw new RangeError("array exceeds the item limit");
+      seen.add(current);
+      const keys = Reflect.ownKeys(current);
+      for (const key of keys) {
+        if (key === "length") continue;
+        if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) ||
+            !Number.isSafeInteger(Number(key)) || Number(key) >= current.length) {
+          throw new TypeError("arrays may contain indexed JSON values only");
+        }
+      }
+      for (let index = 0; index < current.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(current, String(index));
+        if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+          throw new TypeError("arrays cannot contain holes, accessors or non-enumerable values");
+        }
+        validate(descriptor.value, depth + 1);
+      }
+      seen.delete(current);
+      return;
+    }
+    if (typeof current !== "object") throw new TypeError("value contains a non-JSON data type");
+    const prototype = Object.getPrototypeOf(current);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("objects must be plain JSON records");
+    }
+    if (seen.has(current)) throw new TypeError("value contains a circular reference");
+    seen.add(current);
+    for (const key of Reflect.ownKeys(current)) {
+      if (typeof key !== "string" || ["__proto__", "prototype", "constructor"].includes(key)) {
+        throw new TypeError("object contains an unsupported or forbidden key");
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+        throw new TypeError("objects cannot contain accessors or non-enumerable values");
+      }
+      validate(descriptor.value, depth + 1);
+    }
+    seen.delete(current);
+  }
+
   try {
-    serialized = JSON.stringify(value);
+    validate(value, 0);
+    const serialized = JSON.stringify(value);
+    if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > 1024 * 1024) {
+      throw new RangeError("value exceeds the 1 MiB JSON limit");
+    }
+    return JSON.parse(serialized);
   } catch {
-    throw new ExecutionJobQueueError("INVALID_PAYLOAD", label + " must be JSON-serializable");
+    throw new ExecutionJobQueueError("INVALID_PAYLOAD", label + " must contain bounded, plain JSON-compatible data");
   }
-  if (serialized === undefined) {
-    throw new ExecutionJobQueueError("INVALID_PAYLOAD", label + " must be JSON-serializable");
-  }
-  return JSON.parse(serialized);
 }
 
 function freezeDeep(value) {
