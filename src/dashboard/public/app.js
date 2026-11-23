@@ -780,6 +780,8 @@ $("phase4-execute-button").addEventListener("click", runPhase4Engine);
 async function initialize() {
   try {
     await refreshEngines();
+    await refreshPhase4Engines();
+    await refreshPhase4Execution();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");
