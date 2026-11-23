@@ -361,7 +361,7 @@ try {
   progress("API Testing Engine clean-consumer checks passed");
 
   progress("All eight standalone package checks completed");
-  console.log("PASS: all eight npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization, Currency and API Request Engine smoke checks passed.");
+  console.log("PASS: all eight npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization, Currency and API Request and Assertions Engine smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
