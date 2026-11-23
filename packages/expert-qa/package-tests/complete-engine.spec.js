@@ -57,6 +57,13 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "VISUAL_QA_ADAPTER_VERSION",
     "VISUAL_QA_ADAPTER_CAPABILITIES",
     "VISUAL_QA_LIMITS",
+    "createReportCertificationEngineAdapter",
+    "registerReportCertificationEngine",
+    "ReportCertificationAdapterError",
+    "REPORT_CERTIFICATION_ADAPTER_ID",
+    "REPORT_CERTIFICATION_ADAPTER_VERSION",
+    "REPORT_CERTIFICATION_ADAPTER_CAPABILITIES",
+    "REPORT_CERTIFICATION_LIMITS",
     "RuntimeSecurityQaAdapterError",
     "RUNTIME_SECURITY_QA_ADAPTER_ID",
     "RUNTIME_SECURITY_QA_ADAPTER_VERSION",
@@ -132,6 +139,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   assert.equal(engine.PERFORMANCE_QA_ADAPTER_ID, "jb.performance-qa-engine");
   assert.equal(typeof engine.createVisualQaEngineAdapter, "function");
   assert.equal(engine.VISUAL_QA_ADAPTER_ID, "jb.visual-qa-engine");
+  assert.equal(typeof engine.createReportCertificationEngineAdapter, "function");
+  assert.equal(engine.REPORT_CERTIFICATION_ADAPTER_ID, "jb.report-certification-engine");
   assert.equal(EXPERT_QA_PACKAGE_VERSION, "0.2.0");
 });
 
@@ -346,4 +355,34 @@ test("standalone Expert QA package exposes Visual QA and blocks private destinat
       error.code === "AUDIT_FAILED" &&
       !error.message.includes(secret)
   );
+});
+
+ 
+test("standalone package exposes Report & Certification Engine without network or filesystem writes", async () => {
+  const registry = engine.createQaEngineRegistry();
+  const metadata = engine.registerReportCertificationEngine(registry, {
+    clock: () => new Date("2026-11-23T19:00:00.000Z"),
+    idFactory: () => "package-certification-0001"
+  });
+  assert.equal(metadata.id, engine.REPORT_CERTIFICATION_ADAPTER_ID);
+  assert.equal(metadata.targetType, "payload");
+  assert.equal(metadata.executionMode, "in-process");
+  const result = await registry.getRunner(metadata.id)({
+    history: [{
+      id: "package-run",
+      engineId: "static",
+      engineName: "Static QA",
+      targetHash: "package-target-hash",
+      targetLabel: "Package project",
+      createdAt: "2026-11-23T18:00:00.000Z",
+      outcome: "passed",
+      score: 98,
+      findingsCount: 0,
+      findings: []
+    }],
+    format: "json"
+  });
+  assert.equal(result.certification.assessment, "PASSED_WITHIN_RECORDED_SCOPE");
+  assert.equal(result.certification.checkpoint.digestAlgorithm, "sha256");
+  assert.equal(typeof result.artifact, "string");
 });

@@ -118,3 +118,8 @@ The standalone package exports the canonical performance-specialist adapter from
 ## Visual QA Engine Adapter
 
 The standalone package exports the canonical visual/layout adapter from `@jb/expert-qa/visual-qa-adapter` and the root API. Register it with `registerVisualQaEngine(registry)`. The adapter supports the canonical three-viewport or nine-viewport matrix and light/dark themes, with optional read-only PNG baseline comparison. Screenshots are temporary, baselines are never modified, and AI screenshot review is not invoked. The report is bounded and omits target, selector and artifact paths. See [Visual QA Adapter](../../docs/VISUAL-QA-ADAPTER.md).
+
+
+## Report & Certification Engine Adapter
+
+The standalone package exports the scope-aware report and certification adapter from `@jb/expert-qa/report-certification-adapter` and the root API. Register it with `registerReportCertificationEngine(registry)` and provide bounded dashboard history to generate JSON, Markdown or HTML artifacts plus a SHA-256 checkpoint. Assessment states preserve `NOT_ASSESSED`, `NOT_PASSED`, `REVIEW_REQUIRED`, `OBSERVATIONS` and `PASSED_WITHIN_RECORDED_SCOPE`. This adapter does not rerun audits, write files, or average scores across engines. See [Report & Certification Adapter](../../docs/REPORT-CERTIFICATION-ADAPTER.md).
