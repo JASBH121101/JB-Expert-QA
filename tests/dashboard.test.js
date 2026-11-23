@@ -13,7 +13,8 @@ async function startTestDashboard(t, options = {}) {
     await mkdtemp(join(tmpdir(), "jb-qa-control-center-"));
   const server = createDashboardServer({
     storageDirectory,
-    registry: options.registry ?? createAuditEngineRegistry()
+    registry: options.registry ?? createAuditEngineRegistry(),
+    ...(Object.hasOwn(options, "phase4Registry") ? { phase4Registry: options.phase4Registry } : {})
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
