@@ -50,6 +50,7 @@ The browser auditor can capture screenshots, inspect accessibility findings with
 | `jb-qa-security [path]` | Focused static security audit |
 | `jb-qa-security-url <url>` | Runtime website security audit |
 | `jb-qa-autopilot [path]` | AI-assisted analysis and optional remediation |
+| `@jb/expert-qa/autonomous-execution` | Policy-bounded action orchestration with approval gates and audit ledger |
 | `jb-qa-db [path]` | Focused database schema, migration, ORM, query-safety and performance audit |
 
 AI features are opt-in. The autopilot does not apply patches by default. Applying low-risk changes requires the explicit approval flags enforced by the CLI; review diffs and run project tests before accepting any change. Source upload to an AI provider is a separate explicit opt-in.
@@ -66,7 +67,11 @@ const responsiveReport = await auditViewports("https://example.com");
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
 ```
 
-The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./security-bridge`, and `./version`.
+The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, and `./version`.
+
+### Policy-bounded execution
+
+The autonomous execution engine has no built-in shell, deployment or production actions. Callers register trusted handlers explicitly, then allowlist their action types, preauthorize required permissions, constrain resource scopes and configure risk and time limits. Medium- and high-risk actions require a separate approval callback. Use a JSONL audit ledger when durable local traceability is required; keep its directory protected by the host OS.
 
 ## Privacy and execution boundaries
 
