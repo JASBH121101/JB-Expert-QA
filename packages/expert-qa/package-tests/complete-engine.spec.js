@@ -51,6 +51,7 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "PERFORMANCE_QA_ADAPTER_VERSION",
     "PERFORMANCE_QA_ADAPTER_CAPABILITIES",
     "createVisualQaEngineAdapter",
+    "createDashboardPhase4Catalog",
     "createDashboardPhase4Execution",
     "DashboardPhase4ExecutionError",
     "registerVisualQaEngine",
