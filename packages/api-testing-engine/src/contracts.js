@@ -41,9 +41,16 @@ function assertJsonSafe(value, label, limits = {}) {
     if (Array.isArray(item)) {
       if (seen.has(item)) throw new TypeError(label + " cannot contain circular data");
       seen.add(item);
+      const keys = Object.keys(item);
+      if (keys.length !== item.length || keys.some((key) => !/^(0|[1-9]\d*)$/u.test(key) || Number(key) >= item.length)) {
+        throw new TypeError(label + " arrays cannot contain custom enumerable properties");
+      }
       for (let index = 0; index < item.length; index += 1) {
-        if (!Object.hasOwn(item, index)) throw new TypeError(label + " cannot contain sparse arrays");
-        visit(item[index], depth + 1);
+        const descriptor = Object.getOwnPropertyDescriptor(item, String(index));
+        if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+          throw new TypeError(label + " arrays cannot contain holes or accessors");
+        }
+        visit(descriptor.value, depth + 1);
       }
       seen.delete(item);
       return;
