@@ -333,7 +333,11 @@ function sanitizeAuditRecord(record) {
     if (Number.isSafeInteger(record[key]) && record[key] >= 0 && record[key] <= 1000000) output[key] = record[key];
   }
   if (typeof record.reason === "string") {
-    output.reason = redactSensitiveText(record.reason).replace(/[\\u0000-\\u001f\\u007f]/g, " ").replace(/\\s+/g, " ").trim().slice(0, 360);
+    const reason = redactSensitiveText(record.reason);
+    output.reason = [...reason].filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    }).join("").trim().slice(0, 360);
   }
   if (record.event === "action.approval-requested") output.approvalOutcome = "requested";
   else if (record.event === "action.approved") output.approvalOutcome = "approved";
