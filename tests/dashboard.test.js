@@ -479,6 +479,8 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.match(pageHtml, /QA Control Center/);
   assert.match(pageHtml, /Policy-gated engine runner/);
   assert.match(pageHtml, /Request approved execution/);
+  assert.match(pageHtml, /Execution Audit &amp; Evidence/);
+  assert.match(pageHtml, /Refresh evidence/);
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
 
