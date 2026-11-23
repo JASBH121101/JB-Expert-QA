@@ -1,7 +1,7 @@
 {
   "name": "@jb/api-testing-engine",
   "version": "0.1.0",
-  "description": "Dependency-free API request, assertions, contract, passive security, workflow and regression testing engine.",
+  "description": "Dependency-free API request, assertions, contract, passive security, workflow, regression and bounded rate-limit testing engine.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/assertions.js && node --check src/contracts.js && node --check src/security.js && node --check src/workflows.js && node --check src/regression.js && node --test"
+    "check": "node --check src/index.js && node --check src/assertions.js && node --check src/contracts.js && node --check src/security.js && node --check src/workflows.js && node --check src/regression.js && node --check src/rate-limit.js && node --test"
   },
   "repository": {
     "type": "git",
