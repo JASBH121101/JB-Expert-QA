@@ -105,3 +105,51 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; } .panel-index { borde
   .primary-button { width: 100%; } .history-heading { flex-direction: column; } .history-actions { width: 100%; justify-content: space-between; }
   .footer { flex-direction: column; line-height: 1.6; }
 }
+
+.intelligence-panel { margin-top: 16px; padding: 22px; }
+.intelligence-heading { align-items: flex-start; }
+.insight-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin-top: 19px; }
+.insight-metric { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #0f1725; }
+.insight-metric span { display: block; color: var(--faint); font-size: 8px; font-weight: 800; letter-spacing: .1em; }
+.insight-metric strong { display: block; margin: 10px 0 4px; color: var(--text); font-size: 24px; letter-spacing: -.04em; }
+.insight-metric small { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.insight-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+.insight-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: #0f1725; }
+.insight-card-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px; }
+.insight-card-heading h3 { font-size: 11px; }
+.insight-card-heading span { color: var(--faint); font-size: 8px; }
+.insight-bars, .coverage-list, .trend-list { display: grid; gap: 12px; }
+.insight-bar-row { display: grid; grid-template-columns: 74px minmax(0,1fr) 26px; gap: 9px; align-items: center; }
+.insight-bar-label { color: var(--muted); font-size: 8px; font-weight: 800; }
+.insight-bar-row strong { color: var(--text); font-size: 9px; text-align: right; }
+.insight-bar-track, .coverage-track, .trend-track { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #1a2638; }
+.insight-bar-fill, .coverage-fill, .trend-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.insight-bar-fill.severity-critical, .insight-bar-fill.severity-high { background: var(--red); }
+.insight-bar-fill.severity-medium { background: var(--amber); }
+.insight-bar-fill.severity-low { background: #8d9ee8; }
+.insight-bar-fill.severity-info { background: var(--teal); }
+.insight-bar-fill.severity-other { background: #8291a9; }
+.coverage-row { display: grid; gap: 6px; }
+.coverage-row-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.coverage-row-head strong { color: var(--text); font-size: 9px; }
+.coverage-status { color: var(--muted); font-size: 7px; font-weight: 800; }
+.coverage-status.pass { color: var(--teal); } .coverage-status.warn { color: var(--amber); } .coverage-status.fail { color: var(--red); }
+.coverage-row small { color: var(--faint); font-size: 8px; line-height: 1.4; }
+.coverage-fill { background: linear-gradient(90deg,#6d63dd,#53c6b1); }
+.trend-card { margin-top: 12px; }
+.trend-row { display: grid; grid-template-columns: minmax(100px,1.25fr) minmax(80px,1fr) 55px; gap: 10px; align-items: center; }
+.trend-label { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.trend-row strong { color: var(--text); font-size: 8px; text-align: right; }
+.trend-fill { background: linear-gradient(90deg,#7167ea,#59cbb4); }
+.empty-insight { margin: 5px 0; color: var(--faint); font-size: 9px; }
+.insight-footnote { margin: 12px 2px 0; color: var(--faint); font-size: 8px; line-height: 1.55; }
+@media (max-width: 1000px) { .insight-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 640px) {
+  .intelligence-panel { padding: 16px; }
+  .intelligence-heading { flex-direction: column; }
+  .intelligence-heading .history-actions { align-items: flex-start; flex-wrap: wrap; }
+  .insight-grid { grid-template-columns: 1fr; }
+  .insight-metric { padding: 12px; }
+  .insight-metric strong { font-size: 21px; }
+  .trend-row { grid-template-columns: minmax(80px,1.1fr) minmax(55px,.8fr) 45px; gap: 7px; }
+}
