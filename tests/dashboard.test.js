@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
 import { createDashboardServer } from "../src/dashboard/server.js";
 import { createQaEngineRegistry } from "../src/engine-registry/index.js";
+import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";
+import { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
+import { getQaEngineActionType, QA_ENGINE_EXECUTION_PERMISSION } from "../src/engine-registry/orchestrator.js";
 
 async function startTestDashboard(t, options = {}) {
   const storageDirectory = options.storageDirectory ??
@@ -14,7 +17,8 @@ async function startTestDashboard(t, options = {}) {
   const server = createDashboardServer({
     storageDirectory,
     registry: options.registry ?? createAuditEngineRegistry(),
-    ...(Object.hasOwn(options, "phase4Registry") ? { phase4Registry: options.phase4Registry } : {})
+    ...(Object.hasOwn(options, "phase4Registry") ? { phase4Registry: options.phase4Registry } : {}),
+    ...(Object.hasOwn(options, "phase4Execution") ? { phase4Execution: options.phase4Execution } : {})
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -43,6 +47,319 @@ const passingReport = {
   diagnostics: []
 };
 
+function createPhase4EchoFixture({ requestApproval = async () => ({ approved: true, approvalId: "human-approval-1" }), policyOverrides = {}, run = async (input) => ({ echoed: input.value }) } = {}) {
+  let runnerCalls = 0;
+  const registry = createQaEngineRegistry();
+  registry.register({
+    id: "jb.test.echo",
+    name: "Dashboard Echo Engine",
+    version: "1.0.0",
+    category: "testing",
+    targetType: "payload",
+    executionMode: "in-process",
+    capabilities: ["echo"],
+    description: "A deterministic dashboard integration fixture",
+    run: async (input) => {
+      runnerCalls += 1;
+      return run(input);
+    }
+  });
+  registry.seal();
+  const policy = {
+    id: "dashboard-phase4-test-policy",
+    grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION],
+    rules: [{
+      type: getQaEngineActionType("jb.test.echo"),
+      maxRisk: "high",
+      requireApproval: true
+    }],
+    limits: {
+      maxActions: 1,
+      maxExecutionMs: 5000,
+      maxActionMs: 3000,
+      approvalTimeoutMs: 2000,
+      maxInputBytes: 4096,
+      maxOutputBytes: 4096
+    },
+    ...policyOverrides
+  };
+  const execution = createDashboardPhase4Execution({ registry, policy, requestApproval });
+  return { registry, execution, get runnerCalls() { return runnerCalls; } };
+}
+
+test("Dashboard Phase 4 catalog keeps API network origins inert unless the host explicitly allowlists exact origins", () => {
+  const safeDefault = createDashboardPhase4Catalog();
+  assert.equal(safeDefault.isSealed(), true);
+  assert.equal(safeDefault.has("jb.api-testing-engine"), true);
+  const configured = createDashboardPhase4Catalog({
+    apiAllowedOrigins: ["https://api.example.test"]
+  });
+  assert.equal(configured.isSealed(), true);
+  assert.equal(configured.has("jb.api-testing-engine"), true);
+  assert.throws(
+    () => createDashboardPhase4Catalog({ apiAllowedOrigins: ["https://api.example.test/path"] }),
+    /exact HTTP\(S\) origins/
+  );
+  assert.throws(
+    () => createDashboardPhase4Catalog({ apiAllowedOrigins: ["*"] }),
+    /invalid URL/
+  );
+});
+
+test("Phase 4 execution is disabled by default and POST cannot bypass missing host configuration", async (t) => {
+  const { origin } = await startTestDashboard(t);
+  const status = await fetch(origin + "/api/phase4/execution");
+  assert.equal(status.status, 200);
+  const configuration = await status.json();
+  assert.equal(configuration.enabled, false);
+  assert.equal(configuration.approvalRequired, true);
+  assert.equal(configuration.allowedEngineIds.length, 0);
+  assert.equal(configuration.permission, "qa:engine-execute");
+
+  const response = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "must-not-run" } })
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "phase4_execution_disabled");
+});
+
+test("Dashboard bridge rejects nested accessors, circular structures and oversized input before approval", async () => {
+  let getterInvoked = false;
+  let approvalCalls = 0;
+  const fixture = createPhase4EchoFixture({
+    requestApproval: async () => {
+      approvalCalls += 1;
+      return { approved: true, approvalId: "should-not-be-requested" };
+    }
+  });
+  const accessorInput = { value: "safe" };
+  Object.defineProperty(accessorInput, "extra", {
+    enumerable: true,
+    get() {
+      getterInvoked = true;
+      return "unsafe";
+    }
+  });
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", accessorInput),
+    (error) => error.code === "ACCESSOR_NOT_ALLOWED"
+  );
+  assert.equal(getterInvoked, false);
+
+  const circularInput = { value: "safe" };
+  circularInput.self = circularInput;
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", circularInput),
+    (error) => error.code === "INVALID_INPUT"
+  );
+
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", { value: "x".repeat(17000) }),
+    (error) => error.code === "INPUT_TOO_LARGE"
+  );
+  assert.equal(approvalCalls, 0);
+  assert.equal(fixture.runnerCalls, 0);
+});
+
+test("Dashboard creates a policy-gated request and executes only after external approval", async (t) => {
+  const approvals = [];
+  const fixture = createPhase4EchoFixture({
+    requestApproval: async (request) => {
+      approvals.push(request);
+      return { approved: true, approvalId: "external-human-approval-1" };
+    }
+  });
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+
+  const statusResponse = await fetch(origin + "/api/phase4/execution");
+  const status = await statusResponse.json();
+  assert.equal(status.enabled, true);
+  assert.equal(status.policyId, "dashboard-phase4-test-policy");
+  assert.deepEqual(status.allowedEngineIds, ["jb.test.echo"]);
+  assert.equal(status.approvalRequired, true);
+
+  const catalog = await fetch(origin + "/api/phase4/engines");
+  const catalogData = await catalog.json();
+  assert.equal(catalogData.executionEnabled, true);
+
+  const response = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "approved-input", url: "https://example.test/private/path?token=review-secret" } })
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.actions[0].status, "succeeded");
+  assert.deepEqual(result.actions[0].output, { echoed: "approved-input" });
+  assert.equal(result.ledgerIntegrity, true);
+  assert.equal(fixture.runnerCalls, 1);
+  assert.equal(approvals.length, 1);
+  assert.equal(approvals[0].actionType, getQaEngineActionType("jb.test.echo"));
+  assert.equal(approvals[0].risk, "high");
+  assert.equal(approvals[0].permissions.includes(QA_ENGINE_EXECUTION_PERMISSION), true);
+  assert.equal(approvals[0].input, undefined);
+  assert.equal(typeof approvals[0].inputDigest, "string");
+  assert.deepEqual(approvals[0].reviewContext.target, {
+    kind: "url", origin: "https://example.test", path: "/private/path"
+  });
+  assert.equal(JSON.stringify(approvals).includes("review-secret"), false);
+  assert.equal(JSON.stringify(approvals).includes("approved-input"), false);
+});
+
+test("Dashboard never runs an engine after external approval is denied", async (t) => {
+  const fixture = createPhase4EchoFixture({
+    requestApproval: async () => ({ approved: false })
+  });
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  const response = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "denied-input" } })
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.status, "blocked");
+  assert.equal(result.actions[0].status, "blocked");
+  assert.equal(fixture.runnerCalls, 0);
+  assert.equal(result.ledgerIntegrity, true);
+});
+
+test("Dashboard rejects engine IDs outside the exact host allowlist and policy override fields", async (t) => {
+  const fixture = createPhase4EchoFixture();
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  const denied = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ engineId: "jb.other.engine", input: {} })
+  });
+  assert.equal(denied.status, 403);
+  assert.equal(fixture.runnerCalls, 0);
+
+  const override = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({
+      engineId: "jb.test.echo",
+      input: { value: "not-used" },
+      policy: { grantedPermissions: ["qa:engine-execute"] },
+      approvalReceipt: { approved: true }
+    })
+  });
+  assert.equal(override.status, 400);
+  assert.equal(fixture.runnerCalls, 0);
+});
+
+test("Dashboard execution rejects cross-origin requests before approval or runner invocation", async (t) => {
+  let approvalCalls = 0;
+  const fixture = createPhase4EchoFixture({
+    requestApproval: async () => { approvalCalls += 1; return { approved: true, approvalId: "never-used" }; }
+  });
+  const { origin } = await startTestDashboard(t, {
+    phase4Registry: fixture.registry,
+    phase4Execution: fixture.execution
+  });
+  const response = await fetch(origin + "/api/phase4/execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": "https://outside.example" },
+    body: JSON.stringify({ engineId: "jb.test.echo", input: {} })
+  });
+  assert.equal(response.status, 403);
+  assert.equal(approvalCalls, 0);
+  assert.equal(fixture.runnerCalls, 0);
+});
+
+test("Dashboard execution bridge rejects missing permission, missing approval, weak risk and unsealed registry", () => {
+  const registry = createQaEngineRegistry();
+  registry.register({
+    id: "jb.test.echo",
+    name: "Echo",
+    version: "1.0.0",
+    category: "testing",
+    targetType: "payload",
+    executionMode: "in-process",
+    capabilities: ["echo"],
+    run: async () => ({ ok: true })
+  });
+  const rule = { type: getQaEngineActionType("jb.test.echo"), maxRisk: "high", requireApproval: true };
+  assert.throws(
+    () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION], rules: [rule] }, requestApproval: async () => ({ approved: true, approvalId: "x" }) }),
+    (error) => error.code === "REGISTRY_NOT_SEALED"
+  );
+  registry.seal();
+
+  assert.throws(
+    () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [], rules: [rule] }, requestApproval: async () => ({ approved: true, approvalId: "x" }) }),
+    (error) => error.code === "MISSING_EXECUTION_PERMISSION"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION], rules: [rule] } }),
+    (error) => error.code === "APPROVAL_PROVIDER_REQUIRED"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION], rules: [{ ...rule, maxRisk: "low" }] }, requestApproval: async () => ({ approved: true, approvalId: "x" }) }),
+    (error) => error.code === "RISK_CEILING_REQUIRED"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION], rules: [{ ...rule, type: "qa.engine.jb.not-registered" }] }, requestApproval: async () => ({ approved: true, approvalId: "x" }) }),
+    (error) => error.code === "INVALID_ALLOWLIST"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({
+      registry,
+      policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION, "reports:write"], rules: [rule] },
+      requestApproval: async () => ({ approved: true, approvalId: "x" })
+    }),
+    (error) => error.code === "MISSING_EXECUTION_PERMISSION"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({
+      registry,
+      policy: {
+        id: "test-policy",
+        grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION],
+        rules: [{ type: rule.type, maxRisk: "high" }]
+      },
+      requestApproval: async () => ({ approved: true, approvalId: "x" })
+    }),
+    (error) => error.code === "APPROVAL_REQUIRED"
+  );
+});
+
+test("Dashboard refuses an execution bridge created for a different registry", () => {
+  const fixture = createPhase4EchoFixture();
+  const otherRegistry = createQaEngineRegistry();
+  otherRegistry.register({
+    id: "jb.test.other",
+    name: "Other",
+    version: "1.0.0",
+    category: "testing",
+    targetType: "payload",
+    executionMode: "in-process",
+    capabilities: ["other"],
+    run: async () => ({ ok: true })
+  });
+  otherRegistry.seal();
+  assert.throws(
+    () => createDashboardServer({
+      phase4Registry: otherRegistry,
+      phase4Execution: fixture.execution
+    }),
+    /same sealed phase4Registry/
+  );
+});
+
 test("dashboard serves the local UI, engine registry and restrictive browser headers", async (t) => {
   const { origin, server } = await startTestDashboard(t);
   assert.equal(server.address().address, "127.0.0.1");
@@ -52,6 +369,8 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.equal(page.headers.get("x-frame-options"), "DENY");
   const pageHtml = await page.text();
   assert.match(pageHtml, /QA Control Center/);
+  assert.match(pageHtml, /Policy-gated engine runner/);
+  assert.match(pageHtml, /Request approved execution/);
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
 

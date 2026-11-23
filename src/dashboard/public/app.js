@@ -80,6 +80,90 @@ function updateSelectionUi() {
   $("selection-count").textContent = state.selected.size + " SELECTED";
   runButton.disabled = state.running || state.selected.size === 0;
 }
+function renderPhase4Execution() {
+  const status = state.phase4Execution || { enabled: false, allowedEngineIds: [] };
+  const enabled = status.enabled === true && Array.isArray(status.allowedEngineIds) && status.allowedEngineIds.length > 0;
+  const select = $("phase4-execution-engine");
+  const input = $("phase4-execution-input");
+  const button = $("phase4-execute-button");
+  select.replaceChildren();
+  if (enabled) {
+    state.phase4Engines.filter((engine) => status.allowedEngineIds.includes(engine.id)).forEach((engine) => {
+      const option = document.createElement("option");
+      option.value = engine.id;
+      option.textContent = engine.name + " · " + engine.id;
+      select.append(option);
+    });
+  }
+  if (!select.options.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Execution disabled";
+    select.append(option);
+  }
+  select.disabled = !enabled;
+  input.disabled = !enabled;
+  button.disabled = !enabled;
+  const tag = $("phase4-execution-state");
+  tag.textContent = enabled ? "POLICY ENABLED · APPROVAL REQUIRED" : "DISABLED";
+  tag.className = "assessment-tag " + (enabled ? "warn" : "");
+  $("phase4-execution-policy").textContent = enabled
+    ? "Policy: " + status.policyId + " · Permission: " + status.permission + " · High-risk execution requires external approval."
+    : (status.reason || "Execution is disabled. Configure an exact host policy and external approval provider.");
+  if (!enabled) $("phase4-execution-message").textContent = "No execution request can be submitted from this Dashboard instance.";
+}
+async function refreshPhase4Execution() {
+  const response = await fetch("/api/phase4/execution");
+  if (!response.ok) throw new Error("Could not load Phase 4 execution policy status.");
+  state.phase4Execution = await response.json();
+  renderPhase4Execution();
+}
+async function runPhase4Engine() {
+  if (state.running) return;
+  const engineId = $("phase4-execution-engine").value;
+  if (!engineId) return;
+  let input;
+  try {
+    input = JSON.parse($("phase4-execution-input").value);
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      throw new Error("Input must be a JSON object.");
+    }
+  } catch (error) {
+    $("phase4-execution-message").textContent = error.message || "Enter valid JSON.";
+    $("phase4-execution-message").classList.add("error");
+    return;
+  }
+  const button = $("phase4-execute-button");
+  const message = $("phase4-execution-message");
+  const resultView = $("phase4-execution-result");
+  button.disabled = true;
+  message.classList.remove("error");
+  message.textContent = "Execution request submitted. Waiting for the host approval provider and policy-bound result…";
+  resultView.hidden = true;
+  state.running = true;
+  try {
+    const response = await fetch("/api/phase4/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ engineId, input })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Policy-gated execution request failed.");
+    resultView.textContent = JSON.stringify(data, null, 2);
+    resultView.hidden = false;
+    message.textContent = "Execution result: " + String(data.status || "unknown").toUpperCase() +
+      " · Audit ledger integrity: " + (data.ledgerIntegrity === true ? "verified" : "not verified");
+    addActivity(engineId, data.status === "succeeded" ? "PASSED" : "BLOCKED",
+      "Policy-gated Phase 4 engine execution · " + String(data.status || "unknown"));
+  } catch (error) {
+    message.textContent = error.message || "Execution request failed.";
+    message.classList.add("error");
+  } finally {
+    state.running = false;
+    renderPhase4Execution();
+  }
+}
+
 function renderPhase4Engines() {
   const grid = $("phase4-engine-grid");
   if (!grid) return;
@@ -691,10 +775,13 @@ $("refresh-history").addEventListener("click", async () => {
 $("close-detail").addEventListener("click", () => { $("detail-panel").hidden = true; });
 $("download-consolidated").addEventListener("click", downloadConsolidatedReport);
 runButton.addEventListener("click", runSelected);
+$("phase4-execute-button").addEventListener("click", runPhase4Engine);
 
 async function initialize() {
   try {
     await refreshEngines();
+    await refreshPhase4Engines();
+    await refreshPhase4Execution();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");
