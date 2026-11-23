@@ -37,11 +37,11 @@ function safeMarkdown(value) {
     .slice(0, 240);
 }
 
-function assessmentFor(snapshots, severities) {
+function assessmentFor(snapshots, severities, activeFindingCount) {
   if (!snapshots.length) return "NOT_ASSESSED";
   if (snapshots.some((record) => record.outcome === "not_passed")) return "NOT_PASSED";
   if (severities.critical > 0 || severities.high > 0) return "REVIEW_REQUIRED";
-  if (SEVERITY_ORDER.some((key) => severities[key] > 0)) return "OBSERVATIONS";
+  if (activeFindingCount > 0 || snapshots.some((record) => record.outcome === "passed_with_observations")) return "OBSERVATIONS";
   return "PASSED_WITHIN_RECORDED_SCOPE";
 }
 
@@ -163,7 +163,7 @@ export function buildDashboardAnalytics(history, engineDefinitions = []) {
     generatedAt: new Date().toISOString(),
     retainedHistoryCount: records.length,
     currentSnapshotCount: snapshots.length,
-    targetCount: new Set(snapshots.map(targetIdentity)).size,
+    targetCount: new Set(snapshots.map((record) => String(record.targetLabel || "Unknown target"))).size,
     availableEngineCount,
     usedEngineCount,
     coveragePercent: availableEngineCount ? Math.round(usedEngineCount / availableEngineCount * 100) : 0,
@@ -174,7 +174,7 @@ export function buildDashboardAnalytics(history, engineDefinitions = []) {
     currentOutcomes,
     cleanPassRate: snapshots.length ? Math.round(currentOutcomes.passed / snapshots.length * 100) : null,
     severityCounts,
-    assessment: assessmentFor(snapshots, severityCounts),
+    assessment: assessmentFor(snapshots, severityCounts, activeFindingCount),
     engineCoverage,
     topFindings,
     scoreTrend,
