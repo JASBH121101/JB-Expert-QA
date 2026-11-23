@@ -1,6 +1,7 @@
 const ENGINE_ID = "jb.api-rate-limit-testing-engine";
 const ENGINE_VERSION = "0.1.0";
 const REPORT_SCHEMA = "jb.api-rate-limit-report/v1";
+const REQUEST_ENGINE_ID = "jb.api-testing-engine";
 const INPUT_SCHEMA = "jb.api-rate-limit-test/v1";
 const MIN_SAMPLES = 2;
 const MAX_SAMPLES = 20;
@@ -321,8 +322,28 @@ function makeReport(probe, samples, status, errorCode = null, attemptedRequests 
  * already constrained by the supplied API Request Engine's origin allowlist.
  */
 export function createApiRateLimitTestingEngine({ requestEngine, activeTesting = false } = {}) {
-  if (!requestEngine || typeof requestEngine.request !== "function") {
-    throw new TypeError("requestEngine must expose a request() function");
+  const requestDescriptor = requestEngine && Object.getOwnPropertyDescriptor(requestEngine, "request");
+  const originsDescriptor = requestEngine && Object.getOwnPropertyDescriptor(requestEngine, "allowedOrigins");
+  if (!requestEngine || requestEngine.engineId !== REQUEST_ENGINE_ID ||
+      !requestDescriptor || !Object.hasOwn(requestDescriptor, "value") ||
+      typeof requestDescriptor.value !== "function" ||
+      !originsDescriptor || !Object.hasOwn(originsDescriptor, "value") ||
+      !Array.isArray(originsDescriptor.value) || originsDescriptor.value.length < 1 ||
+      originsDescriptor.value.length > 100) {
+    throw new TypeError("requestEngine must be a JB API Request Engine with an explicit origin allowlist");
+  }
+  const allowedOrigins = new Set();
+  for (const origin of originsDescriptor.value) {
+    if (typeof origin !== "string") throw new TypeError("Request Engine origins must be exact HTTP(S) origin strings");
+    let parsed;
+    try { parsed = new URL(origin); } catch {
+      throw new TypeError("Request Engine contains an invalid allowed origin");
+    }
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== origin ||
+        parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      throw new TypeError("Request Engine origins must be exact HTTP(S) origins");
+    }
+    allowedOrigins.add(origin);
   }
   if (activeTesting !== true && activeTesting !== false) {
     throw new TypeError("activeTesting must be a boolean");
@@ -330,6 +351,9 @@ export function createApiRateLimitTestingEngine({ requestEngine, activeTesting =
 
   function run(input, options = {}) {
     const probe = normalizeProbe(input);
+    if (!allowedOrigins.has(new URL(probe.request.url).origin)) {
+      throw new ApiRateLimitError("ORIGIN_NOT_ALLOWED", "Probe origin is not present in the Request Engine allowlist");
+    }
     assertPlainData(options, "options", new Set(["signal"]));
     validateSignal(options.signal);
     if (activeTesting !== true) {
