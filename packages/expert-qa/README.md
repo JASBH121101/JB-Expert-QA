@@ -113,3 +113,8 @@ The focused auditor checks SQL and Prisma schema/migration files plus source and
 ## Performance QA Engine Adapter
 
 The standalone package exports the canonical performance-specialist adapter from `@jb/expert-qa/performance-qa-adapter` and the root API. Use `registerPerformanceQaEngine(registry)` to add it to a QA engine registry. It measures large resource transfers, slow resources, image dimension reservation and large DOM trees using the existing Playwright specialist. The adapter uses public HTTP(S) targets, bounded execution and a sanitized report; it does not perform authenticated, interaction, screenshot, Lighthouse, field Core Web Vitals or load/stress testing. See [Performance QA Adapter](../../docs/PERFORMANCE-QA-ADAPTER.md).
+
+
+## Visual QA Engine Adapter
+
+The standalone package exports the canonical visual/layout adapter from `@jb/expert-qa/visual-qa-adapter` and the root API. Register it with `registerVisualQaEngine(registry)`. The adapter supports the canonical three-viewport or nine-viewport matrix and light/dark themes, with optional read-only PNG baseline comparison. Screenshots are temporary, baselines are never modified, and AI screenshot review is not invoked. The report is bounded and omits target, selector and artifact paths. See [Visual QA Adapter](../../docs/VISUAL-QA-ADAPTER.md).
