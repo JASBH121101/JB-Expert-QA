@@ -28,7 +28,7 @@ function cloneJson(value, label) {
       const keys = Reflect.ownKeys(current);
       for (const key of keys) {
         if (key === "length") continue;
-        if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) ||
+        if (typeof key !== "string" || !/^(0|[1-9]\d*)$/u.test(key) ||
             !Number.isSafeInteger(Number(key)) || Number(key) >= current.length) {
           throw new TypeError("arrays may contain indexed JSON values only");
         }
