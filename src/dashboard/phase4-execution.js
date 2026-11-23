@@ -1,4 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { basename, resolve } from "node:path";
+import { redactSensitiveText } from "../core/redaction.js";
+import { digestExecutionValue } from "../agent/execution-ledger.js";
 import {
   createQaEngineOrchestrator,
   getQaEngineActionType,
@@ -103,6 +106,52 @@ function normalizeLimits(value) {
   return Object.freeze(limits);
 }
 
+function safeUrlSummary(value) {
+  if (typeof value !== "string" || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return null;
+    return Object.freeze({
+      kind: "url",
+      origin: url.origin,
+      path: redactSensitiveText(url.pathname).slice(0, 180)
+    });
+  } catch {
+    return null;
+  }
+}
+
+function createReviewContext(engineId, input) {
+  const context = {
+    engineId,
+    inputFields: Object.keys(input).slice(0, 24).map((key) => key.replace(/[^a-z0-9._-]/gi, "-").slice(0, 64))
+  };
+  if (typeof input.operation === "string") {
+    context.operation = redactSensitiveText(input.operation).slice(0, 80);
+  }
+  if (typeof input.format === "string") {
+    context.format = redactSensitiveText(input.format).slice(0, 32);
+  }
+  if (typeof input.url === "string") {
+    context.target = safeUrlSummary(input.url);
+  } else if (typeof input.path === "string" && input.path.trim()) {
+    const absolutePath = resolve(input.path);
+    context.target = Object.freeze({
+      kind: "local-path",
+      name: basename(absolutePath).slice(0, 120),
+      pathDigest: createHash("sha256").update(absolutePath).digest("hex").slice(0, 16)
+    });
+  } else if (isPlainRecord(input.request) && typeof input.request.url === "string") {
+    context.target = safeUrlSummary(input.request.url);
+    if (typeof input.request.method === "string") {
+      context.requestMethod = input.request.method.toUpperCase().slice(0, 12);
+    }
+  }
+  if (Array.isArray(input.history)) context.historyRecordCount = input.history.length;
+  if (Array.isArray(input.engineDefinitions)) context.engineDefinitionCount = input.engineDefinitions.length;
+  return Object.freeze(context);
+}
+
 function normalizePolicy(value, engineByAction) {
   const policy = readRecord(value, "policy", new Set([
     "id", "grantedPermissions", "rules", "limits", "stopOnFailure"
@@ -196,10 +245,16 @@ export function createDashboardPhase4Execution({
     );
   }
   const normalizedPolicy = normalizePolicy(policy, engineByAction);
+  const reviewContextByDigest = new Map();
+  let executionActive = false;
+  const approvalProvider = async (request) => {
+    const reviewContext = reviewContextByDigest.get(request.inputDigest) ?? null;
+    return requestApproval(Object.freeze({ ...request, reviewContext }));
+  };
   const orchestratorOptions = {
     registry,
     policy: normalizedPolicy,
-    requestApproval,
+    requestApproval: approvalProvider,
     ...(ledger === undefined ? {} : { ledger }),
     ...(clock === undefined ? {} : { clock }),
     ...(idFactory === undefined ? {} : { idFactory })
@@ -230,6 +285,9 @@ export function createDashboardPhase4Execution({
       });
     },
     async executeEngine(engineId, input) {
+      if (executionActive) {
+        throw new DashboardPhase4ExecutionError("EXECUTION_IN_PROGRESS", "Another Dashboard Phase 4 execution is already in progress");
+      }
       if (typeof engineId !== "string" || !allowedIds.has(engineId)) {
         throw new DashboardPhase4ExecutionError("ENGINE_NOT_ALLOWLISTED", "Requested engine is not explicitly enabled by host policy");
       }
@@ -237,14 +295,22 @@ export function createDashboardPhase4Execution({
         throw new DashboardPhase4ExecutionError("INVALID_INPUT", "Engine input must be a plain JSON object");
       }
       const actionType = getQaEngineActionType(engineId);
-      return orchestrator.execute({
-        id: "dashboard-" + randomUUID(),
-        actions: [{
-          id: "engine-" + randomUUID(),
-          type: actionType,
-          input
-        }]
-      });
+      const inputDigest = digestExecutionValue(input);
+      reviewContextByDigest.set(inputDigest, createReviewContext(engineId, input));
+      executionActive = true;
+      try {
+        return await orchestrator.execute({
+          id: "dashboard-" + randomUUID(),
+          actions: [{
+            id: "engine-" + randomUUID(),
+            type: actionType,
+            input
+          }]
+        });
+      } finally {
+        reviewContextByDigest.delete(inputDigest);
+        executionActive = false;
+      }
     },
     verifyLedger: orchestrator.verifyLedger
   });
