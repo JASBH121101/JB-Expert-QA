@@ -48,8 +48,8 @@ Runs these repository-owned npm scripts sequentially:
 1. check — syntax validation and the root regression suite.
 2. test:package-distributions — independently installable package boundaries.
 3. test:engine-contracts — shared engine contract tests.
-4. test:threat-lab — safe Threat Lab integration tests.
-5. test:autonomous-execution — policy-bounded action authorization, approval gates, execution limits and audit ledger.
+4. test:autonomous-execution — policy-bounded action authorization, approval gates, execution limits and audit ledger.
+5. test:threat-lab — safe Threat Lab integration tests.
 
 ### full
 
