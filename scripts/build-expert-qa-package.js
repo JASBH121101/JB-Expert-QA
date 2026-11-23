@@ -52,6 +52,8 @@ const requiredFiles = [
   "src/specialists/accessibility/index.js",
   "src/ai/visual-review.js",
   "src/agent/autopilot.js",
+  "src/agent/autonomous-execution.js",
+  "src/agent/execution-ledger.js",
   "src/security-bridge/index.js",
   "packages/localization-engine/src/catalog.js",
   "packages/localization-engine/src/locale.js",
