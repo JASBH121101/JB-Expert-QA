@@ -51,7 +51,7 @@ function engine(handler, options = {}) {
 
 test("requires an existing Request Engine and an explicit active-testing switch", () => {
   assert.throws(() => createApiRateLimitTestingEngine(), /requestEngine/u);
-  assert.throws(() => createApiRateLimitTestingEngine({ requestEngine: {} }), /request\(\)/u);
+  assert.throws(() => createApiRateLimitTestingEngine({ requestEngine: {} }), /JB API Request Engine/u);
   const requestEngine = { engineId: "jb.api-testing-engine", allowedOrigins: ["https://api.example.test"], request: async () => response() };
   const disabled = createApiRateLimitTestingEngine({ requestEngine });
   assert.equal(disabled.activeTesting, false);
@@ -64,7 +64,7 @@ test("requires an existing Request Engine and an explicit active-testing switch"
 test("requires active-testing opt-in before sending any request", () => {
   let calls = 0;
   const subject = createApiRateLimitTestingEngine({
-    requestEngine: { request: async () => { calls += 1; return response(); } }
+    requestEngine: { engineId: "jb.api-testing-engine", allowedOrigins: ["https://api.example.test"], request: async () => { calls += 1; return response(); } }
   });
   assert.throws(
     () => subject.run(probe()),
