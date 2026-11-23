@@ -309,7 +309,7 @@ test("audit write latency cannot let a handler start after the total execution d
   const delayedLedger = {
     append: async (entry) => {
       if (entry.event === "action.started") {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 750));
       }
       return backing.append(entry);
     },
@@ -324,7 +324,7 @@ test("audit write latency cannot let a handler start after the total execution d
     policy: reportPolicy({
       limits: {
         maxActions: 5,
-        maxExecutionMs: 60,
+        maxExecutionMs: 500,
         maxActionMs: 1000,
         approvalTimeoutMs: 500,
         maxInputBytes: 4096,
