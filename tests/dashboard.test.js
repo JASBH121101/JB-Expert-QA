@@ -273,6 +273,6 @@ test("dashboard exposes consolidated analytics and downloads a scoped Markdown r
   assert.match(reportResponse.headers.get("content-disposition"), /attachment/);
   const report = await reportResponse.text();
   assert.match(report, /Consolidated QA Intelligence Report/);
-  assert.match(report, /Coverage here means/);
+  assert.match(report, /Engine coverage means/);
   assert.match(report, /not a third-party certification/i);
 });
