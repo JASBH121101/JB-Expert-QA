@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test",
     "test:watch": "node --test --watch",
-    "check": "node --check src/index.js && node --check src/specialists/dead-code-rules.js && node --check src/adapters/filesystem/audit-project.js && node --check packages/advisor-engine/src/index.js && node --test",
+    "check": "node --check src/index.js && node --check src/specialists/dead-code-rules.js && node --check src/adapters/filesystem/audit-project.js && node --check packages/advisor-engine/src/index.js && npm run test:api-testing && node --test",
     "example": "node examples/basic-audit.js",
     "audit": "node src/cli.js",
     "audit:project": "node src/project-cli.js",
@@ -39,7 +39,8 @@
     "benchmark:language-qa": "node bench/language-qa.js",
     "qa:local": "node scripts/local-certification.mjs --profile=core",
     "qa:local:full": "node scripts/local-certification.mjs --profile=full",
-    "test:dashboard": "node --test tests/dashboard.test.js tests/dashboard-analytics.test.js"
+    "test:dashboard": "node --test tests/dashboard.test.js tests/dashboard-analytics.test.js",
+    "test:api-testing": "npm --workspace @jb/api-testing-engine run check"
   },
   "dependencies": {
     "axe-core": "4.14.0",
@@ -60,6 +61,7 @@
     "packages/engine-contracts",
     "packages/localization-engine",
     "packages/currency-engine",
-    "packages/sccm"
+    "packages/sccm",
+    "packages/api-testing-engine"
   ]
 }
