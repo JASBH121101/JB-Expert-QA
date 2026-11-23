@@ -30,3 +30,7 @@ Cancellation is intentionally limited to queued jobs. Running execution cancella
 - Only queued jobs can be cancelled; only running jobs can complete/fail.
 - Terminal jobs can be removed to free retention capacity.
 - In-memory only; no workers, automatic execution, persistence, scheduler, HTTP API or paid services.
+
+## Persistence follow-up
+
+The base `createExecutionJobQueue()` remains in-memory by default. Phase 5 Block 4 adds the opt-in `createPersistentExecutionJobQueue({ filePath, ... })` wrapper, which preserves this lifecycle contract using a local durable JSON store and explicit interrupted-job recovery. See `PHASE5-BLOCK4-DURABLE-JOB-PERSISTENCE.md` for durability and recovery semantics.
