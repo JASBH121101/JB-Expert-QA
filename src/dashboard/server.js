@@ -4,6 +4,7 @@ import { chmod, lstat, mkdir, readFile, rename, writeFile } from "node:fs/promis
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAuditEngineRegistry } from "../audit-engines/index.js";
+import { buildDashboardAnalytics, buildConsolidatedReport } from "./analytics.js";
 
 export const DEFAULT_DASHBOARD_PORT = 4173;
 export const DEFAULT_DASHBOARD_HOST = "127.0.0.1";
@@ -308,6 +309,18 @@ export function createDashboardServer({
         const asset = await publicAsset(pathname);
         if (asset) { send(response, 200, asset.body, asset.type); return; }
         if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }
+        if (pathname === "/api/analytics") {
+          const history = await loadHistory(dataDir, maximumHistoryRecords);
+          json(response, 200, buildDashboardAnalytics(history, registry.list())); return;
+        }
+        if (pathname === "/api/reports/consolidated") {
+          const history = await loadHistory(dataDir, maximumHistoryRecords);
+          const report = buildConsolidatedReport(history, registry.list());
+          send(response, 200, report, "text/markdown; charset=utf-8", {
+            "Content-Disposition": "attachment; filename=\"jb-expert-qa-consolidated-report.md\""
+          });
+          return;
+        }
         if (pathname === "/api/history") {
           const history = await loadHistory(dataDir, maximumHistoryRecords);
           json(response, 200, { history: history.map(compactRecord), count: history.length }); return;
