@@ -80,6 +80,7 @@ const requiredFiles = [
   "src/agent/autopilot.js",
   "src/agent/autonomous-execution.js",
   "src/agent/execution-runtime.js",
+  "src/agent/execution-job-queue.js",
   "src/agent/execution-ledger.js",
   "src/security-bridge/index.js",
   "packages/localization-engine/src/catalog.js",

@@ -110,6 +110,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "createAutonomousExecutionEngine",
     "createAutonomousExecutionRuntime",
     "AutonomousExecutionRuntimeError",
+    "createExecutionJobQueue",
+    "ExecutionJobQueueError",
     "createInMemoryExecutionLedger",
     "createJsonlExecutionLedger",
     "verifyExecutionLedger",
@@ -124,6 +126,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   }
   assert.equal(typeof engine.createAutonomousExecutionRuntime, "function");
   assert.equal(typeof engine.AutonomousExecutionRuntimeError, "function");
+  assert.equal(typeof engine.createExecutionJobQueue, "function");
+  assert.equal(typeof engine.ExecutionJobQueueError, "function");
   assert.equal(typeof engine.auditUrl, "function");
   assert.equal(typeof engine.auditViewports, "function");
   assert.equal(typeof engine.createAuditEngineRegistry, "function");
