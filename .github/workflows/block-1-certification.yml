@@ -37,9 +37,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock
-      - name: Diagnostic root suite with spec reporter
-        run: npm run check -- --test-reporter=spec
-        continue-on-error: true
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
       - name: Runner unit tests
         run: node --test tests/local-certification.test.js
       - name: Core certification
