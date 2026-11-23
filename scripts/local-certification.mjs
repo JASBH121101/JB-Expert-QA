@@ -198,7 +198,7 @@ function npmInvocation(npmScript) {
 
 export function parseNodeTestSkips(output = "") {
   if (typeof output !== "string") throw new TypeError("output must be a string");
-  const matches = [...output.matchAll(/^# skipped (\\d+)\\s*$/gm)];
+  const matches = [...output.matchAll(/^# skipped (\d+)\s*$/gm)];
   return matches.reduce((total, match) => total + Number(match[1]), 0);
 }
 
