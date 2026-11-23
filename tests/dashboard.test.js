@@ -287,6 +287,8 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.equal(page.headers.get("x-frame-options"), "DENY");
   const pageHtml = await page.text();
   assert.match(pageHtml, /QA Control Center/);
+  assert.match(pageHtml, /Policy-gated engine runner/);
+  assert.match(pageHtml, /Request approved execution/);
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
 
