@@ -281,3 +281,17 @@ test("rejects validation-option getters without executing them", () => {
   assert.throws(() => compiled.validate(response(), options), /cannot contain accessors/u);
   assert.equal(getterCalled, false);
 });
+
+
+test("rejects array accessors in contract documents without executing them", () => {
+  const invalid = contract();
+  const required = invalid.operations[0].responses["200"].body.properties.data.required;
+  let getterCalled = false;
+  Object.defineProperty(required, "0", {
+    enumerable: true,
+    configurable: true,
+    get() { getterCalled = true; return "id"; }
+  });
+  assert.throws(() => engine.compile(invalid), /accessors/u);
+  assert.equal(getterCalled, false);
+});
