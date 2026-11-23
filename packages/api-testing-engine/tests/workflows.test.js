@@ -502,3 +502,30 @@ test("failed assertion steps cannot publish captures or response references to l
   assert.equal(calls.length, 1);
   assert.equal(JSON.stringify(report).includes("untrusted-token"), false);
 });
+
+
+test("response references are unavailable when their source step failed assertions", async () => {
+  let calls = 0;
+  const engine = createEngine(async () => {
+    calls += 1;
+    return response({ json: { data: { id: 7 } } });
+  });
+  const report = await engine.run(workflow([
+    {
+      id: "failed-source",
+      request: { method: "GET", url: "https://api.example.test/source" },
+      assertions: [{ type: "status", expected: 201 }]
+    },
+    {
+      id: "dependent-reference",
+      request: {
+        method: "POST",
+        url: "https://api.example.test/dependent",
+        json: { sourceId: { "$ref": "failed-source", path: "$.json.data.id" } }
+      }
+    }
+  ], { stopOnFailure: false }));
+  assert.equal(report.status, "failed");
+  assert.equal(report.results[1].error.code, "REFERENCE_UNAVAILABLE");
+  assert.equal(calls, 1);
+});
