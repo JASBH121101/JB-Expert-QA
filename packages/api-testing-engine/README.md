@@ -1,6 +1,6 @@
 # JB API Testing Engine
 
-Dependency-free API testing package for explicitly authorized HTTP and HTTPS targets. Phase 3 Blocks 1–3 provide bounded request execution, response assertions and versioned API contract validation. Security probes, request chaining and regression history remain separate follow-up blocks.
+Dependency-free API testing package for explicitly authorized HTTP and HTTPS targets. Phase 3 Blocks 1–6 provide bounded request execution, assertions, versioned API contracts, passive security checks, sequential workflows and deterministic regression comparison.
 
 ## Requirements
 
@@ -260,3 +260,60 @@ Run the complete API Testing Engine suite with:
 npm --workspace @jb/api-testing-engine run check
 npm run test:api-testing
 ~~~
+
+
+## Phase 3 — Block 6: API Regression Engine
+
+The regression engine compares an existing API Request Engine response with an explicitly captured, versioned baseline. It performs no network requests and does not overwrite baselines automatically.
+
+```js
+import {
+  createApiRequestEngine,
+  createApiRegressionEngine
+} from "@jb/api-testing-engine";
+
+const requests = createApiRequestEngine({
+  allowedOrigins: ["https://api.example.com"]
+});
+const regression = createApiRegressionEngine();
+
+const firstRun = await requests.request({
+  method: "GET",
+  url: "https://api.example.com/v1/users"
+});
+
+const baseline = regression.createBaseline(firstRun, {
+  baselineId: "users-api-production",
+  headerNames: ["content-type", "cache-control"],
+  ignoredJsonPaths: ["$.meta.requestId", "$.meta.generatedAt"],
+  valuePaths: ["$.data.total"]
+});
+
+// Persist the returned JSON baseline in the caller's approved storage.
+// Reuse it in later runs; updating a baseline is always an explicit action.
+
+const nextRun = await requests.request({
+  method: "GET",
+  url: "https://api.example.com/v1/users"
+});
+
+const report = regression.compare(baseline, nextRun, {
+  maxLatencyIncreaseMs: 500,
+  maxLatencyIncreasePercent: 100
+});
+
+console.log(report.status, report.failedCount, report.checks);
+```
+
+Baselines use the `jb.api-regression-baseline/v1` schema and are immutable. They contain a request identity digest, HTTP status, selected response-header fingerprints, JSON structure/type paths, optional selected-value SHA-256 fingerprints and response duration. Raw response bodies, selected JSON values, header values, URL query values and credentials are not copied into the baseline or report.
+
+By default, only `content-type` is selected for header comparison. Configure `headerNames` to add safe headers; credential-bearing headers such as Authorization, Cookie, Set-Cookie and token-like headers are rejected. `ignoredJsonPaths` excludes volatile JSON subtrees from structural comparison. `valuePaths` enables exact comparisons for selected stable fields without storing their values; sensitive paths such as passwords, tokens, email addresses and phone numbers are rejected.
+
+Latency checks are skipped unless `maxLatencyIncreaseMs` or `maxLatencyIncreasePercent` is explicitly configured. Exceeding either configured threshold is reported as a regression. The engine does not make a new baseline when a comparison fails, retry requests, or persist snapshots on the caller's behalf. Use `compile(baseline)` to validate and reuse a frozen baseline comparator.
+
+Run the complete API Testing Engine suite with:
+
+```sh
+npm --workspace @jb/api-testing-engine run check
+npm run test:api-testing
+```

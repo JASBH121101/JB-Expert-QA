@@ -320,3 +320,11 @@ export {
   ApiWorkflowError,
   createApiWorkflowTestingEngine
 } from "./workflows.js";
+
+export {
+  API_REGRESSION_BASELINE_SCHEMA,
+  API_REGRESSION_ENGINE_ID,
+  API_REGRESSION_ENGINE_VERSION,
+  ApiRegressionError,
+  createApiRegressionEngine
+} from "./regression.js";
