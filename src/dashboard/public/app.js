@@ -80,7 +80,50 @@ function updateSelectionUi() {
   $("selection-count").textContent = state.selected.size + " SELECTED";
   runButton.disabled = state.running || state.selected.size === 0;
 }
-function renderEngines() {
+function renderPhase4Engines() {
+  const grid = $("phase4-engine-grid");
+  if (!grid) return;
+  grid.replaceChildren();
+  $("phase4-engine-count").textContent = state.phase4Engines.length + " ENGINES";
+  if (!state.phase4Engines.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "No Phase 4 engines are connected to this dashboard instance.";
+    grid.append(empty);
+    return;
+  }
+  state.phase4Engines.forEach((engine) => {
+    const card = document.createElement("article");
+    card.className = "phase4-engine-card";
+    const heading = document.createElement("strong");
+    heading.textContent = engine.name;
+    const meta = document.createElement("small");
+    meta.textContent = engine.id + " · v" + engine.version + " · " + engine.category + " · " + engine.executionMode;
+    const description = document.createElement("p");
+    description.textContent = engine.description || "Registered trusted adapter.";
+    const capabilityList = document.createElement("div");
+    capabilityList.className = "phase4-capabilities";
+    engine.capabilities.forEach((capability) => {
+      const tag = document.createElement("span");
+      tag.className = "engine-tag";
+      tag.textContent = capability.replace(/-/g, " ");
+      capabilityList.append(tag);
+    });
+    const stateTag = document.createElement("span");
+    stateTag.className = "phase4-readonly-tag";
+    stateTag.textContent = "DISCOVERY ONLY · EXECUTION DISABLED";
+    card.append(heading, meta, description, capabilityList, stateTag);
+    grid.append(card);
+  });
+}
+async function refreshPhase4Engines() {
+  const response = await fetch("/api/phase4/engines");
+  if (!response.ok) throw new Error("Could not load the Phase 4 engine catalog.");
+  const data = await response.json();
+  state.phase4Engines = Array.isArray(data.engines) ? data.engines : [];
+  renderPhase4Engines();
+}
+\nfunction renderEngines() {
   engineGrid.replaceChildren();
   state.engines.forEach((engine) => {
     const label = document.createElement("label");
