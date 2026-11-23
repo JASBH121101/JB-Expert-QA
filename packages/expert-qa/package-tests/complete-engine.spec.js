@@ -51,6 +51,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "PERFORMANCE_QA_ADAPTER_VERSION",
     "PERFORMANCE_QA_ADAPTER_CAPABILITIES",
     "createVisualQaEngineAdapter",
+    "createDashboardPhase4Execution",
+    "DashboardPhase4ExecutionError",
     "registerVisualQaEngine",
     "VisualQaAdapterError",
     "VISUAL_QA_ADAPTER_ID",
@@ -385,4 +387,65 @@ test("standalone package exposes Report & Certification Engine without network o
   assert.equal(result.certification.assessment, "PASSED_WITHIN_RECORDED_SCOPE");
   assert.equal(result.certification.checkpoint.digestAlgorithm, "sha256");
   assert.equal(typeof result.artifact, "string");
+});
+
+ 
+test("standalone package exposes a fail-closed policy-gated Dashboard execution bridge", async () => {
+  const registry = engine.createQaEngineRegistry();
+  let runnerCalls = 0;
+  let approvalCalls = 0;
+  registry.register({
+    id: "jb.package.dashboard-echo",
+    name: "Package Dashboard Echo",
+    version: "1.0.0",
+    category: "testing",
+    targetType: "payload",
+    executionMode: "in-process",
+    capabilities: ["echo"],
+    run: async (input) => {
+      runnerCalls += 1;
+      return { echoed: input.value };
+    }
+  });
+  registry.seal();
+
+  const actionType = engine.getQaEngineActionType("jb.package.dashboard-echo");
+  const policy = {
+    id: "package-dashboard-execution-policy",
+    grantedPermissions: [engine.QA_ENGINE_EXECUTION_PERMISSION],
+    rules: [{ type: actionType, maxRisk: "high", requireApproval: true }],
+    limits: {
+      maxActions: 1,
+      maxExecutionMs: 5000,
+      maxActionMs: 3000,
+      approvalTimeoutMs: 2000,
+      maxInputBytes: 4096,
+      maxOutputBytes: 4096
+    }
+  };
+  assert.throws(
+    () => engine.createDashboardPhase4Execution({ registry, policy }),
+    (error) => error instanceof engine.DashboardPhase4ExecutionError &&
+      error.code === "APPROVAL_PROVIDER_REQUIRED"
+  );
+
+  const execution = engine.createDashboardPhase4Execution({
+    registry,
+    policy,
+    requestApproval: async (request) => {
+      approvalCalls += 1;
+      assert.equal(request.actionType, actionType);
+      assert.equal(request.risk, "high");
+      assert.equal(request.input, undefined);
+      return { approved: true, approvalId: "package-human-approval" };
+    }
+  });
+  assert.equal(execution.getStatus().enabled, true);
+  assert.deepEqual(execution.getStatus().allowedEngineIds, ["jb.package.dashboard-echo"]);
+  const result = await execution.executeEngine("jb.package.dashboard-echo", { value: "package-safe-input" });
+  assert.equal(result.status, "succeeded");
+  assert.deepEqual(result.actions[0].output, { echoed: "package-safe-input" });
+  assert.equal(runnerCalls, 1);
+  assert.equal(approvalCalls, 1);
+  assert.equal(execution.verifyLedger().then !== undefined, true);
 });
