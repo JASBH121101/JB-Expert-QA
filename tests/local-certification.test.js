@@ -56,8 +56,8 @@ test("repository exposes local commands without GitHub or Cloudflare API wiring"
 });
 
 test("TAP skip summaries are counted and prevent a full pass", () => {
-  assert.equal(parseNodeTestSkips("# tests 8\\n# pass 7\\n# fail 0\\n# skipped 1\\n"), 1);
-  assert.equal(parseNodeTestSkips("# tests 3\\n# skipped 0\\n"), 0);
+  assert.equal(parseNodeTestSkips("# tests 8\n# pass 7\n# fail 0\n# skipped 1\n"), 1);
+  assert.equal(parseNodeTestSkips("# tests 3\n# skipped 0\n"), 0);
   assert.equal(parseNodeTestSkips("no TAP summary"), 0);
   assert.throws(() => parseNodeTestSkips(null), /output must be a string/u);
 });
@@ -191,7 +191,7 @@ test("a successful command with skipped TAP tests is reported as PARTIAL", async
           status: "PASS",
           exitCode: 0,
           durationMs: 1,
-          outputTail: calls === 1 ? "# tests 9\\n# pass 8\\n# fail 0\\n# skipped 1\\n" : ""
+          outputTail: calls === 1 ? "# tests 9\n# pass 8\n# fail 0\n# skipped 1\n" : ""
         };
       }
     });
