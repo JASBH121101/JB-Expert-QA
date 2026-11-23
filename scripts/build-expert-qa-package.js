@@ -52,6 +52,7 @@ const requiredFiles = [
   "src/engine-registry/orchestrator.js",
   "packages/api-testing-engine/src/index.js",
   "src/dashboard/analytics.js",
+  "src/dashboard/phase4-catalog.js",
   "src/dashboard/server.js",
   "src/dashboard/phase4-execution.js",
   "src/dashboard-cli.js",
