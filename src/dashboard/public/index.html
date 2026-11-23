@@ -90,6 +90,26 @@
         </aside>
       </section>
 
+      <section class="panel intelligence-panel">
+        <div class="panel-heading intelligence-heading">
+          <div><p class="eyebrow">04 / INTELLIGENCE</p><h2>QA Intelligence &amp; Certification</h2><p class="section-subtitle">Portfolio-level trends across the latest saved engine and target snapshots.</p></div>
+          <div class="history-actions"><span id="analytics-assessment" class="assessment-tag">NOT ASSESSED</span><span id="analytics-coverage-label" class="history-count">NO HISTORY</span><button id="download-consolidated" class="secondary-button" type="button">Download consolidated report</button></div>
+        </div>
+        <div class="insight-metrics" aria-label="QA intelligence summary">
+          <article class="insight-metric"><span>AVERAGE CURRENT SCORE</span><strong id="analytics-score">—</strong><small>Latest snapshot per engine and target</small></article>
+          <article class="insight-metric"><span>CLEAN PASS RATE</span><strong id="analytics-pass-rate">—</strong><small>Snapshots with no recorded findings</small></article>
+          <article class="insight-metric"><span>ACTIVE FINDINGS</span><strong id="analytics-findings">0</strong><small>Latest saved snapshots</small></article>
+          <article class="insight-metric"><span>ENGINE COVERAGE</span><strong id="analytics-engines">0/0</strong><small>Engines used in retained history</small></article>
+        </div>
+        <div class="insight-grid">
+          <article class="insight-card"><div class="insight-card-heading"><h3>Active severity distribution</h3><span>Latest snapshots</span></div><div id="severity-breakdown" class="insight-bars"><p class="empty-insight">Loading severity data…</p></div></article>
+          <article class="insight-card"><div class="insight-card-heading"><h3>Engine coverage</h3><span>Audit history</span></div><div id="engine-coverage" class="coverage-list"><p class="empty-insight">Loading engine coverage…</p></div></article>
+          <article class="insight-card"><div class="insight-card-heading"><h3>Top recurring findings</h3><span>Severity-first ranking</span></div><div id="top-findings" class="top-finding-list"><p class="empty-insight">Loading findings…</p></div></article>
+        </div>
+        <article class="insight-card trend-card"><div class="insight-card-heading"><h3>Recent score trend</h3><span>Latest 12 saved runs</span></div><div id="score-trend" class="trend-list"><p class="empty-insight">Loading score trend…</p></div></article>
+        <p id="analytics-scope" class="insight-footnote">Analytics summarize the bounded local history. Scores from different engines and targets are not directly comparable.</p>
+      </section>
+
       <section class="panel history-panel">
         <div class="panel-heading history-heading">
           <div><p class="eyebrow">04 / EVIDENCE</p><h2>Audit history</h2><p class="section-subtitle">Compare repeat runs against the previous audit of the same engine and target.</p></div>
