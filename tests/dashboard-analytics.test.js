@@ -95,3 +95,19 @@ test("empty history produces a NOT_ASSESSED report, never a false pass", () => {
   assert.match(report, /No saved audit snapshot is available/);
   assert.match(report, /does not mean every engine audited the same target/);
 });
+
+test("findings whose detail was capped remain observations, not a clean pass", () => {
+  const history = [
+    record("run-1", "static", "A", "2026-11-23T01:00:00.000Z", {
+      outcome: "passed_with_observations",
+      findingsCount: 125,
+      findings: [],
+      findingsOmitted: 125
+    })
+  ];
+  const result = buildDashboardAnalytics(history, engines);
+  assert.equal(result.activeFindingCount, 125);
+  assert.equal(result.findingsNotClassified, 125);
+  assert.equal(result.assessment, "OBSERVATIONS");
+  assert.equal(result.cleanPassRate, 0);
+});
