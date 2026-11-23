@@ -130,7 +130,7 @@ test("validates required fields, nested types, enums, numeric bounds and additio
 
 test("reports missing required properties and does not echo response strings", () => {
   const compiled = engine.compile(contract());
-  const secretLikeValue = "private-user-token-value";
+  const secretLikeValue = "private-user-token-value-".repeat(5);
   const result = compiled.validate(response({ json: { data: { id: 42, name: secretLikeValue, roles: ["admin"] } } }), { operationId: "getUser" });
   assert.equal(result.passed, false);
   assert.ok(result.results.some((item) => item.code === "REQUIRED_PROPERTY"));
