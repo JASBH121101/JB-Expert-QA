@@ -447,5 +447,6 @@ test("standalone package exposes a fail-closed policy-gated Dashboard execution 
   assert.deepEqual(result.actions[0].output, { echoed: "package-safe-input" });
   assert.equal(runnerCalls, 1);
   assert.equal(approvalCalls, 1);
-  assert.equal(execution.verifyLedger().then !== undefined, true);
+  const integrity = await execution.verifyLedger();
+  assert.equal(integrity.valid, true);
 });
