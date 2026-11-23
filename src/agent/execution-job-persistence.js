@@ -70,7 +70,7 @@ function safeJson(value) {
       seen.add(current);
       for (const key of Reflect.ownKeys(current)) {
         if (key === "length") continue;
-        if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) ||
+        if (typeof key !== "string" || !/^(0|[1-9]\d*)$/u.test(key) ||
             !Number.isSafeInteger(Number(key)) || Number(key) >= current.length) {
           throw new TypeError("snapshot array contains unsupported properties");
         }
