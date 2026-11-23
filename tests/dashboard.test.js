@@ -5,7 +5,7 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
-import { createDashboardServer } from "../src/dashboard/server.js";
+import { createDashboardServer } from "../src/dashboard/server.js";\nimport { createQaEngineRegistry } from "../src/engine-registry/index.js";
 
 async function startTestDashboard(t, options = {}) {
   const storageDirectory = options.storageDirectory ??
@@ -61,6 +61,58 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   const data = await engines.json();
   assert.equal(data.engines.length, 7);
   assert.ok(data.engines.some((engine) => engine.id === "visual"));
+});
+
+test("Control Center exposes Phase 4 registry metadata without executing engines", async (t) => {
+  let runnerCalls = 0;
+  const phase4Registry = createQaEngineRegistry({
+    adapters: [{
+      id: "jb.visual-qa-engine",
+      name: "Visual QA Engine",
+      version: "1.0.0",
+      category: "visual",
+      targetType: "url",
+      executionMode: "browser",
+      capabilities: ["viewport-audit", "screenshot-capture"],
+      description: "Read-only visual observations",
+      run: async () => { runnerCalls += 1; return { passed: true }; }
+    }]
+  });
+  phase4Registry.seal();
+  const { origin } = await startTestDashboard(t, { phase4Registry });
+
+  const response = await fetch(origin + "/api/phase4/engines");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const data = await response.json();
+  assert.equal(data.executionEnabled, false);
+  assert.equal(data.approvalRequired, true);
+  assert.equal(data.engines.length, 1);
+  assert.deepEqual(data.engines[0], {
+    id: "jb.visual-qa-engine",
+    name: "Visual QA Engine",
+    version: "1.0.0",
+    category: "visual",
+    targetType: "url",
+    executionMode: "browser",
+    capabilities: ["viewport-audit", "screenshot-capture"],
+    description: "Read-only visual observations"
+  });
+  assert.equal(runnerCalls, 0);
+  const page = await fetch(origin + "/");
+  assert.match(await page.text(), /Autonomous engine catalog/);
+  const js = await fetch(origin + "/assets/app.js");
+  assert.match(await js.text(), /refreshPhase4Engines/);
+});
+
+test("Control Center Phase 4 catalog is empty by default and registry is optional", async (t) => {
+  const { origin } = await startTestDashboard(t);
+  const response = await fetch(origin + "/api/phase4/engines");
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.deepEqual(data.engines, []);
+  assert.equal(data.executionEnabled, false);
+  assert.equal(data.approvalRequired, true);
 });
 
 test("dashboard rejects untrusted host headers, cross-origin requests and malformed targets", async (t) => {
