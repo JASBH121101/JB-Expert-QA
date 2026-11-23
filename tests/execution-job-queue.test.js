@@ -141,12 +141,12 @@ test("retry delay defaults to exponential backoff and validates bounds", () => {
   queue.enqueue({ work: 1 }, { id: "backoff-job" });
   queue.claimNext();
   queue.fail("backoff-job", new Error("first failure"));
-  const retry = queue.retryFailed("backoff-job");
-  assert.equal(retry.nextAttemptAt, "2026-11-23T21:00:01.000Z");
   assert.throws(
     () => queue.retryFailed("backoff-job", { delayMs: 86400001 }),
-    (error) => error.code === "INVALID_TRANSITION"
+    (error) => error.code === "INVALID_RETRY_DELAY"
   );
+  const retry = queue.retryFailed("backoff-job");
+  assert.equal(retry.nextAttemptAt, "2026-11-23T21:00:01.000Z");
   current += 1000;
   assert.equal(queue.claimNext().attempts, 2);
 });
