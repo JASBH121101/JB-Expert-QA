@@ -90,6 +90,27 @@ function readRegistry(registry) {
   return byAction;
 }
 
+function readArray(value, label, maximum) {
+  if (!Array.isArray(value) || value.length > maximum) {
+    throw new DashboardPhase4ExecutionError("INVALID_ARRAY", label + " must be an array of at most " + maximum + " entries");
+  }
+  const values = [];
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === "length") continue;
+    if (typeof key !== "string" || !/^(0|[1-9]\\d*)$/u.test(key) || Number(key) >= value.length) {
+      throw new DashboardPhase4ExecutionError("INVALID_ARRAY", label + " contains an unsupported property");
+    }
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new DashboardPhase4ExecutionError("ACCESSOR_NOT_ALLOWED", label + " cannot contain holes or accessors");
+    }
+    values.push(descriptor.value);
+  }
+  return values;
+}
+
 function normalizeLimits(value) {
   const supplied = value === undefined ? Object.create(null) : readRecord(value, "policy.limits", new Set(Object.keys(DEFAULT_LIMITS)));
   const limits = Object.create(null);
@@ -159,28 +180,29 @@ function normalizePolicy(value, engineByAction) {
   if (typeof policy.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u.test(policy.id)) {
     throw new DashboardPhase4ExecutionError("INVALID_POLICY_ID", "An explicit valid policy.id is required");
   }
-  if (!Array.isArray(policy.grantedPermissions) ||
-      !policy.grantedPermissions.includes(QA_ENGINE_EXECUTION_PERMISSION) ||
-      policy.grantedPermissions.some((permission) => typeof permission !== "string")) {
+  const grantedPermissions = readArray(policy.grantedPermissions, "policy.grantedPermissions", 100);
+  if (!grantedPermissions.includes(QA_ENGINE_EXECUTION_PERMISSION) ||
+      grantedPermissions.some((permission) => typeof permission !== "string")) {
     throw new DashboardPhase4ExecutionError(
       "MISSING_EXECUTION_PERMISSION",
       "Policy must explicitly preauthorize qa:engine-execute"
     );
   }
-  if (new Set(policy.grantedPermissions).size !== policy.grantedPermissions.length) {
+  if (new Set(grantedPermissions).size !== grantedPermissions.length) {
     throw new DashboardPhase4ExecutionError("INVALID_PERMISSIONS", "Policy permissions must be unique");
   }
-  if (!Array.isArray(policy.rules) || policy.rules.length < 1 || policy.rules.length > engineByAction.size) {
+  const suppliedRules = readArray(policy.rules, "policy.rules", engineByAction.size);
+  if (suppliedRules.length < 1) {
     throw new DashboardPhase4ExecutionError(
       "INVALID_ALLOWLIST",
-      "Policy must contain at least one exact engine action rule and cannot exceed the registry size"
+      "Policy must contain at least one exact engine action rule"
     );
   }
 
   const seen = new Set();
   const rules = [];
-  for (let index = 0; index < policy.rules.length; index += 1) {
-    const rule = readRecord(policy.rules[index], "policy.rules[" + index + "]",
+  for (let index = 0; index < suppliedRules.length; index += 1) {
+    const rule = readRecord(suppliedRules[index], "policy.rules[" + index + "]",
       new Set(["type", "maxRisk", "scopes", "requireApproval"]));
     if (typeof rule.type !== "string" || !engineByAction.has(rule.type) || seen.has(rule.type)) {
       throw new DashboardPhase4ExecutionError(
@@ -197,7 +219,7 @@ function normalizePolicy(value, engineByAction) {
     if (rule.requireApproval === false) {
       throw new DashboardPhase4ExecutionError("APPROVAL_REQUIRED", "Engine approval cannot be disabled");
     }
-    if (rule.scopes !== undefined && (!Array.isArray(rule.scopes) || rule.scopes.length > 0)) {
+    if (rule.scopes !== undefined && (!Array.isArray(rule.scopes) || rule.scopes.length > 0 || Reflect.ownKeys(rule.scopes).some((key) => key !== "length"))) {
       throw new DashboardPhase4ExecutionError(
         "UNSUPPORTED_SCOPE",
         "This dashboard adapter does not support caller-defined scope resolvers; engine-specific validation remains mandatory"
@@ -217,7 +239,7 @@ function normalizePolicy(value, engineByAction) {
 
   return Object.freeze({
     id: policy.id,
-    grantedPermissions: Object.freeze([...policy.grantedPermissions]),
+    grantedPermissions: Object.freeze(grantedPermissions),
     rules: Object.freeze(rules),
     limits: normalizeLimits(policy.limits),
     stopOnFailure: policy.stopOnFailure !== false
@@ -229,14 +251,11 @@ function normalizePolicy(value, engineByAction) {
  * a sealed registry, an exact allowlist policy, qa:engine-execute permission,
  * and a real approval provider. No approval is synthesized by this module.
  */
-export function createDashboardPhase4Execution({
-  registry,
-  policy,
-  requestApproval,
-  ledger,
-  clock,
-  idFactory
-} = {}) {
+export function createDashboardPhase4Execution(options = {}) {
+  const config = readRecord(options, "options", new Set([
+    "registry", "policy", "requestApproval", "ledger", "clock", "idFactory"
+  ]));
+  const { registry, policy, requestApproval, ledger, clock, idFactory } = config;
   const engineByAction = readRegistry(registry);
   if (typeof requestApproval !== "function") {
     throw new DashboardPhase4ExecutionError(
@@ -291,12 +310,10 @@ export function createDashboardPhase4Execution({
       if (typeof engineId !== "string" || !allowedIds.has(engineId)) {
         throw new DashboardPhase4ExecutionError("ENGINE_NOT_ALLOWLISTED", "Requested engine is not explicitly enabled by host policy");
       }
-      if (!isPlainRecord(input)) {
-        throw new DashboardPhase4ExecutionError("INVALID_INPUT", "Engine input must be a plain JSON object");
-      }
+      const safeInput = readRecord(input, "engine input", null);
       const actionType = getQaEngineActionType(engineId);
-      const inputDigest = digestExecutionValue(input);
-      reviewContextByDigest.set(inputDigest, createReviewContext(engineId, input));
+      const inputDigest = digestExecutionValue(safeInput);
+      reviewContextByDigest.set(inputDigest, createReviewContext(engineId, safeInput));
       executionActive = true;
       try {
         return await orchestrator.execute({
@@ -304,7 +321,7 @@ export function createDashboardPhase4Execution({
           actions: [{
             id: "engine-" + randomUUID(),
             type: actionType,
-            input
+            input: safeInput
           }]
         });
       } finally {
