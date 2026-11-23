@@ -227,7 +227,8 @@ test("converts request failures to sanitized report codes and stops the sequence
   const report = await fake.subject.run(probe({ samples: 4 }));
   assert.equal(report.status, "failed");
   assert.equal(report.error.code, "NETWORK_ERROR");
-  assert.equal(report.sentRequests, 0);
+  assert.equal(report.sentRequests, 1);
+  assert.equal(report.completedResponses, 0);
   assert.equal(JSON.stringify(report).includes("very-secret-token"), false);
 });
 
@@ -243,6 +244,15 @@ test("rejects response header accessors without executing them", async () => {
   assert.equal(report.status, "failed");
   assert.equal(report.error.code, "INVALID_RESPONSE");
   assert.equal(called, false);
+});
+
+test("does not publish malformed Retry-After header values", async () => {
+  const fake = engine(async () => response(429, { "retry-after": "not-a-valid-delay" }));
+  const report = await fake.subject.run(probe());
+  assert.equal(report.status, "throttled");
+  assert.equal(report.summary.retryAfterSeconds, null);
+  assert.equal(report.checks.find((item) => item.id === "retry-after").status, "warning");
+  assert.equal(JSON.stringify(report).includes("not-a-valid-delay"), false);
 });
 
 test("accepts an HTTP-date Retry-After and reports only its normalized duration", async () => {
