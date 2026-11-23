@@ -108,6 +108,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "createRemediationPlan",
     "runAutopilot",
     "createAutonomousExecutionEngine",
+    "createAutonomousExecutionRuntime",
+    "AutonomousExecutionRuntimeError",
     "createInMemoryExecutionLedger",
     "createJsonlExecutionLedger",
     "verifyExecutionLedger",
@@ -120,6 +122,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   for (const name of required) {
     assert.ok(name in engine, "complete package export is missing: " + name);
   }
+  assert.equal(typeof engine.createAutonomousExecutionRuntime, "function");
+  assert.equal(typeof engine.AutonomousExecutionRuntimeError, "function");
   assert.equal(typeof engine.auditUrl, "function");
   assert.equal(typeof engine.auditViewports, "function");
   assert.equal(typeof engine.createAuditEngineRegistry, "function");
