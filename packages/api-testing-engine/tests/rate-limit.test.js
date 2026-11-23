@@ -32,6 +32,8 @@ function response(status = 200, headers = {}, extra = {}) {
 function engine(handler, options = {}) {
   let calls = 0;
   const requestEngine = {
+    engineId: "jb.api-testing-engine",
+    allowedOrigins: ["https://api.example.test"],
     async request(request, requestOptions) {
       calls += 1;
       return handler(request, requestOptions, calls);
@@ -50,7 +52,7 @@ function engine(handler, options = {}) {
 test("requires an existing Request Engine and an explicit active-testing switch", () => {
   assert.throws(() => createApiRateLimitTestingEngine(), /requestEngine/u);
   assert.throws(() => createApiRateLimitTestingEngine({ requestEngine: {} }), /request\(\)/u);
-  const requestEngine = { request: async () => response() };
+  const requestEngine = { engineId: "jb.api-testing-engine", allowedOrigins: ["https://api.example.test"], request: async () => response() };
   const disabled = createApiRateLimitTestingEngine({ requestEngine });
   assert.equal(disabled.activeTesting, false);
   assert.throws(
@@ -79,6 +81,17 @@ test("rejects unsupported schemas, fields, methods, unsafe URLs and credential q
   assert.throws(() => subject.run(probe({ request: { method: "GET", url: "https://user:pass@api.example.test/" } })), /credentials/u);
   assert.throws(() => subject.run(probe({ request: { method: "GET", url: "https://api.example.test/?access_token=secret" } })), /Credential-like query/u);
   assert.throws(() => subject.run(probe({ request: { method: "GET", url: "https://api.example.test/#fragment" } })), /fragments/u);
+});
+
+test("rejects probe origins absent from the Request Engine allowlist", () => {
+  const fake = engine(async () => response());
+  assert.throws(
+    () => fake.subject.run(probe({
+      request: { method: "GET", url: "https://unapproved.example.test/health" }
+    })),
+    (error) => error instanceof ApiRateLimitError && error.code === "ORIGIN_NOT_ALLOWED"
+  );
+  assert.equal(fake.calls, 0);
 });
 
 test("enforces bounded sample counts and intervals", async () => {
