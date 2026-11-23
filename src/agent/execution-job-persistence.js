@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { basename, dirname, resolve } from "node:path";
+import { hostname } from "node:os";
 import { createExecutionJobQueue } from "./execution-job-queue.js";
 
 const STORE_FORMAT = "jb-expert-qa.execution-job-store";
@@ -150,6 +151,55 @@ function readRegularFile(path) {
   }
 }
 
+function removeStaleLock(lockPath) {
+  let originalInfo;
+  let originalContent;
+  try {
+    originalInfo = lstatSync(lockPath);
+    if (originalInfo.isSymbolicLink() || !originalInfo.isFile() || originalInfo.size > 4096) return false;
+    originalContent = readFileSync(lockPath, "utf8");
+  } catch (error) {
+    return error?.code === "ENOENT";
+  }
+
+  let metadata;
+  try {
+    metadata = JSON.parse(originalContent);
+  } catch {
+    metadata = null;
+  }
+
+  let stale = false;
+  if (metadata && metadata.host === hostname() &&
+      Number.isSafeInteger(metadata.pid) && metadata.pid > 0) {
+    try {
+      process.kill(metadata.pid, 0);
+      stale = false;
+    } catch (error) {
+      stale = error?.code === "ESRCH";
+    }
+  } else if (metadata && typeof metadata.host === "string" && metadata.host !== hostname()) {
+    return false;
+  } else {
+    // Recover only old incomplete lock files; allow time for lock creation to finish.
+    stale = Date.now() - originalInfo.mtimeMs > 60_000;
+  }
+
+  if (!stale) return false;
+  try {
+    const currentInfo = lstatSync(lockPath);
+    if (currentInfo.isSymbolicLink() || currentInfo.dev !== originalInfo.dev ||
+        currentInfo.ino !== originalInfo.ino ||
+        readFileSync(lockPath, "utf8") !== originalContent) {
+      return false;
+    }
+    unlinkSync(lockPath);
+    return true;
+  } catch (error) {
+    return error?.code === "ENOENT";
+  }
+}
+
 /**
  * Creates a single-process, local JSON store with an exclusive lock,
  * SHA-256 integrity envelope, atomic same-directory replacement and fsync.
@@ -166,7 +216,7 @@ export function createJsonFileExecutionJobStore(options = {}) {
   const directory = dirname(filePath);
   const lockPath = filePath + ".lock";
   const lockToken = randomUUID();
-  const lockContent = JSON.stringify({ pid: process.pid, token: lockToken, createdAt: new Date().toISOString() });
+  const lockContent = JSON.stringify({ pid: process.pid, host: hostname(), token: lockToken, createdAt: new Date().toISOString() });
   let lockDescriptor;
   let closed = false;
 
@@ -175,10 +225,14 @@ export function createJsonFileExecutionJobStore(options = {}) {
     try {
       lockDescriptor = openSync(lockPath, "wx", 0o600);
     } catch (error) {
-      if (error?.code === "EEXIST") {
+      if (error?.code !== "EEXIST" || !removeStaleLock(lockPath)) {
         throw new ExecutionJobStoreError("STORE_LOCKED", "another process already owns this job store");
       }
-      throw error;
+      try {
+        lockDescriptor = openSync(lockPath, "wx", 0o600);
+      } catch {
+        throw new ExecutionJobStoreError("STORE_LOCKED", "another process acquired this job store lock");
+      }
     }
     writeFileSync(lockDescriptor, lockContent, "utf8");
     fsyncSync(lockDescriptor);
