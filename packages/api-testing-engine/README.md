@@ -317,3 +317,53 @@ Run the complete API Testing Engine suite with:
 npm --workspace @jb/api-testing-engine run check
 npm run test:api-testing
 ```
+
+
+## Phase 3 — Block 7: Bounded API Rate-Limit Testing Engine
+
+The rate-limit engine performs a small, sequential, read-only observation against a single endpoint through an existing API Request Engine. It does not discover endpoints, bypass rate limits, run concurrent traffic, mutate remote resources, or perform stress/load testing.
+
+```js
+import {
+  createApiRequestEngine,
+  createApiRateLimitTestingEngine
+} from "@jb/api-testing-engine";
+
+const requests = createApiRequestEngine({
+  allowedOrigins: ["https://api.example.com"]
+});
+
+// Active probes are disabled unless explicitly authorized by the caller.
+const rateLimits = createApiRateLimitTestingEngine({
+  requestEngine: requests,
+  activeTesting: true
+});
+
+const report = await rateLimits.run({
+  schema: "jb.api-rate-limit-test/v1",
+  probeId: "health-read",
+  version: "1.0.0",
+  request: {
+    method: "GET",
+    url: "https://api.example.com/health"
+  },
+  samples: 3,
+  intervalMs: 1000,
+  stopOnThrottle: true
+});
+
+console.log(report.status, report.signals, report.summary);
+```
+
+Every probe must pass two explicit gates: the Request Engine must allowlist the target origin, and the caller must set `activeTesting: true`. Only GET, HEAD and OPTIONS are accepted. A probe is limited to 2–20 sequential requests, with a pacing interval of 100–10,000 ms. The default is three requests, one second apart. The engine stops on HTTP 429 or an explicit zero remaining-quota signal by default. It never retries automatically.
+
+The report normalizes standard and common vendor rate-limit headers, including remaining quota, limit, reset and `Retry-After`. Numeric Retry-After values and HTTP dates are converted to seconds. Raw response headers, credentials, response bodies, query values and endpoint paths are not copied into reports. Cancellation is propagated through AbortSignal and network failures are represented by sanitized error codes.
+
+This is an observation tool, not a load generator or a guarantee that an API's rate-limit policy is correct. Run probes only against endpoints and environments you are authorized to test. Package tests use fake Request Engine responses and do not send traffic to production APIs.
+
+Run the complete API Testing Engine suite with:
+
+```sh
+npm --workspace @jb/api-testing-engine run check
+npm run test:api-testing
+```
