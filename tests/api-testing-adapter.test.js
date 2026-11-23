@@ -244,7 +244,7 @@ test("explicit rate-limit opt-in stays sequential and uses only the configured t
 
 test("rejects unknown operations, fields, missing inputs and accessor-backed commands", async () => {
   const adapter = createApiTestingEngineAdapter(adapterOptions());
-  await assert.rejects(adapter.run({ operation: "shell", command: "echo unsafe" }), (e) => e.code === "UNSUPPORTED_OPERATION");
+  await assert.rejects(adapter.run({ operation: "shell" }), (e) => e.code === "UNSUPPORTED_OPERATION");
   await assert.rejects(adapter.run({ operation: "request", request: {}, unexpected: true }), (e) => e.code === "UNSUPPORTED_FIELD");
   await assert.rejects(adapter.run({ operation: "request" }), (e) => e.code === "MISSING_FIELD");
   const input = { operation: "request", request: {} };

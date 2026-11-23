@@ -31,6 +31,16 @@ const OPERATION_FIELDS = Object.freeze({
   "regression-compare": Object.freeze(["operation", "baseline", "response", "compareOptions"]),
   "rate-limit": Object.freeze(["operation", "probe"])
 });
+const REQUIRED_OPERATION_FIELDS = Object.freeze({
+  request: Object.freeze(["operation", "request"]),
+  assertions: Object.freeze(["operation", "response", "assertions"]),
+  contract: Object.freeze(["operation", "contract", "response"]),
+  security: Object.freeze(["operation", "response"]),
+  workflow: Object.freeze(["operation", "workflow"]),
+  "regression-baseline": Object.freeze(["operation", "response"]),
+  "regression-compare": Object.freeze(["operation", "baseline", "response"]),
+  "rate-limit": Object.freeze(["operation", "probe"])
+});
 
 export const API_TESTING_ADAPTER_ID = ADAPTER_ID;
 export const API_TESTING_ADAPTER_VERSION = ADAPTER_VERSION;
@@ -77,7 +87,7 @@ function validateCommand(input) {
       throw new ApiTestingAdapterError("UNSUPPORTED_FIELD", "command contains a field not supported by operation " + command.operation);
     }
   }
-  for (const key of OPERATION_FIELDS[command.operation]) {
+  for (const key of REQUIRED_OPERATION_FIELDS[command.operation]) {
     if (key !== "operation" && !Object.hasOwn(command, key)) {
       throw new ApiTestingAdapterError("MISSING_FIELD", "command." + key + " is required for operation " + command.operation);
     }
