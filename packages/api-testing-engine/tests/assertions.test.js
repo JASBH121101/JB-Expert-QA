@@ -60,7 +60,8 @@ test("supports JSON array indexing and comparison operators", () => {
     { type: "json", path: "$.data.items[1]", expected: 4 },
     { type: "number", path: "$.data.items[2]", operator: "between", expected: [5, 7] },
     { type: "json", path: "$.message", operator: "startsWith", expected: "cre" },
-    { type: "json", path: "$.message", operator: "endsWith", expected: "ed" }
+    { type: "json", path: "$.message", operator: "endsWith", expected: "ed" },
+    { type: "regex", path: "$.message", pattern: "created$", flags: "" }
   ]);
   assert.equal(result.passed, true);
 });
@@ -82,6 +83,13 @@ test("validates assertion input, paths, regex flags and operators", () => {
   assert.throws(() => engine.evaluate(response, [{ type: "json", path: "$[x]", expected: "x" }]), /numeric array indexes/u);
   assert.throws(() => engine.evaluate(response, [{ type: "regex", pattern: "(", flags: "" }]), /Invalid regular expression/u);
   assert.throws(() => engine.evaluate(response, [{ type: "regex", pattern: "x", flags: "g" }]), /flags/u);
+  assert.throws(() => engine.evaluate(response, [{ type: "regex", pattern: "x" }]), /JSON path/u);
+  assert.throws(() => engine.evaluate(response, [{ type: "contains", target: "invalid", expected: "x" }]), /target must be json or text/u);
+  assert.throws(() => engine.evaluate(response, [{ type: "text", operator: "matches", expected: "x" }]), /operator is unsupported/u);
+  assert.throws(() => engine.evaluate(response, [{ type: "status", expected: 200, extra: true }]), /unsupported field/u);
+  const accessor = { type: "status", expected: 200 };
+  Object.defineProperty(accessor, "expected", { get() { throw new Error("must not execute"); } });
+  assert.throws(() => engine.evaluate(response, [accessor]), /cannot contain accessors/u);
   assert.throws(() => engine.evaluate(response, [{ type: "status", expected: 99 }]), /HTTP status/u);
   assert.throws(() => engine.evaluate(response, [{ type: "number", path: "$.data.user.id", operator: "between", expected: [4, 2] }]), /ordered numeric pair/u);
 });
