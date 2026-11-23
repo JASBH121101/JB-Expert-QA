@@ -1,6 +1,6 @@
 # JB API Testing Engine
 
-Dependency-free API request engine for explicitly authorized HTTP and HTTPS targets. This is Phase 3, Block 1: request execution only. Assertions, OpenAPI contract validation, security probes, request chaining and regression history are separate follow-up blocks.
+Dependency-free API testing package for explicitly authorized HTTP and HTTPS targets. Phase 3 Blocks 1–3 provide bounded request execution, response assertions and versioned API contract validation. Security probes, request chaining and regression history remain separate follow-up blocks.
 
 ## Requirements
 
@@ -76,3 +76,73 @@ console.log(report.passed, report.passRate, report.results);
 Supported assertion types: `status`, `statusRange`, `header`, `json`, `text`, `contains`, `type`, `exists`, `number`, `arrayLength`, and `regex`. JSON paths support safe object properties and numeric array indexes (for example `$.data.items[0]`). No eval or dynamic code execution is used. Assertions are capped at 1000 per evaluation. Use `stopOnFailure: true` to short-circuit.
 
 Reports include individual PASS/FAIL results, actual/expected values, counts, pass rate, and a global verdict. Contract/schema validation and security probes remain separate future blocks.
+
+
+## Phase 3 — Block 3: API Contract Testing Engine
+
+The contract engine compiles a local, versioned jb.api-contract/v1 document and validates an existing Request Engine response. It does not make network requests, fetch remote schemas or execute dynamic code.
+
+~~~js
+import {
+  createApiRequestEngine,
+  createApiContractTestingEngine
+} from "@jb/api-testing-engine";
+
+const api = createApiRequestEngine({
+  allowedOrigins: ["https://api.example.com"]
+});
+const response = await api.request({
+  method: "GET",
+  url: "https://api.example.com/v1/users/42"
+});
+
+const contracts = createApiContractTestingEngine();
+const compiled = contracts.compile({
+  schema: "jb.api-contract/v1",
+  contractId: "users-api",
+  version: "1.0.0",
+  operations: [{
+    operationId: "getUser",
+    method: "GET",
+    path: "/v1/users/{userId}",
+    responses: {
+      "200": {
+        headers: {
+          "content-type": { contains: "application/json" }
+        },
+        body: {
+          type: "object",
+          required: ["data"],
+          additionalProperties: false,
+          properties: {
+            data: {
+              type: "object",
+              required: ["id", "name"],
+              properties: {
+                id: { type: "integer", minimum: 1 },
+                name: { type: "string", minLength: 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }]
+});
+
+const report = compiled.validate(response, { operationId: "getUser" });
+console.log(report.passed, report.passRate, report.results);
+~~~
+
+A contract declares unique operations by operationId, uppercase HTTP method, path template and status-specific response cases (or default). Each response case may define header rules and a JSON body schema.
+
+The supported JSON schema subset includes type, required, properties, additionalProperties, items, enum, const, string length limits, numeric bounds, array length limits and object property-count limits. Remote references, regex patterns, unknown keywords and unknown contract fields are rejected rather than ignored. Schema depth and node count, contract operations, response cases and result counts are bounded.
+
+Reports include method/path checks, declared-status checks, header checks and body-schema failures with stable error codes. Response string values are summarized rather than copied into the report. Compile once and reuse the compiled contract for multiple responses.
+
+Run the contract and request test suite with:
+
+~~~sh
+npm --workspace @jb/api-testing-engine run check
+npm run test:api-testing
+~~~
