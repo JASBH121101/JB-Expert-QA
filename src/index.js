@@ -144,3 +144,13 @@ export {
   VISUAL_QA_ADAPTER_CAPABILITIES,
   VISUAL_QA_LIMITS
 } from "./engine-registry/adapters/visual-qa.js";
+
+export {
+  createReportCertificationEngineAdapter,
+  registerReportCertificationEngine,
+  ReportCertificationAdapterError,
+  REPORT_CERTIFICATION_ADAPTER_ID,
+  REPORT_CERTIFICATION_ADAPTER_VERSION,
+  REPORT_CERTIFICATION_ADAPTER_CAPABILITIES,
+  REPORT_CERTIFICATION_LIMITS
+} from "./engine-registry/adapters/report-certification.js";
