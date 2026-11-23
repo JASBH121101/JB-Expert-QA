@@ -22,7 +22,7 @@ A registered handler declares:
 - an optional scope resolver for path-scoped actions;
 - an optional per-action timeout.
 
-Policy must explicitly allow the action type and preauthorize every required permission. A scope resolver requires policy scope patterns. Patterns are exact relative paths or directory prefixes such as `reports/**`; absolute paths and traversal segments are rejected.
+Policy must explicitly allow the action type and preauthorize every required permission. A scope resolver requires policy scope patterns. Patterns are exact relative paths or directory prefixes such as `reports/**`; absolute paths and traversal segments are rejected. A registered `getScope` resolver must return the exact resource the handler will act on; handlers must independently enforce that same resource and must not use alternate unvalidated target fields.
 
 Medium- and high-risk actions always require an external approval callback. A policy rule may also require approval for a low-risk action. The approval callback receives only action metadata, the scope, and an input digest rather than the raw input. It must return `{ approved: true, approvalId: "..." }`. Approval cannot grant missing permissions or enable an action type excluded by policy.
 
@@ -60,7 +60,7 @@ const ledger = await createJsonlExecutionLedger(
 
 Ledger entries include event type, execution/action IDs, policy ID, risk, approval receipt, status, duration, and SHA-256 digests of inputs, outputs and resource scopes. Raw input/output payloads and raw scope paths are not copied into ledger records. A hash chain detects accidental edits, truncation and reordering; it is not an immutable remote store or a defense against an attacker who can rewrite the entire file.
 
-A JSONL ledger is single-writer and has a configurable record cap. Keep its directory protected by OS permissions, do not share one file between concurrent processes, and archive/rotate it deliberately before reaching the cap. Close it after use.
+A JSONL ledger is single-writer and has a configurable record cap. Use one engine instance and one process per ledger file; do not share the same JSONL file across concurrently writing processes. Keep its directory protected by OS permissions, do not share one file between concurrent processes, and archive/rotate it deliberately before reaching the cap. Close it after use.
 
 ## Example
 
