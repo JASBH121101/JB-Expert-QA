@@ -280,7 +280,7 @@ export function createDashboardServer({
   storageDirectory = resolve(process.cwd(), ".jb-expert-qa", "dashboard"),
   maximumHistoryRecords = DEFAULT_DASHBOARD_HISTORY_LIMIT,
   maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
-  phase4Registry = null
+  phase4Registry = createDashboardPhase4Catalog()
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
