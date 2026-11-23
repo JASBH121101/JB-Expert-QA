@@ -366,7 +366,7 @@ test("production-only security assessment excludes standalone package test fixtu
     await writeFile(join(packageTests, "complete-engine.spec.js"), [
       'const endpoint = "http://api.production.example.com/v1";',
       'const GITHUB_TOKEN = "ghp_' + "A".repeat(36) + '";'
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(join(root, "src", "app.js"),
       'const endpoint = "http://api.application.example.com/v1";');
 
