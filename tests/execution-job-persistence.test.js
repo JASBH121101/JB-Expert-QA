@@ -311,14 +311,19 @@ test("persistent queue preserves a delayed manual retry across restart", async (
 
     const reopened = createPersistentExecutionJobQueue({
       filePath,
-      maxAttempts: 2,
       now: () => new Date(current).toISOString()
     });
+    assert.equal(reopened.getJob("persisted-retry").maxAttempts, 2);
     assert.equal(reopened.getJob("persisted-retry").state, "queued");
     assert.equal(reopened.getJob("persisted-retry").nextAttemptAt, "2026-11-23T21:00:10.000Z");
     assert.equal(reopened.claimNext(), null);
     current += 10000;
     assert.equal(reopened.claimNext().attempts, 2);
+    reopened.fail("persisted-retry", "second failure");
+    assert.throws(
+      () => reopened.retryFailed("persisted-retry"),
+      (error) => error.code === "ATTEMPT_LIMIT_REACHED"
+    );
     reopened.close();
   });
 });
