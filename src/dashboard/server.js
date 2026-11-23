@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createAuditEngineRegistry } from "../audit-engines/index.js";
 import { buildDashboardAnalytics, buildConsolidatedReport } from "./analytics.js";
 import { createDashboardPhase4Catalog } from "./phase4-catalog.js";
+import { isDashboardPhase4ExecutionBoundTo } from "./phase4-execution.js";
 
 export const DEFAULT_DASHBOARD_PORT = 4173;
 export const DEFAULT_DASHBOARD_HOST = "127.0.0.1";
@@ -257,10 +258,10 @@ function validateHost(request, port) {
 function sameOrigin(request) {
   return typeof request.headers.origin === "string" && request.headers.origin === "http://" + request.headers.host;
 }
-function rateAllowed(requests) {
+function rateAllowed(requests, limit = 15) {
   const now = Date.now();
   while (requests.length && now - requests[0] > 60_000) requests.shift();
-  if (requests.length >= 15) return false;
+  if (requests.length >= limit) return false;
   requests.push(now);
   return true;
 }
@@ -280,7 +281,8 @@ export function createDashboardServer({
   storageDirectory = resolve(process.cwd(), ".jb-expert-qa", "dashboard"),
   maximumHistoryRecords = DEFAULT_DASHBOARD_HISTORY_LIMIT,
   maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
-  phase4Registry = createDashboardPhase4Catalog()
+  phase4Registry = createDashboardPhase4Catalog(),
+  phase4Execution = null
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
@@ -377,6 +379,47 @@ export function createDashboardServer({
         fail(response, 404, "not_found", "Route not found"); return;
       }
 
+      if (request.method === "POST" && pathname === "/api/phase4/execute") {
+        if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
+        if (!phase4Execution) { fail(response, 503, "phase4_execution_disabled", "Phase 4 execution is disabled until the host supplies an explicit policy and external approval provider"); return; }
+        if (!rateAllowed(phase4ExecutionRateWindow, 5)) { fail(response, 429, "phase4_rate_limited", "The Phase 4 execution request limit was reached"); return; }
+        if (busy) { fail(response, 409, "audit_in_progress", "Another QA operation is already running"); return; }
+        const body = await readBody(request, maximumBodyBytes);
+        if (Object.keys(body).some((key) => !["engineId", "input"].includes(key)) ||
+            !Object.hasOwn(body, "engineId") || !Object.hasOwn(body, "input") ||
+            typeof body.engineId !== "string" || body.engineId.length > 128 || !isRecord(body.input)) {
+          fail(response, 400, "invalid_execution_request", "Request must contain only an engineId and a JSON object input"); return;
+        }
+        const engine = phase4Execution.listAllowedEngines().find((item) => item.id === body.engineId);
+        if (!engine) { fail(response, 403, "engine_not_allowlisted", "The requested engine is not enabled by the host policy"); return; }
+        busy = true;
+        try {
+          const result = await phase4Execution.executeEngine(body.engineId, body.input);
+          const ledgerVerification = await phase4Execution.verifyLedger();
+          const actions = Array.isArray(result.actions) ? result.actions.map((action) => ({
+            id: cleanText(action.id, 100),
+            type: cleanText(action.type, 160),
+            status: cleanText(action.status, 24),
+            reason: cleanText(action.reason, 360),
+            durationMs: Number.isFinite(action.durationMs) ? Math.max(0, action.durationMs) : null,
+            ...(Object.hasOwn(action, "output") ? { output: action.output } : {})
+          })) : [];
+          json(response, 200, {
+            executionId: cleanText(result.executionId, 100),
+            planId: cleanText(result.planId, 100),
+            status: cleanText(result.status, 24),
+            durationMs: Number.isFinite(result.durationMs) ? Math.max(0, result.durationMs) : null,
+            actions,
+            ledgerIntegrity: ledgerVerification?.valid === true
+          });
+        } catch {
+          fail(response, 422, "phase4_execution_failed", "Policy-gated engine execution failed or was rejected; inspect the host-side approval and audit records");
+        } finally {
+          busy = false;
+        }
+        return;
+      }
+
       if (request.method === "POST" && pathname === "/api/runs") {
         if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
         if (!rateAllowed(rateWindow)) { fail(response, 429, "rate_limited", "The local dashboard run limit was reached"); return; }
@@ -432,15 +475,15 @@ export function createDashboardServer({
   });
 
   server.headersTimeout = 10_000;
-  server.requestTimeout = 30_000;
+  server.requestTimeout = 130_000;
   server.keepAliveTimeout = 5_000;
   server.maxHeadersCount = 50;
   return server;
 }
 
-export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry } = {}) {
+export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry, phase4Execution } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new TypeError("port must be an integer between 0 and 65535");
-  const server = createDashboardServer({ storageDirectory, registry, phase4Registry });
+  const server = createDashboardServer({ storageDirectory, registry, phase4Registry, phase4Execution });
   await new Promise((resolveListen, rejectListen) => {
     const onError = (error) => { server.off("listening", onListening); rejectListen(error); };
     const onListening = () => { server.off("error", onError); resolveListen(); };
