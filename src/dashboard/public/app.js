@@ -3,6 +3,7 @@ const state = {
   selected: new Set(["live-site"]),
   targetMode: "website",
   history: [],
+  analytics: null,
   running: false,
   activity: [],
   toastTimer: null
@@ -254,6 +255,146 @@ function renderHistory() {
   });
   renderMetrics();
 }
+
+function appendInsightBar(container, labelText, count, maximum, severityName) {
+  const row = document.createElement("div");
+  row.className = "insight-bar-row";
+  const label = document.createElement("span");
+  label.className = "insight-bar-label";
+  label.textContent = labelText;
+  const track = document.createElement("span");
+  track.className = "insight-bar-track";
+  const fill = document.createElement("span");
+  fill.className = "insight-bar-fill severity-" + severityName;
+  fill.style.width = (maximum > 0 ? Math.max(count > 0 ? 2 : 0, count / maximum * 100) : 0) + "%";
+  track.append(fill);
+  const value = document.createElement("strong");
+  value.textContent = String(count);
+  row.append(label, track, value);
+  container.append(row);
+}
+function renderAnalytics(data) {
+  state.analytics = data;
+  $("analytics-score").textContent = Number.isFinite(data.averageCurrentScore) ? data.averageCurrentScore + "/100" : "—";
+  $("analytics-pass-rate").textContent = Number.isFinite(data.cleanPassRate) ? data.cleanPassRate + "%" : "—";
+  $("analytics-findings").textContent = String(data.activeFindingCount ?? 0);
+  $("analytics-engines").textContent = (data.usedEngineCount ?? 0) + "/" + (data.availableEngineCount ?? 0);
+  $("analytics-coverage-label").textContent = (data.currentSnapshotCount ?? 0) + " CURRENT SNAPSHOTS";
+
+  const severityContainer = $("severity-breakdown");
+  severityContainer.replaceChildren();
+  const severityOrder = ["critical", "high", "medium", "low", "info", "other"];
+  const severityCounts = data.severityCounts || {};
+  const maxSeverity = Math.max(0, ...severityOrder.map((key) => Number(severityCounts[key] || 0)));
+  if (!maxSeverity) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = data.currentSnapshotCount ? "No findings in the latest saved snapshots." : "No audit snapshots yet.";
+    severityContainer.append(empty);
+  } else {
+    severityOrder.forEach((key) => appendInsightBar(severityContainer, key.toUpperCase(),
+      Number(severityCounts[key] || 0), maxSeverity, key));
+  }
+
+  const coverageContainer = $("engine-coverage");
+  coverageContainer.replaceChildren();
+  const engineRows = data.engineCoverage || [];
+  const maxRuns = Math.max(1, ...engineRows.map((engine) => engine.auditCount));
+  engineRows.forEach((engine) => {
+    const row = document.createElement("div");
+    row.className = "coverage-row";
+    const header = document.createElement("div");
+    header.className = "coverage-row-head";
+    const name = document.createElement("strong");
+    name.textContent = engine.engineName;
+    const status = document.createElement("span");
+    status.className = "coverage-status " + (engine.latestOutcome ? outcomeClass(engine.latestOutcome) : "");
+    status.textContent = engine.latestOutcome ? outcomeText(engine.latestOutcome) : "NOT RUN";
+    header.append(name, status);
+    const track = document.createElement("span");
+    track.className = "coverage-track";
+    const fill = document.createElement("span");
+    fill.className = "coverage-fill";
+    fill.style.width = (engine.auditCount / maxRuns * 100) + "%";
+    track.append(fill);
+    const detail = document.createElement("small");
+    detail.textContent = engine.auditCount + " run(s) · " + engine.currentTargetCount +
+      " current target(s) · " + engine.activeFindings + " active finding(s)" +
+      (Number.isFinite(engine.averageScore) ? " · avg " + engine.averageScore + "/100" : "");
+    row.append(header, track, detail);
+    coverageContainer.append(row);
+  });
+  if (!engineRows.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "No registered engines were supplied.";
+    coverageContainer.append(empty);
+  }
+
+  const trendContainer = $("score-trend");
+  trendContainer.replaceChildren();
+  const trend = data.scoreTrend || [];
+  trend.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "trend-row";
+    const label = document.createElement("span");
+    label.className = "trend-label";
+    label.textContent = item.engineName + " · " + item.targetLabel + " · " + formatDate(item.createdAt);
+    const track = document.createElement("span");
+    track.className = "trend-track";
+    const fill = document.createElement("span");
+    fill.className = "trend-fill";
+    fill.style.width = (Number.isFinite(item.score) ? Math.max(0, Math.min(100, item.score)) : 0) + "%";
+    track.append(fill);
+    const score = document.createElement("strong");
+    score.textContent = Number.isFinite(item.score) ? item.score + "/100" : "—";
+    row.append(label, track, score);
+    trendContainer.append(row);
+  });
+  if (!trend.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "Run audits to build a score trend.";
+    trendContainer.append(empty);
+  }
+
+  const posture = {
+    NOT_ASSESSED: "No audit data available.",
+    NOT_PASSED: "At least one latest snapshot did not pass.",
+    REVIEW_REQUIRED: "Critical or high-severity findings require review.",
+    OBSERVATIONS: "Findings remain in the latest snapshots.",
+    PASSED_WITHIN_RECORDED_SCOPE: "No findings in the latest saved snapshots."
+  };
+  $("analytics-scope").textContent = posture[data.assessment] +
+    " Coverage shows engines used somewhere in retained history; it does not prove all engines audited the same target. " +
+    "History is locally bounded, and cross-engine scores are not directly comparable.";
+}
+async function refreshAnalytics() {
+  const response = await fetch("/api/analytics", { headers: { "Accept": "application/json" } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Could not load QA intelligence");
+  renderAnalytics(data);
+}
+async function downloadConsolidatedReport() {
+  try {
+    const response = await fetch("/api/reports/consolidated");
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || "Could not generate consolidated report");
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = "jb-expert-qa-consolidated-report.md";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+    showToast("Consolidated QA report generated.");
+  } catch (error) { showToast(error.message); }
+}
+
 async function refreshHistory() {
   const response = await fetch("/api/history", { headers: { "Accept": "application/json" } });
   const data = await response.json();
@@ -319,7 +460,7 @@ async function runSelected() {
   $("run-button-label").textContent = "Run selected audits";
   const message = passed + " passed; " + failed + " not passed or failed.";
   setMessage(message, failed > 0);
-  try { await refreshHistory(); } catch (error) { showToast(error.message); }
+  try { await refreshHistory(); await refreshAnalytics(); } catch (error) { showToast(error.message); }
   showToast("Audit batch completed: " + message);
 }
 async function openDetails(id) {
@@ -459,16 +600,18 @@ document.querySelectorAll("[data-target-mode]").forEach((button) => {
   button.addEventListener("click", () => setTargetMode(button.dataset.targetMode));
 });
 $("refresh-history").addEventListener("click", async () => {
-  try { await refreshHistory(); showToast("Audit history refreshed."); }
+  try { await refreshHistory(); await refreshAnalytics(); showToast("Audit history and intelligence refreshed."); }
   catch (error) { showToast(error.message); }
 });
 $("close-detail").addEventListener("click", () => { $("detail-panel").hidden = true; });
+$("download-consolidated").addEventListener("click", downloadConsolidatedReport);
 runButton.addEventListener("click", runSelected);
 
 async function initialize() {
   try {
     await refreshEngines();
     await refreshHistory();
+    await refreshAnalytics();
     setTargetMode("website");
   } catch (error) {
     setMessage(error.message, true);
