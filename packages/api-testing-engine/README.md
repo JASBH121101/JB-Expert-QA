@@ -1,6 +1,6 @@
 # JB API Testing Engine
 
-Dependency-free API testing package for explicitly authorized HTTP and HTTPS targets. Phase 3 Blocks 1–3 provide bounded request execution, response assertions and versioned API contract validation. Security probes, request chaining and regression history remain separate follow-up blocks.
+Dependency-free API testing package for explicitly authorized HTTP and HTTPS targets. Phase 3 Blocks 1–6 provide bounded request execution, assertions, versioned API contracts, passive security checks, sequential workflows and deterministic regression comparison.
 
 ## Requirements
 
