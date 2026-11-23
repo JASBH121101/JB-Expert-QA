@@ -1,4 +1,6 @@
 import test from "node:test";
+import { createServer } from "node:http";
+import { createApiRequestEngine } from "../src/index.js";
 import assert from "node:assert/strict";
 import {
   API_REGRESSION_BASELINE_SCHEMA,
@@ -169,4 +171,34 @@ test("handles sensitive field names in JSON structure without retaining their va
   assert.equal(report.status, "passed");
   assert.equal(JSON.stringify(baseline).includes("secret-1"), false);
   assert.equal(JSON.stringify(report).includes("password"), false);
+});
+
+test("integrates with the Request Engine using ephemeral loopback HTTP responses", async (t) => {
+  let payload = { data: { id: 9, active: true } };
+  const server = createServer((_request, outgoing) => {
+    outgoing.writeHead(200, { "content-type": "application/json" });
+    outgoing.end(JSON.stringify(payload));
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  }));
+
+  const address = server.address();
+  const origin = "http://127.0.0.1:" + address.port;
+  const requests = createApiRequestEngine({ allowedOrigins: [origin] });
+  const regression = engine();
+  const first = await requests.request({ method: "GET", url: origin + "/v1/resource" });
+  const baseline = regression.createBaseline(first, { valuePaths: ["$.data.active"] });
+
+  payload = { data: { id: 9, active: false } };
+  const second = await requests.request({ method: "GET", url: origin + "/v1/resource" });
+  const report = regression.compare(baseline, second);
+
+  assert.equal(report.status, "regression");
+  assert.equal(report.checks.find((item) => item.id === "json:shape").status, "passed");
+  assert.equal(report.checks.find((item) => item.id === "json:value:$.data.active").status, "failed");
 });
