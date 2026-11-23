@@ -280,6 +280,18 @@ function renderAnalytics(data) {
   $("analytics-findings").textContent = String(data.activeFindingCount ?? 0);
   $("analytics-engines").textContent = (data.usedEngineCount ?? 0) + "/" + (data.availableEngineCount ?? 0);
   $("analytics-coverage-label").textContent = (data.currentSnapshotCount ?? 0) + " CURRENT SNAPSHOTS";
+  const assessmentLabels = {
+    NOT_ASSESSED: "NOT ASSESSED",
+    NOT_PASSED: "NOT PASSED",
+    REVIEW_REQUIRED: "REVIEW REQUIRED",
+    OBSERVATIONS: "OBSERVATIONS",
+    PASSED_WITHIN_RECORDED_SCOPE: "PASSED · RECORDED SCOPE"
+  };
+  const assessment = $("analytics-assessment");
+  assessment.textContent = assessmentLabels[data.assessment] || "NOT ASSESSED";
+  assessment.className = "assessment-tag " + (data.assessment === "NOT_PASSED" ? "fail" :
+    data.assessment === "REVIEW_REQUIRED" || data.assessment === "OBSERVATIONS" ? "warn" :
+    data.assessment === "PASSED_WITHIN_RECORDED_SCOPE" ? "pass" : "");
 
   const severityContainer = $("severity-breakdown");
   severityContainer.replaceChildren();
@@ -329,6 +341,35 @@ function renderAnalytics(data) {
     empty.className = "empty-insight";
     empty.textContent = "No registered engines were supplied.";
     coverageContainer.append(empty);
+  }
+
+  const findingsContainer = $("top-findings");
+  findingsContainer.replaceChildren();
+  const topFindings = data.topFindings || [];
+  topFindings.forEach((finding) => {
+    const card = document.createElement("article");
+    card.className = "top-finding-row";
+    const header = document.createElement("div");
+    header.className = "top-finding-head";
+    const severity = document.createElement("span");
+    severity.className = "top-finding-severity severity-" + finding.severity;
+    severity.textContent = finding.severity.toUpperCase();
+    const occurrences = document.createElement("strong");
+    occurrences.textContent = finding.occurrences + " occurrence(s)";
+    header.append(severity, occurrences);
+    const title = document.createElement("strong");
+    title.className = "top-finding-title";
+    title.textContent = finding.title;
+    const detail = document.createElement("small");
+    detail.textContent = finding.ruleId + " · " + finding.engines.join(", ");
+    card.append(header, title, detail);
+    findingsContainer.append(card);
+  });
+  if (!topFindings.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "No recurring findings in the latest snapshots.";
+    findingsContainer.append(empty);
   }
 
   const trendContainer = $("score-trend");
