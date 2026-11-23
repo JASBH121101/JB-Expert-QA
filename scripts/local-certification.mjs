@@ -30,6 +30,12 @@ const CORE_TASKS = [
     timeoutMs: 5 * 60 * 1000
   },
   {
+    id: "autonomous-execution",
+    title: "Policy-bounded autonomous execution and audit ledger tests",
+    npmScript: "test:autonomous-execution",
+    timeoutMs: 5 * 60 * 1000
+  },
+  {
     id: "threat-lab",
     title: "Threat Lab safe integration tests",
     npmScript: "test:threat-lab",
@@ -64,7 +70,7 @@ export const LOCAL_CERTIFICATION_PROFILES = Object.freeze({
       title: "Static dead-code analysis regression tests",
       npmScript: "test:dead-code",
       timeoutMs: 5 * 60 * 1000
-    }
+    },
   ].map((task) => Object.freeze({ ...task })))
 });
 
@@ -373,8 +379,8 @@ export function printHelp() {
     "  node scripts/local-certification.mjs --profile=core|full [--report-dir=PATH] [--timeout-ms=MS]",
     "",
     "Profiles:",
-    "  core  Root regression, package distribution, engine contracts and Threat Lab",
-    "  full  Core plus Security Guard, Resilience, internationalization and dead-code tests",
+    "  core  Root regression, package distribution, engine contracts, autonomous execution and Threat Lab",
+    "  full  Core plus Security Guard, Resilience, internationalization, dead-code and autonomous-execution tests",
     "",
     "The runner is local-first. It does not call GitHub APIs, GitHub Actions, Cloudflare, or deployment services.",
     "Dependencies must already be installed; install them separately with npm ci."

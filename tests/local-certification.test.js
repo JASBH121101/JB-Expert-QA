@@ -39,9 +39,10 @@ function fakeSpawn({ code = 0, stdout = "ok\n", stderr = "", delayMs = 0, error 
 
 test("local profiles use only allowlisted repository npm scripts", () => {
   assert.deepEqual(LOCAL_CERTIFICATION_PROFILES.core.map((task) => task.npmScript), [
-    "check", "test:package-distributions", "test:engine-contracts", "test:threat-lab"
+    "check", "test:package-distributions", "test:engine-contracts", "test:autonomous-execution", "test:threat-lab"
   ]);
   assert.equal(LOCAL_CERTIFICATION_PROFILES.full.length > LOCAL_CERTIFICATION_PROFILES.core.length, true);
+  assert.ok(LOCAL_CERTIFICATION_PROFILES.core.some((task) => task.npmScript === "test:autonomous-execution"));
   for (const task of Object.values(LOCAL_CERTIFICATION_PROFILES).flat()) {
     assert.match(task.npmScript, /^[a-z][a-z0-9:-]*$/u);
   }
@@ -162,11 +163,11 @@ test("local certification report keeps selected profile scope and preserves fail
         return { status: calls === 2 ? "FAIL" : "PASS", exitCode: calls === 2 ? 1 : 0, durationMs: 1 };
       }
     });
-    assert.equal(calls, 4);
+    assert.equal(calls, LOCAL_CERTIFICATION_PROFILES.core.length);
     assert.equal(report.result, "FAILED");
-    assert.equal(report.summary.passed, 3);
+    assert.equal(report.summary.passed, LOCAL_CERTIFICATION_PROFILES.core.length - 1);
     assert.equal(report.summary.failed, 1);
-    assert.equal(report.notIncluded.length, 4);
+    assert.equal(report.notIncluded.length, LOCAL_CERTIFICATION_PROFILES.full.length - LOCAL_CERTIFICATION_PROFILES.core.length);
     assert.equal(report.coverageLimitations.length >= 3, true);
   } finally {
     console.log = originalLog;
@@ -197,7 +198,7 @@ test("a successful command with skipped TAP tests is reported as PARTIAL", async
     });
     assert.equal(report.result, "PARTIAL");
     assert.equal(report.summary.partial, 1);
-    assert.equal(report.summary.passed, 3);
+    assert.equal(report.summary.passed, LOCAL_CERTIFICATION_PROFILES.core.length - 1);
     assert.equal(report.summary.testSkips, 1);
     assert.equal(report.checks[0].status, "PARTIAL");
     assert.equal(report.checks[0].skippedTests, 1);
