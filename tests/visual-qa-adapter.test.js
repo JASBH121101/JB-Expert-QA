@@ -149,6 +149,28 @@ test("URL, credentials, matrix, themes, timeout and baseline mutation validation
       "expected validation code " + code
     );
   }
+
+  const sparseThemes = new Array(1);
+  await assert.rejects(
+    adapter.run({ url: validUrl, themes: sparseThemes }),
+    (error) => error instanceof VisualQaAdapterError && error.code === "INVALID_THEMES"
+  );
+
+  let themeGetterInvoked = false;
+  const accessorThemes = [];
+  Object.defineProperty(accessorThemes, "0", {
+    enumerable: true,
+    get() {
+      themeGetterInvoked = true;
+      return "light";
+    }
+  });
+  accessorThemes.length = 1;
+  await assert.rejects(
+    adapter.run({ url: validUrl, themes: accessorThemes }),
+    (error) => error instanceof VisualQaAdapterError && error.code === "ACCESSOR_NOT_ALLOWED"
+  );
+  assert.equal(themeGetterInvoked, false);
 });
 
 test("command and execution option accessors are rejected without invocation", async () => {
