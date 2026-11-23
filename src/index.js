@@ -106,3 +106,12 @@ export {
   STATIC_SECURITY_QA_ADAPTER_VERSION,
   STATIC_SECURITY_QA_ADAPTER_CAPABILITIES
 } from "./engine-registry/adapters/static-security-qa.js";
+
+export {
+  createRuntimeSecurityQaEngineAdapter,
+  registerRuntimeSecurityQaEngine,
+  RuntimeSecurityQaAdapterError,
+  RUNTIME_SECURITY_QA_ADAPTER_ID,
+  RUNTIME_SECURITY_QA_ADAPTER_VERSION,
+  RUNTIME_SECURITY_QA_ADAPTER_CAPABILITIES
+} from "./engine-registry/adapters/runtime-security-qa.js";

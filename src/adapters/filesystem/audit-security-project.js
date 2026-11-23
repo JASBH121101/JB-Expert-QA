@@ -9,7 +9,7 @@ import { codeQualityRules, securityRules, dependencyRules } from "../../speciali
 import { scanNpmAdvisories } from "../advisories/osv.js";
 import { securityDefenseRules } from "../../specialists/security-rules.js";
 
-const NON_PRODUCTION_SEGMENTS = new Set(["test", "tests", "__tests__", "fixture", "fixtures", "testing"]);
+const NON_PRODUCTION_SEGMENTS = new Set(["test", "tests", "__tests__", "fixture", "fixtures", "testing", "package-tests"]);
 
 const SELF_AUDIT_RULE_FILES = new Set([
   "src/specialists/security-rules.js",
