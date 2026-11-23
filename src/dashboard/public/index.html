@@ -98,6 +98,29 @@
         <div id="phase4-engine-grid" class="engine-grid phase4-engine-grid" aria-live="polite"><div class="loading-state">Loading Phase 4 registry…</div></div>
         <p class="insight-footnote">Read-only discovery. This panel does not run adapters, grant permissions, bypass orchestrator policy, or request approvals.</p>
       </section>
+      <section class="panel phase4-execution-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">PHASE 4 / CONTROLLED EXECUTION</p><h2>Policy-gated engine runner</h2><p class="section-subtitle">Available only when the host configures an exact engine allowlist, the execution permission and a real external approval provider.</p></div>
+          <span id="phase4-execution-state" class="assessment-tag">DISABLED</span>
+        </div>
+        <div class="phase4-execution-grid">
+          <div class="field-block">
+            <div class="field-heading"><label for="phase4-execution-engine">Allowlisted engine</label><span class="field-note">Host policy only</span></div>
+            <select id="phase4-execution-engine" class="target-input" disabled><option value="">Execution disabled</option></select>
+          </div>
+          <div class="field-block">
+            <div class="field-heading"><label for="phase4-execution-input">JSON input</label><span class="field-note">Object only · bounded by host limits</span></div>
+            <textarea id="phase4-execution-input" class="phase4-json-input" rows="8" spellcheck="false" disabled>{}</textarea>
+          </div>
+        </div>
+        <div class="run-footer phase4-execution-footer">
+          <p id="phase4-execution-policy">Execution is disabled. No host policy or external approval provider is configured.</p>
+          <button type="button" id="phase4-execute-button" class="primary-button" disabled><span class="button-icon">◇</span><span>Request approved execution</span></button>
+        </div>
+        <div id="phase4-execution-message" class="run-message" role="status" aria-live="polite"></div>
+        <pre id="phase4-execution-result" class="phase4-execution-result" hidden></pre>
+        <p class="insight-footnote">The browser cannot submit or override policy, permissions, risk ceilings, scopes or approval receipts. Every registered engine remains high-risk. The host approval provider must make the real human approval decision; absence, denial or timeout blocks execution.</p>
+      </section>
       <section class="panel intelligence-panel">
         <div class="panel-heading intelligence-heading">
           <div><p class="eyebrow">04 / INTELLIGENCE</p><h2>QA Intelligence &amp; Certification</h2><p class="section-subtitle">Portfolio-level trends across the latest saved engine and target snapshots.</p></div>
