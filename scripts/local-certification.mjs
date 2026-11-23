@@ -326,7 +326,7 @@ export async function runLocalCertification({
   const notIncluded = LOCAL_CERTIFICATION_PROFILES.full.filter((task) => !selectedIds.has(task.id));
   const coverageLimitations = Object.freeze([
     "Runs only on the current operating system and Node.js version; it does not reproduce GitHub-hosted OS/version matrices.",
-    "A PASS represents a successful exit code for the selected npm script; individual test-level skips remain visible in that script's output and are not separately parsed.",
+    "A PASS represents a successful exit code and no skipped cases in captured Node.js TAP summaries; TAP skip counts are tracked as PARTIAL and block a full pass.",
     "Browser binaries are not installed by this runner. Install the required Playwright browser separately before running browser-dependent test commands.",
     "No live production targets, deployments, Cloudflare resources, or external accounts are accessed."
   ]);
@@ -358,7 +358,8 @@ export async function runLocalCertification({
     console.log("Markdown report: " + markdownPath);
   }
 
-  console.log("\n[JB Expert QA] " + report.result + " — " + summary.passed + "/" + summary.total + " checks passed");
+  console.log("\n[JB Expert QA] " + report.result + " — " + summary.passed + "/" + summary.total + " checks passed" +
+    (summary.testSkips ? "; " + summary.testSkips + " individual tests skipped" : ""));
   return report;
 }
 
