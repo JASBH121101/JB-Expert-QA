@@ -65,12 +65,13 @@ The profile is an allowlist of fixed scripts in this repository. User input cann
 
 Each completed run writes a JSON report and a Markdown summary under .jb-expert-qa/certification by default. The report records the profile, Node.js version, operating system, duration, command-level outcome, exit code, timeout state, and a bounded redacted output tail.
 
-- PASS — the selected npm script exited with code 0.
+- PASS — the selected npm script exited with code 0 and its captured TAP summary contains no skipped tests.
+- PARTIAL — the selected npm script exited with code 0 but its captured TAP summary reports one or more skipped tests. These runs are not certified as a full pass.
 - FAIL — the process could not be started or exited with a non-zero code.
 - TIMEOUT — the process exceeded its time limit and was terminated.
 - SKIPPED — reserved for a future profile that explicitly records a task as skipped; skipped tasks are not counted as passing.
 
-Exit codes: 0 means the selected profile passed; 1 means one or more checks failed or timed out; 2 means invalid arguments or a preflight/runner error.
+Exit codes: 0 means the selected profile passed with no detected test skips; 1 means one or more checks failed, timed out, or were partial due to skipped tests; 2 means invalid arguments or a preflight/runner error.
 
 ## Safety and scope boundaries
 
