@@ -219,7 +219,7 @@ const report = await workflows.run({
       request: {
         method: "POST",
         url: "https://api.example.com/login",
-        json: { username: "demo", password: "provided-by-test-fixture" }
+        json: { username: "demo" }
       },
       capture: {
         authToken: "$.json.access_token",
