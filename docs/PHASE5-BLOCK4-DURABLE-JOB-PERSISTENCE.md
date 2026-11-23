@@ -64,3 +64,7 @@ Core Validation, package distribution, Security QA, and JB Engines Certification
 ## Lock recovery
 
 A stale same-host lock is reclaimed only after checking that its recorded PID no longer exists and that the lock file has not changed. Locks from another host, a live process, or an ambiguous state fail closed and require operator review.
+
+## Phase 5 Block 5 follow-up
+
+The queue now persists each job's `nextAttemptAt` and per-job `maxAttempts` values for explicit operator-controlled retries. Delayed retries survive restarts; `claimNext()` skips jobs until their retry time. Timeout and active cancellation are cooperative worker controls, not exactly-once or forced termination guarantees. See `PHASE5-BLOCK5-RETRY-TIMEOUT-CANCELLATION.md`.
