@@ -350,8 +350,18 @@ try {
   ], { cwd: currencyInstall });
   progress("Currency Engine clean-consumer checks passed");
 
-  progress("All seven standalone package checks completed");
-  console.log("PASS: all seven npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization and exact Currency Engine smoke checks passed.");
+  // JB API Testing Engine.
+  progress("Packing standalone API Testing Engine tarball");
+  const apiTestingTarball = await pack("packages/api-testing-engine");
+  const apiTestingInstall = await install(apiTestingTarball, "install-api-testing-engine");
+  run(node, [
+    "--input-type=module", "-e",
+    'import { API_TESTING_ENGINE_ID, createApiRequestEngine, ApiTestingError } from "@jb/api-testing-engine"; if (API_TESTING_ENGINE_ID !== "jb.api-testing-engine" || typeof createApiRequestEngine !== "function" || typeof ApiTestingError !== "function") process.exit(1); const engine = createApiRequestEngine({ allowedOrigins: ["https://api.example.test"] }); if (typeof engine.request !== "function") process.exit(1);'
+  ], { cwd: apiTestingInstall });
+  progress("API Testing Engine clean-consumer checks passed");
+
+  progress("All eight standalone package checks completed");
+  console.log("PASS: all eight npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization, Currency and API Request Engine smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
