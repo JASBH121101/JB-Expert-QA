@@ -2,6 +2,7 @@ import { auditProject } from "../adapters/filesystem/audit-project.js";
 import { auditSecurityProject } from "../adapters/filesystem/audit-security-project.js";
 import { auditSecurityUrl } from "../adapters/filesystem/audit-security-url.js";
 import { auditUrl, auditViewports } from "../adapters/playwright/audit-url.js";
+import { runResponsiveQa } from "../adapters/responsive/index.js";
 
 const DEFINITIONS = Object.freeze([
   {
@@ -119,7 +120,7 @@ function normalizeTarget(engineId, input) {
 const DEFAULT_ADAPTERS = Object.freeze({
   static: (target, options) => auditProject(target.path, options),
   "live-site": (target, options) => auditUrl(target.url, options),
-  responsive: (target, options) => auditViewports(target.url, options),
+  responsive: (target, options) => runResponsiveQa(target, options),
   accessibility: (target, options) => auditUrl(target.url, options),
   performance: (target, options) => auditUrl(target.url, options),
   security: (target, options) => Object.hasOwn(target, "path")
