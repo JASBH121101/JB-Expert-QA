@@ -315,6 +315,26 @@ test("Dashboard execution bridge rejects missing permission, missing approval, w
     () => createDashboardPhase4Execution({ registry, policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION], rules: [{ ...rule, type: "qa.engine.jb.not-registered" }] }, requestApproval: async () => ({ approved: true, approvalId: "x" }) }),
     (error) => error.code === "INVALID_ALLOWLIST"
   );
+  assert.throws(
+    () => createDashboardPhase4Execution({
+      registry,
+      policy: { id: "test-policy", grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION, "reports:write"], rules: [rule] },
+      requestApproval: async () => ({ approved: true, approvalId: "x" })
+    }),
+    (error) => error.code === "MISSING_EXECUTION_PERMISSION"
+  );
+  assert.throws(
+    () => createDashboardPhase4Execution({
+      registry,
+      policy: {
+        id: "test-policy",
+        grantedPermissions: [QA_ENGINE_EXECUTION_PERMISSION],
+        rules: [{ type: rule.type, maxRisk: "high" }]
+      },
+      requestApproval: async () => ({ approved: true, approvalId: "x" })
+    }),
+    (error) => error.code === "APPROVAL_REQUIRED"
+  );
 });
 
 test("Dashboard refuses an execution bridge created for a different registry", () => {
