@@ -461,6 +461,7 @@ export function createAutonomousExecutionEngine({
         } catch (error) {
           scope = null;
         }
+        scopeDigest = scope ? digestExecutionValue(scope) : null;
         if (!scope || !scopeMatches(scope, rule.scopes)) {
           const result = blocked("Action resource is outside the policy scope");
           results.push(result);
@@ -474,8 +475,6 @@ export function createAutonomousExecutionEngine({
           continue;
         }
       }
-      scopeDigest = scope ? digestExecutionValue(scope) : null;
-
       try {
         const validInput = await action.validateInput(planned.input);
         if (validInput !== true) throw new Error("Action input validation did not explicitly pass");
@@ -564,7 +563,7 @@ export function createAutonomousExecutionEngine({
         approvalId = approvalResult.value.approvalId;
         await record("action.approved", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest
         });
       }
 
@@ -574,7 +573,7 @@ export function createAutonomousExecutionEngine({
         results.push(result);
         await record("action.timed-out", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest,
           reason: result.reason
         });
         stopReason = "timed-out";
@@ -584,7 +583,7 @@ export function createAutonomousExecutionEngine({
       const actionStarted = Date.now();
       await record("action.started", {
         executionId, actionId: planned.id, actionType: planned.type,
-        risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest
+        risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest
       });
       const runResult = await boundedCall(
         (signal) => action.execute({
@@ -608,7 +607,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.cancelled", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest, durationMs,
           reason: result.reason
         });
         stopReason = "cancelled";
@@ -619,7 +618,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.timed-out", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest, durationMs,
           reason: result.reason
         });
         stopReason = "timed-out";
@@ -631,7 +630,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.failed", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs, reason
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest, durationMs, reason
         });
         stopReason = "failed";
         if (normalizedPolicy.stopOnFailure) break;
@@ -651,7 +650,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.failed", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs, reason
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest, durationMs, reason
         });
         stopReason = "failed";
         if (normalizedPolicy.stopOnFailure) break;
