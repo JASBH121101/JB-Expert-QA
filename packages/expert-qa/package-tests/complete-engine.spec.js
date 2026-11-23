@@ -50,6 +50,13 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "PERFORMANCE_QA_ADAPTER_ID",
     "PERFORMANCE_QA_ADAPTER_VERSION",
     "PERFORMANCE_QA_ADAPTER_CAPABILITIES",
+    "createVisualQaEngineAdapter",
+    "registerVisualQaEngine",
+    "VisualQaAdapterError",
+    "VISUAL_QA_ADAPTER_ID",
+    "VISUAL_QA_ADAPTER_VERSION",
+    "VISUAL_QA_ADAPTER_CAPABILITIES",
+    "VISUAL_QA_LIMITS",
     "RuntimeSecurityQaAdapterError",
     "RUNTIME_SECURITY_QA_ADAPTER_ID",
     "RUNTIME_SECURITY_QA_ADAPTER_VERSION",
@@ -123,6 +130,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   assert.ok(Array.isArray(engine.accessibilityRules));
   assert.equal(typeof engine.createPerformanceQaEngineAdapter, "function");
   assert.equal(engine.PERFORMANCE_QA_ADAPTER_ID, "jb.performance-qa-engine");
+  assert.equal(typeof engine.createVisualQaEngineAdapter, "function");
+  assert.equal(engine.VISUAL_QA_ADAPTER_ID, "jb.visual-qa-engine");
   assert.equal(EXPERT_QA_PACKAGE_VERSION, "0.2.0");
 });
 
@@ -317,6 +326,23 @@ test("standalone Expert QA package exposes Performance QA and blocks private des
   await assert.rejects(
     runner({ url: "http://127.0.0.1/?token=" + secret }),
     (error) => error instanceof engine.PerformanceQaAdapterError &&
+      error.code === "AUDIT_FAILED" &&
+      !error.message.includes(secret)
+  );
+});
+
+ 
+test("standalone Expert QA package exposes Visual QA and blocks private destinations", async () => {
+  const registry = engine.createQaEngineRegistry();
+  const metadata = engine.registerVisualQaEngine(registry);
+  assert.equal(metadata.id, engine.VISUAL_QA_ADAPTER_ID);
+  assert.equal(metadata.targetType, "url");
+  assert.equal(metadata.executionMode, "browser");
+  const runner = registry.getRunner(metadata.id);
+  const secret = "package-visual-secret-123";
+  await assert.rejects(
+    runner({ url: "http://127.0.0.1/?token=" + secret }),
+    (error) => error instanceof engine.VisualQaAdapterError &&
       error.code === "AUDIT_FAILED" &&
       !error.message.includes(secret)
   );

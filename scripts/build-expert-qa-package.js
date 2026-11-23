@@ -47,6 +47,7 @@ const requiredFiles = [
   "src/engine-registry/adapters/runtime-security-qa.js",
   "src/engine-registry/adapters/accessibility-qa.js",
   "src/engine-registry/adapters/performance-qa.js",
+  "src/engine-registry/adapters/visual-qa.js",
   "src/engine-registry/orchestrator.js",
   "packages/api-testing-engine/src/index.js",
   "src/dashboard/analytics.js",
