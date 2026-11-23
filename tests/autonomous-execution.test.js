@@ -369,6 +369,7 @@ test("a corrupt ledger prevents all execution", async () => {
   let calls = 0;
   const ledger = {
     append: async () => {},
+    canAppend: () => true,
     verify: async () => ({ valid: false }),
     snapshot: () => []
   };
@@ -379,6 +380,40 @@ test("a corrupt ledger prevents all execution", async () => {
   });
   await assert.rejects(engine.execute(reportPlan()), /ledger failed integrity/u);
   assert.equal(calls, 0);
+});
+
+test("one engine instance runs only one plan at a time", async () => {
+  let releaseAction;
+  let actionStarted = false;
+  const engine = createAutonomousExecutionEngine({
+    actions: [reportAction({
+      execute: async () => new Promise((resolve) => {
+        actionStarted = true;
+        releaseAction = () => resolve({ saved: "reports/done.json" });
+      })
+    })],
+    policy: reportPolicy()
+  });
+  const first = engine.execute(reportPlan());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(actionStarted, true);
+  await assert.rejects(engine.execute(reportPlan()), /already running/u);
+  releaseAction();
+  const result = await first;
+  assert.equal(result.status, "succeeded");
+});
+
+test("ledger capacity is checked before any handler can execute", async () => {
+  let calls = 0;
+  const ledger = createInMemoryExecutionLedger({ maxRecords: 5 });
+  const engine = createAutonomousExecutionEngine({
+    actions: [reportAction({ execute: async () => { calls += 1; return { saved: "reports/no.json" }; } })],
+    policy: reportPolicy(),
+    ledger
+  });
+  await assert.rejects(engine.execute(reportPlan()), /insufficient record capacity/u);
+  assert.equal(calls, 0);
+  assert.equal(ledger.snapshot().length, 0);
 });
 
 test("ledger hash chains detect modified, truncated and reordered records", () => {
