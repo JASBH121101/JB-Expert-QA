@@ -101,6 +101,28 @@ function snapshot(job) {
   return freezeDeep(copyJob(job));
 }
 
+function readQueueOptions(value, label, allowedKeys) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ExecutionJobQueueError("INVALID_OPTIONS", label + " must be a plain object");
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new ExecutionJobQueueError("INVALID_OPTIONS", label + " must be a plain object");
+  }
+  const output = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string" || !allowedKeys.has(key)) {
+      throw new ExecutionJobQueueError("UNSUPPORTED_OPTION", label + " contains an unsupported field");
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new ExecutionJobQueueError("ACCESSOR_NOT_ALLOWED", label + " cannot contain accessors");
+    }
+    output[key] = descriptor.value;
+  }
+  return output;
+}
+
 function readPersistence(persistence) {
   if (persistence === undefined) return null;
   if (!persistence || typeof persistence !== "object" || Array.isArray(persistence)) {
@@ -294,7 +316,8 @@ export function createExecutionJobQueue(options = {}) {
     return job ? snapshot(job) : null;
   }
 
-  function listJobs({ state } = {}) {
+  function listJobs(options = {}) {
+    const { state } = readQueueOptions(options, "list options", new Set(["state"]));
     if (state !== undefined && !STATES.has(state)) {
       throw new ExecutionJobQueueError("INVALID_STATE_FILTER", "unknown state filter");
     }
@@ -303,15 +326,9 @@ export function createExecutionJobQueue(options = {}) {
     return Object.freeze(values.map(snapshot));
   }
 
-  function enqueue(payload, { id, idempotencyKey } = {}) {
+  function enqueue(payload, options = {}) {
+    const { id, idempotencyKey } = readQueueOptions(options, "enqueue options", new Set(["id", "idempotencyKey"]));
     return transact(() => {
-      if (jobs.size >= maxJobs) {
-        throw new ExecutionJobQueueError("JOB_CAPACITY_REACHED", "job retention capacity reached; clear terminal jobs first");
-      }
-      const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
-      if (queuedCount >= maxQueueSize) {
-        throw new ExecutionJobQueueError("QUEUE_FULL", "execution queue is at capacity");
-      }
       if (id !== undefined && (typeof id !== "string" || !ID_PATTERN.test(id))) {
         throw new ExecutionJobQueueError("INVALID_JOB_ID", "job id has an invalid format");
       }
@@ -321,6 +338,13 @@ export function createExecutionJobQueue(options = {}) {
       }
       if (idempotencyKey && idempotency.has(idempotencyKey)) {
         return getJob(idempotency.get(idempotencyKey));
+      }
+      if (jobs.size >= maxJobs) {
+        throw new ExecutionJobQueueError("JOB_CAPACITY_REACHED", "job retention capacity reached; clear terminal jobs first");
+      }
+      const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
+      if (queuedCount >= maxQueueSize) {
+        throw new ExecutionJobQueueError("QUEUE_FULL", "execution queue is at capacity");
       }
       const jobId = id ?? "job-" + randomUUID();
       if (jobs.has(jobId)) {
