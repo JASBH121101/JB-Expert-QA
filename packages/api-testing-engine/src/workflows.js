@@ -60,7 +60,9 @@ function assertSafeData(value, label, limits = {}) {
     if (Array.isArray(item)) {
       if (seen.has(item)) throw new TypeError(label + " contains circular data");
       seen.add(item);
-      const keys = Object.keys(item);
+      const ownKeys = Reflect.ownKeys(item);
+      if (ownKeys.some((key) => typeof key !== "string")) throw new TypeError(label + " arrays cannot contain symbol properties");
+      const keys = ownKeys;
       if (keys.length !== item.length || keys.some((key) => !/^(0|[1-9]\d*)$/u.test(key) || Number(key) >= item.length)) {
         throw new TypeError(label + " arrays cannot contain holes or custom properties");
       }
@@ -77,7 +79,9 @@ function assertSafeData(value, label, limits = {}) {
     if (!isRecord(item)) throw new TypeError(label + " must contain JSON-compatible plain objects only");
     if (seen.has(item)) throw new TypeError(label + " contains circular data");
     seen.add(item);
-    for (const key of Object.keys(item)) {
+    const ownKeys = Reflect.ownKeys(item);
+    if (ownKeys.some((key) => typeof key !== "string")) throw new TypeError(label + " objects cannot contain symbol properties");
+    for (const key of ownKeys) {
       if (["__proto__", "prototype", "constructor"].includes(key)) {
         throw new TypeError(label + " contains a forbidden object key");
       }
@@ -386,6 +390,7 @@ function validateRequestResponse(response) {
     throw new ApiWorkflowError("INVALID_REQUEST_RESPONSE", "Request Engine returned an invalid HTTP status");
   }
   if (!isRecord(response.headers)) throw new ApiWorkflowError("INVALID_REQUEST_RESPONSE", "Request Engine returned invalid headers");
+  assertPlainRecord(response.headers, "Request Engine response.headers");
   assertSafeData(response, "Request Engine response", { maxNodes: MAX_WORKFLOW_NODES, maxDepth: MAX_WORKFLOW_DEPTH });
   return response;
 }
@@ -491,13 +496,23 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
             }
           }
 
-          const passed = !assertionResult || assertionResult.passed;
+          const hasAssertions = Array.isArray(step.assertions) && step.assertions.length > 0;
+          const defaultHttpOk = response.ok === undefined
+            ? response.status >= 200 && response.status < 300
+            : response.ok === true;
+          const passed = hasAssertions ? assertionResult.passed : defaultHttpOk;
           const status = passed ? "passed" : "failed";
           const details = {
             httpStatus: response.status,
             bytesReceived: Number.isFinite(response.bytesReceived) ? response.bytesReceived : undefined,
             assertions: assertionResult,
-            captureNames
+            captureNames,
+            ...(hasAssertions || defaultHttpOk ? {} : {
+              error: {
+                code: "HTTP_STATUS_NOT_OK",
+                message: "Response status was not successful and the step did not declare assertions."
+              }
+            })
           };
           results.push(makeStepResult(step, status, stepStarted, details));
           stepStates.set(step.id, { status });
