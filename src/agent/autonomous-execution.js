@@ -454,6 +454,7 @@ export function createAutonomousExecutionEngine({
       }
 
       let scope = null;
+      let scopeDigest = null;
       if (action.getScope) {
         try {
           scope = normalizeScope(await action.getScope(planned.input));
@@ -465,7 +466,7 @@ export function createAutonomousExecutionEngine({
           results.push(result);
           await record("action.blocked", {
             executionId, actionId: planned.id, actionType: planned.type,
-            risk: action.risk, inputDigest: planned.inputDigest, scope,
+            risk: action.risk, inputDigest: planned.inputDigest, scopeDigest,
             reason: result.reason
           });
           stopReason = "blocked";
@@ -473,6 +474,7 @@ export function createAutonomousExecutionEngine({
           continue;
         }
       }
+      scopeDigest = scope ? digestExecutionValue(scope) : null;
 
       try {
         const validInput = await action.validateInput(planned.input);
@@ -482,7 +484,7 @@ export function createAutonomousExecutionEngine({
         results.push(result);
         await record("action.blocked", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, inputDigest: planned.inputDigest, scope,
+          risk: action.risk, inputDigest: planned.inputDigest, scopeDigest,
           reason: result.reason
         });
         stopReason = "blocked";
@@ -495,14 +497,14 @@ export function createAutonomousExecutionEngine({
       if (needsApproval) {
         await record("action.approval-requested", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, inputDigest: planned.inputDigest, scope
+          risk: action.risk, inputDigest: planned.inputDigest, scopeDigest
         });
         if (!requestApproval) {
           const result = blocked("This action requires explicit approval, but no approval provider is configured");
           results.push(result);
           await record("action.blocked", {
             executionId, actionId: planned.id, actionType: planned.type,
-            risk: action.risk, inputDigest: planned.inputDigest, scope,
+            risk: action.risk, inputDigest: planned.inputDigest, scopeDigest,
             reason: result.reason
           });
           stopReason = "blocked";
@@ -515,7 +517,7 @@ export function createAutonomousExecutionEngine({
           results.push(result);
           await record("action.timed-out", {
             executionId, actionId: planned.id, actionType: planned.type,
-            risk: action.risk, inputDigest: planned.inputDigest, scope,
+            risk: action.risk, inputDigest: planned.inputDigest, scopeDigest,
             reason: result.reason
           });
           stopReason = "timed-out";
@@ -537,7 +539,7 @@ export function createAutonomousExecutionEngine({
           results.push(result);
           await record("action.timed-out", {
             executionId, actionId: planned.id, actionType: planned.type,
-            risk: action.risk, inputDigest: planned.inputDigest, scope, reason: result.reason
+            risk: action.risk, inputDigest: planned.inputDigest, scopeDigest, reason: result.reason
           });
           stopReason = "timed-out";
           break;
@@ -553,7 +555,7 @@ export function createAutonomousExecutionEngine({
           results.push(result);
           await record("action.blocked", {
             executionId, actionId: planned.id, actionType: planned.type,
-            risk: action.risk, inputDigest: planned.inputDigest, scope, reason
+            risk: action.risk, inputDigest: planned.inputDigest, scopeDigest, reason
           });
           stopReason = "blocked";
           if (normalizedPolicy.stopOnFailure) break;
@@ -562,7 +564,7 @@ export function createAutonomousExecutionEngine({
         approvalId = approvalResult.value.approvalId;
         await record("action.approved", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest
         });
       }
 
@@ -572,7 +574,7 @@ export function createAutonomousExecutionEngine({
         results.push(result);
         await record("action.timed-out", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest,
           reason: result.reason
         });
         stopReason = "timed-out";
@@ -582,7 +584,7 @@ export function createAutonomousExecutionEngine({
       const actionStarted = Date.now();
       await record("action.started", {
         executionId, actionId: planned.id, actionType: planned.type,
-        risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope
+        risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest
       });
       const runResult = await boundedCall(
         (signal) => action.execute({
@@ -606,7 +608,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.cancelled", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope, durationMs,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs,
           reason: result.reason
         });
         stopReason = "cancelled";
@@ -617,7 +619,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.timed-out", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope, durationMs,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs,
           reason: result.reason
         });
         stopReason = "timed-out";
@@ -629,7 +631,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.failed", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope, durationMs, reason
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs, reason
         });
         stopReason = "failed";
         if (normalizedPolicy.stopOnFailure) break;
@@ -649,7 +651,7 @@ export function createAutonomousExecutionEngine({
         results.push(Object.freeze(result));
         await record("action.failed", {
           executionId, actionId: planned.id, actionType: planned.type,
-          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scope, durationMs, reason
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigestDigest, durationMs, reason
         });
         stopReason = "failed";
         if (normalizedPolicy.stopOnFailure) break;
@@ -667,7 +669,7 @@ export function createAutonomousExecutionEngine({
       await record("action.succeeded", {
         executionId, actionId: planned.id, actionType: planned.type,
         risk: action.risk, approvalId, inputDigest: planned.inputDigest,
-        outputDigest, scope, durationMs
+        outputDigest, scopeDigest, durationMs
       });
     }
 
