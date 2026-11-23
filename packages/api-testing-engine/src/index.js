@@ -328,3 +328,13 @@ export {
   ApiRegressionError,
   createApiRegressionEngine
 } from "./regression.js";
+
+ 
+export {
+  API_RATE_LIMIT_REPORT_SCHEMA,
+  API_RATE_LIMIT_TEST_SCHEMA,
+  API_RATE_LIMIT_TESTING_ENGINE_ID,
+  API_RATE_LIMIT_TESTING_ENGINE_VERSION,
+  ApiRateLimitError,
+  createApiRateLimitTestingEngine
+} from "./rate-limit.js";
