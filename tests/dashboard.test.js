@@ -105,14 +105,26 @@ test("Control Center exposes Phase 4 registry metadata without executing engines
   assert.match(await js.text(), /refreshPhase4Engines/);
 });
 
-test("Control Center Phase 4 catalog is empty by default and registry is optional", async (t) => {
+test("Control Center includes built-in Phase 4 engine catalog by default", async (t) => {
   const { origin } = await startTestDashboard(t);
   const response = await fetch(origin + "/api/phase4/engines");
   assert.equal(response.status, 200);
   const data = await response.json();
-  assert.deepEqual(data.engines, []);
   assert.equal(data.executionEnabled, false);
   assert.equal(data.approvalRequired, true);
+  assert.equal(data.engines.length, 8);
+  const ids = data.engines.map((engine) => engine.id);
+  assert.deepEqual(ids, [
+    "jb.api-testing-engine",
+    "jb.static-qa-engine",
+    "jb.static-security-qa-engine",
+    "jb.runtime-security-qa-engine",
+    "jb.accessibility-qa-engine",
+    "jb.performance-qa-engine",
+    "jb.visual-qa-engine",
+    "jb.report-certification-engine"
+  ]);
+  assert.ok(data.engines.every((engine) => !Object.hasOwn(engine, "run")));
 });
 
 test("dashboard rejects untrusted host headers, cross-origin requests and malformed targets", async (t) => {
