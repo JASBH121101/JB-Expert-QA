@@ -470,3 +470,35 @@ test("rejects overlarge workflows and invalid options", async () => {
     { id: "one", request: { method: "GET", url: "https://api.example.test/one" } }
   ]), { retries: 10 }), /only support an AbortSignal/u);
 });
+
+
+test("failed assertion steps cannot publish captures or response references to later requests", async () => {
+  const calls = [];
+  const engine = createEngine(async (request) => {
+    calls.push(request);
+    return response({ json: { token: "untrusted-token", data: { id: 7 } } });
+  });
+  const report = await engine.run(workflow([
+    {
+      id: "failed-login",
+      request: { method: "POST", url: "https://api.example.test/login" },
+      capture: { auth: "$.json.token" },
+      assertions: [{ type: "status", expected: 201 }]
+    },
+    {
+      id: "dependent",
+      request: {
+        method: "POST",
+        url: "https://api.example.test/profile",
+        headers: { authorization: { "$var": "auth" } },
+        json: { userId: { "$ref": "failed-login", path: "$.json.data.id" } }
+      }
+    }
+  ], { stopOnFailure: false }));
+  assert.equal(report.status, "failed");
+  assert.equal(report.results[0].status, "failed");
+  assert.equal(report.results[1].status, "failed");
+  assert.equal(report.results[1].error.code, "VARIABLE_UNAVAILABLE");
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.stringify(report).includes("untrusted-token"), false);
+});
