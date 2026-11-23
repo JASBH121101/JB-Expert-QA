@@ -93,7 +93,7 @@ function propertyPath(base, key) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? base + "." + key : base + "[" + JSON.stringify(key) + "]";
 }
 
-function parsePath(path, { allowWildcard = false } = {}) {
+function parsePath(path, { allowWildcard = false, allowSensitive = false } = {}) {
   if (typeof path !== "string" || path.length < 1 || path.length > MAX_PATH_LENGTH || path[0] !== "$") {
     throw new TypeError("JSON paths must start with $ and be at most " + MAX_PATH_LENGTH + " characters");
   }
@@ -103,7 +103,7 @@ function parsePath(path, { allowWildcard = false } = {}) {
     if (path[index] === ".") {
       const match = /^[A-Za-z_$][A-Za-z0-9_$]*/u.exec(path.slice(index + 1));
       if (!match) throw new TypeError("JSON path contains an invalid property segment");
-      if (FORBIDDEN_KEYS.has(match[0]) || SENSITIVE_NAME.test(match[0])) throw new TypeError("JSON path contains a forbidden or sensitive property name");
+      if (FORBIDDEN_KEYS.has(match[0]) || (!allowSensitive && SENSITIVE_NAME.test(match[0]))) throw new TypeError("JSON path contains a forbidden or sensitive property name");
       parts.push({ type: "key", value: match[0] });
       index += match[0].length + 1;
       continue;
@@ -120,7 +120,7 @@ function parsePath(path, { allowWildcard = false } = {}) {
       } else if (token.startsWith('"')) {
         let key;
         try { key = JSON.parse(token); } catch { throw new TypeError("JSON path contains an invalid quoted property"); }
-        if (typeof key !== "string" || !key || FORBIDDEN_KEYS.has(key) || SENSITIVE_NAME.test(key)) {
+        if (typeof key !== "string" || !key || FORBIDDEN_KEYS.has(key) || (!allowSensitive && SENSITIVE_NAME.test(key))) {
           throw new TypeError("JSON path contains a forbidden or sensitive property name");
         }
         parts.push({ type: "key", value: key });
@@ -139,13 +139,13 @@ function matchesIgnoredPath(path, ignored) {
   return ignored.some((pattern) => path === pattern || path.startsWith(pattern + ".") || path.startsWith(pattern + "["));
 }
 
-function normalizePathList(value, label, { allowWildcard = false, maximum = 100 } = {}) {
+function normalizePathList(value, label, { allowWildcard = false, allowSensitive = false, maximum = 100 } = {}) {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > maximum) throw new TypeError(label + " must be an array of at most " + maximum + " JSON paths");
   const seen = new Set();
   const output = [];
   for (const path of value) {
-    parsePath(path, { allowWildcard });
+    parsePath(path, { allowWildcard, allowSensitive });
     if (seen.has(path)) throw new TypeError(label + " cannot contain duplicate paths");
     seen.add(path);
     output.push(path);
@@ -287,7 +287,7 @@ function validateBaseline(baseline) {
   let valuePaths;
   try {
     headerNames = normalizeHeaderNames(baseline.policy.headerNames);
-    ignoredJsonPaths = normalizePathList(baseline.policy.ignoredJsonPaths, "baseline.policy.ignoredJsonPaths", { allowWildcard: true });
+    ignoredJsonPaths = normalizePathList(baseline.policy.ignoredJsonPaths, "baseline.policy.ignoredJsonPaths", { allowWildcard: true, allowSensitive: true });
     valuePaths = normalizePathList(baseline.policy.valuePaths, "baseline.policy.valuePaths", { maximum: 50 });
   } catch (error) {
     throw new ApiRegressionError("INVALID_BASELINE", error.message);
@@ -319,7 +319,7 @@ function validateBaseline(baseline) {
         typeof entry.path !== "string" || !["null", "array", "object", "string", "number", "integer", "boolean"].includes(entry.type)) {
       throw new ApiRegressionError("INVALID_BASELINE", "baseline contains an invalid JSON shape entry");
     }
-    try { parsePath(entry.path, { allowWildcard: true }); }
+    try { parsePath(entry.path, { allowWildcard: true, allowSensitive: true }); }
     catch (error) { throw new ApiRegressionError("INVALID_BASELINE", error.message); }
     const key = entry.path + "\u0000" + entry.type;
     if (shapeKeys.has(key)) throw new ApiRegressionError("INVALID_BASELINE", "baseline contains duplicate JSON shape entries");
@@ -350,7 +350,7 @@ export function createApiRegressionEngine() {
     if (typeof capturedAt !== "string" || !Number.isFinite(Date.parse(capturedAt))) throw new TypeError("capturedAt must be a valid date-time string");
 
     const headerNames = normalizeHeaderNames(options.headerNames);
-    const ignoredJsonPaths = normalizePathList(options.ignoredJsonPaths, "ignoredJsonPaths", { allowWildcard: true });
+    const ignoredJsonPaths = normalizePathList(options.ignoredJsonPaths, "ignoredJsonPaths", { allowWildcard: true, allowSensitive: true });
     const valuePaths = normalizePathList(options.valuePaths, "valuePaths", { maximum: 50 });
     const headerLookup = new Map(Object.entries(normalized.headers).map(([name, value]) => [name.toLowerCase(), value]));
     const headers = headerNames.filter((name) => headerLookup.has(name)).map((name) => ({ name, valueHash: hash(headerLookup.get(name)) }));
