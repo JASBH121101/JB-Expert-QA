@@ -236,3 +236,43 @@ test("dashboard rate-limits repeated local audit requests and serves only known 
   const missing = await fetch(origin + "/assets/../../package.json");
   assert.equal(missing.status, 404);
 });
+
+
+test("dashboard exposes consolidated analytics and downloads a scoped Markdown report", async (t) => {
+  let cycle = 0;
+  const registry = createAuditEngineRegistry({
+    adapters: {
+      static: async () => {
+        cycle += 1;
+        const findings = cycle === 1
+          ? [{ id: "S-1", ruleId: "static.rule", title: "One finding", severity: "high", location: "src/a.js" }]
+          : [];
+        return {
+          scoring: { passed: true, score: cycle === 1 ? 82 : 98 },
+          summary: { findings: findings.length, rulesExecuted: 8, rulesWithErrors: 0 },
+          diagnostics: findings
+        };
+      }
+    }
+  });
+  const { origin } = await startTestDashboard(t, { registry });
+  await postRun(origin, { engineId: "static", target: { path: "./sample-project" } });
+  await postRun(origin, { engineId: "static", target: { path: "./sample-project" } });
+
+  const analyticsResponse = await fetch(origin + "/api/analytics");
+  assert.equal(analyticsResponse.status, 200);
+  const analytics = await analyticsResponse.json();
+  assert.equal(analytics.retainedHistoryCount, 2);
+  assert.equal(analytics.currentSnapshotCount, 1);
+  assert.equal(analytics.averageCurrentScore, 98);
+  assert.equal(analytics.severityCounts.high, 0);
+  assert.equal(analytics.usedEngineCount, 1);
+
+  const reportResponse = await fetch(origin + "/api/reports/consolidated");
+  assert.equal(reportResponse.status, 200);
+  assert.match(reportResponse.headers.get("content-disposition"), /attachment/);
+  const report = await reportResponse.text();
+  assert.match(report, /Consolidated QA Intelligence Report/);
+  assert.match(report, /Coverage here means/);
+  assert.match(report, /not a third-party certification/i);
+});
