@@ -176,6 +176,13 @@ export function createExecutionJobQueue(options = {}) {
   if (typeof now !== "function") {
     throw new ExecutionJobQueueError("INVALID_CLOCK", "now must be a function");
   }
+  function timestamp() {
+    const value = now();
+    if (typeof value !== "string" || !value.trim()) {
+      throw new ExecutionJobQueueError("INVALID_CLOCK_VALUE", "clock must return a non-empty string");
+    }
+    return value;
+  }
 
   const jobs = new Map();
   const fifo = [];
@@ -282,7 +289,7 @@ export function createExecutionJobQueue(options = {}) {
       if (job.state === "running") {
         job.state = "interrupted";
         job.error = RECOVERY_ERROR;
-        job.finishedAt = now();
+        job.finishedAt = timestamp();
         recoveredRunning = true;
       }
       if (job.state === "queued") queuedCount += 1;
@@ -351,10 +358,7 @@ export function createExecutionJobQueue(options = {}) {
         throw new ExecutionJobQueueError("DUPLICATE_JOB_ID", "job id already exists");
       }
       const clonedPayload = cloneJson(payload, "job payload");
-      const createdAt = now();
-      if (typeof createdAt !== "string" || !createdAt.trim()) {
-        throw new ExecutionJobQueueError("INVALID_CLOCK_VALUE", "clock must return a non-empty string");
-      }
+      const createdAt = timestamp();
       const job = {
         id: jobId,
         state: "queued",
@@ -381,7 +385,7 @@ export function createExecutionJobQueue(options = {}) {
         const job = jobs.get(id);
         if (!job || job.state !== "queued") continue;
         job.state = "running";
-        job.startedAt = now();
+        job.startedAt = timestamp();
         job.finishedAt = null;
         job.error = null;
         job.attempts += 1;
@@ -398,7 +402,7 @@ export function createExecutionJobQueue(options = {}) {
       if (job.state !== "running") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only running jobs can complete");
       job.result = cloneJson(result, "job result");
       job.state = "completed";
-      job.finishedAt = now();
+      job.finishedAt = timestamp();
       return snapshot(job);
     });
   }
@@ -411,7 +415,7 @@ export function createExecutionJobQueue(options = {}) {
       const message = error instanceof Error ? error.message : String(error);
       job.error = message.slice(0, 1000);
       job.state = "failed";
-      job.finishedAt = now();
+      job.finishedAt = timestamp();
       return snapshot(job);
     });
   }
@@ -422,7 +426,7 @@ export function createExecutionJobQueue(options = {}) {
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "queued") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only queued jobs can be cancelled");
       job.state = "cancelled";
-      job.finishedAt = now();
+      job.finishedAt = timestamp();
       return snapshot(job);
     });
   }
@@ -453,7 +457,7 @@ export function createExecutionJobQueue(options = {}) {
       const message = reason instanceof Error ? reason.message : String(reason);
       job.state = "failed";
       job.error = message.slice(0, 1000);
-      job.finishedAt = now();
+      job.finishedAt = timestamp();
       return snapshot(job);
     });
   }
