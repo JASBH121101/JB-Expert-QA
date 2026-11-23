@@ -2,7 +2,7 @@ const ASSERTION_TYPES = new Set([
   "status", "statusRange", "header", "json", "text", "contains",
   "type", "exists", "number", "arrayLength", "regex"
 ]);
-const OPERATORS = new Set(["equals", "notEquals", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual", "between", "contains", "startsWith", "endsWith", "matches"]);
+const OPERATORS = new Set(["equals", "notEquals", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual", "between", "contains", "startsWith", "endsWith"]);
 const JSON_TYPES = new Set(["null", "object", "array", "string", "number", "boolean"]);
 
 export const API_ASSERTIONS_ENGINE_ID = "jb.api-testing-assertions-engine";
@@ -76,7 +76,6 @@ function compare(actual, operator, expected, assertion) {
     case "contains": return typeof actual === "string" ? actual.includes(String(expected)) : Array.isArray(actual) ? actual.some((item) => Object.is(item, expected)) : false;
     case "startsWith": return typeof actual === "string" && actual.startsWith(String(expected));
     case "endsWith": return typeof actual === "string" && actual.endsWith(String(expected));
-    case "matches": return typeof actual === "string" && assertion.regex instanceof RegExp && assertion.regex.test(actual);
     default: return false;
   }
 }
@@ -177,12 +176,23 @@ function evaluateOne(response, assertion) {
 
 function validateAssertion(assertion, index) {
   if (!isRecord(assertion)) throw new TypeError("Assertion " + index + " must be a plain object");
+  const allowedFields = new Set(["type", "description", "path", "operator", "expected", "name", "target", "pattern", "flags"]);
+  for (const key of Object.keys(assertion)) {
+    if (!allowedFields.has(key)) throw new TypeError("Assertion " + index + " contains an unsupported field: " + key);
+    const descriptor = Object.getOwnPropertyDescriptor(assertion, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) throw new TypeError("Assertion " + index + " cannot contain accessors");
+  }
   if (!ASSERTION_TYPES.has(assertion.type)) throw new TypeError("Assertion " + index + " has an unsupported type");
   if (assertion.description !== undefined && (typeof assertion.description !== "string" || assertion.description.length > 300)) {
     throw new TypeError("Assertion description must be a string of at most 300 characters");
   }
   if (assertion.operator !== undefined && !OPERATORS.has(assertion.operator)) throw new TypeError("Assertion operator is unsupported");
   if (["json", "exists", "type", "number", "arrayLength"].includes(assertion.type)) safeJsonPath(assertion.path);
+  if (assertion.type === "contains" || assertion.type === "regex") {
+    const target = assertion.target === undefined ? "json" : assertion.target;
+    if (target !== "json" && target !== "text") throw new TypeError("Assertion target must be json or text");
+    if (target === "json") safeJsonPath(assertion.type === "contains" ? (assertion.path || "$") : assertion.path);
+  }
   if (assertion.type === "header" && (typeof assertion.name !== "string" || !/^[!#$%&'*+.^_\x60|~0-9A-Za-z-]{1,128}$/u.test(assertion.name))) {
     throw new TypeError("Header assertion requires a valid header name");
   }
