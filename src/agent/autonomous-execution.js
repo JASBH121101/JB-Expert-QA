@@ -211,6 +211,9 @@ function createPolicy(value = {}, registry) {
       requireApproval: rawRule.requireApproval ?? false
     }));
   }
+  if (value.stopOnFailure !== undefined && typeof value.stopOnFailure !== "boolean") {
+    throw new TypeError("policy.stopOnFailure must be a boolean");
+  }
   return Object.freeze({
     id,
     grantedPermissions: Object.freeze([...grantedPermissions]),
@@ -279,6 +282,7 @@ function normalizePlan(plan, maxInputBytes) {
   if (Object.keys(plan).some((key) => !allowedPlanKeys.has(key))) {
     throw new TypeError("Execution plan contains unsupported top-level fields");
   }
+  if (plan.actions.length < 1) throw new TypeError("Execution plan must contain at least one action");
   const planId = plan.id ?? null;
   if (planId !== null && (typeof planId !== "string" || !IDENTIFIER_PATTERN.test(planId))) {
     throw new TypeError("Execution plan id is invalid");
