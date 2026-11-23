@@ -12,6 +12,8 @@ const MAX_REPORT_STEPS = 100;
 export const API_WORKFLOW_TESTING_ENGINE_ID = "jb.api-workflow-testing-engine";
 export const API_WORKFLOW_TESTING_ENGINE_VERSION = "0.1.0";
 
+const compiledDefinitions = new WeakMap();
+
 export class ApiWorkflowError extends Error {
   constructor(code, message) {
     super(message);
@@ -438,7 +440,8 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
       throw new TypeError("workflow run options signal must be an AbortSignal");
     }
 
-    const workflow = compiled.definition;
+    const workflow = compiledDefinitions.get(compiled);
+    if (!workflow) throw new ApiWorkflowError("INVALID_COMPILED_WORKFLOW", "Compiled workflow definition is unavailable");
     const responses = new Map();
     const variables = new Map();
     const stepStates = new Map();
@@ -556,7 +559,7 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
 
   function compile(workflow) {
     const metadata = validateWorkflowDefinition(workflow);
-    const definition = Object.freeze(structuredClone(workflow));
+    const definition = structuredClone(workflow);
     const compiled = Object.freeze({
       workflowId: metadata.workflowId,
       version: metadata.version,
@@ -567,7 +570,7 @@ export function createApiWorkflowTestingEngine({ requestEngine, assertionsEngine
         return execute(compiled, options);
       }
     });
-    Object.defineProperty(compiled, "definition", { value: definition, enumerable: false });
+    compiledDefinitions.set(compiled, definition);
     return compiled;
   }
 
