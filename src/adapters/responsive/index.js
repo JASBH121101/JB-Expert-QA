@@ -4,7 +4,8 @@ export const RESPONSIVE_QA_LIMITS = Object.freeze({
   maxViewports: 9,
   maxThemes: 2,
   maxResults: 18,
-  maxFindingsPerViewport: 25
+  maxFindingsPerViewport: 25,
+  maxInteractionActions: 8
 });
 
 function validateMatrix(viewports, themes) {
@@ -40,30 +41,52 @@ function boundedResult(item) {
   });
 }
 
-export async function runResponsiveQa(target, options = {}) {
-  if (!target || typeof target.url !== "string" || !target.url.trim()) {
-    throw new TypeError("Responsive QA target.url must be a non-empty string");
+export function createResponsiveQaAdapter({ audit = auditViewports } = {}) {
+  if (typeof audit !== "function") {
+    throw new TypeError("Responsive QA audit implementation must be a function");
   }
-  const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
-  const themes = options.themes ?? ["light"];
-  validateMatrix(viewports, themes);
 
-  // Baseline changes are opt-in only. Report and screenshot volume is bounded by
-  // the validated 9 x 2 matrix; this adapter never expands the canonical matrix.
-  const report = await auditViewports(target.url, {
-    ...options,
-    viewports,
-    themes,
-    updateBaselines: options.updateBaselines === true,
-    screenshotFullPage: options.screenshotFullPage === true
-  });
+  return async function runResponsiveQa(target, options = {}) {
+    if (!target || typeof target.url !== "string" || !target.url.trim()) {
+      throw new TypeError("Responsive QA target.url must be a non-empty string");
+    }
+    if (!options || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("Responsive QA options must be an object");
+    }
 
-  return Object.freeze({
-    engine: "responsive",
-    limits: RESPONSIVE_QA_LIMITS,
-    summary: report.summary,
-    passed: report.passed === true,
-    themeComparisons: Object.freeze((report.themeComparisons ?? []).slice(0, 9)),
-    viewports: Object.freeze((report.viewports ?? []).slice(0, RESPONSIVE_QA_LIMITS.maxResults).map(boundedResult))
-  });
+    const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+    const themes = options.themes ?? ["light"];
+    validateMatrix(viewports, themes);
+
+    const interactionExploration = options.interactionExploration === true;
+    const maxInteractionActions = options.maxInteractionActions ?? RESPONSIVE_QA_LIMITS.maxInteractionActions;
+    if (!Number.isInteger(maxInteractionActions) || maxInteractionActions < 1 ||
+        maxInteractionActions > RESPONSIVE_QA_LIMITS.maxInteractionActions) {
+      throw new TypeError("Responsive QA maxInteractionActions must be between 1 and 8");
+    }
+
+    // No implicit expansion: max 9 x 2 viewport/theme captures. Interaction
+    // exploration is opt-in and capped. Baseline writes require explicit true.
+    const report = await audit(target.url, {
+      ...options,
+      viewports,
+      themes,
+      interactionExploration,
+      maxInteractionActions,
+      updateBaselines: options.updateBaselines === true,
+      screenshotFullPage: options.screenshotFullPage === true
+    });
+
+    const viewportsReport = Array.isArray(report.viewports) ? report.viewports : [];
+    return Object.freeze({
+      engine: "responsive",
+      limits: RESPONSIVE_QA_LIMITS,
+      summary: report.summary ?? null,
+      passed: report.passed === true,
+      themeComparisons: Object.freeze((report.themeComparisons ?? []).slice(0, 9)),
+      viewports: Object.freeze(viewportsReport.slice(0, RESPONSIVE_QA_LIMITS.maxResults).map(boundedResult))
+    });
+  };
 }
+
+export const runResponsiveQa = createResponsiveQaAdapter();
