@@ -96,6 +96,23 @@ test("interrupted jobs require an explicit requeue decision and preserve attempt
   });
 });
 
+test("requeued interrupted jobs return to the tail of the FIFO queue", async () => {
+  await withTempDir(async (directory) => {
+    const filePath = join(directory, "jobs.json");
+    const first = createPersistentExecutionJobQueue({ filePath, now: clock() });
+    first.enqueue({ plan: "first-attempt" }, { id: "job-interrupted-first" });
+    first.enqueue({ plan: "already-waiting" }, { id: "job-still-queued" });
+    assert.equal(first.claimNext().id, "job-interrupted-first");
+    first.close();
+
+    const queue = createPersistentExecutionJobQueue({ filePath, now: clock() });
+    queue.requeueInterrupted("job-interrupted-first");
+    assert.equal(queue.claimNext().id, "job-still-queued");
+    assert.equal(queue.claimNext().id, "job-interrupted-first");
+    queue.close();
+  });
+});
+
 test("interrupted jobs can be explicitly finalized as failed without replay", async () => {
   await withTempDir(async (directory) => {
     const filePath = join(directory, "jobs.json");
