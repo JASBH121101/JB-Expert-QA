@@ -124,7 +124,7 @@ export function createExecutionWorker(options = {}) {
     }
   }
 
-  function assertReady() {
+  function assertReady({ allowDrain = false } = {}) {
     if (state === "stopping" || state === "stopped") {
       throw new ExecutionWorkerError("WORKER_NOT_STARTED", "worker must be started before it can consume jobs");
     }
@@ -134,13 +134,13 @@ export function createExecutionWorker(options = {}) {
     if (state !== "ready") {
       throw new ExecutionWorkerError("WORKER_NOT_READY", "worker is not ready to consume jobs");
     }
-    if (drainPromise !== null) {
+    if (drainPromise !== null && !allowDrain) {
       throw new ExecutionWorkerError("WORKER_DRAINING", "worker is already draining the queue");
     }
   }
 
-  async function processOne() {
-    assertReady();
+  async function processOne({ fromDrain = false } = {}) {
+    assertReady({ allowDrain: fromDrain });
     assertRuntimeReady();
 
     const job = claimNext();
@@ -202,7 +202,7 @@ export function createExecutionWorker(options = {}) {
     const operation = (async () => {
       const jobs = [];
       while (jobs.length < maxJobs && state === "ready") {
-        const job = await processOne();
+        const job = await processOne({ fromDrain: true });
         if (job === null) break;
         jobs.push(Object.freeze({ id: job.id, state: job.state }));
       }
