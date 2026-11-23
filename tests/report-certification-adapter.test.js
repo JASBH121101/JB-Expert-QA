@@ -226,7 +226,7 @@ test("JSON, Markdown and HTML formats produce safe artifacts and retain checkpoi
   assert.match(html.artifact, /<!doctype html>/iu);
   assert.match(html.artifact, /Certification Report/iu);
   assert.equal(html.artifact.includes("secret-report-value"), false);
-  assert.match(html.artifact, /sha256/iu);
+  assert.match(html.artifact, /SHA-256/u);
 });
 
 test("target labels are anonymized and sensitive data is not included in exports", async () => {
