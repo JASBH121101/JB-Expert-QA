@@ -34,7 +34,9 @@
     "test:language-qa": "node --test tests/language-qa-engine.test.js tests/language-qa-translation-memory-suggestions.test.js tests/language-qa-linguistic-signals.test.js tests/language-qa-translation-memory-snapshots.test.js tests/language-qa-glossary-performance.test.js",
     "sccm:check": "npm --workspace @jb/sccm run test",
     "sccm:report": "node scripts/sccm-report.mjs",
-    "benchmark:language-qa": "node bench/language-qa.js"
+    "benchmark:language-qa": "node bench/language-qa.js",
+    "qa:local": "node scripts/local-certification.mjs --profile=core",
+    "qa:local:full": "node scripts/local-certification.mjs --profile=full"
   },
   "dependencies": {
     "axe-core": "4.14.0",
