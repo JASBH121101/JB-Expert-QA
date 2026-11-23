@@ -28,6 +28,7 @@
     "audit:language": "node src/language-cli.js",
     "test:resilience-engine": "node --test packages/resilience-engine/tests/*.test.js",
     "test:engine-contracts": "npm --workspace @jb/engine-contracts run test",
+    "test:autonomous-execution": "node --test tests/autonomous-execution.test.js",
     "test:localization-engine": "node --test packages/localization-engine/tests/localization-engine.test.js",
     "test:currency-engine": "node --test packages/currency-engine/tests/currency-engine.test.js",
     "test:internationalization": "npm run test:language-qa && npm run test:localization-engine && npm run test:currency-engine",
