@@ -58,6 +58,7 @@ Runs all core checks and adds:
 2. test:resilience-engine.
 3. test:internationalization.
 4. test:dead-code.
+5. test:autonomous-execution — policy-bounded orchestration, approval gates and hash-chained ledger.
 
 The profile is an allowlist of fixed scripts in this repository. User input cannot supply an arbitrary command or shell fragment.
 
