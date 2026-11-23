@@ -1,0 +1,43 @@
+name: Temporary Block 2 Local Certification
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/agent/autonomous-execution.js'
+      - 'src/agent/execution-ledger.js'
+      - 'tests/autonomous-execution.test.js'
+      - 'tests/local-certification.test.js'
+      - 'scripts/local-certification.mjs'
+      - 'package.json'
+      - 'packages/expert-qa/package.json'
+      - 'scripts/build-expert-qa-package.js'
+      - 'packages/expert-qa/package-tests/complete-engine.spec.js'
+      - '.github/workflows/block-2-local-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout PR merge candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install repository dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: Focused Autonomous Execution tests
+        run: npm run test:autonomous-execution
+      - name: Core local certification
+        run: npm run qa:local
+      - name: Full local certification
+        run: npm run qa:local:full
