@@ -88,3 +88,12 @@ export {
   QA_ENGINE_EXECUTION_PERMISSION,
   QA_ENGINE_ORCHESTRATOR_RISK
 } from "./engine-registry/orchestrator.js";
+
+export {
+  createStaticQaEngineAdapter,
+  registerStaticQaEngine,
+  StaticQaAdapterError,
+  STATIC_QA_ADAPTER_ID,
+  STATIC_QA_ADAPTER_VERSION,
+  STATIC_QA_ADAPTER_CAPABILITIES
+} from "./engine-registry/adapters/static-qa.js";

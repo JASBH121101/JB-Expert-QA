@@ -32,6 +32,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "createAuditEngineRegistry",
     "createQaEngineRegistry",
     "createApiTestingEngineAdapter",
+    "createStaticQaEngineAdapter",
+    "registerStaticQaEngine",
+    "StaticQaAdapterError",
+    "STATIC_QA_ADAPTER_ID",
+    "STATIC_QA_ADAPTER_VERSION",
+    "STATIC_QA_ADAPTER_CAPABILITIES",
     "registerApiTestingEngine",
     "createQaEngineOrchestrator",
     "getQaEngineActionType",
@@ -179,4 +185,28 @@ test("standalone package orchestrates the registered API Testing Engine through 
   assert.equal(result.status, "succeeded");
   assert.deepEqual(result.actions[0].output.json, { ok: true });
   assert.equal(calls, 1);
+});
+
+
+test("standalone Expert QA package runs the canonical Static QA adapter without external advisory lookups", async () => {
+  const { mkdtemp, mkdir, rm, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const root = await mkdtemp(join(tmpdir(), "jbqa-static-package-"));
+  try {
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "src", "standalone.js"), "export const ready = true;\n", "utf8");
+
+    const registry = engine.createQaEngineRegistry();
+    const metadata = engine.registerStaticQaEngine(registry);
+    assert.equal(metadata.id, engine.STATIC_QA_ADAPTER_ID);
+    assert.equal(registry.has(engine.STATIC_QA_ADAPTER_ID), true);
+
+    const result = await registry.getRunner(metadata.id)({ path: root });
+    assert.equal(result.readOnly, true);
+    assert.equal(result.dependencyAdvisories.enabled, false);
+    assert.equal(result.dependencyAdvisories.networkRequests, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

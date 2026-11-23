@@ -31,7 +31,8 @@
     "./database": "./src/adapters/filesystem/audit-database.js",
     "./engine-registry": "./src/engine-registry/index.js",
     "./api-testing-adapter": "./src/engine-registry/adapters/api-testing.js",
-    "./engine-orchestrator": "./src/engine-registry/orchestrator.js"
+    "./engine-orchestrator": "./src/engine-registry/orchestrator.js",
+    "./static-qa-adapter": "./src/engine-registry/adapters/static-qa.js"
   },
   "files": [
     "src/**",
