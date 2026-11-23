@@ -100,6 +100,21 @@ A green workflow is necessary but not sufficient. Final certification requires:
 
 Possible outcomes: **Passed**, **Passed with observations**, or **Not passed**. This internal result is not an independent third-party certification and does not establish production readiness.
 
+## Autonomous execution engine — Block 2
+
+JB Expert QA includes a policy-bounded orchestration layer, separate from the AI-assisted supervised autopilot.
+
+- The engine executes only trusted handlers registered by the embedding application. It has no built-in shell, arbitrary command, deployment, publishing, database-write or production-mutation handler.
+- A plan can select action IDs and provide JSON input only. It cannot assign its own risk, permissions, scope, approval receipt or execution limits.
+- Policy allowlists exact action types, preauthorized permissions, risk ceilings, optional path scopes, action-count limits, total runtime, per-action runtime, approval timeout and payload-size limits.
+- Missing permission, unknown action, exceeded risk, invalid input/output and out-of-scope resource requests are denied before the handler is invoked.
+- Medium- and high-risk actions require an external approval callback and a structured approval receipt. Approval cannot add permissions or override an action type that policy does not allow.
+- Actions run sequentially. The default behavior stops after the first blocked, failed, cancelled or timed-out action. AbortSignal and timeout cancellation are passed to handlers; handlers must honor cancellation and must not continue side effects after abort.
+- Input/output payloads are returned to the caller but are not copied into the ledger. The ledger stores action metadata, status, durations, approval IDs, resource-scope digests and SHA-256 input/output digests.
+- The in-memory ledger is the default. A local JSONL ledger can be selected explicitly; its hash chain detects accidental edits, truncation and reordering, but it is not an immutable remote store or a defense against an attacker who can rewrite the entire file. Host-level access controls and backups remain required.
+
+The engine is deny-by-default: an empty registry and empty rule set authorize no work. No action becomes executable merely because an AI model proposed it. The existing autopilot remains separately supervised; this block does not enable source upload, patch application, Git pushes, pull-request creation, merges or deployments.
+
 ## Safety and cost controls
 
 - No changes to `main`, production databases, customer files, deployments or external infrastructure.
