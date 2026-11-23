@@ -380,7 +380,7 @@ export function printHelp() {
     "",
     "Profiles:",
     "  core  Root regression, package distribution, engine contracts and Threat Lab",
-    "  full  Core plus Security Guard, Resilience, internationalization and dead-code tests",
+    "  full  Core plus Security Guard, Resilience, internationalization, dead-code and autonomous-execution tests",
     "",
     "The runner is local-first. It does not call GitHub APIs, GitHub Actions, Cloudflare, or deployment services.",
     "Dependencies must already be installed; install them separately with npm ci."
