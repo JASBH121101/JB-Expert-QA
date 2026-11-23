@@ -26,6 +26,7 @@
     "test:threat-lab": "npm --workspace @jb/threat-lab run check",
     "audit:database:postgres": "node src/postgres-database-cli.js",
     "audit:language": "node src/language-cli.js",
+    "dashboard": "node src/dashboard-cli.js",
     "test:resilience-engine": "node --test packages/resilience-engine/tests/*.test.js",
     "test:engine-contracts": "npm --workspace @jb/engine-contracts run test",
     "test:autonomous-execution": "node --test tests/autonomous-execution.test.js",
@@ -37,7 +38,8 @@
     "sccm:report": "node scripts/sccm-report.mjs",
     "benchmark:language-qa": "node bench/language-qa.js",
     "qa:local": "node scripts/local-certification.mjs --profile=core",
-    "qa:local:full": "node scripts/local-certification.mjs --profile=full"
+    "qa:local:full": "node scripts/local-certification.mjs --profile=full",
+    "test:dashboard": "node --test tests/dashboard.test.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",

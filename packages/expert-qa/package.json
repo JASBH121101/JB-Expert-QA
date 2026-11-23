@@ -13,11 +13,13 @@
     "jb-qa-security": "./src/security-cli.js",
     "jb-qa-security-url": "./src/security-url-cli.js",
     "jb-qa-autopilot": "./src/autopilot-cli.js",
-    "jb-qa-db": "./src/database-cli.js"
+    "jb-qa-db": "./src/database-cli.js",
+    "jb-qa-dashboard": "./src/dashboard-cli.js"
   },
   "exports": {
     ".": "./src/index.js",
     "./audit-engines": "./src/audit-engines/index.js",
+    "./dashboard": "./src/dashboard/server.js",
     "./cli": "./cli/package-cli.js",
     "./browser": "./src/adapters/playwright/audit-url.js",
     "./visual": "./src/adapters/visual/png-diff.js",
