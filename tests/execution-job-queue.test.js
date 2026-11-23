@@ -67,6 +67,22 @@ test("payload and result must be JSON serializable; snapshots are immutable", ()
   assert.ok(Object.isFrozen(job.payload));
   const claimed = queue.claimNext();
   assert.throws(() => queue.complete(claimed.id, { fn() {} }), (error) => error.code === "INVALID_PAYLOAD");
+  let getterCalled = false;
+  const accessorPayload = {};
+  Object.defineProperty(accessorPayload, "secret", {
+    enumerable: true,
+    get() {
+      getterCalled = true;
+      return "value";
+    }
+  });
+  assert.throws(() => queue.enqueue(accessorPayload), (error) => error.code === "INVALID_PAYLOAD");
+  assert.equal(getterCalled, false);
+  const cyclicPayload = {};
+  cyclicPayload.self = cyclicPayload;
+  assert.throws(() => queue.enqueue(cyclicPayload), (error) => error.code === "INVALID_PAYLOAD");
+  assert.throws(() => queue.enqueue({ missing: undefined }), (error) => error.code === "INVALID_PAYLOAD");
+  assert.throws(() => queue.enqueue({ amount: Number.POSITIVE_INFINITY }), (error) => error.code === "INVALID_PAYLOAD");
 });
 
 test("terminal retention can be explicitly cleared; active jobs cannot be removed", () => {
