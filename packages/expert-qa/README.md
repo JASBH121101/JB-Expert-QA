@@ -123,3 +123,8 @@ The standalone package exports the canonical visual/layout adapter from `@jb/exp
 ## Report & Certification Engine Adapter
 
 The standalone package exports the scope-aware report and certification adapter from `@jb/expert-qa/report-certification-adapter` and the root API. Register it with `registerReportCertificationEngine(registry)` and provide bounded dashboard history to generate JSON, Markdown or HTML artifacts plus a SHA-256 checkpoint. Assessment states preserve `NOT_ASSESSED`, `NOT_PASSED`, `REVIEW_REQUIRED`, `OBSERVATIONS` and `PASSED_WITHIN_RECORDED_SCOPE`. This adapter does not rerun audits, write files, or average scores across engines. See [Report & Certification Adapter](../../docs/REPORT-CERTIFICATION-ADAPTER.md).
+
+
+## Policy-Gated Phase 4 Dashboard Execution
+
+The package exports `createDashboardPhase4Catalog` and `createDashboardPhase4Execution`. The Dashboard execution bridge is disabled unless the host supplies a sealed engine registry, an exact high-risk allowlist policy with `qa:engine-execute`, and a real external `requestApproval` provider. The browser cannot submit or override policy, permissions, risk, action IDs or approval receipts. See [Phase 4 Block 13 — Policy-Gated Dashboard Execution](../../docs/PHASE4-BLOCK13-POLICY-GATED-EXECUTION.md).
