@@ -43,6 +43,8 @@ export { createAiProviderRouter } from "./ai/provider-router.js";
 export { reviewScreenshot, reviewViewportScreenshots, validateVisualReview } from "./ai/visual-review.js";
 export { createRemediationPlan, validateRemediationPlan } from "./ai/remediation-plan.js";
 export { runAutopilot } from "./agent/autopilot.js";
+export { createAutonomousExecutionEngine } from "./agent/autonomous-execution.js";
+export { createInMemoryExecutionLedger, createJsonlExecutionLedger, verifyExecutionLedger, digestExecutionValue } from "./agent/execution-ledger.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
 export {
   SECURITY_BRIDGE_PROTOCOL,
