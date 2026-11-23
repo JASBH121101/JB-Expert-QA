@@ -181,10 +181,10 @@ function headerValue(headers, candidates) {
   return null;
 }
 
-function numericHeader(value) {
+function numericHeader(value, maximum = MAX_RETRY_AFTER_SECONDS) {
   if (typeof value !== "string" || !/^\d+(?:\.\d+)?$/.test(value.trim())) return null;
   const number = Number(value);
-  return Number.isFinite(number) && number >= 0 && number <= MAX_RETRY_AFTER_SECONDS ? number : null;
+  return Number.isFinite(number) && number >= 0 && number <= maximum ? number : null;
 }
 
 function retryAfterSeconds(value) {
@@ -202,8 +202,8 @@ function detectRateLimit(sample) {
   const limitRaw = headerValue(sample.headers, RATE_LIMIT_LIMIT_HEADERS);
   const resetRaw = headerValue(sample.headers, RATE_LIMIT_RESET_HEADERS);
   const retryRaw = headerValue(sample.headers, ["retry-after"]);
-  const remaining = numericHeader(remainingRaw);
-  const limit = numericHeader(limitRaw);
+  const remaining = numericHeader(remainingRaw, Number.MAX_SAFE_INTEGER);
+  const limit = numericHeader(limitRaw, Number.MAX_SAFE_INTEGER);
   const resetSeconds = numericHeader(resetRaw);
   const retrySeconds = retryAfterSeconds(retryRaw);
   const throttled = sample.status === 429 || remaining === 0;
