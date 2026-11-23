@@ -69,32 +69,44 @@ function safeErrorMessage(error) {
 }
 
 /**
- * A manually activated, single-concurrency worker which consumes the bounded
- * job queue and delegates every audit plan to the policy-gated QA runtime.
+ * A manually activated, single-concurrency worker. It passes a cooperative
+ * AbortSignal into the policy-gated runtime, supports opt-in deadlines and
+ * active cancellation, and never auto-retries failed work.
  *
- * Construction is inert. start() is an explicit opt-in and does not start a
- * background polling loop. Hosts drive runNext() or drain() from their own
- * local process/CLI. Runtime policy, approval and the audit ledger remain
- * inside the existing orchestrator.
+ * Retry decisions belong to an operator through queue.retryFailed(). Timeout
+ * and cancellation are cooperative: an adapter that ignores AbortSignal cannot
+ * be forcibly stopped by this in-process worker.
  */
 export function createExecutionWorker(options = {}) {
-  const config = readRecord(options, "options", new Set(["queue", "runtime", "workerId"]));
+  const config = readRecord(
+    options,
+    "options",
+    new Set(["queue", "runtime", "workerId", "timeoutMs"])
+  );
   const claimNext = readMethod(config.queue, "claimNext", "queue");
   const completeJob = readMethod(config.queue, "complete", "queue");
   const failJob = readMethod(config.queue, "fail", "queue");
+  const cancelRunningJob = readMethod(config.queue, "cancelRunning", "queue");
   const getQueueStats = readMethod(config.queue, "stats", "queue");
   const getRuntimeStatus = readMethod(config.runtime, "getStatus", "runtime");
   const executeRuntime = readMethod(config.runtime, "execute", "runtime");
 
   const workerId = normalizeWorkerId(config.workerId);
+  const timeoutMs = config.timeoutMs ?? null;
+  if (timeoutMs !== null && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000)) {
+    throw new ExecutionWorkerError("INVALID_TIMEOUT", "timeoutMs must be an integer from 1 to 600000");
+  }
+
   let state = "stopped";
   let startedOnce = false;
   let activeJobId = null;
   let activeExecution = null;
+  let activeAbortController = null;
   let drainPromise = null;
   let stopPromise = null;
   let completedJobs = 0;
   let failedJobs = 0;
+  let cancelledJobs = 0;
 
   function getStatus() {
     return Object.freeze({
@@ -103,9 +115,12 @@ export function createExecutionWorker(options = {}) {
       enabled: state === "ready" || state === "busy" || state === "stopping",
       activeJobId,
       active: activeExecution !== null,
+      abortRequested: activeAbortController?.signal.aborted === true,
+      timeoutMs,
       draining: drainPromise !== null,
       completedJobs,
       failedJobs,
+      cancelledJobs,
       queue: getQueueStats()
     });
   }
@@ -153,18 +168,55 @@ export function createExecutionWorker(options = {}) {
 
     activeJobId = job.id;
     state = "busy";
+    const controller = new AbortController();
+    activeAbortController = controller;
 
     const execution = (async () => {
+      let timeoutHandle = null;
+      let timedOut = false;
       try {
-        const result = await executeRuntime(job.payload, { executionId: job.id });
+        if (timeoutMs !== null) {
+          timeoutHandle = setTimeout(() => {
+            timedOut = true;
+            controller.abort(new ExecutionWorkerError(
+              "EXECUTION_TIMEOUT",
+              "Execution exceeded the configured " + timeoutMs + " ms deadline"
+            ));
+          }, timeoutMs);
+        }
+
+        const result = await executeRuntime(job.payload, {
+          executionId: job.id,
+          signal: controller.signal
+        });
+        if (timedOut) {
+          throw new ExecutionWorkerError("EXECUTION_TIMEOUT", "Execution exceeded the configured deadline");
+        }
+        if (controller.signal.aborted) {
+          throw new ExecutionWorkerError("EXECUTION_CANCELLED", "Execution was cancelled by the operator");
+        }
+
         const completed = completeJob(job.id, result);
         completedJobs += 1;
         return completed;
       } catch (error) {
+        if (timedOut) {
+          const failed = failJob(job.id, "Execution timed out after " + timeoutMs + " ms");
+          failedJobs += 1;
+          return failed;
+        }
+        if (controller.signal.aborted) {
+          const reason = controller.signal.reason ?? error;
+          const cancelled = cancelRunningJob(job.id, safeErrorMessage(reason));
+          cancelledJobs += 1;
+          return cancelled;
+        }
         const failed = failJob(job.id, safeErrorMessage(error));
         failedJobs += 1;
         return failed;
       } finally {
+        if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+        if (activeAbortController === controller) activeAbortController = null;
         activeJobId = null;
         activeExecution = null;
         if (state === "busy") state = "ready";
@@ -213,6 +265,7 @@ export function createExecutionWorker(options = {}) {
         processed: jobs.length,
         completed: jobs.filter((job) => job.state === "completed").length,
         failed: jobs.filter((job) => job.state === "failed").length,
+        cancelled: jobs.filter((job) => job.state === "cancelled").length,
         jobs: Object.freeze(jobs)
       });
     })();
@@ -225,12 +278,20 @@ export function createExecutionWorker(options = {}) {
     }
   }
 
+  function cancelActive(reason = "Execution cancelled by operator") {
+    if (!activeAbortController || activeAbortController.signal.aborted) return false;
+    const message = safeErrorMessage(reason);
+    activeAbortController.abort(new ExecutionWorkerError("EXECUTION_CANCELLED", message));
+    return true;
+  }
+
   function stop() {
     if (stopPromise) return stopPromise;
     if (state === "stopped") return Promise.resolve(getStatus());
 
     state = "stopping";
     stopPromise = (async () => {
+      // stop() remains graceful. Use cancelActive() for an explicit cooperative abort.
       const pending = [activeExecution, drainPromise].filter(Boolean);
       await Promise.all(pending.map((promise) => promise.then(() => undefined, () => undefined)));
       activeJobId = null;
@@ -246,6 +307,7 @@ export function createExecutionWorker(options = {}) {
     start,
     runNext,
     drain,
+    cancelActive,
     stop
   });
 }

@@ -34,3 +34,7 @@ Cancellation is intentionally limited to queued jobs. Running execution cancella
 ## Persistence follow-up
 
 The base `createExecutionJobQueue()` remains in-memory by default. Phase 5 Block 4 adds the opt-in `createPersistentExecutionJobQueue({ filePath, ... })` wrapper, which preserves this lifecycle contract using a local durable JSON store and explicit interrupted-job recovery. See `PHASE5-BLOCK4-DURABLE-JOB-PERSISTENCE.md` for durability and recovery semantics.
+
+## Phase 5 Block 5 follow-up
+
+Block 5 adds cooperative running-job cancellation through `cancelRunning()` after the worker's AbortSignal flow settles. It also adds explicit bounded `retryFailed()` with persisted `nextAttemptAt` scheduling. See `PHASE5-BLOCK5-RETRY-TIMEOUT-CANCELLATION.md` for the full contract.

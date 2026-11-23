@@ -89,6 +89,8 @@ function copyJob(job) {
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
+    nextAttemptAt: job.nextAttemptAt ?? null,
+    maxAttempts: job.maxAttempts,
     payload: cloneJson(job.payload, "job payload"),
     result: job.result === undefined ? undefined : cloneJson(job.result, "job result"),
     error: job.error,
@@ -149,7 +151,7 @@ export function createExecutionJobQueue(options = {}) {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
     throw new ExecutionJobQueueError("INVALID_OPTIONS", "options must be an object");
   }
-  const allowed = new Set(["maxQueueSize", "maxJobs", "now", "persistence"]);
+  const allowed = new Set(["maxQueueSize", "maxJobs", "maxAttempts", "now", "persistence"]);
   const config = Object.create(null);
   for (const key of Reflect.ownKeys(options)) {
     if (typeof key !== "string" || !allowed.has(key)) {
@@ -164,6 +166,7 @@ export function createExecutionJobQueue(options = {}) {
 
   const maxQueueSize = config.maxQueueSize ?? 50;
   const maxJobs = config.maxJobs ?? 500;
+  const maxAttempts = config.maxAttempts ?? 3;
   const now = config.now ?? (() => new Date().toISOString());
   const persistence = readPersistence(config.persistence);
 
@@ -172,6 +175,9 @@ export function createExecutionJobQueue(options = {}) {
   }
   if (!Number.isSafeInteger(maxJobs) || maxJobs < 1 || maxJobs > 10000) {
     throw new ExecutionJobQueueError("INVALID_JOB_LIMIT", "maxJobs must be an integer from 1 to 10000");
+  }
+  if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10) {
+    throw new ExecutionJobQueueError("INVALID_ATTEMPT_LIMIT", "maxAttempts must be an integer from 1 to 10");
   }
   if (typeof now !== "function") {
     throw new ExecutionJobQueueError("INVALID_CLOCK", "now must be a function");
@@ -263,6 +269,9 @@ export function createExecutionJobQueue(options = {}) {
           typeof record.createdAt !== "string" || !record.createdAt.trim() ||
           !(record.startedAt === null || typeof record.startedAt === "string") ||
           !(record.finishedAt === null || typeof record.finishedAt === "string") ||
+          !(record.nextAttemptAt === undefined || record.nextAttemptAt === null ||
+            (typeof record.nextAttemptAt === "string" && Number.isFinite(Date.parse(record.nextAttemptAt)))) ||
+          !(record.maxAttempts === undefined || (Number.isSafeInteger(record.maxAttempts) && record.maxAttempts >= 1 && record.maxAttempts <= 10)) ||
           !(record.error === null || typeof record.error === "string") ||
           !(record.idempotencyKey === null || (typeof record.idempotencyKey === "string" && ID_PATTERN.test(record.idempotencyKey))) ||
           !Number.isSafeInteger(record.attempts) || record.attempts < 0 ||
@@ -280,6 +289,8 @@ export function createExecutionJobQueue(options = {}) {
         createdAt: record.createdAt,
         startedAt: record.startedAt,
         finishedAt: record.finishedAt,
+        nextAttemptAt: record.nextAttemptAt ?? null,
+        maxAttempts: record.maxAttempts ?? maxAttempts,
         payload: cloneJson(record.payload, "persisted job payload"),
         result: record.result === undefined ? undefined : cloneJson(record.result, "persisted job result"),
         error: record.error,
@@ -365,6 +376,8 @@ export function createExecutionJobQueue(options = {}) {
         createdAt,
         startedAt: null,
         finishedAt: null,
+        nextAttemptAt: null,
+        maxAttempts,
         payload: clonedPayload,
         result: undefined,
         error: null,
@@ -380,13 +393,28 @@ export function createExecutionJobQueue(options = {}) {
 
   function claimNext() {
     return transact(() => {
-      while (fifo.length) {
-        const id = fifo.shift();
+      if (fifo.length === 0) return null;
+      const currentTime = timestamp();
+      const currentTimeMs = Date.parse(currentTime);
+      if (!Number.isFinite(currentTimeMs)) {
+        throw new ExecutionJobQueueError("INVALID_CLOCK_VALUE", "clock must return a valid ISO-compatible timestamp");
+      }
+      for (let index = 0; index < fifo.length;) {
+        const id = fifo[index];
         const job = jobs.get(id);
-        if (!job || job.state !== "queued") continue;
+        if (!job || job.state !== "queued") {
+          fifo.splice(index, 1);
+          continue;
+        }
+        if (job.nextAttemptAt && Date.parse(job.nextAttemptAt) > currentTimeMs) {
+          index += 1;
+          continue;
+        }
+        fifo.splice(index, 1);
         job.state = "running";
-        job.startedAt = timestamp();
+        job.startedAt = currentTime;
         job.finishedAt = null;
+        job.nextAttemptAt = null;
         job.error = null;
         job.attempts += 1;
         return snapshot(job);
@@ -402,6 +430,7 @@ export function createExecutionJobQueue(options = {}) {
       if (job.state !== "running") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only running jobs can complete");
       job.result = cloneJson(result, "job result");
       job.state = "completed";
+      job.nextAttemptAt = null;
       job.finishedAt = timestamp();
       return snapshot(job);
     });
@@ -415,6 +444,7 @@ export function createExecutionJobQueue(options = {}) {
       const message = error instanceof Error ? error.message : String(error);
       job.error = message.slice(0, 1000);
       job.state = "failed";
+      job.nextAttemptAt = null;
       job.finishedAt = timestamp();
       return snapshot(job);
     });
@@ -426,7 +456,63 @@ export function createExecutionJobQueue(options = {}) {
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "queued") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only queued jobs can be cancelled");
       job.state = "cancelled";
+      job.nextAttemptAt = null;
       job.finishedAt = timestamp();
+      return snapshot(job);
+    });
+  }
+
+  function cancelRunning(id, reason = "Running job was cancelled.") {
+    return transact(() => {
+      const job = jobs.get(id);
+      if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
+      if (job.state !== "running") {
+        throw new ExecutionJobQueueError("INVALID_TRANSITION", "only running jobs can be cancelled after cooperative abort");
+      }
+      const message = reason instanceof Error ? reason.message : String(reason);
+      job.state = "cancelled";
+      job.error = message.slice(0, 1000);
+      job.nextAttemptAt = null;
+      job.finishedAt = timestamp();
+      return snapshot(job);
+    });
+  }
+
+  /**
+   * Explicit operator retry for failed jobs. Retries are bounded by maxAttempts
+   * and use exponential backoff by default; they are never scheduled automatically.
+   */
+  function retryFailed(id, options = {}) {
+    const { delayMs } = readQueueOptions(options, "retry options", new Set(["delayMs"]));
+    return transact(() => {
+      const job = jobs.get(id);
+      if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
+      if (job.state !== "failed") {
+        throw new ExecutionJobQueueError("INVALID_TRANSITION", "only failed jobs can be retried");
+      }
+      if (job.attempts >= job.maxAttempts) {
+        throw new ExecutionJobQueueError("ATTEMPT_LIMIT_REACHED", "job has reached its configured attempt limit");
+      }
+      const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
+      if (queuedCount >= maxQueueSize) {
+        throw new ExecutionJobQueueError("QUEUE_FULL", "execution queue is at capacity");
+      }
+      const delay = delayMs ?? Math.min(1000 * (2 ** Math.max(0, job.attempts - 1)), 60000);
+      if (!Number.isSafeInteger(delay) || delay < 0 || delay > 86400000) {
+        throw new ExecutionJobQueueError("INVALID_RETRY_DELAY", "delayMs must be an integer from 0 to 86400000");
+      }
+      const currentTime = timestamp();
+      const currentTimeMs = Date.parse(currentTime);
+      if (!Number.isFinite(currentTimeMs)) {
+        throw new ExecutionJobQueueError("INVALID_CLOCK_VALUE", "clock must return a valid ISO-compatible timestamp");
+      }
+      job.state = "queued";
+      job.finishedAt = null;
+      job.nextAttemptAt = delay === 0 ? null : new Date(currentTimeMs + delay).toISOString();
+      // Preserve the previous error for inspection until the retry is claimed.
+      jobs.delete(job.id);
+      jobs.set(job.id, job);
+      fifo.push(job.id);
       return snapshot(job);
     });
   }
@@ -436,10 +522,14 @@ export function createExecutionJobQueue(options = {}) {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "interrupted") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only interrupted jobs can be recovered");
+      if (job.attempts >= job.maxAttempts) {
+        throw new ExecutionJobQueueError("ATTEMPT_LIMIT_REACHED", "job has reached its configured attempt limit");
+      }
       const queuedCount = fifo.reduce((count, jobId) => count + (jobs.get(jobId)?.state === "queued" ? 1 : 0), 0);
       if (queuedCount >= maxQueueSize) throw new ExecutionJobQueueError("QUEUE_FULL", "execution queue is at capacity");
       job.state = "queued";
       job.error = null;
+      job.nextAttemptAt = null;
       job.finishedAt = null;
       // Move the recovered job to the tail so FIFO order reflects the retry decision.
       jobs.delete(job.id);
@@ -457,6 +547,7 @@ export function createExecutionJobQueue(options = {}) {
       const message = reason instanceof Error ? reason.message : String(reason);
       job.state = "failed";
       job.error = message.slice(0, 1000);
+      job.nextAttemptAt = null;
       job.finishedAt = timestamp();
       return snapshot(job);
     });
@@ -478,7 +569,7 @@ export function createExecutionJobQueue(options = {}) {
   function stats() {
     const counts = { queued: 0, running: 0, interrupted: 0, completed: 0, failed: 0, cancelled: 0, total: jobs.size };
     for (const job of jobs.values()) counts[job.state] += 1;
-    return Object.freeze({ ...counts, maxQueueSize, maxJobs, persistent: persistence !== null });
+    return Object.freeze({ ...counts, maxQueueSize, maxJobs, maxAttempts, persistent: persistence !== null });
   }
 
   function close() {
@@ -499,6 +590,8 @@ export function createExecutionJobQueue(options = {}) {
     complete,
     fail,
     cancel,
+    cancelRunning,
+    retryFailed,
     requeueInterrupted,
     failInterrupted,
     getJob,

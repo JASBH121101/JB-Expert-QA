@@ -64,7 +64,9 @@ test("worker claims a job, delegates to the runtime and records completion", asy
   assert.equal(completed.id, job.id);
   assert.equal(completed.state, "completed");
   assert.deepEqual(receivedPlan, { id: "plan-1", actions: [] });
-  assert.deepEqual(receivedOptions, { executionId: "job-1" });
+  assert.equal(receivedOptions.executionId, "job-1");
+  assert.ok(receivedOptions.signal instanceof AbortSignal);
+  assert.equal(receivedOptions.signal.aborted, false);
   assert.equal(queue.getJob("job-1").state, "completed");
   assert.equal(worker.getStatus().completedJobs, 1);
   assert.equal(runtime.calls, 1);
@@ -194,5 +196,83 @@ test("worker rejects untrusted dependency shapes and accessor options", () => {
   assert.throws(
     () => createExecutionWorker(options),
     (error) => error.code === "ACCESSOR_NOT_ALLOWED"
+  );
+});
+
+
+test("worker passes a cooperative abort signal and cancels an active job", async () => {
+  const queue = createExecutionJobQueue();
+  queue.enqueue({ id: "plan-cancel", actions: [] }, { id: "job-cancel" });
+  let seenSignal;
+  const runtime = createRuntime((_plan, options) => new Promise((_resolve, reject) => {
+    seenSignal = options.signal;
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  const worker = createExecutionWorker({ queue, runtime: runtime.runtime });
+  worker.start();
+
+  const active = worker.runNext();
+  await Promise.resolve();
+  assert.equal(worker.cancelActive("operator requested stop"), true);
+  const cancelled = await active;
+  assert.equal(seenSignal.aborted, true);
+  assert.equal(cancelled.state, "cancelled");
+  assert.equal(queue.getJob("job-cancel").state, "cancelled");
+  assert.equal(worker.getStatus().cancelledJobs, 1);
+  assert.equal(worker.cancelActive(), false);
+});
+
+test("worker timeout aborts the runtime and records a failed job", async () => {
+  const queue = createExecutionJobQueue();
+  queue.enqueue({ id: "plan-timeout", actions: [] }, { id: "job-timeout" });
+  let seenSignal;
+  const runtime = createRuntime((_plan, options) => new Promise((_resolve, reject) => {
+    seenSignal = options.signal;
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  const worker = createExecutionWorker({ queue, runtime: runtime.runtime, timeoutMs: 15 });
+  worker.start();
+
+  const failed = await worker.runNext();
+  assert.equal(seenSignal.aborted, true);
+  assert.equal(failed.state, "failed");
+  assert.match(failed.error, /timed out/u);
+  assert.equal(worker.getStatus().failedJobs, 1);
+});
+
+test("timeout does not release the single worker while a non-cooperative runtime is still active", async () => {
+  const queue = createExecutionJobQueue();
+  queue.enqueue({ id: "plan-stubborn", actions: [] }, { id: "job-stubborn" });
+  let release;
+  let seenSignal;
+  const runtime = createRuntime((_plan, options) => {
+    seenSignal = options.signal;
+    return new Promise((resolve) => { release = resolve; });
+  });
+  const worker = createExecutionWorker({ queue, runtime: runtime.runtime, timeoutMs: 10 });
+  worker.start();
+
+  const active = worker.runNext();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(seenSignal.aborted, true);
+  assert.equal(worker.getStatus().state, "busy");
+  assert.equal(queue.getJob("job-stubborn").state, "running");
+  release({ status: "late-completion" });
+
+  const failed = await active;
+  assert.equal(failed.state, "failed");
+  assert.equal(worker.getStatus().state, "ready");
+});
+
+test("worker validates timeout bounds and reports active abort state", async () => {
+  const queue = createExecutionJobQueue();
+  const runtime = createRuntime();
+  assert.throws(
+    () => createExecutionWorker({ queue, runtime: runtime.runtime, timeoutMs: 0 }),
+    (error) => error.code === "INVALID_TIMEOUT"
+  );
+  assert.throws(
+    () => createExecutionWorker({ queue, runtime: runtime.runtime, timeoutMs: 600001 }),
+    (error) => error.code === "INVALID_TIMEOUT"
   );
 });

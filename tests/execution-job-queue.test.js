@@ -105,3 +105,68 @@ test("unknown options, invalid limits, duplicate IDs and invalid state filters a
   assert.throws(() => queue.enqueue({ a: 2 }, { id: "duplicate" }), (error) => error.code === "DUPLICATE_JOB_ID");
   assert.throws(() => queue.listJobs({ state: "unknown" }), (error) => error.code === "INVALID_STATE_FILTER");
 });
+
+
+test("failed jobs support explicit bounded retries with backoff and delayed FIFO claiming", () => {
+  let current = Date.parse("2026-11-23T21:00:00.000Z");
+  const queue = createExecutionJobQueue({
+    maxAttempts: 2,
+    now: () => new Date(current).toISOString()
+  });
+  queue.enqueue({ work: "retryable-by-operator" }, { id: "retry-job" });
+  queue.claimNext();
+  queue.fail("retry-job", new Error("temporary adapter failure"));
+
+  const retried = queue.retryFailed("retry-job", { delayMs: 5000 });
+  assert.equal(retried.state, "queued");
+  assert.equal(retried.attempts, 1);
+  assert.equal(retried.nextAttemptAt, "2026-11-23T21:00:05.000Z");
+  assert.equal(queue.claimNext(), null);
+
+  current += 5000;
+  const secondAttempt = queue.claimNext();
+  assert.equal(secondAttempt.id, "retry-job");
+  assert.equal(secondAttempt.attempts, 2);
+  assert.equal(secondAttempt.nextAttemptAt, null);
+  queue.fail("retry-job", new Error("second attempt failed"));
+  assert.throws(
+    () => queue.retryFailed("retry-job"),
+    (error) => error instanceof ExecutionJobQueueError && error.code === "ATTEMPT_LIMIT_REACHED"
+  );
+});
+
+test("retry delay defaults to exponential backoff and validates bounds", () => {
+  let current = Date.parse("2026-11-23T21:00:00.000Z");
+  const queue = createExecutionJobQueue({ maxAttempts: 3, now: () => new Date(current).toISOString() });
+  queue.enqueue({ work: 1 }, { id: "backoff-job" });
+  queue.claimNext();
+  queue.fail("backoff-job", new Error("first failure"));
+  assert.throws(
+    () => queue.retryFailed("backoff-job", { delayMs: 86400001 }),
+    (error) => error.code === "INVALID_RETRY_DELAY"
+  );
+  const retry = queue.retryFailed("backoff-job");
+  assert.equal(retry.nextAttemptAt, "2026-11-23T21:00:01.000Z");
+  current += 1000;
+  assert.equal(queue.claimNext().attempts, 2);
+});
+
+test("running jobs can be marked cancelled only after cooperative abort settles", () => {
+  const queue = createExecutionJobQueue({ now: clock() });
+  queue.enqueue({ work: 1 }, { id: "running-cancel" });
+  assert.throws(() => queue.cancelRunning("running-cancel"), (error) => error.code === "INVALID_TRANSITION");
+  queue.claimNext();
+  const cancelled = queue.cancelRunning("running-cancel", "operator requested cancellation");
+  assert.equal(cancelled.state, "cancelled");
+  assert.equal(cancelled.error, "operator requested cancellation");
+  assert.throws(() => queue.cancelRunning("running-cancel"), (error) => error.code === "INVALID_TRANSITION");
+});
+
+test("retry and recovery attempt limits are validated", () => {
+  assert.throws(() => createExecutionJobQueue({ maxAttempts: 0 }), (error) => error.code === "INVALID_ATTEMPT_LIMIT");
+  const queue = createExecutionJobQueue({ maxAttempts: 1, now: clock() });
+  queue.enqueue({ work: 1 }, { id: "one-attempt" });
+  queue.claimNext();
+  queue.fail("one-attempt", "failed");
+  assert.throws(() => queue.retryFailed("one-attempt"), (error) => error.code === "ATTEMPT_LIMIT_REACHED");
+});

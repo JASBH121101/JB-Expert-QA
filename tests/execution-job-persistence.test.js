@@ -291,3 +291,39 @@ test("store adapter exposes stable schema envelope and private file permissions"
     store.close();
   });
 });
+
+
+test("persistent queue preserves a delayed manual retry across restart", async () => {
+  await withTempDir(async (directory) => {
+    let current = Date.parse("2026-11-23T21:00:00.000Z");
+    const filePath = join(directory, "retry-jobs.json");
+    const queue = createPersistentExecutionJobQueue({
+      filePath,
+      maxAttempts: 2,
+      now: () => new Date(current).toISOString()
+    });
+    queue.enqueue({ plan: "retry-after-restart" }, { id: "persisted-retry" });
+    queue.claimNext();
+    queue.fail("persisted-retry", "temporary failure");
+    const retried = queue.retryFailed("persisted-retry", { delayMs: 10000 });
+    assert.equal(retried.nextAttemptAt, "2026-11-23T21:00:10.000Z");
+    queue.close();
+
+    const reopened = createPersistentExecutionJobQueue({
+      filePath,
+      now: () => new Date(current).toISOString()
+    });
+    assert.equal(reopened.getJob("persisted-retry").maxAttempts, 2);
+    assert.equal(reopened.getJob("persisted-retry").state, "queued");
+    assert.equal(reopened.getJob("persisted-retry").nextAttemptAt, "2026-11-23T21:00:10.000Z");
+    assert.equal(reopened.claimNext(), null);
+    current += 10000;
+    assert.equal(reopened.claimNext().attempts, 2);
+    reopened.fail("persisted-retry", "second failure");
+    assert.throws(
+      () => reopened.retryFailed("persisted-retry"),
+      (error) => error.code === "ATTEMPT_LIMIT_REACHED"
+    );
+    reopened.close();
+  });
+});
