@@ -33,6 +33,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "createQaEngineRegistry",
     "createApiTestingEngineAdapter",
     "registerApiTestingEngine",
+    "createQaEngineOrchestrator",
+    "getQaEngineActionType",
+    "QaEngineOrchestratorError",
+    "QA_ENGINE_ACTION_PREFIX",
+    "QA_ENGINE_EXECUTION_PERMISSION",
+    "QA_ENGINE_ORCHESTRATOR_RISK",
     "ApiTestingAdapterError",
     "API_TESTING_ADAPTER_ID",
     "API_TESTING_ADAPTER_VERSION",
@@ -128,5 +134,49 @@ test("standalone Expert QA package connects API Testing Engine through the centr
   });
   assert.equal(result.status, 200);
   assert.deepEqual(result.json, { ok: true });
+  assert.equal(calls, 1);
+});
+
+
+test("standalone package orchestrates the registered API Testing Engine through policy and approval", async () => {
+  let calls = 0;
+  const registry = engine.createQaEngineRegistry();
+  engine.registerApiTestingEngine(registry, {
+    allowedOrigins: ["https://standalone-orchestrator.test"],
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  });
+  registry.seal();
+
+  const actionType = engine.getQaEngineActionType(engine.API_TESTING_ADAPTER_ID);
+  const orchestrator = engine.createQaEngineOrchestrator({
+    registry,
+    policy: {
+      id: "standalone-api-policy",
+      grantedPermissions: [engine.QA_ENGINE_EXECUTION_PERMISSION],
+      rules: [{ type: actionType, maxRisk: "high" }]
+    },
+    requestApproval: async () => ({ approved: true, approvalId: "standalone-approval-1" })
+  });
+
+  assert.equal(calls, 0, "construction must not invoke registered engines");
+  const result = await orchestrator.execute({
+    id: "standalone-api-plan",
+    actions: [{
+      id: "standalone-api-action",
+      type: actionType,
+      input: {
+        operation: "request",
+        request: { method: "GET", url: "https://standalone-orchestrator.test/health" }
+      }
+    }]
+  });
+  assert.equal(result.status, "succeeded");
+  assert.deepEqual(result.actions[0].output.json, { ok: true });
   assert.equal(calls, 1);
 });

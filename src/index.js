@@ -79,3 +79,12 @@ export { buildDashboardAnalytics, buildConsolidatedReport } from "./dashboard/an
 export { createQaEngineRegistry, QaEngineRegistryError, QA_ENGINE_ADAPTER_CONTRACT } from "./engine-registry/index.js";
 
 export { createApiTestingEngineAdapter, registerApiTestingEngine, ApiTestingAdapterError, API_TESTING_ADAPTER_ID, API_TESTING_ADAPTER_VERSION, API_TESTING_ADAPTER_OPERATIONS } from "./engine-registry/adapters/api-testing.js";
+
+export {
+  createQaEngineOrchestrator,
+  getQaEngineActionType,
+  QaEngineOrchestratorError,
+  QA_ENGINE_ACTION_PREFIX,
+  QA_ENGINE_EXECUTION_PERMISSION,
+  QA_ENGINE_ORCHESTRATOR_RISK
+} from "./engine-registry/orchestrator.js";

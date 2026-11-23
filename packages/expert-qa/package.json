@@ -30,7 +30,8 @@
     "./version": "./package-version.js",
     "./database": "./src/adapters/filesystem/audit-database.js",
     "./engine-registry": "./src/engine-registry/index.js",
-    "./api-testing-adapter": "./src/engine-registry/adapters/api-testing.js"
+    "./api-testing-adapter": "./src/engine-registry/adapters/api-testing.js",
+    "./engine-orchestrator": "./src/engine-registry/orchestrator.js"
   },
   "files": [
     "src/**",
