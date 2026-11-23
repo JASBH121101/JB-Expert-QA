@@ -159,3 +159,5 @@ export {
   createDashboardPhase4Execution,
   DashboardPhase4ExecutionError
 } from "./dashboard/phase4-execution.js";
+
+export { createDashboardPhase4Catalog } from "./dashboard/phase4-catalog.js";
