@@ -31,6 +31,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "auditViewports",
     "createAuditEngineRegistry",
     "createQaEngineRegistry",
+    "createApiTestingEngineAdapter",
+    "registerApiTestingEngine",
+    "ApiTestingAdapterError",
+    "API_TESTING_ADAPTER_ID",
+    "API_TESTING_ADAPTER_VERSION",
+    "API_TESTING_ADAPTER_OPERATIONS",
     "QaEngineRegistryError",
     "QA_ENGINE_ADAPTER_CONTRACT",
     "buildDashboardAnalytics",
@@ -65,6 +71,11 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   assert.equal(typeof engine.auditViewports, "function");
   assert.equal(typeof engine.createAuditEngineRegistry, "function");
   assert.equal(typeof engine.createQaEngineRegistry, "function");
+  assert.equal(typeof engine.createApiTestingEngineAdapter, "function");
+  assert.equal(typeof engine.registerApiTestingEngine, "function");
+  assert.equal(engine.API_TESTING_ADAPTER_ID, "jb.api-testing-engine");
+  assert.equal(engine.API_TESTING_ADAPTER_VERSION, "0.1.0");
+  assert.ok(engine.API_TESTING_ADAPTER_OPERATIONS.includes("rate-limit"));
   assert.equal(engine.QA_ENGINE_ADAPTER_CONTRACT, "jb.qa-engine-adapter/v1");
   assert.equal(typeof engine.buildDashboardAnalytics, "function");
   assert.equal(typeof engine.buildConsolidatedReport, "function");
@@ -90,4 +101,32 @@ test("the bundled engine keeps the default configuration and every specialist gr
   assert.ok((await readFile(resolve(root, "src/adapters/visual/png-diff.js"), "utf8")).includes("comparePngBuffers"));
   assert.ok((await readFile(resolve(root, "src/ai/visual-review.js"), "utf8")).includes("reviewViewportScreenshots"));
   assert.ok((await readFile(resolve(root, "src/agent/autopilot.js"), "utf8")).includes("runAutopilot"));
+});
+
+
+test("standalone Expert QA package connects API Testing Engine through the central registry", async () => {
+  let calls = 0;
+  const registry = engine.createQaEngineRegistry();
+  const metadata = engine.registerApiTestingEngine(registry, {
+    allowedOrigins: ["https://standalone-adapter.test"],
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  });
+
+  assert.equal(metadata.id, "jb.api-testing-engine");
+  assert.deepEqual(registry.find({ category: "api" }).map((item) => item.id), ["jb.api-testing-engine"]);
+  assert.equal(calls, 0, "registration must not send API requests");
+
+  const result = await registry.getRunner(metadata.id)({
+    operation: "request",
+    request: { method: "GET", url: "https://standalone-adapter.test/health" }
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.json, { ok: true });
+  assert.equal(calls, 1);
 });

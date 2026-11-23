@@ -29,7 +29,8 @@
     "./security-bridge": "./src/security-bridge/index.js",
     "./version": "./package-version.js",
     "./database": "./src/adapters/filesystem/audit-database.js",
-    "./engine-registry": "./src/engine-registry/index.js"
+    "./engine-registry": "./src/engine-registry/index.js",
+    "./api-testing-adapter": "./src/engine-registry/adapters/api-testing.js"
   },
   "files": [
     "src/**",
@@ -37,7 +38,8 @@
     "config/**",
     "package-version.js",
     "README.md",
-    "packages/localization-engine/src/**"
+    "packages/localization-engine/src/**",
+    "packages/api-testing-engine/src/**"
   ],
   "scripts": {
     "setup:browser": "node cli/package-cli.js setup --browser chromium"
