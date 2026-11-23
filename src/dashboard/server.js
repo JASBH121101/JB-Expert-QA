@@ -4,7 +4,7 @@ import { chmod, lstat, mkdir, readFile, rename, writeFile } from "node:fs/promis
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAuditEngineRegistry } from "../audit-engines/index.js";
-import { buildDashboardAnalytics, buildConsolidatedReport } from "./analytics.js";
+import { buildDashboardAnalytics, buildConsolidatedReport } from "./analytics.js";\nimport { createDashboardPhase4Catalog } from "./phase4-catalog.js";
 
 export const DEFAULT_DASHBOARD_PORT = 4173;
 export const DEFAULT_DASHBOARD_HOST = "127.0.0.1";
@@ -290,7 +290,7 @@ export function createDashboardServer({
   if (!Number.isInteger(maximumBodyBytes) || maximumBodyBytes < 1024 || maximumBodyBytes > 65_536) {
     throw new TypeError("maximumBodyBytes must be between 1024 and 65536");
   }
-  if (phase4Registry !== null && (!phase4Registry || typeof phase4Registry.list !== "function")) {\n    throw new TypeError("phase4Registry must be a JB QA engine registry or null");\n  }\n  const dataDir = resolve(storageDirectory);
+  if (!phase4Registry || typeof phase4Registry.list !== "function") {\n    throw new TypeError("phase4Registry must be a JB QA engine registry or null");\n  }\n  const dataDir = resolve(storageDirectory);
   const rateWindow = [];
   let busy = false;
 
@@ -426,9 +426,9 @@ export function createDashboardServer({
   return server;
 }
 
-export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry } = {}) {
+export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new TypeError("port must be an integer between 0 and 65535");
-  const server = createDashboardServer({ storageDirectory, registry });
+  const server = createDashboardServer({ storageDirectory, registry, phase4Registry });
   await new Promise((resolveListen, rejectListen) => {
     const onError = (error) => { server.off("listening", onListening); rejectListen(error); };
     const onListening = () => { server.off("error", onError); resolveListen(); };
