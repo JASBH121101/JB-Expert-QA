@@ -25,7 +25,7 @@ The adapter invokes the canonical Playwright audit with the performance speciali
 
 The returned report is a summarized view of the canonical audit. It caps findings at 30, strips target URLs, resource names, selectors and raw evidence objects, and retains only allowlisted numerical performance metrics. Diagnostic text is passed through the repository's sensitive-text redactor.
 
-The report explicitly marks the assessment inconclusive when the canonical specialist scope, execution evidence, DNS revalidation evidence or rule execution is incomplete. DNS is revalidated for intercepted HTTP requests; Chromium connection-time DNS is not pinned by the current browser adapter.
+A pre-aborted `AbortSignal` prevents browser startup; the current canonical auditor does not expose mid-run cancellation through this adapter. The report explicitly marks the assessment inconclusive when the canonical specialist scope, execution evidence, DNS revalidation evidence or rule execution is incomplete. DNS is revalidated for intercepted HTTP requests; Chromium connection-time DNS is not pinned by the current browser adapter.
 
 ## Orchestration
 
