@@ -367,6 +367,7 @@ export async function auditUrl(url, {
 
     Object.assign(context, runtimeIssues);
 
+    let axeScanCompleted = false;
     if (runAxe) {
       try {
         const axeScriptUrl = new URL("/__jb-expert-qa-axe.min.js", parsed.href).href;
@@ -393,6 +394,7 @@ export async function auditUrl(url, {
             }))
           }));
         }, AXE_TAGS);
+        axeScanCompleted = true;
       } catch (error) {
         context.axeViolations = [];
         runtimeIssues.pageErrors.push({
@@ -433,6 +435,7 @@ export async function auditUrl(url, {
         interactionActionsAttempted: context.interactionExploration?.actionsAttempted ?? 0,
         interactionExploration: context.interactionExploration,
         axeViolations: context.axeViolations?.length ?? null,
+        axeScanCompleted,
         themeAudit: context.themeAudit,
         themeTransitionAudit: context.themeTransitionAudit,
         layoutIntegrity: context.layoutIntegrity?.summary ?? null,

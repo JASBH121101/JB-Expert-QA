@@ -38,6 +38,12 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "registerStaticSecurityQaEngine",
     "createRuntimeSecurityQaEngineAdapter",
     "registerRuntimeSecurityQaEngine",
+    "createAccessibilityQaEngineAdapter",
+    "registerAccessibilityQaEngine",
+    "AccessibilityQaAdapterError",
+    "ACCESSIBILITY_QA_ADAPTER_ID",
+    "ACCESSIBILITY_QA_ADAPTER_VERSION",
+    "ACCESSIBILITY_QA_ADAPTER_CAPABILITIES",
     "RuntimeSecurityQaAdapterError",
     "RUNTIME_SECURITY_QA_ADAPTER_ID",
     "RUNTIME_SECURITY_QA_ADAPTER_VERSION",
@@ -272,5 +278,21 @@ test("standalone Expert QA package exposes Runtime Security QA and blocks privat
     (error) => error instanceof engine.RuntimeSecurityQaAdapterError &&
       error.code === "AUDIT_FAILED" &&
       !error.message.includes(secret)
+  );
+});
+
+
+test("standalone Expert QA package exposes Accessibility QA and blocks private destinations", async () => {
+  const registry = engine.createQaEngineRegistry();
+  const metadata = engine.registerAccessibilityQaEngine(registry);
+  assert.equal(metadata.id, engine.ACCESSIBILITY_QA_ADAPTER_ID);
+  assert.equal(metadata.targetType, "url");
+  assert.equal(metadata.executionMode, "browser");
+  const runner = registry.getRunner(metadata.id);
+  await assert.rejects(
+    runner({ url: "http://127.0.0.1/?token=package-accessibility-secret" }),
+    (error) => error instanceof engine.AccessibilityQaAdapterError &&
+      error.code === "AUDIT_FAILED" &&
+      !error.message.includes("package-accessibility-secret")
   );
 });

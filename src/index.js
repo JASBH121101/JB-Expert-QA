@@ -115,3 +115,12 @@ export {
   RUNTIME_SECURITY_QA_ADAPTER_VERSION,
   RUNTIME_SECURITY_QA_ADAPTER_CAPABILITIES
 } from "./engine-registry/adapters/runtime-security-qa.js";
+
+export {
+  createAccessibilityQaEngineAdapter,
+  registerAccessibilityQaEngine,
+  AccessibilityQaAdapterError,
+  ACCESSIBILITY_QA_ADAPTER_ID,
+  ACCESSIBILITY_QA_ADAPTER_VERSION,
+  ACCESSIBILITY_QA_ADAPTER_CAPABILITIES
+} from "./engine-registry/adapters/accessibility-qa.js";
