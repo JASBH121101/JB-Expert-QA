@@ -379,7 +379,7 @@ export function printHelp() {
     "  node scripts/local-certification.mjs --profile=core|full [--report-dir=PATH] [--timeout-ms=MS]",
     "",
     "Profiles:",
-    "  core  Root regression, package distribution, engine contracts and Threat Lab",
+    "  core  Root regression, package distribution, engine contracts, autonomous execution and Threat Lab",
     "  full  Core plus Security Guard, Resilience, internationalization, dead-code and autonomous-execution tests",
     "",
     "The runner is local-first. It does not call GitHub APIs, GitHub Actions, Cloudflare, or deployment services.",
