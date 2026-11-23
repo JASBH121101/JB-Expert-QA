@@ -173,6 +173,17 @@ test("detects remaining-zero without treating arbitrary response headers as rate
   assert.equal(JSON.stringify(report).includes("must-not-appear"), false);
 });
 
+test("preserves large vendor quota counters above the Retry-After time bound", async () => {
+  const fake = engine(async () => response(200, {
+    "ratelimit-limit": "250000",
+    "ratelimit-remaining": "220000"
+  }));
+  const report = await fake.subject.run(probe());
+  assert.equal(report.status, "completed");
+  assert.equal(report.summary.lastLimit, 250000);
+  assert.equal(report.summary.lastRemaining, 220000);
+});
+
 test("continues after a throttle only when stopOnThrottle is explicitly disabled", async () => {
   const fake = engine(async (_request, _options, call) => call === 1
     ? response(429, { "retry-after": "1" })
