@@ -154,3 +154,8 @@ export {
   REPORT_CERTIFICATION_ADAPTER_CAPABILITIES,
   REPORT_CERTIFICATION_LIMITS
 } from "./engine-registry/adapters/report-certification.js";
+
+export {
+  createDashboardPhase4Execution,
+  DashboardPhase4ExecutionError
+} from "./dashboard/phase4-execution.js";
