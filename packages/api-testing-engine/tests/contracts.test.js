@@ -44,7 +44,7 @@ function contract(overrides = {}) {
           }
         },
         "404": {
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": { contains: "application/json" } },
           body: {
             type: "object",
             required: ["error"],
