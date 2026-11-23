@@ -296,3 +296,11 @@ export {
   ApiAssertionError,
   createApiAssertionsEngine
 } from "./assertions.js";
+
+
+export {
+  API_CONTRACT_TESTING_ENGINE_ID,
+  API_CONTRACT_TESTING_ENGINE_VERSION,
+  ApiContractError,
+  createApiContractTestingEngine
+} from "./contracts.js";
