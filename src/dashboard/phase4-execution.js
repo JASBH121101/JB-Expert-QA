@@ -127,6 +127,58 @@ function normalizeLimits(value) {
   return Object.freeze(limits);
 }
 
+function cloneJsonValue(value, label, seen = new Set(), depth = 0) {
+  if (depth > 20) {
+    throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " exceeds the maximum nesting depth");
+  }
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " contains a non-finite number");
+    }
+    return value;
+  }
+  if (typeof value !== "object") {
+    throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " must contain JSON-compatible values only");
+  }
+  if (seen.has(value)) {
+    throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " cannot contain circular data");
+  }
+  seen.add(value);
+  let output;
+  if (Array.isArray(value)) {
+    const entries = readArray(value, label, 4096);
+    output = entries.map((entry, index) => cloneJsonValue(entry, label + "[" + index + "]", seen, depth + 1));
+  } else {
+    const record = readRecord(value, label, null);
+    output = Object.create(null);
+    const keys = Object.keys(record);
+    if (keys.length > 1000) {
+      throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " contains too many object properties");
+    }
+    for (const key of keys) {
+      if (["__proto__", "prototype", "constructor"].includes(key)) {
+        throw new DashboardPhase4ExecutionError("INVALID_INPUT", label + " contains a forbidden object key");
+      }
+      output[key] = cloneJsonValue(record[key], label + "." + key, seen, depth + 1);
+    }
+  }
+  seen.delete(value);
+  return output;
+}
+
+function normalizeEngineInput(value) {
+  if (!isPlainRecord(value)) {
+    throw new DashboardPhase4ExecutionError("INVALID_INPUT", "Engine input must be a plain JSON object");
+  }
+  const input = cloneJsonValue(value, "engine input");
+  const size = Buffer.byteLength(JSON.stringify(input), "utf8");
+  if (size > DEFAULT_LIMITS.maxInputBytes) {
+    throw new DashboardPhase4ExecutionError("INPUT_TOO_LARGE", "Engine input exceeds the dashboard execution input limit");
+  }
+  return input;
+}
+
 function safeUrlSummary(value) {
   if (typeof value !== "string" || value.length > 2048) return null;
   try {
@@ -310,7 +362,7 @@ export function createDashboardPhase4Execution(options = {}) {
       if (typeof engineId !== "string" || !allowedIds.has(engineId)) {
         throw new DashboardPhase4ExecutionError("ENGINE_NOT_ALLOWLISTED", "Requested engine is not explicitly enabled by host policy");
       }
-      const safeInput = readRecord(input, "engine input", null);
+      const safeInput = normalizeEngineInput(input);
       const actionType = getQaEngineActionType(engineId);
       const inputDigest = digestExecutionValue(safeInput);
       reviewContextByDigest.set(inputDigest, createReviewContext(engineId, safeInput));
