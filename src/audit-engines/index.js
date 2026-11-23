@@ -33,6 +33,7 @@ const DEFINITIONS = Object.freeze([
     name: "Accessibility QA",
     mode: "specialist-browser",
     target: "url",
+    specialist: "accessibility",
     description: "Runs the browser accessibility specialist and axe-core checks.",
     capabilities: Object.freeze(["axe-core", "labels", "alternative-text", "wcag"])
   },
@@ -41,6 +42,7 @@ const DEFINITIONS = Object.freeze([
     name: "Performance QA",
     mode: "specialist-browser",
     target: "url",
+    specialist: "performance",
     description: "Runs browser resource, image-dimension and DOM-size performance rules.",
     capabilities: Object.freeze(["resource-size", "resource-duration", "image-dimensions", "dom-size"])
   },
@@ -118,8 +120,8 @@ const DEFAULT_ADAPTERS = Object.freeze({
   static: (target, options) => auditProject(target.path, options),
   "live-site": (target, options) => auditUrl(target.url, options),
   responsive: (target, options) => auditViewports(target.url, options),
-  accessibility: (target, options) => auditUrl(target.url, { ...options, specialist: "accessibility" }),
-  performance: (target, options) => auditUrl(target.url, { ...options, specialist: "performance" }),
+  accessibility: (target, options) => auditUrl(target.url, options),
+  performance: (target, options) => auditUrl(target.url, options),
   security: (target, options) => Object.hasOwn(target, "path")
     ? auditSecurityProject(target.path, options)
     : auditSecurityUrl(target.url, options),
@@ -157,7 +159,11 @@ export function createAuditEngineRegistry({ adapters = {} } = {}) {
       }
       const target = normalizeTarget(engineId, input);
       const safeOptions = readPlainRecord(options, "Audit options");
-      return runners[engineId](target, safeOptions);
+      const requiredSpecialist = DEFINITION_BY_ID.get(engineId).specialist;
+      const effectiveOptions = requiredSpecialist
+        ? Object.freeze({ ...safeOptions, specialist: requiredSpecialist })
+        : safeOptions;
+      return runners[engineId](target, effectiveOptions);
     }
   });
 }
