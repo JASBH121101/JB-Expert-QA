@@ -101,11 +101,23 @@ function validateCommand(value) {
   }
   const viewports = matrix === "full" ? FULL_VIEWPORTS : DEFAULT_VIEWPORTS;
 
-  const themes = command.themes ?? ["light"];
-  if (!Array.isArray(themes) || themes.length < 1 || themes.length > MAX_THEMES ||
-      themes.some((theme) => !["light", "dark"].includes(theme)) ||
-      new Set(themes).size !== themes.length) {
+  const suppliedThemes = command.themes ?? ["light"];
+  if (!Array.isArray(suppliedThemes) || suppliedThemes.length < 1 || suppliedThemes.length > MAX_THEMES) {
     throw new VisualQaAdapterError("INVALID_THEMES", "themes must contain light, dark, or both without duplicates");
+  }
+  const themes = [];
+  for (let index = 0; index < suppliedThemes.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(suppliedThemes, String(index));
+    if (!descriptor) {
+      throw new VisualQaAdapterError("INVALID_THEMES", "themes cannot contain sparse entries");
+    }
+    if (!Object.hasOwn(descriptor, "value")) {
+      throw new VisualQaAdapterError("ACCESSOR_NOT_ALLOWED", "themes cannot contain getters or setters");
+    }
+    if (!["light", "dark"].includes(descriptor.value) || themes.includes(descriptor.value)) {
+      throw new VisualQaAdapterError("INVALID_THEMES", "themes must contain light, dark, or both without duplicates");
+    }
+    themes.push(descriptor.value);
   }
 
   const timeout = command.timeout ?? 20000;
@@ -137,7 +149,7 @@ function validateCommand(value) {
     url: parsed.href,
     matrix,
     viewports,
-    themes: Object.freeze([...themes]),
+    themes: Object.freeze(themes),
     timeout,
     baselineDir: baselineDir ? baselineDir.trim() : null,
     visualThreshold,
