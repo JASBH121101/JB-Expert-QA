@@ -19,7 +19,7 @@ test("responsive adapter rejects invalid targets and matrices before browser exe
   await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { viewports: [] }), /1 to 9 viewports/);
   await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { viewports: Array(10).fill(DEFAULT_VIEWPORTS[0]) }), /1 to 9 viewports/);
   await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { themes: ["light", "light"] }), /without duplicates/);
-  await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { themes: ["light", "dark", "light"] }), /without duplicates/);
+  await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { themes: ["light", "dark", "light"] }), /without duplicates/);\n  await assert.rejects(runResponsiveQa({ url: "https://example.test" }, { maxInteractionActions: 9 }), /between 1 and 8/);
 });
 
 test("responsive adapter defaults baseline updates and full-page captures off", () => {
