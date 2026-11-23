@@ -7,7 +7,8 @@ import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
 import { createDashboardServer } from "../src/dashboard/server.js";
 import { createQaEngineRegistry } from "../src/engine-registry/index.js";
-import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";\nimport { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
+import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";
+import { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
 import { getQaEngineActionType, QA_ENGINE_EXECUTION_PERMISSION } from "../src/engine-registry/orchestrator.js";
 
 async function startTestDashboard(t, options = {}) {
