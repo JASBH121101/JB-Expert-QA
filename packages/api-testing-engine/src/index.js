@@ -288,3 +288,11 @@ export function createApiRequestEngine({
     request
   });
 }
+
+
+export {
+  API_ASSERTIONS_ENGINE_ID,
+  API_ASSERTIONS_ENGINE_VERSION,
+  ApiAssertionError,
+  createApiAssertionsEngine
+} from "./assertions.js";

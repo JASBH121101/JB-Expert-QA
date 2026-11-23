@@ -356,12 +356,12 @@ try {
   const apiTestingInstall = await install(apiTestingTarball, "install-api-testing-engine");
   run(node, [
     "--input-type=module", "-e",
-    'import { API_TESTING_ENGINE_ID, createApiRequestEngine, ApiTestingError } from "@jb/api-testing-engine"; if (API_TESTING_ENGINE_ID !== "jb.api-testing-engine" || typeof createApiRequestEngine !== "function" || typeof ApiTestingError !== "function") process.exit(1); const engine = createApiRequestEngine({ allowedOrigins: ["https://api.example.test"] }); if (typeof engine.request !== "function") process.exit(1);'
+    'import { API_TESTING_ENGINE_ID, createApiRequestEngine, ApiTestingError, API_ASSERTIONS_ENGINE_ID, createApiAssertionsEngine, ApiAssertionError } from "@jb/api-testing-engine"; if (API_TESTING_ENGINE_ID !== "jb.api-testing-engine" || typeof createApiRequestEngine !== "function" || typeof ApiTestingError !== "function" || API_ASSERTIONS_ENGINE_ID !== "jb.api-testing-assertions-engine" || typeof createApiAssertionsEngine !== "function" || typeof ApiAssertionError !== "function") process.exit(1); const engine = createApiRequestEngine({ allowedOrigins: ["https://api.example.test"] }); if (typeof engine.request !== "function") process.exit(1); const assertions = createApiAssertionsEngine(); const report = assertions.evaluate({ status: 200, headers: {}, bodyText: JSON.stringify({ data: { id: 7 } }), json: { data: { id: 7 } } }, [{ type: "status", expected: 200 }, { type: "json", path: "$.data.id", expected: 7 }]); if (!report.passed || report.total !== 2) process.exit(1);'
   ], { cwd: apiTestingInstall });
   progress("API Testing Engine clean-consumer checks passed");
 
   progress("All eight standalone package checks completed");
-  console.log("PASS: all eight npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization, Currency and API Request Engine smoke checks passed.");
+  console.log("PASS: all eight npm tarballs installed in clean directories; Expert QA browser, Advisor Engine API/offline dataset, Localization, Currency and API Request and Assertions Engine smoke checks passed.");
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }
