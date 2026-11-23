@@ -304,3 +304,11 @@ export {
   ApiContractError,
   createApiContractTestingEngine
 } from "./contracts.js";
+
+
+export {
+  API_SECURITY_TESTING_ENGINE_ID,
+  API_SECURITY_TESTING_ENGINE_VERSION,
+  ApiSecurityError,
+  createApiSecurityTestingEngine
+} from "./security.js";

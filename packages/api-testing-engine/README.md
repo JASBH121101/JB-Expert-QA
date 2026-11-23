@@ -146,3 +146,46 @@ Run the contract and request test suite with:
 npm --workspace @jb/api-testing-engine run check
 npm run test:api-testing
 ~~~
+
+
+## Phase 3 — Block 4: Passive API Security Testing Engine
+
+The security engine inspects a response object already returned by the API Request Engine. It does not send requests, mutate remote state, replay credentials, follow redirects, exploit vulnerabilities or make network connections.
+
+~~~js
+import {
+  createApiRequestEngine,
+  createApiSecurityTestingEngine
+} from "@jb/api-testing-engine";
+
+const request = createApiRequestEngine({
+  allowedOrigins: ["https://api.example.com"]
+});
+const response = await request.request({
+  method: "GET",
+  url: "https://api.example.com/v1/profile"
+});
+
+const security = createApiSecurityTestingEngine();
+const report = security.analyze(response, {
+  requestOrigin: "https://app.example.com",
+  allowedCorsOrigins: ["https://app.example.com"],
+  sensitiveResponse: true
+});
+
+console.log(report.status, report.failedCount, report.warningCount);
+console.log(report.checks);
+~~~
+
+The passive checks cover HTTPS transport, HSTS, MIME sniffing protection, CORS origin policy, cache policy for explicitly marked sensitive responses, cookie Secure/HttpOnly/SameSite attributes, implementation-disclosure headers and populated credential-like JSON fields.
+
+Policies are explicit and bounded. The requestOrigin and allowedCorsOrigins options require exact HTTP(S) origins. Local HTTP exceptions can be enabled only for localhost/loopback. Token fields such as access_token and refresh_token are reported as review warnings because they may be legitimate in authentication responses; populated password, private-key and credential-like fields are high-severity failures.
+
+Reports never include raw cookie values, response header values or sensitive response strings. They include stable check IDs, severity, pass/warning/fail status, limited evidence and remediation guidance. The engine is heuristic and passive: a clean report is not proof that an API is secure, and checks requiring authentication context, authorization probing, rate-limit measurement, TLS handshake inspection or active fuzzing are out of scope for this block.
+
+Run the API testing package suite with:
+
+~~~sh
+npm --workspace @jb/api-testing-engine run check
+npm run test:api-testing
+~~~

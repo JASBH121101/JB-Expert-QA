@@ -1,7 +1,7 @@
 {
   "name": "@jb/api-testing-engine",
   "version": "0.1.0",
-  "description": "Dependency-free HTTP request, response assertions and versioned API contract testing engine.",
+  "description": "Dependency-free API request, assertions, contract and passive security testing engine.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/assertions.js && node --check src/contracts.js && node --test"
+    "check": "node --check src/index.js && node --check src/assertions.js && node --check src/contracts.js && node --check src/security.js && node --test"
   },
   "repository": {
     "type": "git",
