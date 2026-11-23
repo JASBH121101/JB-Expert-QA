@@ -91,8 +91,12 @@ export function verifyExecutionLedger(records) {
   });
 }
 
-function createLedger({ initialRecords = [], persist = async () => {}, now = () => new Date(), closeResource = async () => {} } = {}) {
+function createLedger({ initialRecords = [], persist = async () => {}, now = () => new Date(), closeResource = async () => {}, maxRecords = 100000 } = {}) {
+  if (!Number.isSafeInteger(maxRecords) || maxRecords < 1 || maxRecords > 1000000) {
+    throw new TypeError("maxRecords must be between 1 and 1000000");
+  }
   const records = initialRecords.map((record) => freezeRecord(copyRecord(record)));
+  if (records.length > maxRecords) throw new RangeError("Execution ledger already exceeds maxRecords");
   const initialVerification = verifyExecutionLedger(records);
   if (!initialVerification.valid) throw new Error("Execution ledger integrity verification failed");
   let queue = Promise.resolve();
@@ -109,6 +113,7 @@ function createLedger({ initialRecords = [], persist = async () => {}, now = () 
     }
     const operation = queue.then(async () => {
       if (closed) throw new Error("Execution ledger is closed");
+      if (records.length >= maxRecords) throw new RangeError("Execution ledger maxRecords limit reached");
       const timestamp = entry.timestamp ?? now().toISOString();
       if (typeof timestamp !== "string" || !Number.isFinite(Date.parse(timestamp))) {
         throw new TypeError("Execution ledger timestamp must be a valid ISO date string");
@@ -134,6 +139,7 @@ function createLedger({ initialRecords = [], persist = async () => {}, now = () 
 
   return Object.freeze({
     append,
+    canAppend: (count = 1) => Number.isSafeInteger(count) && count >= 0 && records.length + count <= maxRecords,
     snapshot: () => Object.freeze(records.map((record) => freezeRecord(copyRecord(record)))),
     verify: () => verifyExecutionLedger(records),
     close: async () => {
@@ -155,7 +161,7 @@ export function createInMemoryExecutionLedger(options = {}) {
  * truncation and reordering; it is not a substitute for OS-level file access
  * controls or a remote immutable audit store.
  */
-export async function createJsonlExecutionLedger(filePath, { now = () => new Date() } = {}) {
+export async function createJsonlExecutionLedger(filePath, { now = () => new Date(), maxRecords = 100000 } = {}) {
   if (typeof filePath !== "string" || !filePath.trim()) {
     throw new TypeError("A ledger file path is required");
   }
@@ -189,6 +195,7 @@ export async function createJsonlExecutionLedger(filePath, { now = () => new Dat
     return createLedger({
       initialRecords,
       now,
+      maxRecords,
       persist: async (record) => {
         await handle.appendFile(JSON.stringify(record) + "\n", "utf8");
         await handle.sync();
