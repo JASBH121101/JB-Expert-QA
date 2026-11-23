@@ -147,7 +147,8 @@ function validateResponse(response) {
   }
   if (headersDescriptor && !Object.hasOwn(headersDescriptor, "value")) {
     throw new ApiRateLimitError("INVALID_RESPONSE", "Response headers cannot be an accessor");
-  }\n  const headers = headersDescriptor?.value ?? {};
+  }
+  const headers = headersDescriptor?.value ?? {};
   if (!isPlainRecord(headers)) throw new ApiRateLimitError("INVALID_RESPONSE", "Request Engine returned invalid response headers");
   const normalizedHeaders = new Map();
   for (const key of Reflect.ownKeys(headers)) {
