@@ -1,7 +1,7 @@
 {
   "name": "@jb/expert-qa",
   "version": "0.2.0",
-  "description": "Complete local-first web project quality, security, browser, accessibility and visual QA engine.",
+  "description": "Complete local-first web project quality, security, performance, browser, accessibility and visual QA engine.",
   "type": "module",
   "engines": {
     "node": ">=22"
