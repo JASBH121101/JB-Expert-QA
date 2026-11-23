@@ -11,8 +11,22 @@ This certification validates four core engines as separate products and then val
 
 The packages remain independently versioned and independently installable. This certification does not collapse their source trees into one monolithic runtime.
 
-## Test execution
+## Local execution without GitHub Actions
 
+JB Expert QA now includes a repository-owned local certification runner. It can run the selected regression and integration checks directly on the developer's machine; GitHub Actions is not required to start these profiles.
+
+Commands:
+
+    npm run qa:local
+    npm run qa:local:full
+
+The core profile runs root syntax/regression checks, package-distribution boundaries, shared engine contracts and the safe Threat Lab suite. The full profile adds Security Guard, Resilience Engine, internationalization and dead-code regression suites. JSON and Markdown reports are written locally under .jb-expert-qa/certification.
+
+The runner invokes only fixed npm scripts from an allowlist, runs them sequentially, enforces per-check timeouts, preserves failures and redacts the bounded output tail. It does not call GitHub APIs, access production services or deploy infrastructure.
+
+This local profile runs only on the current host and Node.js version. It is not a substitute for cross-platform Node/OS matrices or browser provisioning; the report states these coverage limitations and lists checks not included in the selected profile.
+
+## Hosted compatibility matrix (optional)
 The `JB Engines Certification` GitHub Actions workflow runs:
 
 - Expert QA full regression tests on Node.js 22 and 24, including browser QA.
