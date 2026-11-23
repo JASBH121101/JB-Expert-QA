@@ -154,8 +154,8 @@ test("retry delay defaults to exponential backoff and validates bounds", () => {
 test("running jobs can be marked cancelled only after cooperative abort settles", () => {
   const queue = createExecutionJobQueue({ now: clock() });
   queue.enqueue({ work: 1 }, { id: "running-cancel" });
+  assert.throws(() => queue.cancelRunning("running-cancel"), (error) => error.code === "INVALID_TRANSITION");
   queue.claimNext();
-  assert.throws(() => queue.cancelRunning("running-cancel", "not running"), (error) => error.code === "INVALID_TRANSITION");
   const cancelled = queue.cancelRunning("running-cancel", "operator requested cancellation");
   assert.equal(cancelled.state, "cancelled");
   assert.equal(cancelled.error, "operator requested cancellation");
