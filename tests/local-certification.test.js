@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -44,6 +44,14 @@ test("local profiles use only allowlisted repository npm scripts", () => {
   for (const task of Object.values(LOCAL_CERTIFICATION_PROFILES).flat()) {
     assert.match(task.npmScript, /^[a-z][a-z0-9:-]*$/u);
   }
+});
+
+test("repository exposes local commands without GitHub or Cloudflare API wiring", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const runnerSource = await readFile(new URL("../scripts/local-certification.mjs", import.meta.url), "utf8");
+  assert.equal(packageJson.scripts["qa:local"], "node scripts/local-certification.mjs --profile=core");
+  assert.equal(packageJson.scripts["qa:local:full"], "node scripts/local-certification.mjs --profile=full");
+  assert.doesNotMatch(runnerSource, /api\.github\.com|actions\/checkout|actions\/setup-node|cloudflare\.com\/client/u);
 });
 
 test("argument parser accepts safe profiles and report directories", () => {
