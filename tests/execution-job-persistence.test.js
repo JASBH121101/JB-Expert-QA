@@ -220,6 +220,7 @@ test("queue rejects mutations after close but keeps read-only inspection availab
 });
 
 test("persistent store rejects symlink job store files", async () => {
+  if (process.platform === "win32") return;
   await withTempDir(async (directory) => {
     const target = join(directory, "target.json");
     const filePath = join(directory, "jobs.json");
