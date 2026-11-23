@@ -7,7 +7,9 @@ const packageRoot = resolve(repositoryRoot, "packages/expert-qa");
 const sourceRoot = resolve(repositoryRoot, "src");
 const configRoot = resolve(repositoryRoot, "config");
 const localizationSourceRoot = resolve(repositoryRoot, "packages/localization-engine/src");
+const apiTestingSourceRoot = resolve(repositoryRoot, "packages/api-testing-engine/src");
 const packageLocalizationRoot = resolve(packageRoot, "packages/localization-engine/src");
+const packageApiTestingRoot = resolve(packageRoot, "packages/api-testing-engine/src");
 const packageSourceRoot = resolve(packageRoot, "src");
 const packageConfigRoot = resolve(packageRoot, "config");
 
@@ -16,6 +18,7 @@ const manifest = JSON.parse(await readFile(resolve(packageRoot, "package.json"),
 await rm(packageSourceRoot, { recursive: true, force: true });
 await rm(packageConfigRoot, { recursive: true, force: true });
 await rm(resolve(packageRoot, "packages/localization-engine"), { recursive: true, force: true });
+await rm(resolve(packageRoot, "packages/api-testing-engine"), { recursive: true, force: true });
 await mkdir(packageRoot, { recursive: true });
 
 await cp(sourceRoot, packageSourceRoot, { recursive: true, force: true });
@@ -24,6 +27,9 @@ await cp(configRoot, packageConfigRoot, { recursive: true, force: true });
 // Copy its source into the standalone package so relative imports remain valid after npm pack.
 await mkdir(packageLocalizationRoot, { recursive: true });
 await cp(localizationSourceRoot, packageLocalizationRoot, { recursive: true, force: true });
+// Bundle the canonical API Testing Engine source required by the standalone adapter.
+await mkdir(packageApiTestingRoot, { recursive: true });
+await cp(apiTestingSourceRoot, packageApiTestingRoot, { recursive: true, force: true });
 
 await writeFile(
   resolve(packageRoot, "package-version.js"),
@@ -35,6 +41,8 @@ const requiredFiles = [
   "src/index.js",
   "src/audit-engines/index.js",
   "src/engine-registry/index.js",
+  "src/engine-registry/adapters/api-testing.js",
+  "packages/api-testing-engine/src/index.js",
   "src/dashboard/analytics.js",
   "src/dashboard/server.js",
   "src/dashboard-cli.js",

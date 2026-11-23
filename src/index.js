@@ -77,3 +77,5 @@ export { createDashboardServer, startDashboard, DEFAULT_DASHBOARD_PORT, DEFAULT_
 export { buildDashboardAnalytics, buildConsolidatedReport } from "./dashboard/analytics.js";
 
 export { createQaEngineRegistry, QaEngineRegistryError, QA_ENGINE_ADAPTER_CONTRACT } from "./engine-registry/index.js";
+
+export { createApiTestingEngineAdapter, registerApiTestingEngine, ApiTestingAdapterError, API_TESTING_ADAPTER_ID, API_TESTING_ADAPTER_VERSION, API_TESTING_ADAPTER_OPERATIONS } from "./engine-registry/adapters/api-testing.js";
