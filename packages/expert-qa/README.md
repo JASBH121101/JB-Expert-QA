@@ -108,3 +108,8 @@ npx jb-qa-db ./ --format=json --output=.jb-expert-qa/reports/database.json
 ```
 
 The focused auditor checks SQL and Prisma schema/migration files plus source and configuration files for destructive DDL, unsafe raw queries, ORM auto-sync, disabled database TLS verification, selected SQL performance patterns, PostgreSQL privilege issues, missing foreign-key indexes and visible migration rollback gaps. It is local and static: it does not connect to a live database, read rows, execute queries, run EXPLAIN, modify schemas or make network requests. Findings are heuristic and require human review.
+
+
+## Performance QA Engine Adapter
+
+The standalone package exports the canonical performance-specialist adapter from `@jb/expert-qa/performance-qa-adapter` and the root API. Use `registerPerformanceQaEngine(registry)` to add it to a QA engine registry. It measures large resource transfers, slow resources, image dimension reservation and large DOM trees using the existing Playwright specialist. The adapter uses public HTTP(S) targets, bounded execution and a sanitized report; it does not perform authenticated, interaction, screenshot, Lighthouse, field Core Web Vitals or load/stress testing. See [Performance QA Adapter](../../docs/PERFORMANCE-QA-ADAPTER.md).
