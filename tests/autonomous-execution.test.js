@@ -303,6 +303,42 @@ test("action timeouts abort the handler and record a timed-out state", async () 
   assert.equal(aborted, true);
 });
 
+test("audit write latency cannot let a handler start after the total execution deadline", async () => {
+  let calls = 0;
+  const backing = createInMemoryExecutionLedger();
+  const delayedLedger = {
+    append: async (entry) => {
+      if (entry.event === "action.started") {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return backing.append(entry);
+    },
+    canAppend: (count) => backing.canAppend(count),
+    verify: () => backing.verify(),
+    snapshot: () => backing.snapshot()
+  };
+  const engine = createAutonomousExecutionEngine({
+    actions: [reportAction({
+      execute: async () => { calls += 1; return { saved: "reports/too-late.json" }; }
+    })],
+    policy: reportPolicy({
+      limits: {
+        maxActions: 5,
+        maxExecutionMs: 60,
+        maxActionMs: 1000,
+        approvalTimeoutMs: 500,
+        maxInputBytes: 4096,
+        maxOutputBytes: 4096
+      }
+    }),
+    ledger: delayedLedger
+  });
+  const result = await engine.execute(reportPlan());
+  assert.equal(result.status, "timed-out");
+  assert.equal(result.actions[0].status, "timed-out");
+  assert.equal(calls, 0);
+});
+
 test("an external AbortSignal cancels an in-flight action", async () => {
   const controller = new AbortController();
   const action = reportAction({
