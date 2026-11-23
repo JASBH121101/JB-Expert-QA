@@ -43,6 +43,7 @@
     "./dashboard-phase4-catalog": "./src/dashboard/phase4-catalog.js",
     "./execution-runtime": "./src/agent/execution-runtime.js",
     "./execution-job-queue": "./src/agent/execution-job-queue.js",
+    "./execution-job-persistence": "./src/agent/execution-job-persistence.js",
     "./execution-worker": "./src/agent/execution-worker.js"
   },
   "files": [
