@@ -64,10 +64,16 @@ const staticReport = await auditProject("./");
 const databaseReport = await auditDatabaseProject("./");
 const browserReport = await auditUrl("https://example.com");
 const responsiveReport = await auditViewports("https://example.com");
+
+// Or use the unified adapters:
+import { createAuditEngineRegistry } from "@jb/expert-qa";
+const qa = createAuditEngineRegistry();
+const staticReport = await qa.run("static", { path: "./" });
+const liveReport = await qa.run("live-site", { url: "https://example.com" });
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
 ```
 
-The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, and `./version`.
+The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`,  `./version`, and `./audit-engines`.
 
 ### Policy-bounded execution
 

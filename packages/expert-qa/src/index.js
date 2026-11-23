@@ -10,3 +10,5 @@ export { formatReport, formatHtmlReport, formatMarkdownReport } from "./reporter
 export { projectRules } from "./specialists/project-rules.js";
 export { deadCodeRules } from "./specialists/dead-code-rules.js";
 export { EXPERT_QA_PACKAGE_VERSION } from "./version.js";
+
+export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/index.js";

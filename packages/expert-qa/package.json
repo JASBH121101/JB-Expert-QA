@@ -17,6 +17,7 @@
   },
   "exports": {
     ".": "./src/index.js",
+    "./audit-engines": "./src/audit-engines/index.js",
     "./cli": "./cli/package-cli.js",
     "./browser": "./src/adapters/playwright/audit-url.js",
     "./visual": "./src/adapters/visual/png-diff.js",
