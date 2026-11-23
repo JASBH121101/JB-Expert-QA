@@ -65,6 +65,12 @@ export const LOCAL_CERTIFICATION_PROFILES = Object.freeze({
       npmScript: "test:dead-code",
       timeoutMs: 5 * 60 * 1000
     }
+,    {
+      id: "autonomous-execution",
+      title: "Policy-bounded autonomous execution and audit ledger tests",
+      npmScript: "test:autonomous-execution",
+      timeoutMs: 5 * 60 * 1000
+    }
   ].map((task) => Object.freeze({ ...task })))
 });
 
