@@ -60,3 +60,7 @@ This is durable queue state, not an exactly-once execution guarantee. A process 
 \`node --test tests/execution-job-persistence.test.js tests/execution-job-queue.test.js tests/execution-worker.test.js tests/autonomous-execution-runtime.test.js\`
 
 Core Validation, package distribution, Security QA, and JB Engines Certification run on the pull request.
+
+## Lock recovery
+
+A stale same-host lock is reclaimed only after checking that its recorded PID no longer exists and that the lock file has not changed. Locks from another host, a live process, or an ambiguous state fail closed and require operator review.
