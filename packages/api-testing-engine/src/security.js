@@ -35,7 +35,11 @@ function isRecord(value) {
 
 function assertPlainDataObject(value, label, allowedKeys) {
   if (!isRecord(value)) throw new TypeError(label + " must be a plain object");
-  const keys = Object.keys(value);
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some((key) => typeof key !== "string")) {
+    throw new TypeError(label + " cannot contain symbol properties");
+  }
+  const keys = ownKeys;
   if (allowedKeys && keys.some((key) => !allowedKeys.has(key))) {
     throw new TypeError(label + " contains unsupported fields");
   }
@@ -142,9 +146,19 @@ function normalizePolicy(input) {
     if (!Array.isArray(input.allowedCorsOrigins) || input.allowedCorsOrigins.length > 100) {
       throw new TypeError("policy.allowedCorsOrigins must be an array of at most 100 exact origins");
     }
+    const arrayKeys = Object.keys(input.allowedCorsOrigins);
+    if (arrayKeys.length !== input.allowedCorsOrigins.length ||
+        arrayKeys.some((key) => !/^(0|[1-9]\d*)$/u.test(key) || Number(key) >= input.allowedCorsOrigins.length)) {
+      throw new TypeError("policy.allowedCorsOrigins cannot contain sparse or custom array properties");
+    }
     allowedCorsOrigins = [];
     const seen = new Set();
-    for (const item of input.allowedCorsOrigins) {
+    for (let index = 0; index < input.allowedCorsOrigins.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(input.allowedCorsOrigins, String(index));
+      if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+        throw new TypeError("policy.allowedCorsOrigins cannot contain array accessors");
+      }
+      const item = descriptor.value;
       const origin = normalizeOrigin(item, "policy.allowedCorsOrigins entry");
       if (seen.has(origin)) throw new TypeError("policy.allowedCorsOrigins cannot contain duplicates");
       seen.add(origin);
@@ -236,7 +250,12 @@ function scanSensitiveValues(root, checks) {
         !(typeof item === "string" && (!item.trim() || /^\[?redacted\]?$/iu.test(item.trim()) || /^[*x]{3,}$/iu.test(item.trim())));
       const nextPath = /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? path + "." + key : path + "[" + JSON.stringify(key) + "]";
       if (SENSITIVE_FIELDS.has(normalized) && itemHasValue) {
-        matches.push({ path: nextPath, valueType: Array.isArray(item) ? "array" : item === null ? "null" : typeof item, valueLength: typeof item === "string" ? item.length : undefined });
+        matches.push({
+          path: nextPath,
+          field: normalized,
+          valueType: Array.isArray(item) ? "array" : item === null ? "null" : typeof item,
+          valueLength: typeof item === "string" ? item.length : undefined
+        });
       }
       if (isRecord(item) || Array.isArray(item)) walk(item, nextPath, depth + 1);
     }
@@ -323,6 +342,9 @@ function analyzeResponse(normalized, policy) {
       corsStatus = "fail";
       corsCode = "cors.wildcard-credentials";
       corsMessage = "Wildcard CORS is combined with credentialed access.";
+    } else if (normalizedAllowOrigin === "*" && policy.allowedCorsOrigins !== undefined) {
+      corsStatus = "fail";
+      corsMessage = "Wildcard CORS cannot satisfy an explicit origin allowlist.";
     } else if (normalizedAllowOrigin === "*" && policy.disallowWildcardCors) {
       corsStatus = "fail";
       corsMessage = "Wildcard CORS is disallowed by the active policy.";
@@ -417,11 +439,23 @@ function analyzeResponse(normalized, policy) {
   if (policy.scanSensitiveFields && normalized.jsonParsed) {
     const sensitive = scanSensitiveValues(normalized.json, checks);
     if (sensitive.length) {
-      addCheck(checks, "data.sensitive-fields", "data-exposure", "high", "fail",
-        "Sensitive response fields",
-        "Parsed response JSON contains non-empty fields commonly used for secrets or credentials.",
-        "Do not return stored passwords, private keys or server-side credentials. Return short-lived tokens only through explicitly designed authentication flows and apply an appropriate response policy.",
-        { fieldCount: sensitive.length, fields: Object.freeze(sensitive.map((item) => Object.freeze(item))) });
+      const tokenFields = new Set(["access_token", "accesstoken", "refresh_token", "refreshtoken", "id_token", "idtoken"]);
+      const unexpectedSecrets = sensitive.filter((item) => !tokenFields.has(item.field));
+      const expectedTokenMaterial = sensitive.filter((item) => tokenFields.has(item.field));
+      if (unexpectedSecrets.length) {
+        addCheck(checks, "data.sensitive-fields", "data-exposure", "high", "fail",
+          "Sensitive response fields",
+          "Parsed response JSON contains populated fields commonly used for passwords, private keys or server-side credentials.",
+          "Do not return stored passwords, private keys or server-side credentials. Replace them with non-sensitive status metadata.",
+          { fieldCount: unexpectedSecrets.length, fields: Object.freeze(unexpectedSecrets.map((item) => Object.freeze(item))) });
+      }
+      if (expectedTokenMaterial.length) {
+        addCheck(checks, "data.authentication-tokens", "authentication-data", "medium", "warning",
+          "Authentication token material",
+          "Parsed response JSON contains access, refresh or identity token fields. These can be legitimate authentication responses but require endpoint-specific review.",
+          "Confirm the endpoint is an intentional authentication flow, tokens are short-lived and scoped, and responses use Cache-Control: no-store.",
+          { fieldCount: expectedTokenMaterial.length, fields: Object.freeze(expectedTokenMaterial.map((item) => Object.freeze(item))) });
+      }
     } else {
       addCheck(checks, "data.sensitive-fields", "data-exposure", "high", "pass",
         "Sensitive response fields",
