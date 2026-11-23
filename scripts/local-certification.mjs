@@ -106,6 +106,34 @@ function appendTail(current, chunk) {
   return next.length > MAX_OUTPUT_TAIL ? next.slice(-MAX_OUTPUT_TAIL) : next;
 }
 
+function terminateProcessTree(child, signal) {
+  if (!child || child.exitCode !== null) return;
+  if (process.platform !== "win32" && Number.isInteger(child.pid)) {
+    try {
+      // POSIX detached children lead their own process group; terminate npm and its test descendants.
+      process.kill(-child.pid, signal);
+      return;
+    } catch (error) {
+      if (error?.code !== "ESRCH" && error?.code !== "EPERM") {
+        try { child.kill(signal); } catch { /* best-effort termination */ }
+        return;
+      }
+    }
+  }
+  if (process.platform === "win32" && Number.isInteger(child.pid)) {
+    try {
+      const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+        windowsHide: true,
+        stdio: "ignore"
+      });
+      killer.unref?.();
+    } catch {
+      // Fall through to the direct child termination below.
+    }
+  }
+  try { child.kill(signal); } catch { /* best-effort termination */ }
+}
+
 export function runProcess({ command, args = [], cwd = REPOSITORY_ROOT, timeoutMs = DEFAULT_TASK_TIMEOUT_MS, spawnProcess = spawn, shell = false }) {
   if (typeof command !== "string" || !command.trim()) throw new TypeError("command must be a non-empty string");
   if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string")) throw new TypeError("args must be an array of strings");
@@ -150,6 +178,7 @@ export function runProcess({ command, args = [], cwd = REPOSITORY_ROOT, timeoutM
         env: process.env,
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
+        detached: process.platform !== "win32",
         shell
       });
     } catch (error) {
@@ -176,9 +205,9 @@ export function runProcess({ command, args = [], cwd = REPOSITORY_ROOT, timeoutM
 
     timeoutHandle = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      terminateProcessTree(child, "SIGTERM");
       forceKillHandle = setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
+        terminateProcessTree(child, "SIGKILL");
       }, 2000);
     }, timeoutMs);
   });
