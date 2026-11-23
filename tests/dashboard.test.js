@@ -132,7 +132,7 @@ test("Dashboard creates a policy-gated request and executes only after external 
   const response = await fetch(origin + "/api/phase4/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Origin": origin },
-    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "approved-input" } })
+    body: JSON.stringify({ engineId: "jb.test.echo", input: { value: "approved-input", url: "https://example.test/private/path?token=review-secret" } })
   });
   assert.equal(response.status, 200);
   const result = await response.json();
@@ -147,6 +147,10 @@ test("Dashboard creates a policy-gated request and executes only after external 
   assert.equal(approvals[0].permissions.includes(QA_ENGINE_EXECUTION_PERMISSION), true);
   assert.equal(approvals[0].input, undefined);
   assert.equal(typeof approvals[0].inputDigest, "string");
+  assert.deepEqual(approvals[0].reviewContext.target, {
+    kind: "url", origin: "https://example.test", path: "/private/path"
+  });
+  assert.equal(JSON.stringify(approvals).includes("review-secret"), false);
   assert.equal(JSON.stringify(approvals).includes("approved-input"), false);
 });
 
