@@ -216,10 +216,35 @@ test("persistent store rejects symlink job store files", async () => {
   });
 });
 
+test("idempotent retries return the existing job even when the queue is at capacity", () => {
+  const queue = createExecutionJobQueue({ maxQueueSize: 1, maxJobs: 1 });
+  const first = queue.enqueue({ plan: "first" }, { idempotencyKey: "same-request" });
+  const duplicate = queue.enqueue({ plan: "different" }, { idempotencyKey: "same-request" });
+  assert.equal(duplicate.id, first.id);
+  assert.throws(
+    () => queue.enqueue({ plan: "second" }, { idempotencyKey: "new-request" }),
+    (error) => error.code === "QUEUE_FULL"
+  );
+});
+
 test("store adapter exposes stable schema envelope and private file permissions", async () => {
   await withTempDir(async (directory) => {
     const filePath = join(directory, "direct-store.json");
     const store = createJsonFileExecutionJobStore({ filePath });
+    let getterCalled = false;
+    const unsafeSnapshot = {};
+    Object.defineProperty(unsafeSnapshot, "data", {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return "unsafe";
+      }
+    });
+    assert.throws(
+      () => store.save(unsafeSnapshot),
+      (error) => error instanceof ExecutionJobStoreError && error.code === "INVALID_SNAPSHOT"
+    );
+    assert.equal(getterCalled, false);
     store.save({ schemaVersion: 1, jobs: [] });
     const loaded = store.load();
     assert.deepEqual(loaded, { schemaVersion: 1, jobs: [] });
@@ -229,6 +254,7 @@ test("store adapter exposes stable schema envelope and private file permissions"
     assert.match(envelope.checksum, /^[a-f0-9]{64}$/u);
     const info = await stat(filePath);
     assert.equal(info.isFile(), true);
+    if (process.platform !== "win32") assert.equal(info.mode & 0o777, 0o600);
     store.close();
   });
 });
