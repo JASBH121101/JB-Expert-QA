@@ -12,3 +12,5 @@ export { deadCodeRules } from "./specialists/dead-code-rules.js";
 export { EXPERT_QA_PACKAGE_VERSION } from "./version.js";
 
 export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/index.js";
+
+export { createDashboardServer, startDashboard, DEFAULT_DASHBOARD_PORT, DEFAULT_DASHBOARD_HOST } from "./dashboard/server.js";

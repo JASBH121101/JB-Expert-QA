@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Local quality assurance control center for JB Expert QA">
+  <title>JB Expert QA — Control Center</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="JB Expert QA Control Center">
+        <span class="brand-mark">JB</span>
+        <span class="brand-copy">
+          <strong>JB EXPERT QA</strong>
+          <small>CONTROL CENTER <span class="dot"></span> LOCAL LAB</small>
+        </span>
+      </a>
+      <div class="top-meta">
+        <span class="local-indicator"><i></i> LOCAL INSTANCE</span>
+        <span class="version-label">AUDIT ENGINE REGISTRY · V1</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">QUALITY OPERATIONS</p>
+          <h1>QA Control Center</h1>
+          <p class="intro-copy">Select audit engines, run checks against an authorized project or website, and review the evidence from this local machine.</p>
+        </div>
+        <div class="intro-status">
+          <span class="status-pulse"></span>
+          <div><strong>Ready for audit</strong><small>Execution stays on this device</small></div>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="Dashboard summary">
+        <article class="metric-card"><span class="metric-label">AVAILABLE ENGINES</span><strong id="metric-engines">—</strong><span class="metric-foot">Registered QA adapters</span></article>
+        <article class="metric-card"><span class="metric-label">RECORDED AUDITS</span><strong id="metric-runs">0</strong><span class="metric-foot">Local history</span></article>
+        <article class="metric-card"><span class="metric-label">LATEST SCORE</span><strong id="metric-score">—</strong><span class="metric-foot" id="metric-score-foot">No completed audit</span></article>
+        <article class="metric-card"><span class="metric-label">LATEST RESULT</span><strong id="metric-result" class="metric-status">WAITING</strong><span class="metric-foot" id="metric-result-foot">No execution recorded</span></article>
+      </section>
+
+      <section class="workspace-grid">
+        <div class="panel run-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">01 / CONFIGURE</p><h2>Launch an audit</h2></div>
+            <span class="panel-index">RUNNER</span>
+          </div>
+          <div class="field-block">
+            <div class="field-heading"><label>Target type</label><span class="field-note">Choose one scope</span></div>
+            <div class="segmented" role="group" aria-label="Target type">
+              <button type="button" class="segment active" data-target-mode="website" aria-pressed="true">Website URL</button>
+              <button type="button" class="segment" data-target-mode="project" aria-pressed="false">Project folder</button>
+            </div>
+          </div>
+          <div class="field-block">
+            <div class="field-heading"><label for="target-input" id="target-label">Website address</label><span class="field-note" id="target-note">Public URL or an authorized website</span></div>
+            <input id="target-input" class="target-input" type="url" inputmode="url" placeholder="https://example.com" autocomplete="url" spellcheck="false">
+            <p class="helper-text" id="target-helper">Private and loopback network targets remain blocked by the browser safety policy.</p>
+          </div>
+          <div class="engine-heading">
+            <div><p class="eyebrow">02 / SELECT ENGINES</p><h3>Audit modules</h3></div>
+            <span id="selection-count" class="selection-count">1 SELECTED</span>
+          </div>
+          <div id="engine-grid" class="engine-grid" aria-live="polite"><div class="loading-state">Loading engine registry…</div></div>
+          <div class="run-footer">
+            <p>Audits run one at a time. Browser engines may take longer than static checks.</p>
+            <button type="button" id="run-button" class="primary-button" disabled><span class="button-icon">↗</span><span id="run-button-label">Run selected audits</span></button>
+          </div>
+          <div id="run-message" class="run-message" role="status" aria-live="polite"></div>
+        </div>
+
+        <aside class="panel activity-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">03 / LIVE ACTIVITY</p><h2>Execution feed</h2></div>
+            <span class="live-tag"><i></i> LIVE</span>
+          </div>
+          <div id="activity-feed" class="activity-feed">
+            <div class="empty-feed"><span class="empty-icon">⌁</span><strong>No activity yet</strong><p>Run an audit to see progress and results here.</p></div>
+          </div>
+          <div class="safety-note">
+            <span class="shield-icon">◇</span>
+            <div><strong>Local execution boundary</strong><p>This panel does not execute shell commands, install packages, modify source files, push Git refs, or deploy applications.</p></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-heading history-heading">
+          <div><p class="eyebrow">04 / EVIDENCE</p><h2>Audit history</h2><p class="section-subtitle">Compare repeat runs against the previous audit of the same engine and target.</p></div>
+          <div class="history-actions"><span id="history-count" class="history-count">0 RECORDS</span><button id="refresh-history" class="secondary-button" type="button">↻ Refresh</button></div>
+        </div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead><tr><th>ENGINE / TARGET</th><th>EXECUTED</th><th>RESULT</th><th>SCORE</th><th>FINDINGS</th><th>CHANGE</th><th></th></tr></thead>
+            <tbody id="history-body"><tr><td colspan="7" class="empty-table">No local audit records yet.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="detail-panel" class="panel detail-panel" hidden>
+        <div class="panel-heading"><div><p class="eyebrow">05 / RUN DETAILS</p><h2 id="detail-title">Audit details</h2></div><button type="button" id="close-detail" class="icon-button" aria-label="Close audit details">×</button></div>
+        <div id="detail-content" class="detail-content"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>JB EXPERT QA <span class="footer-separator">/</span> CONTROL CENTER</span>
+      <span>LOCAL-FIRST · NO EXTERNAL DASHBOARD SERVICE</span>
+    </footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

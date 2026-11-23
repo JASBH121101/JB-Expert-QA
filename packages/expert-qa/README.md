@@ -10,6 +10,14 @@ npm install --save-dev @jb/expert-qa
 
 Node.js 22 or newer is required. The package is independently installable and does not require JB Security Guard or JB Malware Engine.
 
+## QA Control Center — local dashboard
+
+Start the local control panel from the project root with `npm run dashboard`, or run `npx jb-qa-dashboard` from an independently installed package. The server prints a loopback URL such as `http://127.0.0.1:4173`; open that address in your browser and keep the terminal running. It binds only to `127.0.0.1`, rejects cross-origin actions, and does not expose a remote dashboard service.
+
+The Control Center runs the seven registered audit engines sequentially, stores compact local history and finding comparisons under `.jb-expert-qa/dashboard/`, and generates Markdown internal certification reports. Visual QA stores its viewport screenshots in the same local area. These records can include project and website metadata; protect the directory and do not commit it.
+
+Use a project-relative or absolute directory for Static QA. The path is resolved by the machine running the dashboard, not by the browser device. Website audits continue to enforce the existing URL safety policy. Install Chromium once with `npx jb-qa setup --browser chromium` before running browser-based checks.
+
 ## First run: static project audit
 
 ```bash
@@ -72,7 +80,7 @@ const liveSiteReport = await qa.run("live-site", { url: "https://example.com" })
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
 ```
 
-The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, `./version`, and `./audit-engines`.
+The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry, the local QA Control Center server and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, `./version`, `./audit-engines`, and `./dashboard`.
 
 ### Policy-bounded execution
 

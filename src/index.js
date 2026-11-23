@@ -71,3 +71,5 @@ export * from "./language/index.js";
 export { languageRules } from "./specialists/language/index.js";
 
 export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/index.js";
+
+export { createDashboardServer, startDashboard, DEFAULT_DASHBOARD_PORT, DEFAULT_DASHBOARD_HOST } from "./dashboard/server.js";
