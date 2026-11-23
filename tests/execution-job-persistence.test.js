@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, stat, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -225,6 +225,20 @@ test("idempotent retries return the existing job even when the queue is at capac
     () => queue.enqueue({ plan: "second" }, { idempotencyKey: "new-request" }),
     (error) => error.code === "QUEUE_FULL"
   );
+});
+
+test("pre-existing job stores with broad POSIX permissions are rejected", async () => {
+  if (process.platform === "win32") return;
+  await withTempDir(async (directory) => {
+    const filePath = join(directory, "jobs.json");
+    await writeFile(filePath, JSON.stringify({ format: "untrusted" }), "utf8");
+    await chmod(filePath, 0o644);
+    assert.throws(
+      () => createPersistentExecutionJobQueue({ filePath }),
+      (error) => error instanceof ExecutionJobStoreError && error.code === "UNSAFE_STORE_PERMISSIONS"
+    );
+    await assert.rejects(stat(filePath + ".lock"), (error) => error.code === "ENOENT");
+  });
 });
 
 test("store adapter exposes stable schema envelope and private file permissions", async () => {
