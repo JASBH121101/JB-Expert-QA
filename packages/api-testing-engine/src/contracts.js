@@ -139,7 +139,7 @@ function validateHeaderRules(headers, label) {
     }
     if (rule.equals !== undefined) requireString(rule.equals, label + "." + name + ".equals", 1024);
     if (rule.contains !== undefined) requireString(rule.contains, label + "." + name + ".contains", 1024);
-    if (rule.equals === undefined && rule.contains === undefined && rule.required !== true) {
+    if (rule.equals === undefined && rule.contains === undefined && typeof rule.required !== "boolean") {
       throw new ApiContractError("INVALID_HEADER_RULE", label + "." + name + " must define equals, contains or required: true");
     }
   }
