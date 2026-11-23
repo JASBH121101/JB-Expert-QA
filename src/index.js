@@ -46,6 +46,7 @@ export { runAutopilot } from "./agent/autopilot.js";
 export { createAutonomousExecutionEngine } from "./agent/autonomous-execution.js";
 export { createAutonomousExecutionRuntime, AutonomousExecutionRuntimeError } from "./agent/execution-runtime.js";
 export { createExecutionJobQueue, ExecutionJobQueueError } from "./agent/execution-job-queue.js";
+export { createExecutionWorker, ExecutionWorkerError } from "./agent/execution-worker.js";
 export { createInMemoryExecutionLedger, createJsonlExecutionLedger, verifyExecutionLedger, digestExecutionValue } from "./agent/execution-ledger.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
 export {
