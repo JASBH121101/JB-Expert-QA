@@ -63,7 +63,9 @@ function readRuntimeStatus(getStatus) {
 
 function safeErrorMessage(error) {
   const message = error instanceof Error ? error.message : String(error ?? "Execution failed");
-  return redactSensitiveText(message).slice(0, 1000) || "Execution failed";
+  return redactSensitiveText(message)
+    .replace(/\\b(?:gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk_live_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{30,})\\b/g, "[REDACTED_TOKEN]")
+    .slice(0, 1000) || "Execution failed";
 }
 
 /**
