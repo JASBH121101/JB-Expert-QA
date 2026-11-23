@@ -5,7 +5,8 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
-import { createDashboardServer } from "../src/dashboard/server.js";\nimport { createQaEngineRegistry } from "../src/engine-registry/index.js";
+import { createDashboardServer } from "../src/dashboard/server.js";
+import { createQaEngineRegistry } from "../src/engine-registry/index.js";
 
 async function startTestDashboard(t, options = {}) {
   const storageDirectory = options.storageDirectory ??
