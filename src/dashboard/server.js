@@ -293,8 +293,9 @@ export function createDashboardServer({
   if (!Number.isInteger(maximumBodyBytes) || maximumBodyBytes < 1024 || maximumBodyBytes > 65_536) {
     throw new TypeError("maximumBodyBytes must be between 1024 and 65536");
   }
-  if (!phase4Registry || typeof phase4Registry.list !== "function") {
-    throw new TypeError("phase4Registry must be a JB QA engine registry");
+  if (!phase4Registry || typeof phase4Registry.list !== "function" ||
+      typeof phase4Registry.isSealed !== "function" || phase4Registry.isSealed() !== true) {
+    throw new TypeError("phase4Registry must be a sealed JB QA engine registry");
   }
   if (phase4Execution !== null && !isDashboardPhase4ExecutionBoundTo(phase4Execution, phase4Registry)) {
     throw new TypeError("phase4Execution must be created for the same sealed phase4Registry");
