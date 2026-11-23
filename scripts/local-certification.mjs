@@ -196,10 +196,18 @@ function npmInvocation(npmScript) {
   return { command: "npm", args: ["run", npmScript] };
 }
 
+export function parseNodeTestSkips(output = "") {
+  if (typeof output !== "string") throw new TypeError("output must be a string");
+  const matches = [...output.matchAll(/^# skipped (\\d+)\\s*$/gm)];
+  return matches.reduce((total, match) => total + Number(match[1]), 0);
+}
+
 function summarizeResults(checks) {
-  const summary = { total: checks.length, passed: 0, failed: 0, timedOut: 0, skipped: 0 };
+  const summary = { total: checks.length, passed: 0, partial: 0, failed: 0, timedOut: 0, skipped: 0, testSkips: 0 };
   for (const check of checks) {
+    summary.testSkips += check.skippedTests ?? 0;
     if (check.status === "PASS") summary.passed += 1;
+    else if (check.status === "PARTIAL") summary.partial += 1;
     else if (check.status === "TIMEOUT") summary.timedOut += 1;
     else if (check.status === "SKIPPED") summary.skipped += 1;
     else summary.failed += 1;
@@ -224,9 +232,11 @@ export function renderMarkdownReport(report) {
     "",
     "- Total checks: " + report.summary.total,
     "- Passed: " + report.summary.passed,
+    "- Partially passed: " + report.summary.partial,
     "- Failed: " + report.summary.failed,
     "- Timed out: " + report.summary.timedOut,
-    "- Skipped: " + report.summary.skipped,
+    "- Skipped checks: " + report.summary.skipped,
+    "- Individual tests skipped: " + report.summary.testSkips,
     "",
     "## Checks",
     "",
@@ -275,8 +285,10 @@ export async function runLocalCertification({
       cwd,
       timeoutMs: timeoutMs ?? task.timeoutMs
     });
-    checks.push(Object.freeze({ id: task.id, title: task.title, npmScript: task.npmScript, ...outcome }));
-    console.log("[JB Expert QA] " + task.id + ": " + outcome.status);
+    const skippedTests = parseNodeTestSkips(outcome.outputTail ?? "");
+    const status = outcome.status === "PASS" && skippedTests > 0 ? "PARTIAL" : outcome.status;
+    checks.push(Object.freeze({ id: task.id, title: task.title, npmScript: task.npmScript, ...outcome, status, skippedTests }));
+    console.log("[JB Expert QA] " + task.id + ": " + status + (skippedTests ? " (" + skippedTests + " skipped tests)" : ""));
   }
 
   const completedAt = new Date();
@@ -294,7 +306,8 @@ export async function runLocalCertification({
     engine: "JB Expert QA Local Certification",
     engineVersion: packageJson.version,
     profile,
-    result: summary.failed === 0 && summary.timedOut === 0 && summary.skipped === 0 ? "PASSED" : "FAILED",
+    result: summary.failed > 0 || summary.timedOut > 0 ? "FAILED" :
+      summary.partial > 0 || summary.skipped > 0 ? "PARTIAL" : "PASSED",
     runtime: Object.freeze({ node: process.version, platform: process.platform, arch: process.arch }),
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
