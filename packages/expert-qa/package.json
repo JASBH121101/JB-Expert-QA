@@ -22,6 +22,7 @@
     "./visual": "./src/adapters/visual/png-diff.js",
     "./ai": "./src/ai/provider-router.js",
     "./autopilot": "./src/agent/autopilot.js",
+    "./autonomous-execution": "./src/agent/autonomous-execution.js",
     "./security-bridge": "./src/security-bridge/index.js",
     "./version": "./package-version.js",
     "./database": "./src/adapters/filesystem/audit-database.js"
