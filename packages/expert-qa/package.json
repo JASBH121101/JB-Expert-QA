@@ -41,7 +41,8 @@
     "./report-certification-adapter": "./src/engine-registry/adapters/report-certification.js",
     "./dashboard-phase4-execution": "./src/dashboard/phase4-execution.js",
     "./dashboard-phase4-catalog": "./src/dashboard/phase4-catalog.js",
-    "./execution-runtime": "./src/agent/execution-runtime.js"
+    "./execution-runtime": "./src/agent/execution-runtime.js",
+    "./execution-job-queue": "./src/agent/execution-job-queue.js"
   },
   "files": [
     "src/**",
