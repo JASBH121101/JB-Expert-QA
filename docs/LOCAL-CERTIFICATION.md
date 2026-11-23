@@ -14,9 +14,9 @@ This is the first decoupling step. Existing GitHub Actions workflows are deliber
 
 Install dependencies once, when network access is available:
 
-    npm ci --ignore-scripts --no-audit --no-fund
+    npm install --ignore-scripts --no-audit --no-fund --no-package-lock
 
-The runner itself does not install packages, fetch code, call GitHub APIs, call Cloudflare APIs, access production services, or deploy anything.
+The repository currently has no npm lockfile, so `npm ci` cannot be used until a lockfile is added. The install command above avoids creating an untracked lockfile. The runner itself does not install packages, fetch code, call GitHub APIs, call Cloudflare APIs, access production services, or deploy anything.
 
 ## Run
 
@@ -63,7 +63,7 @@ The profile is an allowlist of fixed scripts in this repository. User input cann
 
 ## Reports and exit codes
 
-Each completed run writes a JSON report and a Markdown summary under .jb-expert-qa/certification by default. The report records the profile, Node.js version, operating system, duration, command-level outcome, exit code, timeout state, and a bounded redacted output tail.
+Each completed run writes a JSON report and a Markdown summary under `.jb-expert-qa/certification` by default. The report records the profile, Node.js version, operating system, duration, command-level outcome, exit code, timeout state, and a bounded redacted output tail.
 
 - PASS — the selected npm script exited with code 0 and its captured TAP summary contains no skipped tests.
 - PARTIAL — the selected npm script exited with code 0 but its captured TAP summary reports one or more skipped tests. These runs are not certified as a full pass.
