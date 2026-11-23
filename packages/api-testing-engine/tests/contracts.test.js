@@ -131,7 +131,7 @@ test("validates required fields, nested types, enums, numeric bounds and additio
 test("reports missing required properties and does not echo response strings", () => {
   const compiled = engine.compile(contract());
   const secretLikeValue = "private-user-token-value";
-  const result = compiled.validate(response({ json: { data: { id: 42, name: secretLikeValue, active: true, roles: ["admin"] } } }), { operationId: "getUser" });
+  const result = compiled.validate(response({ json: { data: { id: 42, name: secretLikeValue, roles: ["admin"] } } }), { operationId: "getUser" });
   assert.equal(result.passed, false);
   assert.ok(result.results.some((item) => item.code === "REQUIRED_PROPERTY"));
   const nameCheck = result.results.find((item) => item.path === "$.data.name" && item.code === "MAX_LENGTH");
@@ -254,4 +254,30 @@ test("requires bounded plain response data and rejects response getters", () => 
   const unsafeResponse = response();
   Object.defineProperty(unsafeResponse, "json", { enumerable: true, get() { throw new Error("must not execute"); } });
   assert.throws(() => compiled.validate(unsafeResponse, { operationId: "getUser" }), /accessor properties/u);
+});
+
+test("rejects response header accessors without executing them", () => {
+  const compiled = engine.compile(contract());
+  let getterCalled = false;
+  const unsafeHeaders = {};
+  Object.defineProperty(unsafeHeaders, "content-type", {
+    enumerable: true,
+    get() { getterCalled = true; return "application/json"; }
+  });
+  const result = compiled.validate(response({ headers: unsafeHeaders }), { operationId: "getUser" });
+  assert.equal(result.passed, false);
+  assert.equal(getterCalled, false);
+  assert.ok(result.results.some((item) => item.code === "INVALID_RESPONSE_HEADERS"));
+});
+
+test("rejects validation-option getters without executing them", () => {
+  const compiled = engine.compile(contract());
+  let getterCalled = false;
+  const options = {};
+  Object.defineProperty(options, "operationId", {
+    enumerable: true,
+    get() { getterCalled = true; return "getUser"; }
+  });
+  assert.throws(() => compiled.validate(response(), options), /cannot contain accessors/u);
+  assert.equal(getterCalled, false);
 });
