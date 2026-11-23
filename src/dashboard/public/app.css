@@ -173,3 +173,13 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; } .panel-index { borde
   .intelligence-heading .history-actions { gap: 8px; }
   .assessment-tag { white-space: normal; }
 }
+
+.phase4-panel { margin-top: 20px; }
+.phase4-engine-grid { grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+.phase4-engine-card { min-width:0; padding:13px; border:1px solid var(--line); border-radius:10px; background:#121c2c; }
+.phase4-engine-card strong { display:block; font-size:11px; }
+.phase4-engine-card small { display:block; margin-top:5px; color:var(--muted); font-size:9px; overflow-wrap:anywhere; }
+.phase4-engine-card p { color:var(--muted); font-size:10px; line-height:1.5; }
+.phase4-capabilities { display:flex; flex-wrap:wrap; gap:6px; }
+.phase4-capabilities .engine-tag { margin:0; padding:3px 6px; border:1px solid var(--line); border-radius:5px; background:#0e1725; }
+.phase4-readonly-tag { display:inline-block; margin-top:10px; color:#f2c17d; font-size:8px; font-weight:800; letter-spacing:.06em; }
