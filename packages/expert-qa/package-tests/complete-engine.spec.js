@@ -29,6 +29,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "auditSecurityUrl",
     "auditUrl",
     "auditViewports",
+    "createAuditEngineRegistry",
+    "AUDIT_ENGINE_IDS",
     "DEFAULT_VIEWPORTS",
     "comparePngBuffers",
     "comparePngFiles",
@@ -54,6 +56,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   }
   assert.equal(typeof engine.auditUrl, "function");
   assert.equal(typeof engine.auditViewports, "function");
+  assert.equal(typeof engine.createAuditEngineRegistry, "function");
+  assert.deepEqual(engine.AUDIT_ENGINE_IDS, ["static", "live-site", "responsive", "accessibility", "performance", "security", "visual"]);
   assert.equal(typeof engine.comparePngBuffers, "function");
   assert.ok(Array.isArray(engine.responsiveRules));
   assert.ok(Array.isArray(engine.accessibilityRules));

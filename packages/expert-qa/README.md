@@ -58,16 +58,21 @@ AI features are opt-in. The autopilot does not apply patches by default. Applyin
 ## JavaScript API
 
 ```js
-import { auditProject, auditDatabaseProject, auditUrl, auditViewports, comparePngBuffers } from "@jb/expert-qa";
+import { auditProject, auditDatabaseProject, auditUrl, auditViewports, comparePngBuffers, createAuditEngineRegistry } from "@jb/expert-qa";
 
 const staticReport = await auditProject("./");
 const databaseReport = await auditDatabaseProject("./");
 const browserReport = await auditUrl("https://example.com");
 const responsiveReport = await auditViewports("https://example.com");
+
+// Or use the unified adapters:
+const qa = createAuditEngineRegistry();
+const unifiedStaticReport = await qa.run("static", { path: "./" });
+const liveSiteReport = await qa.run("live-site", { url: "https://example.com" });
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
 ```
 
-The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, and `./version`.
+The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, `./version`, and `./audit-engines`.
 
 ### Policy-bounded execution
 

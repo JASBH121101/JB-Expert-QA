@@ -69,3 +69,5 @@ export { auditPostgresDatabase, createPostgresClient } from "./adapters/database
 export { auditLanguageFiles } from "./adapters/filesystem/audit-language.js";
 export * from "./language/index.js";
 export { languageRules } from "./specialists/language/index.js";
+
+export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/index.js";
