@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, readFile, rm, writeFile, stat, chmod } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, hostname } from "node:os";
 import { join } from "node:path";
 import {
   createJsonFileExecutionJobStore,
@@ -141,6 +141,24 @@ test("exclusive lock prevents two live processes from opening the same store", a
     first.close();
     const second = createPersistentExecutionJobQueue({ filePath });
     second.close();
+  });
+});
+
+test("dead same-host process locks are reclaimed without weakening live-process exclusion", async () => {
+  if (process.platform === "win32") return;
+  await withTempDir(async (directory) => {
+    const filePath = join(directory, "jobs.json");
+    const lockPath = filePath + ".lock";
+    await writeFile(lockPath, JSON.stringify({
+      pid: 2147483647,
+      host: hostname(),
+      token: "stale-lock-token",
+      createdAt: new Date().toISOString()
+    }), { encoding: "utf8", mode: 0o600 });
+
+    const queue = createPersistentExecutionJobQueue({ filePath });
+    assert.equal(queue.stats().persistent, true);
+    queue.close();
   });
 });
 
