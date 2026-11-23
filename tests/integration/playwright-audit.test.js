@@ -79,6 +79,7 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
     assert.ok(ids.some((id) => id.startsWith("A11Y-AXE-")), "should include axe-core findings");
     assert.ok(ids.some((id) => id.startsWith("FUNC-003")), "should detect HTTP error");
     assert.ok(report.evidence.axeViolations > 0);
+    assert.equal(report.evidence.axeScanCompleted, true);
     assert.ok(report.summary.rulesExecuted >= 18);
     assert.equal(report.target.url, url);
   } finally {
@@ -86,6 +87,41 @@ test("Playwright and axe-core detect page defects with browser evidence", { time
   }
 });
 
+
+test("accessibility specialist completes axe-core and only executes accessibility rules", { timeout: 30000 }, async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end(
+      "<!doctype html><html><head><title>A11y fixture</title></head>" +
+      "<body><main><h1>Accessibility fixture</h1>" +
+      "<img src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='>" +
+      "<input type='email'></main></body></html>"
+    );
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const url = "http://127.0.0.1:" + server.address().port + "/";
+  try {
+    const report = await auditUrl(url, {
+      specialist: "accessibility",
+      timeout: 10000,
+      allowPrivateNetworks: true,
+      sameOriginOnly: true,
+      interactionExploration: false
+    });
+    assert.equal(report.evidence.axeScanCompleted, true);
+    assert.equal(report.evidence.sameOriginOnly, true);
+    assert.equal(report.evidence.interactionExploration.enabled, false);
+    assert.deepEqual(report.summary.specialists, ["accessibility"]);
+    assert.equal(report.summary.rulesExecuted, 5);
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("A11Y-AXE-")));
+    assert.ok(report.diagnostics.some((item) => item.id.startsWith("A11Y-001-")));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 
 test("browser audit redacts secrets from target and resource URLs", { timeout: 30000 }, async () => {
   const targetSecret = "target-secret-value";
