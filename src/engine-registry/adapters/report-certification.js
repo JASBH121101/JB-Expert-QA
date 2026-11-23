@@ -189,11 +189,9 @@ function normalizeHistory(value) {
     // Target labels are replaced with a stable digest so raw URLs, project paths
     // or user-provided labels are not copied into consolidated exports.
     const targetIdentityValue = item.targetHash ?? item.targetLabel ?? "unknown-target";
-    if (typeof targetIdentityValue !== "string") {
-      throw new ReportCertificationAdapterError("INVALID_TARGET_IDENTITY", "Target identity must be a string");
-    }
-    const targetDigest = createHash("sha256").update(targetIdentityValue).digest("hex");
-    const targetLabel = targetIdentityValue === "unknown-target"
+    const targetIdentity = safeText(targetIdentityValue, "history.targetIdentity", 4096, true);
+    const targetDigest = createHash("sha256").update(targetIdentity).digest("hex");
+    const targetLabel = targetIdentity === "unknown-target"
       ? "Unknown target"
       : "Target " + targetDigest.slice(0, 12);
 
@@ -387,7 +385,7 @@ export function createReportCertificationEngineAdapter({
     const history = normalizeHistory(command.history ?? []);
     const engineDefinitions = normalizeEngineDefinitions(command.engineDefinitions);
     const format = normalizeFormat(command.format);
-    const generatedAt = normalizeClock(clock());
+    const generatedAt = normalizeClock(clock);
     let certificationId;
     try {
       certificationId = safeText(idFactory(), "certificationId", 128, true);
