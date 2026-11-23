@@ -590,6 +590,25 @@ export function createAutonomousExecutionEngine({
         executionId, actionId: planned.id, actionType: planned.type,
         risk: action.risk, approvalId, inputDigest: planned.inputDigest, scopeDigest
       });
+      const actionBudget = deadline - Date.now();
+      if (actionBudget <= 0) {
+        const durationMs = Date.now() - actionStarted;
+        const result = {
+          id: planned.id,
+          type: planned.type,
+          status: "timed-out",
+          durationMs,
+          reason: "Execution time budget expired before the handler was invoked"
+        };
+        results.push(Object.freeze(result));
+        await record("action.timed-out", {
+          executionId, actionId: planned.id, actionType: planned.type,
+          risk: action.risk, approvalId, inputDigest: planned.inputDigest,
+          scopeDigest, durationMs, reason: result.reason
+        });
+        stopReason = "timed-out";
+        break;
+      }
       const runResult = await boundedCall(
         (signal) => action.execute({
           executionId,
@@ -602,7 +621,7 @@ export function createAutonomousExecutionEngine({
           signal
         }),
         {
-          timeoutMs: Math.min(action.timeoutMs, normalizedPolicy.limits.maxActionMs, remaining),
+          timeoutMs: Math.min(action.timeoutMs, normalizedPolicy.limits.maxActionMs, actionBudget),
           signal: options.signal
         }
       );
