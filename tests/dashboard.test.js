@@ -124,6 +124,44 @@ test("Phase 4 execution is disabled by default and POST cannot bypass missing ho
   assert.equal((await response.json()).error, "phase4_execution_disabled");
 });
 
+test("Dashboard bridge rejects nested accessors, circular structures and oversized input before approval", async () => {
+  let getterInvoked = false;
+  let approvalCalls = 0;
+  const fixture = createPhase4EchoFixture({
+    requestApproval: async () => {
+      approvalCalls += 1;
+      return { approved: true, approvalId: "should-not-be-requested" };
+    }
+  });
+  const accessorInput = { value: "safe" };
+  Object.defineProperty(accessorInput, "extra", {
+    enumerable: true,
+    get() {
+      getterInvoked = true;
+      return "unsafe";
+    }
+  });
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", accessorInput),
+    (error) => error.code === "ACCESSOR_NOT_ALLOWED"
+  );
+  assert.equal(getterInvoked, false);
+
+  const circularInput = { value: "safe" };
+  circularInput.self = circularInput;
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", circularInput),
+    (error) => error.code === "INVALID_INPUT"
+  );
+
+  await assert.rejects(
+    fixture.execution.executeEngine("jb.test.echo", { value: "x".repeat(17000) }),
+    (error) => error.code === "INPUT_TOO_LARGE"
+  );
+  assert.equal(approvalCalls, 0);
+  assert.equal(fixture.runnerCalls, 0);
+});
+
 test("Dashboard creates a policy-gated request and executes only after external approval", async (t) => {
   const approvals = [];
   const fixture = createPhase4EchoFixture({
