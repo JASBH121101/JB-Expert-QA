@@ -13,6 +13,7 @@ on:
       - "src/agent/contained-process-runner.js"
       - "src/agent/execution-event-journal.js"
       - "src/agent/execution-event-journal-persistence.js"
+      - "src/agent/execution-supervisor.js"
       - "tests/execution-process-runner.test.js"
       - "tests/linux-cgroup-v2-resource-controller.test.js"
       - "tests/windows-job-object-resource-controller.test.js"
@@ -24,6 +25,7 @@ on:
       - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-supervisor.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   pull_request:
     branches: [main]
@@ -37,6 +39,7 @@ on:
       - "src/agent/contained-process-runner.js"
       - "src/agent/execution-event-journal.js"
       - "src/agent/execution-event-journal-persistence.js"
+      - "src/agent/execution-supervisor.js"
       - "tests/execution-process-runner.test.js"
       - "tests/linux-cgroup-v2-resource-controller.test.js"
       - "tests/windows-job-object-resource-controller.test.js"
@@ -48,6 +51,7 @@ on:
       - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-supervisor.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   workflow_dispatch:
 
@@ -80,4 +84,4 @@ jobs:
       - name: Run native Job Object integration and process-runner tests
         shell: pwsh
         run: |
-          node --test --test-concurrency=1 tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js
+          node --test --test-concurrency=1 tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js tests/execution-supervisor.test.js
