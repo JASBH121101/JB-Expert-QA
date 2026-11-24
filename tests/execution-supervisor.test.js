@@ -519,6 +519,7 @@ test("supervisor explicitly owns and closes a durable event journal after record
 
     const finalStatus = await supervisor.close();
     assert.equal(finalStatus.state, "closed");
+    assert.deepEqual(finalStatus.eventJournal, { owned: true, closed: true });
     assert.equal(journal.getStatus().closed, true);
     assert.throws(
       () => journal.recordEvent({ eventType: "JOB_CREATED", jobId: "after-supervisor-close" }),
@@ -562,8 +563,9 @@ test("supervisor leaves shared event journals open unless ownership is explicitl
     eventJournal: journal
   });
 
-  await supervisor.close();
+  const finalStatus = await supervisor.close();
   assert.equal(closeCalls, 0);
+  assert.deepEqual(finalStatus.eventJournal, { owned: false, closed: false });
 });
 
 test("supervisor rejects event journal ownership without a trusted close method", () => {
@@ -627,6 +629,7 @@ test("supervisor records an event journal close failure and retries lock release
     }
   );
   assert.equal(closeCalls, 2);
+  assert.deepEqual(supervisor.getStatus().eventJournal, { owned: true, closed: true });
   assert.deepEqual(events, [
     "SUPERVISOR_SHUTDOWN_STARTED",
     "SUPERVISOR_SHUTDOWN_COMPLETED",
