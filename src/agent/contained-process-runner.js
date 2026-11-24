@@ -241,11 +241,6 @@ export function createContainedLocalProcessEngineRunner(options = {}) {
                 );
               }
             } catch (error) {
-              process.stderr.write(
-                "resource-snapshot-diagnostic " +
-                String(error?.name ?? "unknown") + " " +
-                String(error?.stack ?? "").split("\n").slice(1, 5).join(" | ") + "\n"
-              );
               emitFailure(engineId, executionId, error, "resource_snapshot");
             }
           }
