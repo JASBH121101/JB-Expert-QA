@@ -144,7 +144,10 @@ export function createWindowsJobObjectResourceController(options = {}) {
     let readySettled = false;
     const readyPromise = new Promise((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
 
-    const readyTimer = setTimeout(() => failReady(new WindowsJobObjectResourceControllerError("WINDOWS_JOB_START_TIMEOUT", "the native Job Object host did not become ready within the startup deadline")), limits.startupTimeoutMs);
+    const readyTimer = setTimeout(() => {
+      failReady(new WindowsJobObjectResourceControllerError("WINDOWS_JOB_START_TIMEOUT", "the native Job Object host did not become ready within the startup deadline"));
+      try { helper.kill(); } catch {}
+    }, limits.startupTimeoutMs);
     function failReady(error) {
       if (readySettled) return;
       readySettled = true;
@@ -238,6 +241,7 @@ export function createWindowsJobObjectResourceController(options = {}) {
           const timer = setTimeout(() => {
             pending.delete(id);
             reject(new WindowsJobObjectResourceControllerError("WINDOWS_JOB_COMMAND_TIMEOUT", "the native Job Object host did not complete an operation within its deadline"));
+            try { helper.kill(); } catch {}
           }, limits.commandTimeoutMs);
           pending.set(id, { resolve, reject, timer });
           try {
