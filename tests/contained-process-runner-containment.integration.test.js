@@ -33,7 +33,7 @@ test("native containment dispatcher integrates with the contained runner and lif
   };
   const runner = createContainedLocalProcessEngineRunner({
     runner: {
-      engineId: "jb.test.native-containment",
+      engineId: "jb.test.payload-redaction-probe-84c2",
       moduleRoot: root,
       modulePath,
       cwd: root,
@@ -57,14 +57,14 @@ test("native containment dispatcher integrates with the contained runner and lif
     assert.equal(before.containmentDispatcher.enforced, true);
     assert.equal(before.containmentDispatcher.required, true);
 
-    const result = await runner.run({ value: "native-containment" });
+    const result = await runner.run({ value: "payload-redaction-probe-84c2" });
     assert.deepEqual(result, {
-      value: "native-containment",
+      value: "payload-redaction-probe-84c2",
       pid: result.pid
     });
     assert.ok(Number.isSafeInteger(result.pid) && result.pid > 0);
 
-    const lifecycle = journal.getEventsForEngine("jb.test.native-containment");
+    const lifecycle = journal.getEventsForEngine("jb.test.payload-redaction-probe-84c2");
     const lifecycleTypes = lifecycle.map((event) => event.eventType);
     assert.ok(lifecycleTypes.includes("CONTAINMENT_CONTROLLER_READY"));
     assert.ok(lifecycleTypes.includes("CONTAINMENT_SCOPE_CREATED"));
@@ -93,13 +93,13 @@ test("native containment dispatcher integrates with the contained runner and lif
     assert.equal(closed.eventJournal.emissionFailures, 0);
     assert.equal(
       journal.getEventsByType("CONTAINMENT_CONTROLLER_CLOSED", {
-        engineId: "jb.test.native-containment"
+        engineId: "jb.test.payload-redaction-probe-84c2"
       }).length,
       1
     );
 
     const serialized = JSON.stringify(journal.listEvents());
-    assert.equal(serialized.includes("native-containment"), false);
+    assert.equal(serialized.includes("payload-redaction-probe-84c2"), false);
     assert.equal(journal.listEvents().some((event) => Object.hasOwn(event, "pid")), false);
   } finally {
     await runner.close().catch(() => undefined);
