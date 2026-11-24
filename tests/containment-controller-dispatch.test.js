@@ -22,7 +22,7 @@ test("Linux dispatch refuses to start without a delegated child cgroup path", ()
   );
 });
 
-test("Linux dispatch permits uncontained fallback only when explicitly authorized", () => {
+test("Linux dispatch permits uncontained fallback only when explicitly authorized", async () => {
   const dispatcher = createContainmentControllerDispatcher({
     policy: { allowUncontainedFallback: true },
     capabilityProbeOptions: LINUX_CAPABILITIES
@@ -40,20 +40,17 @@ test("Linux dispatch permits uncontained fallback only when explicitly authorize
     requestId: "12345678-1234-4234-8234-123456789012"
   });
   assert.deepEqual(scope.getUsage(), { state: "unenforced", contained: false });
-  assert.deepEqual(awaitValue(scope.attachProcess(123)), {
+  assert.deepEqual(await scope.attachProcess(123), {
     attached: false,
     contained: false,
     pid: 123
   });
-  assert.deepEqual(awaitValue(scope.terminateAll()), { terminated: false, contained: false });
+  assert.deepEqual(await scope.terminateAll(), { terminated: false, contained: false });
   assert.equal(dispatcher.getStatus().activeScopes, 1);
-  scope.close();
+  await scope.close();
   assert.equal(dispatcher.getStatus().activeScopes, 0);
 });
 
-function awaitValue(value) {
-  return value;
-}
 
 test("unsupported platforms fail closed unless fallback is explicitly enabled", () => {
   assert.throws(
