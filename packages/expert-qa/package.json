@@ -47,7 +47,8 @@
     "./execution-worker": "./src/agent/execution-worker.js",
     "./execution-supervisor": "./src/agent/execution-supervisor.js",
     "./execution-event-journal": "./src/agent/execution-event-journal.js",
-    "./execution-process-runner": "./src/agent/execution-process-runner.js"
+    "./execution-process-runner": "./src/agent/execution-process-runner.js",
+    "./linux-cgroup-v2-resource-controller": "./src/agent/linux-cgroup-v2-resource-controller.js"
   },
   "files": [
     "src/**",
