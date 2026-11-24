@@ -185,8 +185,8 @@ function sleep(ms) {
  */
 export function createLinuxCgroupV2ResourceController(options = {}) {
   const config = readRecord(options, "options", new Set(["cgroupRoot", "limits"]));
-  const rootInfo = validateRoot(config.cgroupRoot);
   const limits = normalizeLimits(config.limits);
+  const rootInfo = validateRoot(config.cgroupRoot);
   let closed = false;
   const scopes = new Map();
 
