@@ -55,6 +55,7 @@ export { createExecutionWorker, ExecutionWorkerError } from "./agent/execution-w
 export { createExecutionLifecycleSupervisor, ExecutionLifecycleSupervisorError } from "./agent/execution-supervisor.js";
 export { createExecutionEventJournal, ExecutionEventJournalError } from "./agent/execution-event-journal.js";
 export { createLocalProcessEngineRunner, LocalProcessEngineRunnerError } from "./agent/execution-process-runner.js";
+export { createLinuxCgroupV2ResourceController, LinuxCgroupV2ResourceControllerError } from "./agent/linux-cgroup-v2-resource-controller.js";
 export { createInMemoryExecutionLedger, createJsonlExecutionLedger, verifyExecutionLedger, digestExecutionValue } from "./agent/execution-ledger.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
 export {
