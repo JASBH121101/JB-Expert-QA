@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalProcessEngineRunner } from "../src/agent/execution-process-runner.js";
@@ -22,7 +23,15 @@ async function fixture(source, options = {}) {
     timeoutMs: options.timeoutMs ?? 5000,
     killGraceMs: options.killGraceMs ?? 100,
     maxInputBytes: options.maxInputBytes ?? 32768,
-    maxOutputBytes: options.maxOutputBytes ?? 32768
+    maxOutputBytes: options.maxOutputBytes ?? 32768,
+    ...(options.resourceController === undefined ? {} : {
+      resourceController: typeof options.resourceController === "function"
+        ? options.resourceController(root)
+        : options.resourceController
+    }),
+    ...(options.requireResourceContainment === undefined ? {} : {
+      requireResourceContainment: options.requireResourceContainment
+    })
   });
   return {
     root,
@@ -180,6 +189,98 @@ test("runner close force-terminates active work and permanently stops admission"
     assert.equal(item.runner.getStatus().active, false);
     assert.equal(item.runner.getStatus().forcedTerminations, 1);
     await assert.rejects(item.runner.run({ value: "late" }), (error) => error.code === "RUNNER_CLOSED");
+  } finally {
+    await item.cleanup();
+  }
+});
+
+test("resource containment is required when explicitly configured", () => {
+  assert.throws(
+    () => createLocalProcessEngineRunner({
+      engineId: "jb.test.process",
+      moduleRoot: "/tmp",
+      modulePath: "/tmp/runner.mjs",
+      requireResourceContainment: true
+    }),
+    (error) => error.code === "RESOURCE_CONTAINMENT_REQUIRED"
+  );
+});
+
+test("process runner attaches the child to its OS resource scope before adapter initialization", async () => {
+  const state = { attachCalls: 0, closeCalls: 0, terminateCalls: 0, attachedPid: null };
+  const item = await fixture(`
+    import { readFileSync } from "node:fs";
+    export async function run() {
+      return { attachedBeforeAdapter: readFileSync("scope-attached.marker", "utf8") === "attached" };
+    }
+  `, {
+    requireResourceContainment: true,
+    resourceController: (root) => Object.freeze({
+      getStatus: () => Object.freeze({ mode: "test-cgroup-provider", available: true, enforced: true }),
+      createScope: ({ engineId, requestId }) => {
+        assert.equal(engineId, "jb.test.process");
+        assert.match(requestId, /^[0-9a-f-]{36}$/iu);
+        return Object.freeze({
+          attachProcess(pid) {
+            state.attachCalls += 1;
+            state.attachedPid = pid;
+            writeFileSync(join(root, "scope-attached.marker"), "attached");
+          },
+          terminateAll() { state.terminateCalls += 1; },
+          getUsage() { return Object.freeze({ state: "active", processCount: 1 }); },
+          async close() { state.closeCalls += 1; }
+        });
+      }
+    })
+  });
+  try {
+    assert.equal(item.runner.getStatus().resourceContainment.required, true);
+    assert.equal(item.runner.getStatus().resourceContainment.configured, true);
+    assert.equal(item.runner.getStatus().resourceContainment.controller.enforced, true);
+    const result = await item.runner.run({ value: "bounded" });
+    assert.deepEqual(result, { attachedBeforeAdapter: true });
+    assert.equal(state.attachCalls, 1);
+    assert.ok(Number.isSafeInteger(state.attachedPid) && state.attachedPid > 0);
+    assert.equal(state.closeCalls, 1);
+  } finally {
+    await item.cleanup();
+  }
+});
+
+test("process runner kills the entire resource scope after cooperative grace expires", async () => {
+  const state = { attachCalls: 0, closeCalls: 0, terminateCalls: 0 };
+  const item = await fixture(`
+    export async function run() {
+      setInterval(() => {}, 1000);
+      return await new Promise(() => {});
+    }
+  `, {
+    timeoutMs: 5000,
+    killGraceMs: 60,
+    requireResourceContainment: true,
+    resourceController: () => Object.freeze({
+      getStatus: () => Object.freeze({ mode: "test-cgroup-provider", available: true, enforced: true }),
+      createScope: () => Object.freeze({
+        attachProcess() { state.attachCalls += 1; },
+        terminateAll() { state.terminateCalls += 1; },
+        getUsage() { return Object.freeze({ state: "active", processCount: 1 }); },
+        async close() { state.closeCalls += 1; }
+      })
+    })
+  });
+  try {
+    const controller = new AbortController();
+    const active = item.runner.run({ value: "hang" }, { signal: controller.signal });
+    const deadline = Date.now() + 5000;
+    while (state.attachCalls === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(state.attachCalls, 1);
+    controller.abort();
+    await assert.rejects(active, (error) => error.code === "EXECUTION_CANCELLED");
+    assert.equal(state.terminateCalls, 1);
+    assert.equal(state.closeCalls, 1);
+    assert.equal(item.runner.getStatus().resourceContainment.activeUsage, null);
   } finally {
     await item.cleanup();
   }
