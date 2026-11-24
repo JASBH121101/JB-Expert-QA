@@ -150,6 +150,13 @@ function validateRoot(cgroupRoot) {
       );
     }
 
+    const cgroupType = readText(path.join(root, "cgroup.type"), "CGROUP_TYPE_UNAVAILABLE");
+    if (cgroupType !== "domain") {
+      throw new LinuxCgroupV2ResourceControllerError(
+        "CGROUP_ROOT_TYPE_UNSUPPORTED",
+        "cgroupRoot must be a valid domain cgroup v2 subtree"
+      );
+    }
     const rootControllers = readText(path.join(root, "cgroup.controllers"), "CGROUP_CONTROLLERS_UNAVAILABLE")
       .split(/\s+/u).filter(Boolean);
     const childControllers = readText(path.join(root, "cgroup.subtree_control"), "CGROUP_SUBTREE_CONTROL_UNAVAILABLE")
