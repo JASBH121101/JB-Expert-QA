@@ -280,7 +280,7 @@ test("supervisor rejects invalid dependencies, accessor options and invalid shut
     (error) => error.code === "ACCESSOR_NOT_ALLOWED"
   );
   assert.throws(
-    () => worker && createExecutionLifecycleSupervisor({
+    () => createExecutionLifecycleSupervisor({
       worker,
       runtime: runtime.runtime,
       queue,
