@@ -246,6 +246,7 @@ export function createLinuxCgroupV2ResourceController(options = {}) {
     let attachedPid = null;
     let scopeClosed = false;
     let terminated = false;
+    let hasMemoryPeak = true;
 
     try {
       for (const filePath of [
@@ -256,7 +257,6 @@ export function createLinuxCgroupV2ResourceController(options = {}) {
       ]) {
         lstatSync(filePath);
       }
-      let hasMemoryPeak = true;
       try { lstatSync(controls.memoryPeak); } catch { hasMemoryPeak = false; }
       writeText(controls.memoryMax, limits.maxMemoryBytes, "CGROUP_MEMORY_LIMIT_FAILED");
       writeText(controls.memorySwapMax, limits.maxSwapBytes, "CGROUP_SWAP_LIMIT_FAILED");
