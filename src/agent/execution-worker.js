@@ -44,6 +44,18 @@ function readMethod(target, name, label) {
   return descriptor.value.bind(target);
 }
 
+function readEventJournal(value) {
+  if (value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ExecutionWorkerError("INVALID_EVENT_JOURNAL", "eventJournal must expose a synchronous recordEvent() method");
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, "recordEvent");
+  if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+    throw new ExecutionWorkerError("INVALID_EVENT_JOURNAL", "eventJournal must expose an own recordEvent() method");
+  }
+  return descriptor.value.bind(value);
+}
+
 function normalizeWorkerId(value) {
   const id = value ?? "worker-" + randomUUID();
   if (typeof id !== "string" || !ID_PATTERN.test(id)) {
@@ -81,7 +93,7 @@ export function createExecutionWorker(options = {}) {
   const config = readRecord(
     options,
     "options",
-    new Set(["queue", "runtime", "workerId", "timeoutMs"])
+    new Set(["queue", "runtime", "workerId", "timeoutMs", "eventJournal"])
   );
   const claimNext = readMethod(config.queue, "claimNext", "queue");
   const completeJob = readMethod(config.queue, "complete", "queue");
@@ -92,6 +104,26 @@ export function createExecutionWorker(options = {}) {
   const executeRuntime = readMethod(config.runtime, "execute", "runtime");
 
   const workerId = normalizeWorkerId(config.workerId);
+  const recordEvent = readEventJournal(config.eventJournal);
+  let eventEmissionFailures = 0;
+
+  function emitLifecycleEvent(eventType, jobId, attempt, severity = "info", code) {
+    if (!recordEvent) return;
+    try {
+      const result = recordEvent({
+        eventType,
+        severity,
+        workerId,
+        ...(jobId ? { jobId } : {}),
+        ...(Number.isSafeInteger(attempt) ? { attempt } : {}),
+        stage: "worker",
+        ...(code ? { code } : {})
+      });
+      if (result && typeof result.then === "function") eventEmissionFailures += 1;
+    } catch {
+      eventEmissionFailures += 1;
+    }
+  }
   const timeoutMs = config.timeoutMs ?? null;
   if (timeoutMs !== null && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000)) {
     throw new ExecutionWorkerError("INVALID_TIMEOUT", "timeoutMs must be an integer from 1 to 600000");
@@ -121,6 +153,7 @@ export function createExecutionWorker(options = {}) {
       completedJobs,
       failedJobs,
       cancelledJobs,
+      eventEmissionFailures,
       queue: getQueueStats()
     });
   }
@@ -168,6 +201,7 @@ export function createExecutionWorker(options = {}) {
 
     activeJobId = job.id;
     state = "busy";
+    emitLifecycleEvent("EXECUTION_STARTED", job.id, job.attempts);
     const controller = new AbortController();
     activeAbortController = controller;
 
@@ -197,21 +231,25 @@ export function createExecutionWorker(options = {}) {
         }
 
         const completed = completeJob(job.id, result);
+        emitLifecycleEvent("EXECUTION_SUCCEEDED", job.id, job.attempts);
         completedJobs += 1;
         return completed;
       } catch (error) {
         if (timedOut) {
           const failed = failJob(job.id, "Execution timed out after " + timeoutMs + " ms");
+          emitLifecycleEvent("EXECUTION_TIMEOUT", job.id, job.attempts, "error", "EXECUTION_TIMEOUT");
           failedJobs += 1;
           return failed;
         }
         if (controller.signal.aborted) {
           const reason = controller.signal.reason ?? error;
           const cancelled = cancelRunningJob(job.id, safeErrorMessage(reason));
+          emitLifecycleEvent("EXECUTION_CANCELLED", job.id, job.attempts, "warning", "EXECUTION_CANCELLED");
           cancelledJobs += 1;
           return cancelled;
         }
         const failed = failJob(job.id, safeErrorMessage(error));
+        emitLifecycleEvent("EXECUTION_FAILED", job.id, job.attempts, "error", "EXECUTION_FAILED");
         failedJobs += 1;
         return failed;
       } finally {
@@ -235,6 +273,7 @@ export function createExecutionWorker(options = {}) {
     assertRuntimeReady();
     startedOnce = true;
     state = "ready";
+    emitLifecycleEvent("WORKER_STARTED");
     return getStatus();
   }
 
@@ -282,6 +321,7 @@ export function createExecutionWorker(options = {}) {
     if (!activeAbortController || activeAbortController.signal.aborted) return false;
     const message = safeErrorMessage(reason);
     activeAbortController.abort(new ExecutionWorkerError("EXECUTION_CANCELLED", message));
+    emitLifecycleEvent("EXECUTION_CANCEL_REQUESTED", activeJobId, undefined, "warning", "EXECUTION_CANCELLED");
     return true;
   }
 
@@ -290,12 +330,14 @@ export function createExecutionWorker(options = {}) {
     if (state === "stopped") return Promise.resolve(getStatus());
 
     state = "stopping";
+    emitLifecycleEvent("WORKER_STOPPING");
     stopPromise = (async () => {
       // stop() remains graceful. Use cancelActive() for an explicit cooperative abort.
       const pending = [activeExecution, drainPromise].filter(Boolean);
       await Promise.all(pending.map((promise) => promise.then(() => undefined, () => undefined)));
       activeJobId = null;
       state = "stopped";
+      emitLifecycleEvent("WORKER_STOPPED");
       return getStatus();
     })();
     return stopPromise;
