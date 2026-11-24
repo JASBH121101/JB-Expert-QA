@@ -49,7 +49,8 @@
     "./execution-event-journal": "./src/agent/execution-event-journal.js",
     "./execution-process-runner": "./src/agent/execution-process-runner.js",
     "./linux-cgroup-v2-resource-controller": "./src/agent/linux-cgroup-v2-resource-controller.js",
-    "./windows-job-object-resource-controller": "./src/agent/windows-job-object-resource-controller.js"
+    "./windows-job-object-resource-controller": "./src/agent/windows-job-object-resource-controller.js",
+    "./containment-policy": "./src/agent/containment-policy.js"
   },
   "files": [
     "src/**",
