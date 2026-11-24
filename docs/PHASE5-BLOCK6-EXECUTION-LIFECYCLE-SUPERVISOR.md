@@ -69,3 +69,8 @@ node --test tests/execution-supervisor.test.js tests/execution-worker.test.js te
 ```
 
 The pull request must also pass Core Validation, Security QA, JB Engines Certification and package-distribution checks before merge.
+
+
+## Phase 5 Block 7 follow-up
+
+The supervisor now also exposes explicit operator inspection and recovery methods (getJob, listJobs, recoverInterrupted, failInterrupted and retryFailed). See [Phase 5 Block 7 — Operator Inspection & Recovery Controls](PHASE5-BLOCK7-OPERATOR-INSPECTION-RECOVERY.md) for the API and safety contract.

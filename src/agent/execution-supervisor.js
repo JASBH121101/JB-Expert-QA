@@ -54,6 +54,18 @@ function readStatus(value, label) {
   return value;
 }
 
+function readOptionalMethod(target, name, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+  if (!descriptor) return null;
+  if (!Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+    throw new ExecutionLifecycleSupervisorError(
+      "INVALID_DEPENDENCY",
+      label + " must expose a trusted " + name + "() method when provided"
+    );
+  }
+  return descriptor.value.bind(target);
+}
+
 function normalizeSupervisorId(value) {
   const id = value ?? "supervisor-" + randomUUID();
   if (typeof id !== "string" || !ID_PATTERN.test(id)) {
@@ -95,6 +107,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const enqueueJob = readMethod(config.queue, "enqueue", "queue");
   const getQueueStats = readMethod(config.queue, "stats", "queue");
   const closeQueue = readMethod(config.queue, "close", "queue");
+  const getQueueJob = readOptionalMethod(config.queue, "getJob", "queue");
+  const listQueueJobs = readOptionalMethod(config.queue, "listJobs", "queue");
+  const requeueInterruptedJob = readOptionalMethod(config.queue, "requeueInterrupted", "queue");
+  const failInterruptedJob = readOptionalMethod(config.queue, "failInterrupted", "queue");
+  const retryFailedJob = readOptionalMethod(config.queue, "retryFailed", "queue");
 
   const supervisorId = normalizeSupervisorId(config.supervisorId);
   let state = "idle";
@@ -143,6 +160,51 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   function enqueue(payload, jobOptions = {}) {
     assertAccepting();
     return enqueueJob(payload, jobOptions);
+  }
+
+  function callQueueCapability(method, name, ...args) {
+    if (method === null) {
+      throw new ExecutionLifecycleSupervisorError(
+        "QUEUE_CAPABILITY_UNAVAILABLE",
+        "queue does not support the optional " + name + "() operation"
+      );
+    }
+    return method(...args);
+  }
+
+  // Operator recovery remains explicit and never consumes a queued job.
+  function getJob(id) {
+    assertAccepting();
+    return callQueueCapability(getQueueJob, "getJob", id);
+  }
+
+  function listJobs(listOptions = {}) {
+    assertAccepting();
+    return callQueueCapability(listQueueJobs, "listJobs", listOptions);
+  }
+
+  function recoverInterrupted(id) {
+    assertAccepting();
+    return callQueueCapability(requeueInterruptedJob, "requeueInterrupted", id);
+  }
+
+  function failInterrupted(id, reason) {
+    assertAccepting();
+    if (reason !== undefined &&
+        (typeof reason !== "string" || !reason.trim() || reason.length > 500)) {
+      throw new ExecutionLifecycleSupervisorError(
+        "INVALID_RECOVERY_REASON",
+        "recovery reason must be a non-empty string of at most 500 characters"
+      );
+    }
+    return reason === undefined
+      ? callQueueCapability(failInterruptedJob, "failInterrupted", id)
+      : callQueueCapability(failInterruptedJob, "failInterrupted", id, reason);
+  }
+
+  function retryFailed(id, retryOptions = {}) {
+    assertAccepting();
+    return callQueueCapability(retryFailedJob, "retryFailed", id, retryOptions);
   }
 
   function runNext() {
@@ -261,6 +323,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
     getStatus,
     start,
     enqueue,
+    getJob,
+    listJobs,
+    recoverInterrupted,
+    failInterrupted,
+    retryFailed,
     runNext,
     drain,
     cancelActive,
