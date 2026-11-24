@@ -221,7 +221,8 @@ test("process runner attaches the child to its OS resource scope before adapter 
         assert.equal(engineId, "jb.test.process");
         assert.match(requestId, /^[0-9a-f-]{36}$/iu);
         return Object.freeze({
-          attachProcess(pid) {
+          async attachProcess(pid) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
             state.attachCalls += 1;
             state.attachedPid = pid;
             writeFileSync(join(root, "scope-attached.marker"), "attached");
