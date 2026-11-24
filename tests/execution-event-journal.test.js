@@ -338,3 +338,57 @@ test("journal rejects unsafe, non-integral, negative and unapproved resource met
   );
   assert.equal(journal.getStatus().retainedEvents, 0);
 });
+
+
+test("journal supports descending history pages with an exclusive before-sequence cursor", () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  for (let index = 0; index < 7; index += 1) {
+    journal.recordEvent({
+      eventType: index % 2 ? "JOB_COMPLETED" : "JOB_CREATED",
+      jobId: "page-job-" + index
+    });
+  }
+
+  const latest = journal.listEvents({ limit: 3 });
+  assert.deepEqual(latest.map((event) => event.sequence), [5, 6, 7]);
+
+  const previous = journal.listEvents({
+    beforeSequence: latest[0].sequence,
+    limit: 3
+  });
+  assert.deepEqual(previous.map((event) => event.sequence), [2, 3, 4]);
+
+  const oldest = journal.listEvents({
+    beforeSequence: previous[0].sequence,
+    limit: 3
+  });
+  assert.deepEqual(oldest.map((event) => event.sequence), [1]);
+
+  assert.deepEqual(
+    journal.listEvents({ afterSequence: 1, beforeSequence: 5 }).map((event) => event.sequence),
+    [2, 3, 4]
+  );
+  assert.deepEqual(
+    journal.getEventsForJob("page-job-4", { beforeSequence: 7 }).map((event) => event.sequence),
+    [5]
+  );
+});
+
+test("journal rejects invalid before-sequence cursors", () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  journal.recordEvent({ eventType: "JOB_CREATED", jobId: "cursor-job" });
+  for (const beforeSequence of [0, 1, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => journal.listEvents({ beforeSequence }),
+      (error) => error.code === "INVALID_CURSOR"
+    );
+  }
+  assert.throws(
+    () => journal.listEvents({ afterSequence: 4, beforeSequence: 4 }),
+    (error) => error.code === "INVALID_CURSOR"
+  );
+  assert.throws(
+    () => journal.listEvents({ afterSequence: 4, beforeSequence: 3 }),
+    (error) => error.code === "INVALID_CURSOR"
+  );
+});
