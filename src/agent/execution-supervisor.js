@@ -140,6 +140,24 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const recordEvent = config.eventJournal === undefined
     ? null
     : readMethod(config.eventJournal, "recordEvent", "eventJournal");
+  const listJournalEvents = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "listEvents", "eventJournal");
+  const getJournalEventsForJob = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "getEventsForJob", "eventJournal");
+  const getJournalEventsForExecution = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "getEventsForExecution", "eventJournal");
+  const getJournalEventsForEngine = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "getEventsForEngine", "eventJournal");
+  const getJournalEventsByType = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "getEventsByType", "eventJournal");
+  const getJournalStatus = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "getStatus", "eventJournal");
   const closeJournalOnShutdown = config.closeEventJournal ?? false;
   if (typeof closeJournalOnShutdown !== "boolean") {
     throw new ExecutionLifecycleSupervisorError(
@@ -250,6 +268,50 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       );
     }
     return method(...args);
+  }
+
+  function callEventJournalCapability(method, name, ...args) {
+    if (method === null) {
+      throw new ExecutionLifecycleSupervisorError(
+        "EVENT_JOURNAL_CAPABILITY_UNAVAILABLE",
+        "event journal does not support the optional " + name + "() operation"
+      );
+    }
+    return method(...args);
+  }
+
+  // Event inspection is read-only. It never changes queue, worker or runtime state.
+  function listEvents(query = {}) {
+    assertAccepting();
+    return callEventJournalCapability(listJournalEvents, "listEvents", query);
+  }
+
+  function getEventsForJob(id, query = {}) {
+    assertAccepting();
+    return callEventJournalCapability(getJournalEventsForJob, "getEventsForJob", id, query);
+  }
+
+  function getEventsForExecution(id, query = {}) {
+    assertAccepting();
+    return callEventJournalCapability(getJournalEventsForExecution, "getEventsForExecution", id, query);
+  }
+
+  function getEventsForEngine(id, query = {}) {
+    assertAccepting();
+    return callEventJournalCapability(getJournalEventsForEngine, "getEventsForEngine", id, query);
+  }
+
+  function getEventsByType(eventType, query = {}) {
+    assertAccepting();
+    return callEventJournalCapability(getJournalEventsByType, "getEventsByType", eventType, query);
+  }
+
+  function getEventJournalStatus() {
+    assertAccepting();
+    return readStatus(
+      callEventJournalCapability(getJournalStatus, "getStatus"),
+      "eventJournal"
+    );
   }
 
   // Operator recovery remains explicit and never consumes a queued job.
@@ -450,6 +512,12 @@ export function createExecutionLifecycleSupervisor(options = {}) {
     enqueue,
     getJob,
     listJobs,
+    listEvents,
+    getEventsForJob,
+    getEventsForExecution,
+    getEventsForEngine,
+    getEventsByType,
+    getEventJournalStatus,
     recoverInterrupted,
     failInterrupted,
     retryFailed,
