@@ -3,7 +3,6 @@ import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
 import { createLocalProcessEngineRunner } from "../src/agent/execution-process-runner.js";
 import {
   createLinuxCgroupV2ResourceController,
@@ -77,7 +76,7 @@ test("real Linux cgroup v2 scope applies limits and kills adapter descendants", 
       maxMemoryBytes: 268435456,
       cpuQuotaMicros: 50000,
       cpuPeriodMicros: 100000,
-      maxProcesses: 8,
+      maxProcesses: 64,
       maxSwapBytes: 0,
       cleanupTimeoutMs: 5000
     }
