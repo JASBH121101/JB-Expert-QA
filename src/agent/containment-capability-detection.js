@@ -24,7 +24,7 @@ export function detectContainmentCapabilities(options = {}) {
       cgroupV2 = exists(path.join(cgroupRoot, "cgroup.controllers"));
       if (cgroupV2) {
         controllers = readText(path.join(cgroupRoot, "cgroup.controllers"))
-          .trim().split(/\\s+/u).filter(Boolean).sort();
+          .trim().split(/\s+/u).filter(Boolean).sort();
         cgroupWritable = exists(path.join(cgroupRoot, "cgroup.subtree_control"));
       }
     } catch {
