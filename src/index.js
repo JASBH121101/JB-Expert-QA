@@ -179,3 +179,5 @@ export { createWindowsJobObjectResourceController, WindowsJobObjectResourceContr
 export { createContainmentPolicy, ContainmentPolicyError } from "./agent/containment-policy.js";
 
 export { createContainmentControllerDispatcher, ContainmentControllerDispatchError } from "./agent/containment-controller-dispatch.js";
+
+export { createContainedLocalProcessEngineRunner, ContainedProcessEngineRunnerError } from "./agent/contained-process-runner.js";
