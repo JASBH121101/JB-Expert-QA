@@ -124,7 +124,15 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "validateUnifiedPatch",
     "createSecurityAssessment",
     "createSecurityBridgeCoordinator",
-    "createSecurityBridgeServer"
+    "createSecurityBridgeServer",
+    "createContainmentPolicy",
+    "createContainmentControllerDispatcher",
+    "ContainmentControllerDispatchError",
+    "detectContainmentCapabilities",
+    "createContainedLocalProcessEngineRunner",
+    "ContainedProcessEngineRunnerError",
+    "createLinuxCgroupV2ResourceController",
+    "createWindowsJobObjectResourceController"
   ];
   for (const name of required) {
     assert.ok(name in engine, "complete package export is missing: " + name);
@@ -475,4 +483,19 @@ test("standalone package exposes a fail-closed policy-gated Dashboard execution 
   assert.ok(audit.records.every((record) => !Object.hasOwn(record, "approvalId")));
   assert.equal(JSON.stringify(audit).includes("package-safe-input"), false);
   assert.equal(JSON.stringify(audit).includes("package-human-approval"), false);
+});
+
+
+test("standalone package exposes the native containment modules through documented subpaths", async () => {
+  const dispatcher = await import("@jb/expert-qa/containment-controller-dispatch");
+  const containedRunner = await import("@jb/expert-qa/contained-process-runner");
+  const capability = await import("@jb/expert-qa/containment-capability-detection");
+  const linux = await import("@jb/expert-qa/linux-cgroup-v2-resource-controller");
+  const windows = await import("@jb/expert-qa/windows-job-object-resource-controller");
+
+  assert.equal(typeof dispatcher.createContainmentControllerDispatcher, "function");
+  assert.equal(typeof containedRunner.createContainedLocalProcessEngineRunner, "function");
+  assert.equal(typeof capability.detectContainmentCapabilities, "function");
+  assert.equal(typeof linux.createLinuxCgroupV2ResourceController, "function");
+  assert.equal(typeof windows.createWindowsJobObjectResourceController, "function");
 });
