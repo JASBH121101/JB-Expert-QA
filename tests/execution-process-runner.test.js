@@ -102,6 +102,24 @@ test("local process runner isolates module failures and does not expose raw erro
   }
 });
 
+test("local process runner applies its configured output byte limit in the child", async () => {
+  const item = await fixture(`
+    export async function run() {
+      return { large: "x".repeat(2048) };
+    }
+  `, { maxOutputBytes: 128 });
+  try {
+    await assert.rejects(
+      item.runner.run({ value: "bounded-output" }),
+      (error) => error.code === "PAYLOAD_LIMIT"
+    );
+    assert.equal(item.runner.getStatus().failedProcesses, 1);
+    assert.equal(item.runner.getStatus().active, false);
+  } finally {
+    await item.cleanup();
+  }
+});
+
 test("local process runner force-terminates a non-cooperative adapter at its deadline", async () => {
   const item = await fixture(`
     export async function run() {
@@ -160,6 +178,7 @@ test("runner close force-terminates active work and permanently stops admission"
     await assert.rejects(active, (error) => error.code === "RUNNER_CLOSED");
     assert.equal(item.runner.getStatus().state, "closed");
     assert.equal(item.runner.getStatus().active, false);
+    assert.equal(item.runner.getStatus().forcedTerminations, 1);
     await assert.rejects(item.runner.run({ value: "late" }), (error) => error.code === "RUNNER_CLOSED");
   } finally {
     await item.cleanup();
