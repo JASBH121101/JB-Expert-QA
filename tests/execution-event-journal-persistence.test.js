@@ -133,7 +133,7 @@ test("durable journal rejects corrupt checksums and invalid persisted event sche
     await writeFile(checksumPath, contents.replace("JOB_CREATED", "JOB_FAILED"), "utf8");
     assert.throws(
       () => createPersistentExecutionEventJournal({ filePath: checksumPath }),
-      (error) => error.code === "STORE_CHECKSUM_MISMATCH"
+      (error) => error.code === "PERSISTENCE_LOAD_FAILED"
     );
 
     const schemaPath = join(directory, "schema.json");
