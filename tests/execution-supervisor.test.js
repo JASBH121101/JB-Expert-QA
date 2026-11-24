@@ -590,3 +590,46 @@ test("supervisor rejects event journal ownership without a trusted close method"
     (error) => error.code === "INVALID_EVENT_JOURNAL_OWNERSHIP"
   );
 });
+
+
+test("supervisor records an event journal close failure and retries lock release once", async () => {
+  const events = [];
+  let closeCalls = 0;
+  const journal = Object.freeze({
+    recordEvent: (event) => { events.push(event.eventType); },
+    close: () => {
+      closeCalls += 1;
+      if (closeCalls === 1) {
+        const error = new Error("private lock failure detail");
+        error.code = "PERSISTENCE_CLOSE_FAILED";
+        throw error;
+      }
+    }
+  });
+  const { queue, runtime, worker } = createHarness();
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    eventJournal: journal,
+    closeEventJournal: true
+  });
+
+  await assert.rejects(
+    supervisor.close(),
+    (error) => {
+      assert.equal(error.code, "SHUTDOWN_FAILED");
+      assert.deepEqual(error.failures, [
+        { stage: "eventJournal.close", code: "PERSISTENCE_CLOSE_FAILED" }
+      ]);
+      assert.equal(error.message.includes("private lock failure detail"), false);
+      return true;
+    }
+  );
+  assert.equal(closeCalls, 2);
+  assert.deepEqual(events, [
+    "SUPERVISOR_SHUTDOWN_STARTED",
+    "SUPERVISOR_SHUTDOWN_COMPLETED",
+    "SHUTDOWN_FAILURE"
+  ]);
+});
