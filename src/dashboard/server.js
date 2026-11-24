@@ -646,9 +646,22 @@ export function createDashboardServer({
   return server;
 }
 
-export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry, phase4Execution } = {}) {
+export async function startDashboard({
+  port = DEFAULT_DASHBOARD_PORT,
+  storageDirectory,
+  registry,
+  phase4Registry,
+  phase4Execution,
+  phase5Supervisor = null
+} = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new TypeError("port must be an integer between 0 and 65535");
-  const server = createDashboardServer({ storageDirectory, registry, phase4Registry, phase4Execution });
+  const server = createDashboardServer({
+    storageDirectory,
+    registry,
+    phase4Registry,
+    phase4Execution,
+    phase5Supervisor
+  });
   await new Promise((resolveListen, rejectListen) => {
     const onError = (error) => { server.off("listening", onListening); rejectListen(error); };
     const onListening = () => { server.off("error", onError); resolveListen(); };
