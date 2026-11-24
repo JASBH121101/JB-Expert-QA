@@ -5,7 +5,7 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuditEngineRegistry } from "../src/audit-engines/index.js";
-import { createDashboardServer } from "../src/dashboard/server.js";
+import { createDashboardServer, startDashboard } from "../src/dashboard/server.js";
 import { createQaEngineRegistry } from "../src/engine-registry/index.js";
 import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";
 import { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
@@ -876,4 +876,39 @@ test("Phase 5 dashboard rejects inherited event supervisor methods", async () =>
     () => createDashboardServer({ phase5Supervisor: inherited }),
     (error) => error instanceof TypeError && error.message.includes("own listEvents() method")
   );
+});
+
+
+test("startDashboard forwards an explicitly supplied Phase 5 supervisor without taking ownership", async () => {
+  const storageDirectory = await mkdtemp(join(tmpdir(), "jb-qa-start-dashboard-phase5-"));
+  const journal = createExecutionEventJournal();
+  journal.recordEvent({ eventType: "SUPERVISOR_STARTED", supervisorId: "embedded-host" });
+  let closeCalls = 0;
+  const phase5Supervisor = Object.freeze({
+    listEvents: (query) => journal.listEvents(query),
+    getEventJournalStatus: () => journal.getStatus(),
+    close: () => { closeCalls += 1; }
+  });
+  let dashboard;
+  try {
+    dashboard = await startDashboard({
+      port: 0,
+      storageDirectory,
+      phase5Supervisor
+    });
+    const statusResponse = await fetch(dashboard.url + "/api/phase5/events/status");
+    assert.equal(statusResponse.status, 200);
+    const status = await statusResponse.json();
+    assert.equal(status.enabled, true);
+    assert.equal(status.journal.retainedEvents, 1);
+
+    const eventsResponse = await fetch(dashboard.url + "/api/phase5/events");
+    assert.equal(eventsResponse.status, 200);
+    const events = await eventsResponse.json();
+    assert.deepEqual(events.events.map((event) => event.eventType), ["SUPERVISOR_STARTED"]);
+  } finally {
+    if (dashboard) await dashboard.close();
+    assert.equal(closeCalls, 0);
+    await rm(storageDirectory, { recursive: true, force: true });
+  }
 });
