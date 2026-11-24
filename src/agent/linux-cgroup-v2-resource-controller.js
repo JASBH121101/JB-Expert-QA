@@ -309,6 +309,9 @@ export function createLinuxCgroupV2ResourceController(options = {}) {
           memoryCurrentBytes: Number(readText(controls.memoryCurrent, "CGROUP_USAGE_UNAVAILABLE")),
           memoryPeakBytes: hasMemoryPeak ? Number(readText(controls.memoryPeak, "CGROUP_USAGE_UNAVAILABLE")) : null,
           cpuUsageMicros: cpu.usage_usec ?? 0,
+          cpuPeriods: cpu.nr_periods ?? 0,
+          cpuThrottledPeriods: cpu.nr_throttled ?? 0,
+          cpuThrottledMicros: cpu.throttled_usec ?? 0,
           processCount: Number(readText(controls.pidsCurrent, "CGROUP_USAGE_UNAVAILABLE")),
           memoryEvents
         });
