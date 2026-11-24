@@ -33,7 +33,7 @@ test("native containment dispatcher integrates with the contained runner and lif
   };
   const runner = createContainedLocalProcessEngineRunner({
     runner: {
-      engineId: "jb.test.payload-redaction-probe-84c2",
+      engineId: "jb.test.native-containment",
       moduleRoot: root,
       modulePath,
       cwd: root,
@@ -64,7 +64,7 @@ test("native containment dispatcher integrates with the contained runner and lif
     });
     assert.ok(Number.isSafeInteger(result.pid) && result.pid > 0);
 
-    const lifecycle = journal.getEventsForEngine("jb.test.payload-redaction-probe-84c2");
+    const lifecycle = journal.getEventsForEngine("jb.test.native-containment");
     const lifecycleTypes = lifecycle.map((event) => event.eventType);
     assert.ok(lifecycleTypes.includes("CONTAINMENT_CONTROLLER_READY"));
     assert.ok(lifecycleTypes.includes("CONTAINMENT_SCOPE_CREATED"));
@@ -93,7 +93,7 @@ test("native containment dispatcher integrates with the contained runner and lif
     assert.equal(closed.eventJournal.emissionFailures, 0);
     assert.equal(
       journal.getEventsByType("CONTAINMENT_CONTROLLER_CLOSED", {
-        engineId: "jb.test.payload-redaction-probe-84c2"
+        engineId: "jb.test.native-containment"
       }).length,
       1
     );
