@@ -486,6 +486,11 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
 
+  const exportScript = await fetch(origin + "/assets/event-export.js");
+  assert.equal(exportScript.status, 200);
+  assert.match(exportScript.headers.get("content-type"), /javascript/);
+  assert.match(await exportScript.text(), /JBPhase5EventExport/);
+
   const script = await fetch(origin + "/assets/app.js");
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /javascript/);
