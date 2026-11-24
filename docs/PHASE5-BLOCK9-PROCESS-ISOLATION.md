@@ -19,6 +19,60 @@ The parent process retains the trusted engine registry, orchestrator, policy che
 
 The module path and export name are fixed by trusted host configuration at runner construction. Job inputs cannot select modules, paths, executables, shell commands or environment variables. The module must export a function accepting `(input, { signal })`.
 
+## Host integration example
+
+The host chooses and validates the module path before registering the adapter. The registry executionMode value is descriptive metadata; the isolation boundary is provided by the runner function explicitly supplied as run.
+
+```js
+import {
+  createLocalProcessEngineRunner,
+  createQaEngineOrchestrator,
+  createAutonomousExecutionRuntime,
+  createExecutionJobQueue,
+  createExecutionWorker,
+  createExecutionLifecycleSupervisor
+} from "@jb/expert-qa";
+
+const isolatedRunner = createLocalProcessEngineRunner({
+  engineId: "jb.static-qa-engine",
+  moduleRoot: trustedAdapterRoot,
+  modulePath: trustedAdapterModulePath,
+  exportName: "run",
+  timeoutMs: 30000,
+  killGraceMs: 250
+});
+
+registry.register({
+  id: "jb.static-qa-engine",
+  name: "Static QA",
+  version: "1.0.0",
+  category: "audit",
+  targetType: "path",
+  executionMode: "local-process",
+  capabilities: ["read-only"],
+  run: isolatedRunner.run
+});
+registry.seal();
+
+// Existing policy, permission and human approval configuration is unchanged.
+const orchestrator = createQaEngineOrchestrator({
+  registry,
+  policy: hostPolicy,
+  requestApproval: hostApprovalProvider.request
+});
+const runtime = createAutonomousExecutionRuntime({ orchestrator, enabled: true });
+const queue = createExecutionJobQueue();
+const worker = createExecutionWorker({ queue, runtime });
+const supervisor = createExecutionLifecycleSupervisor({
+  queue,
+  runtime,
+  worker,
+  processRunners: [isolatedRunner]
+});
+```
+
+The orchestrator invokes isolatedRunner.run only after its normal policy, permission and approval gates pass. The host must use the same trusted runner instance in the registry and in processRunners, so supervisor shutdown can close it.
+
 ## IPC and process controls
 
 - A fixed internal Node bootstrap is launched with `child_process.fork()`, `shell: false` semantics (no shell is used), `execArgv: []`, a constrained environment allowlist, and a fixed working directory inside the configured module root.
@@ -35,7 +89,7 @@ The lifecycle supervisor accepts an optional list of trusted process runners. Du
 
 ## Security and limitations
 
-This is process fault isolation and hard termination of the direct child process; it is not an OS sandbox or a hostile-code security boundary. The child runs under the same OS user and retains that user's filesystem/network permissions. Process descendants created by an adapter are not guaranteed to be terminated as a process tree. Hosts must continue to use adapter-specific path/origin allowlists, read-only rules, policy scope checks and external approval.
+This is process fault isolation and hard termination of the direct child process; it is not an OS sandbox or a hostile-code security boundary. The child runs under the same OS user and retains that user's filesystem/network permissions. This block enforces wall-clock deadlines and bounded IPC/log payloads, but it does not impose CPU or memory quotas. Process descendants created by an adapter are not guaranteed to be terminated as a process tree. Hosts must continue to use adapter-specific path/origin allowlists, read-only rules, policy scope checks and external approval.
 
 A killed child may have performed an external side effect before termination. Queue recovery and retries remain manual. This block does not provide exactly-once execution.
 
