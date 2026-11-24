@@ -132,9 +132,11 @@ export function createContainmentControllerDispatcher(options = {}) {
 
   const probeOptions = normalizeProbeOptions(config.capabilityProbeOptions ?? {});
   let capabilities;
+  let capabilityProbeError = null;
   try {
     capabilities = detectContainmentCapabilities(probeOptions);
   } catch (error) {
+    capabilityProbeError = error;
     capabilities = Object.freeze({
       schemaVersion: 1,
       platform: probeOptions.platform ?? process.platform,
@@ -149,18 +151,18 @@ export function createContainmentControllerDispatcher(options = {}) {
         powershellAvailable: false
       })
     });
-    if (!policy.allowUncontainedFallback || policy.required) {
-      throw new ContainmentControllerDispatchError(
-        "CAPABILITY_PROBE_FAILED",
-        "host containment capabilities could not be inspected",
-        error
-      );
-    }
   }
 
   let nativeController = null;
   let fallbackReason = null;
   try {
+    if (capabilityProbeError) {
+      throw new ContainmentControllerDispatchError(
+        "CAPABILITY_PROBE_FAILED",
+        "host containment capabilities could not be inspected",
+        capabilityProbeError
+      );
+    }
     if (capabilities.platform === "linux") {
       const linux = capabilities.linuxCgroupV2;
       if (!linux?.detected || !linux.requiredControllersAvailable || !linux.writableControlFileDetected) {
@@ -234,6 +236,8 @@ export function createContainmentControllerDispatcher(options = {}) {
     const nativeStatus = nativeController ? nativeController.getStatus() : null;
     return Object.freeze({
       schemaVersion: 1,
+      state: closed ? "closed" : nativeController ? "ready" : "fallback",
+      accepting: !closed && (nativeController === null || nativeStatus.accepting !== false),
       platform: capabilities.platform,
       mode: nativeController ? nativeStatus.mode : "uncontained-fallback",
       available: nativeController !== null,
