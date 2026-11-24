@@ -117,6 +117,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
     "ExecutionJobStoreError",
     "createExecutionWorker",
     "ExecutionWorkerError",
+    "createAutonomousExecutionPollingScheduler",
+    "AutonomousExecutionPollingSchedulerError",
     "createInMemoryExecutionLedger",
     "createJsonlExecutionLedger",
     "verifyExecutionLedger",
@@ -146,6 +148,8 @@ test("the npm package exposes the complete canonical JB Expert QA API", () => {
   assert.equal(typeof engine.ExecutionJobStoreError, "function");
   assert.equal(typeof engine.createExecutionWorker, "function");
   assert.equal(typeof engine.ExecutionWorkerError, "function");
+  assert.equal(typeof engine.createAutonomousExecutionPollingScheduler, "function");
+  assert.equal(typeof engine.AutonomousExecutionPollingSchedulerError, "function");
   assert.equal(typeof engine.auditUrl, "function");
   assert.equal(typeof engine.auditViewports, "function");
   assert.equal(typeof engine.createAuditEngineRegistry, "function");
@@ -498,4 +502,10 @@ test("standalone package exposes the native containment modules through document
   assert.equal(typeof capability.detectContainmentCapabilities, "function");
   assert.equal(typeof linux.createLinuxCgroupV2ResourceController, "function");
   assert.equal(typeof windows.createWindowsJobObjectResourceController, "function");
+});
+
+test("standalone package exposes the autonomous polling scheduler through its public subpath", async () => {
+  const standalone = await import("@jb/expert-qa/execution-polling-scheduler");
+  assert.equal(standalone.createAutonomousExecutionPollingScheduler, engine.createAutonomousExecutionPollingScheduler);
+  assert.equal(standalone.AutonomousExecutionPollingSchedulerError, engine.AutonomousExecutionPollingSchedulerError);
 });
