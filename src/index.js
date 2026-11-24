@@ -52,6 +52,7 @@ export {
   ExecutionJobStoreError
 } from "./agent/execution-job-persistence.js";
 export { createExecutionWorker, ExecutionWorkerError } from "./agent/execution-worker.js";
+export { createExecutionLifecycleSupervisor, ExecutionLifecycleSupervisorError } from "./agent/execution-supervisor.js";
 export { createInMemoryExecutionLedger, createJsonlExecutionLedger, verifyExecutionLedger, digestExecutionValue } from "./agent/execution-ledger.js";
 export { evaluatePatchPaths, normalizeProjectPath, redactSourceForAI, validateUnifiedPatch } from "./agent/policy.js";
 export {
