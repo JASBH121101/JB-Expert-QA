@@ -874,6 +874,6 @@ test("Phase 5 dashboard rejects inherited event supervisor methods", async () =>
   });
   assert.throws(
     () => createDashboardServer({ phase5Supervisor: inherited }),
-    /own listEvents() method/
+    (error) => error instanceof TypeError && error.message.includes("own listEvents() method")
   );
 });
