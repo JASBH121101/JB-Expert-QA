@@ -202,7 +202,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       processRunners: Object.freeze(processRunners.map((runner, index) =>
         readStatus(runner.getStatus(), "processRunners[" + index + "]")
       )),
-      eventEmissionFailures
+      eventEmissionFailures,
+      eventJournal: Object.freeze({
+        owned: closeJournalOnShutdown,
+        closed: eventJournalClosed
+      })
     });
   }
 
