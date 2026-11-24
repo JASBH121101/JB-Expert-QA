@@ -49,19 +49,14 @@ test("Windows Job Object controller enforces native limits and terminates descen
     engineId: "jb.test.windows-job",
     requestId: "6f53446b-bb9c-43c1-86ab-653ff34f20a4"
   });
-  const source = [
-    "const { spawn } = require('node:child_process');",
-    "let buffer = '';",
-    "process.stdin.setEncoding('utf8');",
-    "process.stdin.on('data', chunk => {",
-    "  buffer += chunk;",
-    "  if (buffer.includes('\n')) {",
-    "    const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-    "    process.stdout.write(String(descendant.pid) + '\n');",
-    "  }",
-    "});",
-    "setInterval(() => {}, 1000);"
-  ].join("\n");
+  const source = `
+    const { spawn } = require("node:child_process");
+    process.stdin.once("data", () => {
+      const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
+      descendant.once("spawn", () => process.stdout.write(String(descendant.pid) + "\\n"));
+    });
+    setInterval(() => {}, 1000);
+  `;
   const child = spawn(process.execPath, ["-e", source], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
   let stdout = "";
   const pidLine = new Promise((resolve, reject) => {
@@ -81,7 +76,7 @@ test("Windows Job Object controller enforces native limits and terminates descen
     await scope.attachProcess(child.pid);
     assert.equal(scope.getUsage().attachedPid, child.pid);
     assert.ok(scope.getUsage().committedMemoryLimitBytes >= 512 * 1024 * 1024);
-    child.stdin.write("spawn-descendant\n");
+    child.stdin.write("start-descendant");
     const descendantPid = await pidLine;
     assert.ok(Number.isSafeInteger(descendantPid) && descendantPid > 0);
     const childExit = once(child, "exit");
