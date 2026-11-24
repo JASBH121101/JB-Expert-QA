@@ -175,3 +175,5 @@ export {
 export { createDashboardPhase4Catalog } from "./dashboard/phase4-catalog.js";
 
 export { createWindowsJobObjectResourceController, WindowsJobObjectResourceControllerError } from "./agent/windows-job-object-resource-controller.js";
+
+export { createContainmentPolicy, ContainmentPolicyError } from "./agent/containment-policy.js";
