@@ -86,6 +86,55 @@ The root export also exposes specialist rule groups, provider adapters, visual r
 
 The autonomous execution engine has no built-in shell, deployment or production actions. Callers register trusted handlers explicitly, then allowlist their action types, preauthorize required permissions, constrain resource scopes and configure risk and time limits. Medium- and high-risk actions require a separate approval callback. Use a JSONL audit ledger when durable local traceability is required; keep its directory protected by the host OS.
 
+
+## OS resource containment for isolated engines
+
+The optional contained process-runner factory connects the isolated Node.js child process to the host's native resource controller:
+
+- Linux uses a host-prepared, delegated cgroup v2 subtree with CPU, memory and process-count limits.
+- Windows uses a native Job Object with memory, CPU-rate and process-tree controls.
+- Capability checks and policy selection happen inside the JB Expert QA runtime. GitHub Actions is used for validation and delivery, not as the execution host.
+- Uncontained fallback is disabled by default. Enable it only when the host policy explicitly permits reduced isolation, and inspect `getStatus().containmentDispatcher.enforced` before treating a run as contained.
+
+On Linux, prepare and delegate a cgroup v2 child directory on the host and pass its absolute path as `cgroupRoot`. The library does not mount cgroupfs, enable parent controllers, invoke sudo or change host-wide limits. Windows does not require `cgroupRoot`.
+
+```js
+import { resolve } from "node:path";
+import { createContainedLocalProcessEngineRunner } from "@jb/expert-qa/contained-process-runner";
+
+const containment = {
+  policy: {
+    required: true,
+    memoryLimit: "512MiB",
+    cpuLimit: 50,
+    processLimit: 32
+  },
+  ...(process.platform === "linux"
+    ? { cgroupRoot: process.env.JBQA_CGROUP_ROOT }
+    : {})
+};
+
+const runner = createContainedLocalProcessEngineRunner({
+  runner: {
+    engineId: "example.engine",
+    moduleRoot: resolve("./engines"),
+    modulePath: resolve("./engines/example.mjs")
+  },
+  containment
+});
+
+try {
+  const result = await runner.run({ task: "audit" });
+  console.log(result);
+} finally {
+  await runner.close();
+}
+```
+
+Use `@jb/expert-qa/containment-controller-dispatch` when a host needs direct control of the policy/capability dispatcher. The separate `@jb/expert-qa/containment-policy`, `@jb/expert-qa/containment-capability-detection`, `@jb/expert-qa/linux-cgroup-v2-resource-controller` and `@jb/expert-qa/windows-job-object-resource-controller` subpaths expose the lower-level building blocks.
+
+Resource containment limits execution resources and terminates the child process tree; it is not a filesystem or network sandbox. The child retains the OS identity and filesystem/network permissions of the host process. Keep module paths and cgroup delegation host-controlled.
+
 ## Privacy and execution boundaries
 
 - Static audits read supported local project files; they do not execute the audited application.
