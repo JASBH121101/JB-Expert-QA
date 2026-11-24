@@ -66,6 +66,26 @@ function readOptionalMethod(target, name, label) {
   return descriptor.value.bind(target);
 }
 
+function readProcessRunners(value) {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length > 32) {
+    throw new ExecutionLifecycleSupervisorError("INVALID_PROCESS_RUNNERS", "processRunners must be an array of at most 32 trusted runners");
+  }
+  const runners = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new ExecutionLifecycleSupervisorError("INVALID_PROCESS_RUNNER", "processRunners cannot contain holes or accessors");
+    }
+    const runner = descriptor.value;
+    runners.push(Object.freeze({
+      getStatus: readMethod(runner, "getStatus", "processRunners[" + index + "]"),
+      close: readMethod(runner, "close", "processRunners[" + index + "]")
+    }));
+  }
+  return Object.freeze(runners);
+}
+
 function normalizeSupervisorId(value) {
   const id = value ?? "supervisor-" + randomUUID();
   if (typeof id !== "string" || !ID_PATTERN.test(id)) {
@@ -93,7 +113,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const config = readRecord(
     options,
     "options",
-    new Set(["worker", "runtime", "queue", "supervisorId", "eventJournal"])
+    new Set(["worker", "runtime", "queue", "supervisorId", "eventJournal", "processRunners"])
   );
 
   const getWorkerStatus = readMethod(config.worker, "getStatus", "worker");
@@ -113,6 +133,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const failInterruptedJob = readOptionalMethod(config.queue, "failInterrupted", "queue");
   const retryFailedJob = readOptionalMethod(config.queue, "retryFailed", "queue");
 
+  const processRunners = readProcessRunners(config.processRunners);
   const supervisorId = normalizeSupervisorId(config.supervisorId);
   const recordEvent = config.eventJournal === undefined
     ? null
@@ -159,6 +180,9 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       worker: readStatus(getWorkerStatus(), "worker"),
       runtime: readStatus(getRuntimeStatus(), "runtime"),
       queue: readStatus(getQueueStats(), "queue"),
+      processRunners: Object.freeze(processRunners.map((runner, index) =>
+        readStatus(runner.getStatus(), "processRunners[" + index + "]")
+      )),
       eventEmissionFailures
     });
   }
@@ -320,6 +344,14 @@ export function createExecutionLifecycleSupervisor(options = {}) {
         await closeRuntime();
       } catch (error) {
         failures.push(failureRecord("runtime.close", error));
+      }
+
+      for (let index = 0; index < processRunners.length; index += 1) {
+        try {
+          await processRunners[index].close();
+        } catch (error) {
+          failures.push(failureRecord("processRunners.close." + index, error));
+        }
       }
 
       try {
