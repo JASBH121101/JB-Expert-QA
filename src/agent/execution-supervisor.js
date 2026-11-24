@@ -106,8 +106,10 @@ function failureRecord(stage, error) {
  * and worker. Construction is inert. Hosts explicitly start and drive work.
  *
  * Shutdown ordering is intentional: stop worker admission and await active
- * work, close the runtime, then release queue persistence resources. An
- * optional abortActive request is cooperative and never force-kills a promise.
+ * work, close the runtime and process runners, then release queue persistence
+ * resources. A journal is closed only when closeEventJournal ownership is
+ * explicitly enabled. An optional abortActive request is cooperative and never
+ * force-kills a promise.
  */
 export function createExecutionLifecycleSupervisor(options = {}) {
   const config = readRecord(
