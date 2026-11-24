@@ -125,6 +125,18 @@ function readQueueOptions(value, label, allowedKeys) {
   return output;
 }
 
+function readEventJournal(value) {
+  if (value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ExecutionJobQueueError("INVALID_EVENT_JOURNAL", "eventJournal must expose a synchronous recordEvent() method");
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, "recordEvent");
+  if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+    throw new ExecutionJobQueueError("INVALID_EVENT_JOURNAL", "eventJournal must expose an own recordEvent() method");
+  }
+  return descriptor.value.bind(value);
+}
+
 function readPersistence(persistence) {
   if (persistence === undefined) return null;
   if (!persistence || typeof persistence !== "object" || Array.isArray(persistence)) {
@@ -151,7 +163,7 @@ export function createExecutionJobQueue(options = {}) {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
     throw new ExecutionJobQueueError("INVALID_OPTIONS", "options must be an object");
   }
-  const allowed = new Set(["maxQueueSize", "maxJobs", "maxAttempts", "now", "persistence"]);
+  const allowed = new Set(["maxQueueSize", "maxJobs", "maxAttempts", "now", "persistence", "eventJournal"]);
   const config = Object.create(null);
   for (const key of Reflect.ownKeys(options)) {
     if (typeof key !== "string" || !allowed.has(key)) {
@@ -169,6 +181,27 @@ export function createExecutionJobQueue(options = {}) {
   const maxAttempts = config.maxAttempts ?? 3;
   const now = config.now ?? (() => new Date().toISOString());
   const persistence = readPersistence(config.persistence);
+  const recordEvent = readEventJournal(config.eventJournal);
+  let eventEmissionFailures = 0;
+
+  function emitLifecycleEvent(eventType, job, severity = "info") {
+    if (!recordEvent) return;
+    try {
+      const result = recordEvent({
+        eventType,
+        severity,
+        ...(job?.id ? { jobId: job.id } : {}),
+        ...(Number.isSafeInteger(job?.attempts) ? { attempt: job.attempts } : {}),
+        stage: "queue"
+      });
+      if (result && typeof result.then === "function") {
+        eventEmissionFailures += 1;
+        Promise.resolve(result).catch(() => {});
+      }
+    } catch {
+      eventEmissionFailures += 1;
+    }
+  }
 
   if (!Number.isSafeInteger(maxQueueSize) || maxQueueSize < 1 || maxQueueSize > 1000) {
     throw new ExecutionJobQueueError("INVALID_QUEUE_LIMIT", "maxQueueSize must be an integer from 1 to 1000");
@@ -261,6 +294,7 @@ export function createExecutionJobQueue(options = {}) {
     const seenKeys = new Set();
     let queuedCount = 0;
     let recoveredRunning = false;
+    const interruptedJobs = [];
 
     for (const record of data.jobs) {
       if (!record || typeof record !== "object" || Array.isArray(record) ||
@@ -302,6 +336,7 @@ export function createExecutionJobQueue(options = {}) {
         job.error = RECOVERY_ERROR;
         job.finishedAt = timestamp();
         recoveredRunning = true;
+        interruptedJobs.push(job);
       }
       if (job.state === "queued") queuedCount += 1;
       restored.push(job);
@@ -312,6 +347,7 @@ export function createExecutionJobQueue(options = {}) {
     }
     restoreState(restored);
     if (recoveredRunning) persist();
+    for (const job of interruptedJobs) emitLifecycleEvent("JOB_INTERRUPTED", job, "warning");
     return recoveredRunning;
   }
 
@@ -346,7 +382,8 @@ export function createExecutionJobQueue(options = {}) {
 
   function enqueue(payload, options = {}) {
     const { id, idempotencyKey } = readQueueOptions(options, "enqueue options", new Set(["id", "idempotencyKey"]));
-    return transact(() => {
+    let created = false;
+    const result = transact(() => {
       if (id !== undefined && (typeof id !== "string" || !ID_PATTERN.test(id))) {
         throw new ExecutionJobQueueError("INVALID_JOB_ID", "job id has an invalid format");
       }
@@ -387,12 +424,18 @@ export function createExecutionJobQueue(options = {}) {
       jobs.set(jobId, job);
       fifo.push(jobId);
       if (idempotencyKey) idempotency.set(idempotencyKey, jobId);
+      created = true;
       return snapshot(job);
     });
+    if (created) {
+      emitLifecycleEvent("JOB_CREATED", result);
+      emitLifecycleEvent("JOB_QUEUED", result);
+    }
+    return result;
   }
 
   function claimNext() {
-    return transact(() => {
+    const result = transact(() => {
       if (fifo.length === 0) return null;
       const currentTime = timestamp();
       const currentTimeMs = Date.parse(currentTime);
@@ -421,10 +464,12 @@ export function createExecutionJobQueue(options = {}) {
       }
       return null;
     });
+    if (result) emitLifecycleEvent("JOB_CLAIMED", result);
+    return result;
   }
 
   function complete(id, result) {
-    return transact(() => {
+    const completed = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "running") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only running jobs can complete");
@@ -434,10 +479,12 @@ export function createExecutionJobQueue(options = {}) {
       job.finishedAt = timestamp();
       return snapshot(job);
     });
+    emitLifecycleEvent("JOB_COMPLETED", completed);
+    return completed;
   }
 
   function fail(id, error) {
-    return transact(() => {
+    const failed = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "running") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only running jobs can fail");
@@ -448,10 +495,12 @@ export function createExecutionJobQueue(options = {}) {
       job.finishedAt = timestamp();
       return snapshot(job);
     });
+    emitLifecycleEvent("JOB_FAILED", failed, "error");
+    return failed;
   }
 
   function cancel(id) {
-    return transact(() => {
+    const cancelled = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "queued") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only queued jobs can be cancelled");
@@ -460,10 +509,12 @@ export function createExecutionJobQueue(options = {}) {
       job.finishedAt = timestamp();
       return snapshot(job);
     });
+    emitLifecycleEvent("JOB_CANCELLED", cancelled, "warning");
+    return cancelled;
   }
 
   function cancelRunning(id, reason = "Running job was cancelled.") {
-    return transact(() => {
+    const cancelled = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "running") {
@@ -476,6 +527,8 @@ export function createExecutionJobQueue(options = {}) {
       job.finishedAt = timestamp();
       return snapshot(job);
     });
+    emitLifecycleEvent("JOB_CANCELLED", cancelled, "warning");
+    return cancelled;
   }
 
   /**
@@ -484,7 +537,7 @@ export function createExecutionJobQueue(options = {}) {
    */
   function retryFailed(id, options = {}) {
     const { delayMs } = readQueueOptions(options, "retry options", new Set(["delayMs"]));
-    return transact(() => {
+    const retried = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "failed") {
@@ -515,10 +568,12 @@ export function createExecutionJobQueue(options = {}) {
       fifo.push(job.id);
       return snapshot(job);
     });
+    emitLifecycleEvent("RETRY_QUEUED", retried);
+    return retried;
   }
 
   function requeueInterrupted(id) {
-    return transact(() => {
+    const recovered = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "interrupted") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only interrupted jobs can be recovered");
@@ -537,10 +592,12 @@ export function createExecutionJobQueue(options = {}) {
       fifo.push(job.id);
       return snapshot(job);
     });
+    emitLifecycleEvent("JOB_REQUEUED", recovered, "warning");
+    return recovered;
   }
 
   function failInterrupted(id, reason = "Interrupted job was not automatically replayed.") {
-    return transact(() => {
+    const failed = transact(() => {
       const job = jobs.get(id);
       if (!job) throw new ExecutionJobQueueError("JOB_NOT_FOUND", "job does not exist");
       if (job.state !== "interrupted") throw new ExecutionJobQueueError("INVALID_TRANSITION", "only interrupted jobs can be finalized as failed");
@@ -551,6 +608,8 @@ export function createExecutionJobQueue(options = {}) {
       job.finishedAt = timestamp();
       return snapshot(job);
     });
+    emitLifecycleEvent("INTERRUPTED_JOB_FAILED", failed, "warning");
+    return failed;
   }
 
   function removeTerminal(id) {
@@ -569,7 +628,7 @@ export function createExecutionJobQueue(options = {}) {
   function stats() {
     const counts = { queued: 0, running: 0, interrupted: 0, completed: 0, failed: 0, cancelled: 0, total: jobs.size };
     for (const job of jobs.values()) counts[job.state] += 1;
-    return Object.freeze({ ...counts, maxQueueSize, maxJobs, maxAttempts, persistent: persistence !== null });
+    return Object.freeze({ ...counts, maxQueueSize, maxJobs, maxAttempts, persistent: persistence !== null, eventEmissionFailures });
   }
 
   function close() {

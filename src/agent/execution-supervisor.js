@@ -93,7 +93,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const config = readRecord(
     options,
     "options",
-    new Set(["worker", "runtime", "queue", "supervisorId"])
+    new Set(["worker", "runtime", "queue", "supervisorId", "eventJournal"])
   );
 
   const getWorkerStatus = readMethod(config.worker, "getStatus", "worker");
@@ -114,6 +114,30 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const retryFailedJob = readOptionalMethod(config.queue, "retryFailed", "queue");
 
   const supervisorId = normalizeSupervisorId(config.supervisorId);
+  const recordEvent = config.eventJournal === undefined
+    ? null
+    : readMethod(config.eventJournal, "recordEvent", "eventJournal");
+  let eventEmissionFailures = 0;
+  function emitLifecycleEvent(eventType, jobId, attempt, severity = "info", stage = "supervisor", code) {
+    if (!recordEvent) return;
+    try {
+      const result = recordEvent({
+        eventType,
+        severity,
+        supervisorId,
+        ...(jobId ? { jobId } : {}),
+        ...(Number.isSafeInteger(attempt) ? { attempt } : {}),
+        stage,
+        ...(code ? { code } : {})
+      });
+      if (result && typeof result.then === "function") {
+        eventEmissionFailures += 1;
+        Promise.resolve(result).catch(() => {});
+      }
+    } catch {
+      eventEmissionFailures += 1;
+    }
+  }
   let state = "idle";
   let closePromise = null;
 
@@ -134,7 +158,8 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       accepting: state === "idle" || state === "running",
       worker: readStatus(getWorkerStatus(), "worker"),
       runtime: readStatus(getRuntimeStatus(), "runtime"),
-      queue: readStatus(getQueueStats(), "queue")
+      queue: readStatus(getQueueStats(), "queue"),
+      eventEmissionFailures
     });
   }
 
@@ -154,6 +179,8 @@ export function createExecutionLifecycleSupervisor(options = {}) {
 
     startWorker();
     state = "running";
+    emitLifecycleEvent("RUNTIME_READY", undefined, undefined, "info", "runtime");
+    emitLifecycleEvent("SUPERVISOR_STARTED");
     return getStatus();
   }
 
@@ -185,7 +212,9 @@ export function createExecutionLifecycleSupervisor(options = {}) {
 
   function recoverInterrupted(id) {
     assertAccepting();
-    return callQueueCapability(requeueInterruptedJob, "requeueInterrupted", id);
+    const recovered = callQueueCapability(requeueInterruptedJob, "requeueInterrupted", id);
+    emitLifecycleEvent("RECOVERY_COMPLETED", recovered?.id ?? id, recovered?.attempts, "warning", "operator");
+    return recovered;
   }
 
   function failInterrupted(id, reason) {
@@ -204,7 +233,9 @@ export function createExecutionLifecycleSupervisor(options = {}) {
 
   function retryFailed(id, retryOptions = {}) {
     assertAccepting();
-    return callQueueCapability(retryFailedJob, "retryFailed", id, retryOptions);
+    const retried = callQueueCapability(retryFailedJob, "retryFailed", id, retryOptions);
+    emitLifecycleEvent("RETRY_REQUESTED", retried?.id ?? id, retried?.attempts, "warning", "operator");
+    return retried;
   }
 
   function runNext() {
@@ -260,6 +291,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
     if (state === "closed") return Promise.resolve(getStatus());
 
     state = "closing";
+    emitLifecycleEvent("SUPERVISOR_SHUTDOWN_STARTED");
     let resolveClose;
     let rejectClose;
     closePromise = new Promise((resolve, reject) => {
@@ -298,6 +330,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
 
       state = "closed";
       if (failures.length > 0) {
+        emitLifecycleEvent("SHUTDOWN_FAILURE", undefined, undefined, "error", "supervisor", "SHUTDOWN_FAILED");
         rejectClose(new ExecutionLifecycleSupervisorError(
           "SHUTDOWN_FAILED",
           "one or more execution resources failed to close cleanly",
@@ -305,9 +338,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
         ));
         return;
       }
+      emitLifecycleEvent("SUPERVISOR_SHUTDOWN_COMPLETED");
       resolveClose(getStatus());
     })().catch((error) => {
       state = "closed";
+      emitLifecycleEvent("SHUTDOWN_FAILURE", undefined, undefined, "error", "supervisor", "SHUTDOWN_FAILED");
       rejectClose(new ExecutionLifecycleSupervisorError(
         "SHUTDOWN_FAILED",
         "execution supervisor shutdown failed unexpectedly",
