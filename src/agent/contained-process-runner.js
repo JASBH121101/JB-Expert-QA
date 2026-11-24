@@ -180,7 +180,7 @@ export function createContainedLocalProcessEngineRunner(options = {}) {
                 severity: "warning",
                 code: "UNCONTAINED_PROCESS_TERMINATION"
               });
-            } else if (result?.terminated === true) {
+            } else if (result === true || result?.terminated === true) {
               emitEvent("CONTAINMENT_SCOPE_TERMINATED", { engineId, executionId });
             }
             return result;
