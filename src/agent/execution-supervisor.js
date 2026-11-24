@@ -95,6 +95,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const enqueueJob = readMethod(config.queue, "enqueue", "queue");
   const getQueueStats = readMethod(config.queue, "stats", "queue");
   const closeQueue = readMethod(config.queue, "close", "queue");
+  const getQueueJob = readMethod(config.queue, "getJob", "queue");
+  const listQueueJobs = readMethod(config.queue, "listJobs", "queue");
+  const requeueInterruptedJob = readMethod(config.queue, "requeueInterrupted", "queue");
+  const failInterruptedJob = readMethod(config.queue, "failInterrupted", "queue");
+  const retryFailedJob = readMethod(config.queue, "retryFailed", "queue");
 
   const supervisorId = normalizeSupervisorId(config.supervisorId);
   let state = "idle";
@@ -143,6 +148,41 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   function enqueue(payload, jobOptions = {}) {
     assertAccepting();
     return enqueueJob(payload, jobOptions);
+  }
+
+  // Operator recovery remains explicit and never consumes a queued job.
+  function getJob(id) {
+    assertAccepting();
+    return getQueueJob(id);
+  }
+
+  function listJobs(listOptions = {}) {
+    assertAccepting();
+    return listQueueJobs(listOptions);
+  }
+
+  function recoverInterrupted(id) {
+    assertAccepting();
+    return requeueInterruptedJob(id);
+  }
+
+  function failInterrupted(id, reason) {
+    assertAccepting();
+    if (reason !== undefined &&
+        (typeof reason !== "string" || !reason.trim() || reason.length > 500)) {
+      throw new ExecutionLifecycleSupervisorError(
+        "INVALID_RECOVERY_REASON",
+        "recovery reason must be a non-empty string of at most 500 characters"
+      );
+    }
+    return reason === undefined
+      ? failInterruptedJob(id)
+      : failInterruptedJob(id, reason);
+  }
+
+  function retryFailed(id, retryOptions = {}) {
+    assertAccepting();
+    return retryFailedJob(id, retryOptions);
   }
 
   function runNext() {
@@ -261,6 +301,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
     getStatus,
     start,
     enqueue,
+    getJob,
+    listJobs,
+    recoverInterrupted,
+    failInterrupted,
+    retryFailed,
     runNext,
     drain,
     cancelActive,
