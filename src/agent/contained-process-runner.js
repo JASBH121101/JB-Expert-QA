@@ -109,7 +109,13 @@ export function createContainedLocalProcessEngineRunner(options = {}) {
     });
   }
 
-  const dispatcher = createContainmentControllerDispatcher(containmentOptions);
+  let dispatcher;
+  try {
+    dispatcher = createContainmentControllerDispatcher(containmentOptions);
+  } catch (error) {
+    emitFailure(runnerOptions.engineId, undefined, error, "controller_init");
+    throw error;
+  }
   const controllerStatus = dispatcher.getStatus();
   if (controllerStatus.enforced) {
     const readyCode = controllerStatus.mode === "windows-job-object"
@@ -184,7 +190,12 @@ export function createContainedLocalProcessEngineRunner(options = {}) {
           }
         },
         getUsage() {
-          return scope.getUsage();
+          try {
+            return scope.getUsage();
+          } catch (error) {
+            emitFailure(engineId, executionId, error);
+            throw error;
+          }
         },
         async close() {
           try {
