@@ -138,6 +138,23 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const recordEvent = config.eventJournal === undefined
     ? null
     : readMethod(config.eventJournal, "recordEvent", "eventJournal");
+  const closeJournalOnShutdown = config.closeEventJournal ?? false;
+  if (typeof closeJournalOnShutdown !== "boolean") {
+    throw new ExecutionLifecycleSupervisorError(
+      "INVALID_EVENT_JOURNAL_OWNERSHIP",
+      "closeEventJournal must be a boolean"
+    );
+  }
+  const closeEventJournalResource = config.eventJournal === undefined
+    ? null
+    : readOptionalMethod(config.eventJournal, "close", "eventJournal");
+  if (closeJournalOnShutdown && (!recordEvent || !closeEventJournalResource)) {
+    throw new ExecutionLifecycleSupervisorError(
+      "INVALID_EVENT_JOURNAL_OWNERSHIP",
+      "closeEventJournal requires an event journal with trusted recordEvent() and close() methods"
+    );
+  }
+  let eventJournalClosed = false;
   let eventEmissionFailures = 0;
   function emitLifecycleEvent(eventType, jobId, attempt, severity = "info", stage = "supervisor", code) {
     if (!recordEvent) return;
@@ -363,6 +380,36 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       state = "closed";
       if (failures.length > 0) {
         emitLifecycleEvent("SHUTDOWN_FAILURE", undefined, undefined, "error", "supervisor", "SHUTDOWN_FAILED");
+      } else {
+        emitLifecycleEvent("SUPERVISOR_SHUTDOWN_COMPLETED");
+      }
+
+      if (closeJournalOnShutdown) {
+        try {
+          await closeEventJournalResource();
+          eventJournalClosed = true;
+        } catch (error) {
+          failures.push(failureRecord("eventJournal.close", error));
+          emitLifecycleEvent(
+            "SHUTDOWN_FAILURE",
+            undefined,
+            undefined,
+            "error",
+            "supervisor",
+            "EVENT_JOURNAL_CLOSE_FAILED"
+          );
+          // A failed close may leave the exclusive file lock held. Retry once
+          // after recording the sanitized failure while the journal is usable.
+          try {
+            await closeEventJournalResource();
+            eventJournalClosed = true;
+          } catch (retryError) {
+            failures.push(failureRecord("eventJournal.close.retry", retryError));
+          }
+        }
+      }
+
+      if (failures.length > 0) {
         rejectClose(new ExecutionLifecycleSupervisorError(
           "SHUTDOWN_FAILED",
           "one or more execution resources failed to close cleanly",
@@ -370,7 +417,6 @@ export function createExecutionLifecycleSupervisor(options = {}) {
         ));
         return;
       }
-      emitLifecycleEvent("SUPERVISOR_SHUTDOWN_COMPLETED");
       resolveClose(getStatus());
     })().catch((error) => {
       state = "closed";
