@@ -20,6 +20,7 @@ on:
       - "tests/containment-controller-dispatch.test.js"
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   pull_request:
@@ -41,6 +42,7 @@ on:
       - "tests/containment-controller-dispatch.test.js"
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   workflow_dispatch:
@@ -74,4 +76,4 @@ jobs:
       - name: Run native Job Object integration and process-runner tests
         shell: pwsh
         run: |
-          node --test tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/execution-event-journal.test.js
+          node --test tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js
