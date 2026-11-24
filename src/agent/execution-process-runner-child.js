@@ -28,45 +28,51 @@ function within(root, target) {
     !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative);
 }
 
+function codedError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
 function cloneJson(value, maxBytes) {
   const seen = new Set();
   let nodes = 0;
   function visit(current, depth) {
     nodes += 1;
-    if (nodes > 20000 || depth > 24) throw new Error("INVALID_JSON");
+    if (nodes > 20000 || depth > 24) throw codedError("INVALID_JSON");
     if (current === null || typeof current === "string" || typeof current === "boolean") return;
     if (typeof current === "number") {
-      if (!Number.isFinite(current)) throw new Error("INVALID_JSON");
+      if (!Number.isFinite(current)) throw codedError("INVALID_JSON");
       return;
     }
     if (Array.isArray(current)) {
-      if (seen.has(current) || current.length > 10000) throw new Error("INVALID_JSON");
+      if (seen.has(current) || current.length > 10000) throw codedError("INVALID_JSON");
       seen.add(current);
       for (let index = 0; index < current.length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(current, String(index));
         if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
-          throw new Error("INVALID_JSON");
+          throw codedError("INVALID_JSON");
         }
         visit(descriptor.value, depth + 1);
       }
       for (const key of Reflect.ownKeys(current)) {
         if (key !== "length" && (typeof key !== "string" || !/^(0|[1-9]\d*)$/u.test(key) ||
-            Number(key) >= current.length)) throw new Error("INVALID_JSON");
+            Number(key) >= current.length)) throw codedError("INVALID_JSON");
       }
       seen.delete(current);
       return;
     }
     if (typeof current !== "object" ||
         (Object.getPrototypeOf(current) !== Object.prototype && Object.getPrototypeOf(current) !== null) ||
-        seen.has(current)) throw new Error("INVALID_JSON");
+        seen.has(current)) throw codedError("INVALID_JSON");
     seen.add(current);
     for (const key of Reflect.ownKeys(current)) {
       if (typeof key !== "string" || ["__proto__", "prototype", "constructor"].includes(key)) {
-        throw new Error("INVALID_JSON");
+        throw codedError("INVALID_JSON");
       }
       const descriptor = Object.getOwnPropertyDescriptor(current, key);
       if (!descriptor || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
-        throw new Error("INVALID_JSON");
+        throw codedError("INVALID_JSON");
       }
       visit(descriptor.value, depth + 1);
     }
@@ -75,7 +81,7 @@ function cloneJson(value, maxBytes) {
   visit(value, 0);
   const serialized = JSON.stringify(value);
   if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > maxBytes) {
-    throw new Error("PAYLOAD_LIMIT");
+    throw codedError("PAYLOAD_LIMIT");
   }
   return JSON.parse(serialized);
 }
@@ -183,7 +189,7 @@ async function execute(message) {
   try {
     const input = cloneJson(message.input, maxInputBytes);
     if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error("INVALID_INPUT");
+      throw codedError("INVALID_INPUT");
     }
     const output = await runner(input, { signal: controller.signal });
     const safeOutput = cloneJson(output, maxOutputBytes);
