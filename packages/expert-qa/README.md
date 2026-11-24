@@ -80,7 +80,7 @@ const liveSiteReport = await qa.run("live-site", { url: "https://example.com" })
 // comparePngBuffers(baselineBuffer, actualBuffer) returns a structured visual diff.
 ```
 
-The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry, the local QA Control Center server and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, `./version`, `./audit-engines`, and `./dashboard`.
+The root export also exposes specialist rule groups, provider adapters, visual review, remediation planning, autopilot controls, the autonomous execution engine, the audit-engine registry, the local QA Control Center server and the security-bridge contracts. Optional subpath exports are available for `./browser`, `./visual`, `./ai`, `./autopilot`, `./autonomous-execution`, `./security-bridge`, `./version`, `./audit-engines`, `./dashboard`, `./containment-capability-detection`, `./containment-policy`, `./containment-controller-dispatch`, `./contained-process-runner`, `./linux-cgroup-v2-resource-controller`, and `./windows-job-object-resource-controller`.
 
 ### Policy-bounded execution
 
