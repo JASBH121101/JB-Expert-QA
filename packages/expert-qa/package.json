@@ -44,7 +44,8 @@
     "./execution-runtime": "./src/agent/execution-runtime.js",
     "./execution-job-queue": "./src/agent/execution-job-queue.js",
     "./execution-job-persistence": "./src/agent/execution-job-persistence.js",
-    "./execution-worker": "./src/agent/execution-worker.js"
+    "./execution-worker": "./src/agent/execution-worker.js",
+    "./execution-supervisor": "./src/agent/execution-supervisor.js"
   },
   "files": [
     "src/**",

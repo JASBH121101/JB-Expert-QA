@@ -32,3 +32,7 @@ No background polling loop, HTTP server, remote workers, process isolation, dura
 `node --test tests/execution-worker.test.js tests/execution-job-queue.test.js tests/autonomous-execution-runtime.test.js`
 
 Core Validation, package distribution and JB Engines Certification run on the pull request.
+
+## Phase 5 Block 6 follow-up
+
+Block 6 adds `createExecutionLifecycleSupervisor()` to coordinate explicit startup, host-facing job submission/dispatch and ordered shutdown across the worker, runtime and queue. The worker remains independently usable. See `PHASE5-BLOCK6-EXECUTION-LIFECYCLE-SUPERVISOR.md` for lifecycle ownership and shutdown semantics.
