@@ -15,7 +15,9 @@ The Phase 4 execution ledger remains the source for policy-gated execution evide
 - `getEventsByType(eventType, options)`
 - `getStatus()`
 
-The journal is synchronous and in-memory in this block. It maintains monotonically increasing sequence numbers and immutable event snapshots. When the configured rolling window is full, the oldest record is evicted and `droppedEvents` increases; the retained sequence range and eviction count remain visible. There is deliberately no clear/delete API.
+The default journal is synchronous and in-memory. It maintains monotonically increasing sequence numbers and immutable event snapshots. When the configured rolling window is full, the oldest record is evicted and `droppedEvents` increases; the retained sequence range and eviction count remain visible. There is deliberately no clear/delete API.
+
+Phase 5 Block 12.10 adds the optional `createPersistentExecutionEventJournal({ filePath, maxEvents, now })` adapter. It stores the bounded journal state in the existing hardened local JSON file store, preserving event IDs, timestamps, sequence cursors and eviction counts across restarts. The default `createExecutionEventJournal()` remains memory-only. Both modes expose `close()`; persistent mode must be closed to release its exclusive store lock.
 
 ## Integration
 
