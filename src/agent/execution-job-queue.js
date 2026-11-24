@@ -194,7 +194,10 @@ export function createExecutionJobQueue(options = {}) {
         ...(Number.isSafeInteger(job?.attempts) ? { attempt: job.attempts } : {}),
         stage: "queue"
       });
-      if (result && typeof result.then === "function") eventEmissionFailures += 1;
+      if (result && typeof result.then === "function") {
+        eventEmissionFailures += 1;
+        Promise.resolve(result).catch(() => {});
+      }
     } catch {
       eventEmissionFailures += 1;
     }
