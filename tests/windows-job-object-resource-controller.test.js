@@ -53,7 +53,7 @@ test("Windows Job Object controller enforces native limits and terminates descen
     const { spawn } = require("node:child_process");
     process.stdin.once("data", () => {
       const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore", windowsHide: true });
-      descendant.once("spawn", () => process.stdout.write(String(descendant.pid) + "\\n"));
+      console.log(descendant.pid);
     });
     setInterval(() => {}, 1000);
   `;
@@ -79,20 +79,20 @@ test("Windows Job Object controller enforces native limits and terminates descen
     child.stdin.write("start-descendant");
     const descendantPid = await pidLine;
     assert.ok(Number.isSafeInteger(descendantPid) && descendantPid > 0);
+    const usageDeadline = Date.now() + 5000;
+    let beforeTermination = scope.getUsage();
+    while (beforeTermination.processCount < 2 && Date.now() < usageDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      beforeTermination = scope.getUsage();
+    }
+    assert.ok(beforeTermination.processCount >= 2, "Job Object accounting must include the descendant process");
     const childExit = once(child, "exit");
     await scope.terminateAll();
     await childExit;
-    let descendantAlive = true;
-    const deadline = Date.now() + 5000;
-    while (descendantAlive && Date.now() < deadline) {
-      try {
-        process.kill(descendantPid, 0);
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      } catch {
-        descendantAlive = false;
-      }
-    }
-    assert.equal(descendantAlive, false, "Job Object termination must remove the descendant process");
+    const afterTermination = scope.getUsage();
+    assert.equal(afterTermination.processCount, 0, "Job Object must have no active processes after termination");
+    assert.ok(afterTermination.totalProcesses >= 2, "Job Object must have counted the worker and descendant");
+    assert.ok(afterTermination.terminatedProcesses >= 2, "Job Object must report termination of the worker and descendant");
     await scope.close();
     assert.equal(controller.getStatus().activeScopes, 0);
   } finally {
