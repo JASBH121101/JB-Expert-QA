@@ -115,7 +115,7 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const config = readRecord(
     options,
     "options",
-    new Set(["worker", "runtime", "queue", "supervisorId", "eventJournal", "processRunners"])
+    new Set(["worker", "runtime", "queue", "supervisorId", "eventJournal", "processRunners", "closeEventJournal"])
   );
 
   const getWorkerStatus = readMethod(config.worker, "getStatus", "worker");
@@ -150,10 +150,16 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const closeEventJournalResource = config.eventJournal === undefined
     ? null
     : readOptionalMethod(config.eventJournal, "close", "eventJournal");
-  if (closeJournalOnShutdown && (!recordEvent || !closeEventJournalResource)) {
+  if (closeJournalOnShutdown && !recordEvent) {
     throw new ExecutionLifecycleSupervisorError(
       "INVALID_EVENT_JOURNAL_OWNERSHIP",
-      "closeEventJournal requires an event journal with trusted recordEvent() and close() methods"
+      "closeEventJournal requires an event journal"
+    );
+  }
+  if (closeJournalOnShutdown && !closeEventJournalResource) {
+    throw new ExecutionLifecycleSupervisorError(
+      "INVALID_DEPENDENCY",
+      "eventJournal must expose a trusted close() method when ownership is enabled"
     );
   }
   let eventJournalClosed = false;
