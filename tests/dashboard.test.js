@@ -10,6 +10,7 @@ import { createQaEngineRegistry } from "../src/engine-registry/index.js";
 import { createDashboardPhase4Execution } from "../src/dashboard/phase4-execution.js";
 import { createDashboardPhase4Catalog } from "../src/dashboard/phase4-catalog.js";
 import { getQaEngineActionType, QA_ENGINE_EXECUTION_PERMISSION } from "../src/engine-registry/orchestrator.js";
+import { createExecutionEventJournal } from "../src/agent/execution-event-journal.js";
 
 async function startTestDashboard(t, options = {}) {
   const storageDirectory = options.storageDirectory ??
@@ -18,7 +19,8 @@ async function startTestDashboard(t, options = {}) {
     storageDirectory,
     registry: options.registry ?? createAuditEngineRegistry(),
     ...(Object.hasOwn(options, "phase4Registry") ? { phase4Registry: options.phase4Registry } : {}),
-    ...(Object.hasOwn(options, "phase4Execution") ? { phase4Execution: options.phase4Execution } : {})
+    ...(Object.hasOwn(options, "phase4Execution") ? { phase4Execution: options.phase4Execution } : {}),
+    ...(Object.hasOwn(options, "phase5Supervisor") ? { phase5Supervisor: options.phase5Supervisor } : {})
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -773,4 +775,105 @@ test("dashboard exposes consolidated analytics and downloads a scoped Markdown r
   assert.match(report, /Consolidated QA Intelligence Report/);
   assert.match(report, /Engine coverage means/);
   assert.match(report, /not a third-party certification/i);
+});
+
+
+test("Phase 5 operational event endpoints remain unavailable without a host supervisor", async (t) => {
+  const { origin } = await startTestDashboard(t);
+  const status = await fetch(origin + "/api/phase5/events/status");
+  assert.equal(status.status, 200);
+  const statusBody = await status.json();
+  assert.equal(statusBody.enabled, false);
+  assert.match(statusBody.reason, /host supplies a lifecycle supervisor/iu);
+
+  const events = await fetch(origin + "/api/phase5/events");
+  assert.equal(events.status, 503);
+  assert.equal((await events.json()).error, "event_journal_unavailable");
+});
+
+test("Phase 5 dashboard provides bounded read-only event pages, filters and older cursors", async (t) => {
+  const journal = createExecutionEventJournal({ maxEvents: 50 });
+  const engineId = "jb.test.dashboard-events";
+  const executionId = "12345678-1234-4234-8234-123456789012";
+  const events = [
+    { eventType: "JOB_CREATED", jobId: "timeline-job-1", engineId },
+    { eventType: "JOB_COMPLETED", jobId: "timeline-job-1", engineId },
+    { eventType: "CONTAINMENT_RESOURCE_SNAPSHOT", engineId, executionId, cpuUsageMicros: 42, memoryPeakBytes: 4096 },
+    { eventType: "CONTAINMENT_FAILURE", engineId, executionId, code: "CONTROLLER_READ_FAILED" },
+    { eventType: "JOB_CREATED", jobId: "timeline-job-2", engineId },
+    { eventType: "JOB_COMPLETED", jobId: "timeline-job-2", engineId },
+    { eventType: "EXECUTION_FAILED", engineId, executionId, code: "EXECUTION_TIMEOUT" },
+    { eventType: "SUPERVISOR_STARTED", supervisorId: "timeline-supervisor" }
+  ];
+  events.forEach((event) => journal.recordEvent(event));
+  const phase5Supervisor = Object.freeze({
+    listEvents: (query) => journal.listEvents(query),
+    getEventJournalStatus: () => journal.getStatus()
+  });
+  const { origin } = await startTestDashboard(t, { phase5Supervisor });
+
+  const statusResponse = await fetch(origin + "/api/phase5/events/status");
+  assert.equal(statusResponse.status, 200);
+  assert.equal(statusResponse.headers.get("cache-control"), "no-store");
+  const status = await statusResponse.json();
+  assert.equal(status.enabled, true);
+  assert.equal(status.journal.mode, "memory");
+  assert.equal(status.journal.retainedEvents, 8);
+  assert.equal(status.journal.firstSequence, 1);
+  assert.equal(status.journal.lastSequence, 8);
+
+  const firstResponse = await fetch(origin + "/api/phase5/events?limit=3");
+  assert.equal(firstResponse.status, 200);
+  assert.equal(firstResponse.headers.get("cache-control"), "no-store");
+  const first = await firstResponse.json();
+  assert.equal(first.enabled, true);
+  assert.deepEqual(first.events.map((event) => event.sequence), [6, 7, 8]);
+  assert.equal(first.pagination.hasMore, true);
+  assert.equal(first.pagination.nextBeforeSequence, 6);
+
+  const previousResponse = await fetch(
+    origin + "/api/phase5/events?limit=3&before=" + first.pagination.nextBeforeSequence
+  );
+  const previous = await previousResponse.json();
+  assert.deepEqual(previous.events.map((event) => event.sequence), [3, 4, 5]);
+  assert.equal(previous.pagination.hasMore, true);
+  assert.equal(previous.pagination.nextBeforeSequence, 3);
+
+  const oldestResponse = await fetch(
+    origin + "/api/phase5/events?limit=3&before=" + previous.pagination.nextBeforeSequence
+  );
+  const oldest = await oldestResponse.json();
+  assert.deepEqual(oldest.events.map((event) => event.sequence), [1, 2]);
+  assert.equal(oldest.pagination.hasMore, false);
+  assert.equal(oldest.pagination.nextBeforeSequence, null);
+
+  const filteredResponse = await fetch(
+    origin + "/api/phase5/events?eventType=CONTAINMENT_RESOURCE_SNAPSHOT&engineId=" + encodeURIComponent(engineId)
+  );
+  const filtered = await filteredResponse.json();
+  assert.equal(filtered.events.length, 1);
+  assert.equal(filtered.events[0].executionId, executionId);
+  assert.equal(filtered.events[0].cpuUsageMicros, 42);
+  assert.equal(JSON.stringify(filtered).includes("pid"), false);
+  assert.equal(JSON.stringify(filtered).includes("rawInput"), false);
+
+  const invalidBefore = await fetch(origin + "/api/phase5/events?before=1");
+  assert.equal(invalidBefore.status, 400);
+  const repeated = await fetch(origin + "/api/phase5/events?limit=2&limit=3");
+  assert.equal(repeated.status, 400);
+  const unsupported = await fetch(origin + "/api/phase5/events?pid=1234");
+  assert.equal(unsupported.status, 400);
+  const invalidType = await fetch(origin + "/api/phase5/events?eventType=UNKNOWN_EVENT");
+  assert.equal(invalidType.status, 400);
+});
+
+test("Phase 5 dashboard rejects inherited event supervisor methods", async () => {
+  const inherited = Object.create({
+    listEvents: () => [],
+    getEventJournalStatus: () => ({ mode: "memory" })
+  });
+  assert.throws(
+    () => createDashboardServer({ phase5Supervisor: inherited }),
+    (error) => error instanceof TypeError && error.message.includes("own listEvents() method")
+  );
 });

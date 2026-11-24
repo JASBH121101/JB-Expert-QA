@@ -387,12 +387,17 @@ export function createExecutionEventJournal(options = {}) {
 
   function normalizeQuery(options = {}) {
     const query = readRecord(options, "query options", new Set([
-      "afterSequence", "limit", "eventType", "jobId", "engineId", "executionId"
+      "afterSequence", "beforeSequence", "limit", "eventType", "jobId", "engineId", "executionId"
     ]));
     const afterSequence = query.afterSequence ?? 0;
+    const beforeSequence = query.beforeSequence;
     const limit = query.limit ?? 100;
     if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
       throw new ExecutionEventJournalError("INVALID_CURSOR", "afterSequence must be a non-negative safe integer");
+    }
+    if (beforeSequence !== undefined &&
+        (!Number.isSafeInteger(beforeSequence) || beforeSequence < 2 || beforeSequence <= afterSequence)) {
+      throw new ExecutionEventJournalError("INVALID_CURSOR", "beforeSequence must be a safe integer greater than afterSequence and at least 2");
     }
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
       throw new ExecutionEventJournalError("INVALID_QUERY_LIMIT", "limit must be an integer from 1 to 1000");
@@ -403,13 +408,14 @@ export function createExecutionEventJournal(options = {}) {
     const jobId = identifier(query.jobId, "jobId");
     const engineId = identifier(query.engineId, "engineId");
     const executionId = identifier(query.executionId, "executionId");
-    return { afterSequence, limit, eventType: query.eventType, jobId, engineId, executionId };
+    return { afterSequence, beforeSequence, limit, eventType: query.eventType, jobId, engineId, executionId };
   }
 
   function listEvents(options = {}) {
     const query = normalizeQuery(options);
     const matches = events.filter((event) =>
       event.sequence > query.afterSequence &&
+      (query.beforeSequence === undefined || event.sequence < query.beforeSequence) &&
       (query.eventType === undefined || event.eventType === query.eventType) &&
       (query.jobId === undefined || event.jobId === query.jobId) &&
       (query.engineId === undefined || event.engineId === query.engineId) &&
@@ -419,20 +425,20 @@ export function createExecutionEventJournal(options = {}) {
   }
 
   function getEventsForJob(jobId, options = {}) {
-    const query = readRecord(options, "job query options", new Set(["afterSequence", "limit", "eventType"]));
+    const query = readRecord(options, "job query options", new Set(["afterSequence", "beforeSequence", "limit", "eventType"]));
     return listEvents({ ...query, jobId });
   }
 
   function getEventsForExecution(executionId, options = {}) {
     const query = readRecord(options, "execution query options", new Set([
-      "afterSequence", "limit", "eventType", "engineId"
+      "afterSequence", "beforeSequence", "limit", "eventType", "engineId"
     ]));
     return listEvents({ ...query, executionId });
   }
 
   function getEventsForEngine(engineId, options = {}) {
     const query = readRecord(options, "engine query options", new Set([
-      "afterSequence", "limit", "eventType", "executionId", "jobId"
+      "afterSequence", "beforeSequence", "limit", "eventType", "executionId", "jobId"
     ]));
     return listEvents({ ...query, engineId });
   }
@@ -443,7 +449,7 @@ export function createExecutionEventJournal(options = {}) {
     }
     return listEvents({
       ...readRecord(options, "type query options", new Set([
-        "afterSequence", "limit", "jobId", "engineId", "executionId"
+        "afterSequence", "beforeSequence", "limit", "jobId", "engineId", "executionId"
       ])),
       eventType
     });
