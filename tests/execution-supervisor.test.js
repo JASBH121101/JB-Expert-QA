@@ -670,6 +670,10 @@ test("supervisor exposes read-only execution journal inspection with bounded fil
       1
     );
     assert.equal(supervisor.getEventsForJob("inspect-job-1").length, 1);
+    assert.deepEqual(
+      supervisor.listEvents({ beforeSequence: 2, limit: 10 }).map((event) => event.sequence),
+      [1]
+    );
     const executionEvents = supervisor.getEventsForExecution(executionId);
     assert.equal(executionEvents.length, 1);
     assert.equal(executionEvents[0].memoryPeakBytes, 2048);
