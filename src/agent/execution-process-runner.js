@@ -397,20 +397,22 @@ export function createLocalProcessEngineRunner(options = {}) {
       if (finished || finishing) return;
       finishing = true;
       clearTimersAndListeners();
+      let finalError = error;
       if (resourceScope) {
         try {
           await resourceScope.close();
         } catch {
-          failedProcesses += 1;
-          error = new LocalProcessEngineRunnerError(
+          if (!finalError) failedProcesses += 1;
+          finalError = new LocalProcessEngineRunnerError(
             "RESOURCE_CLEANUP_FAILED",
             "OS resource scope could not be fully cleaned up; execution is not reported as successful"
           );
         }
       }
+      if (!finalError && value !== undefined) completedProcesses += 1;
       finished = true;
       if (active === execution) active = null;
-      if (error) rejectCompletion(error);
+      if (finalError) rejectCompletion(finalError);
       else resolveCompletion(value);
     }
 
@@ -447,7 +449,7 @@ export function createLocalProcessEngineRunner(options = {}) {
     execution.terminate = terminate;
 
     function maybeFinishAfterExit() {
-      if (!exitInfo || finished) return;
+      if (!exitInfo || finished || finishing) return;
       if (terminationReason) {
         if (terminationReason === "EXECUTION_TIMEOUT") {
           timedOutProcesses += 1;
@@ -469,7 +471,6 @@ export function createLocalProcessEngineRunner(options = {}) {
         return;
       }
       if (resultValue !== undefined && exitInfo.code === 0) {
-        completedProcesses += 1;
         finish(null, resultValue);
         return;
       }
