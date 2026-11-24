@@ -12,6 +12,7 @@ on:
       - "src/agent/contained-process-runner.js"
       - "src/agent/execution-event-journal.js"
       - "src/agent/execution-event-journal-persistence.js"
+      - "src/agent/execution-supervisor.js"
       - "tests/execution-process-runner.test.js"
       - "tests/linux-cgroup-v2-resource-controller.test.js"
       - "tests/windows-job-object-resource-controller.test.js"
@@ -23,6 +24,7 @@ on:
       - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-supervisor.test.js"
       - ".github/workflows/linux-cgroup-v2-containment.yml"
   pull_request:
     branches: [main]
@@ -35,6 +37,7 @@ on:
       - "src/agent/contained-process-runner.js"
       - "src/agent/execution-event-journal.js"
       - "src/agent/execution-event-journal-persistence.js"
+      - "src/agent/execution-supervisor.js"
       - "tests/execution-process-runner.test.js"
       - "tests/linux-cgroup-v2-resource-controller.test.js"
       - "tests/windows-job-object-resource-controller.test.js"
@@ -46,6 +49,7 @@ on:
       - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-supervisor.test.js"
       - ".github/workflows/linux-cgroup-v2-containment.yml"
   workflow_dispatch:
 
@@ -99,7 +103,7 @@ jobs:
           done
           echo "JBQA_CGROUP_V2_TEST_ROOT=$DELEGATED" >> "$GITHUB_ENV"
       - name: Run real cgroup v2 resource enforcement and descendant cleanup
-        run: sudo -E "$(command -v node)" --test tests/linux-cgroup-v2-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js
+        run: sudo -E "$(command -v node)" --test tests/linux-cgroup-v2-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js tests/execution-supervisor.test.js
       - name: Remove ephemeral delegated cgroup subtree
         if: always()
         shell: bash
