@@ -636,3 +636,91 @@ test("supervisor records an event journal close failure and retries lock release
     "SHUTDOWN_FAILURE"
   ]);
 });
+
+
+test("supervisor exposes read-only execution journal inspection with bounded filters", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jbqa-supervisor-event-inspection-"));
+  const filePath = join(directory, "events.json");
+  const journal = createPersistentExecutionEventJournal({ filePath, maxEvents: 50 });
+  const executionId = "12345678-1234-4234-8234-123456789012";
+  const engineId = "jb.test.operator-inspection";
+  journal.recordEvent({
+    eventType: "CONTAINMENT_RESOURCE_SNAPSHOT",
+    engineId,
+    executionId,
+    code: "RESOURCE_USAGE_CAPTURED",
+    memoryPeakBytes: 2048,
+    cpuUsageMicros: 75
+  });
+  journal.recordEvent({ eventType: "JOB_CREATED", jobId: "inspect-job-1" });
+
+  const { queue, runtime, worker } = createHarness();
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    eventJournal: journal
+  });
+
+  try {
+    assert.equal(supervisor.getEventJournalStatus().mode, "persistent");
+    assert.equal(supervisor.getEventJournalStatus().retainedEvents, 2);
+    assert.equal(
+      supervisor.listEvents({ eventType: "CONTAINMENT_RESOURCE_SNAPSHOT" }).length,
+      1
+    );
+    assert.equal(supervisor.getEventsForJob("inspect-job-1").length, 1);
+    const executionEvents = supervisor.getEventsForExecution(executionId);
+    assert.equal(executionEvents.length, 1);
+    assert.equal(executionEvents[0].memoryPeakBytes, 2048);
+    const engineEvents = supervisor.getEventsForEngine(engineId, { limit: 1 });
+    assert.equal(engineEvents.length, 1);
+    assert.equal(engineEvents[0].executionId, executionId);
+    assert.equal(
+      supervisor.getEventsByType("CONTAINMENT_RESOURCE_SNAPSHOT", {
+        engineId,
+        executionId
+      }).length,
+      1
+    );
+
+    await supervisor.close();
+    assert.throws(
+      () => supervisor.listEvents(),
+      (error) => error.code === "SUPERVISOR_CLOSED"
+    );
+    assert.throws(
+      () => supervisor.getEventJournalStatus(),
+      (error) => error.code === "SUPERVISOR_CLOSED"
+    );
+  } finally {
+    if (!journal.getStatus().closed) journal.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("supervisor fails closed when an event journal omits optional inspection capabilities", async () => {
+  const journal = Object.freeze({ recordEvent: () => undefined });
+  const { queue, runtime, worker } = createHarness();
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    eventJournal: journal
+  });
+
+  for (const operation of [
+    () => supervisor.listEvents(),
+    () => supervisor.getEventsForJob("job"),
+    () => supervisor.getEventsForExecution("execution"),
+    () => supervisor.getEventsForEngine("engine"),
+    () => supervisor.getEventsByType("JOB_CREATED"),
+    () => supervisor.getEventJournalStatus()
+  ]) {
+    assert.throws(
+      operation,
+      (error) => error.code === "EVENT_JOURNAL_CAPABILITY_UNAVAILABLE"
+    );
+  }
+  await supervisor.close();
+});
