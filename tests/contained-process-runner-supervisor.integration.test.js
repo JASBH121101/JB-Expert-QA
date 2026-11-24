@@ -251,7 +251,23 @@ test("native containment protects the full registry-to-supervisor pipeline and s
       const types = correlated.map((event) => event.eventType);
       assert.ok(types.includes("CONTAINMENT_SCOPE_CREATED"));
       assert.ok(types.includes("CONTAINMENT_PROCESS_ATTACHED"));
+      assert.ok(types.includes("CONTAINMENT_RESOURCE_SNAPSHOT"));
       assert.ok(types.includes("CONTAINMENT_SCOPE_CLOSED"));
+      const snapshots = correlated.filter((event) =>
+        event.eventType === "CONTAINMENT_RESOURCE_SNAPSHOT"
+      );
+      assert.equal(snapshots.length, 1);
+      assert.equal(snapshots[0].memoryLimitBytes, 268435456);
+      assert.equal(snapshots[0].cpuLimitPercent, 50);
+      assert.equal(snapshots[0].processLimit, 16);
+      assert.ok(Number.isSafeInteger(snapshots[0].cpuUsageMicros));
+      assert.ok(Number.isSafeInteger(snapshots[0].processCount));
+      assert.equal(Object.hasOwn(snapshots[0], "pid"), false);
+      assert.equal(Object.hasOwn(snapshots[0], "attachedPid"), false);
+      const scopeClosed = correlated.find((event) =>
+        event.eventType === "CONTAINMENT_SCOPE_CLOSED"
+      );
+      assert.ok(snapshots[0].sequence < scopeClosed.sequence);
     }
 
     const successfulScope = journal.getEventsForExecution(scopeEvents[0].executionId)
