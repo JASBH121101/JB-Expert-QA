@@ -531,10 +531,13 @@ export function createLocalProcessEngineRunner(options = {}) {
     child.on("error", () => {
       failureCode = "PROCESS_SPAWN_FAILED";
     });
-    child.on("exit", (code, signalName) => {
-      exitInfo = { code, signal: signalName };
+    const onProcessExit = (code, signalName) => {
+      if (exitInfo === null) exitInfo = { code, signal: signalName };
       maybeFinishAfterExit();
-    });
+    };
+    child.on("exit", onProcessExit);
+    // A spawn error is not guaranteed to emit "exit"; "close" is the fallback.
+    child.on("close", onProcessExit);
 
     return completion;
   }
