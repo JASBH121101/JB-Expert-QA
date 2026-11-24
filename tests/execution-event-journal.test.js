@@ -88,6 +88,7 @@ test("journal rejects accessors, unknown options and invalid clocks", () => {
 
 
 import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
+import { createPersistentExecutionJobQueue } from "../src/agent/execution-job-persistence.js";
 import { createExecutionWorker } from "../src/agent/execution-worker.js";
 import { createExecutionLifecycleSupervisor } from "../src/agent/execution-supervisor.js";
 
@@ -142,4 +143,32 @@ test("journal failures are isolated from queue state transitions and counted", (
   assert.equal(job.state, "queued");
   assert.equal(queue.getJob(job.id).state, "queued");
   assert.equal(queue.stats().eventEmissionFailures, 2);
+});
+
+
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+test("persistent queue restart records interrupted jobs without replaying them", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jbqa-phase5-block8-"));
+  const filePath = join(directory, "jobs.json");
+  try {
+    const initial = createPersistentExecutionJobQueue({ filePath });
+    initial.enqueue({ plan: "interrupted-job" }, { id: "interrupted-event-job" });
+    initial.claimNext();
+    initial.close();
+
+    const journal = createExecutionEventJournal({ now: clock() });
+    const recovered = createPersistentExecutionJobQueue({ filePath, eventJournal: journal });
+    assert.equal(recovered.getJob("interrupted-event-job").state, "interrupted");
+    assert.deepEqual(
+      journal.getEventsForJob("interrupted-event-job").map((event) => event.eventType),
+      ["JOB_INTERRUPTED"]
+    );
+    assert.equal(journal.getEventsForJob("interrupted-event-job")[0].severity, "warning");
+    recovered.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
