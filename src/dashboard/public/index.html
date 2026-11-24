@@ -7,6 +7,7 @@
   <meta name="description" content="Local quality assurance control center for JB Expert QA">
   <title>JB Expert QA — Control Center</title>
   <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/event-export.js" defer></script>
   <script src="/assets/app.js" defer></script>
 </head>
 <body>
@@ -139,6 +140,8 @@
           <div class="history-actions">
             <span id="phase5-events-state" class="assessment-tag">UNAVAILABLE</span>
             <button type="button" id="phase5-events-refresh" class="secondary-button">Refresh events</button>
+            <button type="button" id="phase5-events-export-json" class="secondary-button" disabled>Export JSON</button>
+            <button type="button" id="phase5-events-export-csv" class="secondary-button" disabled>Export CSV</button>
           </div>
         </div>
         <div class="phase5-event-filters" aria-label="Event filters">
