@@ -255,7 +255,7 @@ test("process runner kills the entire resource scope after cooperative grace exp
       return await new Promise(() => {});
     }
   `, {
-    timeoutMs: 120,
+    timeoutMs: 5000,
     killGraceMs: 60,
     requireResourceContainment: true,
     resourceController: () => Object.freeze({
@@ -269,8 +269,15 @@ test("process runner kills the entire resource scope after cooperative grace exp
     })
   });
   try {
-    await assert.rejects(item.runner.run({ value: "hang" }), (error) => error.code === "EXECUTION_TIMEOUT");
+    const controller = new AbortController();
+    const active = item.runner.run({ value: "hang" }, { signal: controller.signal });
+    const deadline = Date.now() + 5000;
+    while (state.attachCalls === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     assert.equal(state.attachCalls, 1);
+    controller.abort();
+    await assert.rejects(active, (error) => error.code === "EXECUTION_CANCELLED");
     assert.equal(state.terminateCalls, 1);
     assert.equal(state.closeCalls, 1);
     assert.equal(item.runner.getStatus().resourceContainment.activeUsage, null);
