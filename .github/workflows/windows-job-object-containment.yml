@@ -80,4 +80,4 @@ jobs:
       - name: Run native Job Object integration and process-runner tests
         shell: pwsh
         run: |
-          node --test tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js
+          node --test --test-concurrency=1 tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js
