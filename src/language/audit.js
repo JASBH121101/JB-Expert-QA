@@ -6,6 +6,8 @@ import { auditTranslationSemantics } from "./semantic-audit.js";
 import { auditTranslationLinguisticSignals } from "./linguistic-signals.js";
 import { auditTranslationRegionalStyle } from "./regional-style.js";
 import { auditTranslationRegisterSignals } from "./register-signals.js";
+import { auditNativeAcceptanceSignals } from "./native-acceptance.js";
+import { auditTranslationContextualProfiles } from "./contextual-profiles.js";
 
 function isPlainTranslationRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value) || value === Object.prototype) {
@@ -100,7 +102,9 @@ export function auditTranslationMaps(sourceMap, targetMap, {
   targetLocale = "en",
   library = new LanguageLibrary(),
   humanApproval = null,
-  allowUntranslatedKeys = []
+  allowUntranslatedKeys = [],
+  intendedRegister,
+  contextMap = Object.create(null)
 } = {}) {
   const source = flattenTranslationMap(sourceMap);
   const target = flattenTranslationMap(targetMap);
@@ -122,8 +126,19 @@ export function auditTranslationMaps(sourceMap, targetMap, {
   findings.push(...linguisticFindings);
   const regionalStyleFindings = auditTranslationRegionalStyle(target, { targetLocale });
   findings.push(...regionalStyleFindings);
-  const registerFindings = auditTranslationRegisterSignals(target, { targetLocale });
+  const registerFindings = auditTranslationRegisterSignals(target, {
+    targetLocale,
+    intendedRegister: intendedRegister ?? "neutral"
+  });
   findings.push(...registerFindings);
+  const contextualProfileFindings = auditTranslationContextualProfiles(target, {
+    targetLocale,
+    intendedRegister,
+    contextMap
+  });
+  findings.push(...contextualProfileFindings);
+  const nativeAcceptanceFindings = auditNativeAcceptanceSignals(target, { targetLocale });
+  findings.push(...nativeAcceptanceFindings);
 
   const reportShapeMismatch = (key) => {
     if (reportedShapeMismatches.has(key)) return;
@@ -205,7 +220,9 @@ export function auditTranslationMaps(sourceMap, targetMap, {
       corruptedText: semanticFindings.filter((item) => item.id.startsWith("corrupted-") || item.id === "suspicious-encoding-sequence").length,
       linguisticSignals: linguisticFindings.length,
       regionalStyleSignals: regionalStyleFindings.length,
-      registerSignals: registerFindings.length
+      registerSignals: registerFindings.length,
+      contextualProfileSignals: contextualProfileFindings.length,
+      nativeAcceptanceSignals: nativeAcceptanceFindings.length
     }),
     sourceHash,
     targetHash,

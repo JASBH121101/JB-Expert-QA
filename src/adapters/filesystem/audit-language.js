@@ -55,6 +55,8 @@ export async function auditLanguageFiles(projectRoot, {
   sourceLocale = DEFAULT_LOCALE,
   targetLocale = "en",
   library,
+  intendedRegister,
+  contextMap = Object.create(null),
   maxFiles = 500
 } = {}) {
   if (typeof projectRoot !== "string" || !projectRoot.trim()) {
@@ -157,6 +159,8 @@ export async function auditLanguageFiles(projectRoot, {
       const result = auditTranslationMaps(sourceResource, targetResource, {
         sourceLocale: source,
         targetLocale: target,
+        intendedRegister,
+        contextMap,
         ...(library ? { library } : {})
       });
       const fileFindings = result.findings.map((item) => ({ ...item, path: relativePath }));
@@ -202,7 +206,12 @@ export async function auditLanguageFiles(projectRoot, {
       placeholderMismatches: findings.filter((item) => item.id === "placeholder-mismatch").length,
       glossaryReview: findings.filter((item) => item.id === "glossary-review").length,
       unchangedSourceText: findings.filter((item) => item.id === "unchanged-source-text").length,
-      protectedTokenMismatches: findings.filter((item) => item.id.startsWith("protected-")).length
+      protectedTokenMismatches: findings.filter((item) => item.id.startsWith("protected-")).length,
+      contextualProfileSignals: findings.filter((item) => [
+        "context-copy-too-long",
+        "context-register-review",
+        "regional-address-form-review"
+      ].includes(item.id)).length
     })
   });
 }

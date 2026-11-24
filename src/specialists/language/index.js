@@ -51,7 +51,10 @@ function titleFor(id) {
     "suspicious-encoding-sequence": "Translation may contain mojibake or encoding corruption",
     "missing-locale-file": "Translation resource is missing",
     "target-file-without-source": "Target resource has no source file",
-    "resource-parse-error": "Translation resource could not be parsed safely"
+    "resource-parse-error": "Translation resource could not be parsed safely",
+    "context-copy-too-long": "Contextual copy may be too long",
+    "context-register-review": "Context may require a more formal register",
+    "regional-address-form-review": "Regional form of address may need review"
   })[id] ?? "Language QA finding";
 }
 
@@ -77,6 +80,9 @@ function recommendationFor(id) {
   if (id === "repeated-function-word") return "Check whether the repeated common word is a typing error; the signal is advisory and may be intentional.";
   if (id === "untranslated-marker") return "Replace the unfinished marker with reviewed localized content before release.";
   if (id === "mojibake") return "Verify the file encoding and repair the corrupted text; preserve the source content for human review.";
+  if (id === "context-copy-too-long") return "Review the message in its UI context and shorten it only if meaning, accessibility and task clarity remain intact.";
+  if (id === "context-register-review") return "Confirm the register with the legal, compliance or customer-experience owner; this profile is advisory and must not alter obligations.";
+  if (id === "regional-address-form-review") return "Ask a reviewer familiar with the target market to confirm the preferred form of address; do not apply a global replacement.";
   if (id === "corrupted-replacement-character" || id === "corrupted-control-character" || id === "suspicious-encoding-sequence") return "Inspect the original resource encoding and source content, then restore the intended characters. Treat this as a corruption signal, not an automatic rewrite.";
   return "Review the locale resource pair and confirm that public-facing text is complete and appropriate.";
 }

@@ -2,7 +2,7 @@ name: Language QA validation
 
 on:
   push:
-    branches: [main, "integration/**", "feature/language-qa-engine"]
+    branches: [main, "integration/**", "feature/language-qa-engine", "feature/language-qa-native-acceptance-v1"]
     paths:
       - "package.json"
       - "src/language/**"
@@ -14,6 +14,8 @@ on:
       - "tests/language-qa-engine.test.js"
       - "tests/language-qa-translation-memory-suggestions.test.js"
       - "tests/language-qa-linguistic-signals.test.js"
+      - "tests/language-qa-native-acceptance.test.js"
+      - "tests/language-qa-contextual-profiles.test.js"
       - "bench/language-qa.js"
       - ".github/workflows/language-qa.yml"
   pull_request:
@@ -29,6 +31,8 @@ on:
       - "tests/language-qa-engine.test.js"
       - "tests/language-qa-translation-memory-suggestions.test.js"
       - "tests/language-qa-linguistic-signals.test.js"
+      - "tests/language-qa-native-acceptance.test.js"
+      - "tests/language-qa-contextual-profiles.test.js"
       - ".github/workflows/language-qa.yml"
 
 permissions:
@@ -62,6 +66,8 @@ jobs:
           node --check src/language/translation-memory.js
           node --check src/language/review.js
           node --check src/language/audit.js
+          node --check src/language/native-acceptance.js
+          node --check src/language/contextual-profiles.js
           node --check src/adapters/filesystem/audit-language.js
           node --check src/specialists/language/index.js
           node --check src/language-cli.js
