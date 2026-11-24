@@ -7,7 +7,12 @@ const state = {
   running: false,
   activity: [],
   toastTimer: null,
-  phase4Audit: null
+  phase4Audit: null,
+  phase5EventStatus: null,
+  phase5Events: [],
+  phase5EventPagination: null,
+  phase5EventLoading: false,
+  phase5EventError: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -132,6 +137,150 @@ async function refreshPhase4Audit() {
   state.phase4Audit = data;
   renderPhase4Audit();
 }
+function renderPhase5Events() {
+  const stateTag = $("phase5-events-state");
+  const feed = $("phase5-event-feed");
+  const count = $("phase5-event-count");
+  const refresh = $("phase5-events-refresh");
+  const older = $("phase5-events-load-older");
+  const status = state.phase5EventStatus;
+  const journal = status?.journal ?? null;
+  const enabled = status?.enabled === true;
+
+  stateTag.textContent = !enabled ? "UNAVAILABLE" :
+    journal?.closed === true ? "JOURNAL CLOSED" :
+    journal?.persistent === true ? "DURABLE JOURNAL" : "MEMORY JOURNAL";
+  stateTag.className = "assessment-tag " + (enabled && journal?.closed !== true ? "pass" : "");
+  count.textContent = enabled
+    ? state.phase5Events.length + " EVENTS · " + String(journal?.retainedEvents ?? 0) + " RETAINED"
+    : "0 EVENTS";
+
+  feed.replaceChildren();
+  if (state.phase5EventError) {
+    const error = document.createElement("p");
+    error.className = "empty-insight";
+    error.textContent = state.phase5EventError;
+    feed.append(error);
+  } else if (!enabled) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = status?.reason || "Connect a Phase 5 supervisor to inspect operational events.";
+    feed.append(empty);
+  } else if (!state.phase5Events.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "No operational events match the selected filters.";
+    feed.append(empty);
+  } else {
+    state.phase5Events.slice().reverse().forEach((event) => {
+      const card = document.createElement("article");
+      card.className = "phase5-event-card";
+
+      const heading = document.createElement("div");
+      heading.className = "phase5-event-head";
+      const title = document.createElement("div");
+      title.className = "phase5-event-title";
+      const sequence = document.createElement("span");
+      sequence.className = "phase5-event-sequence";
+      sequence.textContent = "#" + event.sequence;
+      const name = document.createElement("strong");
+      name.textContent = event.eventType;
+      const severity = document.createElement("span");
+      severity.className = "assessment-tag " +
+        (event.severity === "error" ? "fail" : event.severity === "warning" ? "warn" : "pass");
+      severity.textContent = String(event.severity || "info").toUpperCase();
+      title.append(sequence, name);
+      heading.append(title, severity);
+
+      const timestamp = document.createElement("time");
+      timestamp.className = "phase5-event-time";
+      timestamp.dateTime = event.timestamp;
+      timestamp.textContent = formatDate(event.timestamp);
+
+      const metadata = document.createElement("div");
+      metadata.className = "phase5-event-meta";
+      for (const [label, value] of [
+        ["ENGINE", event.engineId],
+        ["JOB", event.jobId],
+        ["EXECUTION", event.executionId],
+        ["WORKER", event.workerId],
+        ["SUPERVISOR", event.supervisorId],
+        ["STAGE", event.stage],
+        ["CODE", event.code]
+      ]) {
+        if (value === undefined) continue;
+        const item = document.createElement("span");
+        item.textContent = label + " · " + String(value);
+        metadata.append(item);
+      }
+
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "View sanitized event fields";
+      const record = document.createElement("pre");
+      record.textContent = JSON.stringify(event, null, 2);
+      details.append(summary, record);
+      card.append(heading, timestamp, metadata, details);
+      feed.append(card);
+    });
+  }
+
+  refresh.disabled = state.phase5EventLoading;
+  older.disabled = state.phase5EventLoading || !enabled || state.phase5EventPagination?.hasMore !== true;
+  older.textContent = state.phase5EventLoading ? "Loading…" : "Load older events";
+}
+
+async function refreshPhase5Events({ beforeSequence, appendOlder = false } = {}) {
+  if (state.phase5EventLoading) return;
+  state.phase5EventLoading = true;
+  state.phase5EventError = null;
+  renderPhase5Events();
+  try {
+    if (!appendOlder) {
+      const statusResponse = await fetch("/api/phase5/events/status");
+      const statusData = await statusResponse.json();
+      if (!statusResponse.ok) throw new Error(statusData.message || "Could not load event journal status.");
+      state.phase5EventStatus = statusData;
+      state.phase5Events = [];
+      state.phase5EventPagination = null;
+      if (statusData.enabled !== true) return;
+    }
+
+    const params = new URLSearchParams({ limit: "50" });
+    if (beforeSequence !== undefined) params.set("before", String(beforeSequence));
+    const eventType = $("phase5-event-type").value;
+    const engineId = $("phase5-event-engine").value.trim();
+    const jobId = $("phase5-event-job").value.trim();
+    const executionId = $("phase5-event-execution").value.trim();
+    if (eventType) params.set("eventType", eventType);
+    if (engineId) params.set("engineId", engineId);
+    if (jobId) params.set("jobId", jobId);
+    if (executionId) params.set("executionId", executionId);
+
+    const response = await fetch("/api/phase5/events?" + params.toString(), {
+      headers: { "Accept": "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Could not load operational events.");
+    state.phase5EventStatus = { enabled: data.enabled === true, journal: data.journal };
+    state.phase5Events = appendOlder
+      ? [...data.events, ...state.phase5Events]
+      : data.events;
+    state.phase5EventPagination = data.pagination;
+  } catch (error) {
+    state.phase5EventError = error.message || "Could not load operational events.";
+  } finally {
+    state.phase5EventLoading = false;
+    renderPhase5Events();
+  }
+}
+
+async function loadOlderPhase5Events() {
+  const beforeSequence = state.phase5EventPagination?.nextBeforeSequence;
+  if (!Number.isSafeInteger(beforeSequence)) return;
+  await refreshPhase5Events({ beforeSequence, appendOlder: true });
+}
+
 async function refreshPhase4Execution() {
   const response = await fetch("/api/phase4/execution");
   if (!response.ok) throw new Error("Could not load Phase 4 execution policy status.");
@@ -800,6 +949,11 @@ $("phase4-audit-refresh").addEventListener("click", async () => {
   try { await refreshPhase4Audit(); }
   catch (error) { $("phase4-audit-result").textContent = error.message; }
 });
+$("phase5-events-refresh").addEventListener("click", () => refreshPhase5Events());
+$("phase5-events-load-older").addEventListener("click", loadOlderPhase5Events);
+for (const id of ["phase5-event-type", "phase5-event-engine", "phase5-event-job", "phase5-event-execution"]) {
+  $(id).addEventListener("change", () => refreshPhase5Events());
+}
 
 async function initialize() {
   try {
@@ -807,6 +961,7 @@ async function initialize() {
     await refreshPhase4Engines();
     await refreshPhase4Execution();
     await refreshPhase4Audit();
+    await refreshPhase5Events();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");
