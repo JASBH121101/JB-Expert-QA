@@ -450,7 +450,9 @@ export function createLocalProcessEngineRunner(options = {}) {
         if (!exitInfo && child && child.exitCode === null && child.signalCode === null) {
           forcedTerminations += 1;
           try {
-            resourceScope?.terminateAll();
+            Promise.resolve(resourceScope?.terminateAll()).catch(() => {
+              failureCode = "RESOURCE_TREE_TERMINATION_FAILED";
+            });
           } catch {
             failureCode = "RESOURCE_TREE_TERMINATION_FAILED";
           }
@@ -533,38 +535,45 @@ export function createLocalProcessEngineRunner(options = {}) {
 
     child.on("spawn", () => {
       if (terminationReason || finished) return;
-      if (resourceScope) {
+      const sendInitialize = () => {
+        if (terminationReason || finished || child.exitCode !== null || child.signalCode !== null) return;
         try {
-          // Attach before sending initialize: the child bootstrap cannot load the adapter before this point.
-          resourceScope.attachProcess(child.pid);
+          child.send({
+            protocol: PROTOCOL,
+            type: "initialize",
+            requestId,
+            engineId: config.engineId,
+            moduleRoot: paths.moduleRoot,
+            modulePath: paths.modulePath,
+            exportName,
+            maxInputBytes,
+            maxOutputBytes
+          }, (error) => {
+            if (error) {
+              failureCode = "PROCESS_IPC_FAILED";
+              terminate("PROCESS_IPC_FAILED");
+            }
+          });
         } catch {
+          failureCode = "PROCESS_IPC_FAILED";
+          terminate("PROCESS_IPC_FAILED");
+        }
+      };
+      if (!resourceScope) {
+        sendInitialize();
+        return;
+      }
+      // A Windows Job Object attachment is asynchronous. Do not initialize
+      // the child bootstrap (and therefore do not load adapter code) until
+      // the OS confirms that the process belongs to its resource scope.
+      Promise.resolve()
+        .then(() => resourceScope.attachProcess(child.pid))
+        .then(() => sendInitialize())
+        .catch(() => {
           failureCode = "RESOURCE_ATTACH_FAILED";
           terminationReason = "RESOURCE_ATTACH_FAILED";
           try { child.kill("SIGKILL"); } catch {}
-          return;
-        }
-      }
-      try {
-        child.send({
-          protocol: PROTOCOL,
-          type: "initialize",
-          requestId,
-          engineId: config.engineId,
-          moduleRoot: paths.moduleRoot,
-          modulePath: paths.modulePath,
-          exportName,
-          maxInputBytes,
-          maxOutputBytes
-        }, (error) => {
-          if (error) {
-            failureCode = "PROCESS_IPC_FAILED";
-            terminate("PROCESS_IPC_FAILED");
-          }
         });
-      } catch {
-        failureCode = "PROCESS_IPC_FAILED";
-        terminate("PROCESS_IPC_FAILED");
-      }
     });
 
     child.on("message", (message) => {
