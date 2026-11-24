@@ -14,7 +14,7 @@ test("Linux cgroup v2 controller validates host-owned configuration without muta
   assert.throws(
     () => createLinuxCgroupV2ResourceController({ cgroupRoot: "relative/path" }),
     (error) => error instanceof LinuxCgroupV2ResourceControllerError &&
-      error.code === "INVALID_CGROUP_ROOT"
+      error.code === (process.platform === "linux" ? "INVALID_CGROUP_ROOT" : "UNSUPPORTED_PLATFORM")
   );
   assert.throws(
     () => createLinuxCgroupV2ResourceController({
