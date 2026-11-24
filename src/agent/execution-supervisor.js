@@ -130,7 +130,10 @@ export function createExecutionLifecycleSupervisor(options = {}) {
         stage,
         ...(code ? { code } : {})
       });
-      if (result && typeof result.then === "function") eventEmissionFailures += 1;
+      if (result && typeof result.then === "function") {
+        eventEmissionFailures += 1;
+        Promise.resolve(result).catch(() => {});
+      }
     } catch {
       eventEmissionFailures += 1;
     }
