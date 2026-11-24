@@ -21,6 +21,7 @@ on:
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
       - "tests/execution-event-journal.test.js"
+      - ".github/workflows/windows-job-object-containment.yml"
   pull_request:
     branches: [main]
     paths:
@@ -41,6 +42,7 @@ on:
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
       - "tests/execution-event-journal.test.js"
+      - ".github/workflows/windows-job-object-containment.yml"
   workflow_dispatch:
 
 permissions:
