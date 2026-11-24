@@ -224,3 +224,6 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; } .panel-index { borde
   .phase5-event-head { align-items:flex-start; flex-direction:column; }
   .phase5-event-pagination { align-items:flex-start; }
 }
+
+.phase5-events-heading .history-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.phase5-events-export-note { color:var(--faint); font-size:8px; }
