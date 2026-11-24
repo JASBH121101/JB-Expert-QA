@@ -33,7 +33,7 @@ function normalizeLimits(value = {}) {
     maxMemoryBytes: config.maxMemoryBytes ?? 536870912,
     cpuRatePercent: config.cpuRatePercent ?? 50,
     maxProcesses: config.maxProcesses ?? 32,
-    startupTimeoutMs: config.startupTimeoutMs ?? 10000,
+    startupTimeoutMs: config.startupTimeoutMs ?? 30000,
     commandTimeoutMs: config.commandTimeoutMs ?? 5000,
     cleanupTimeoutMs: config.cleanupTimeoutMs ?? 5000
   };
