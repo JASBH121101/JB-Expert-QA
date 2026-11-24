@@ -10,7 +10,6 @@ import { fileURLToPath } from "node:url";
 const PROTOCOL = "jb-expert-qa.local-process/v1";
 const ENGINE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const EXPORT_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/u;
-const REQUEST_ID_PATTERN = /^[0-9a-f-]{36}$/iu;
 const MAX_LOG_BYTES = 16 * 1024;
 const CHILD_BOOTSTRAP = fileURLToPath(new URL("./execution-process-runner-child.js", import.meta.url));
 
@@ -194,13 +193,15 @@ function normalizeCode(value, fallback = "PROCESS_FAILED") {
     : fallback;
 }
 
-function messageShape(value, allowedKeys) {
+function messageShape(value, requiredKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
       (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
     return false;
   }
   const keys = Reflect.ownKeys(value);
-  return keys.every((key) => typeof key === "string" && allowedKeys.has(key));
+  return keys.length === requiredKeys.size &&
+    keys.every((key) => typeof key === "string" && requiredKeys.has(key)) &&
+    [...requiredKeys].every((key) => Object.hasOwn(value, key));
 }
 
 /**
@@ -310,7 +311,6 @@ export function createLocalProcessEngineRunner(options = {}) {
     let resultValue;
     let failureCode = null;
     let terminationReason = null;
-    let forced = false;
     let finished = false;
     let phase = "starting";
     let logBytes = 0;
@@ -356,7 +356,6 @@ export function createLocalProcessEngineRunner(options = {}) {
       }
       killHandle = setTimeout(() => {
         if (!exitInfo && child && child.exitCode === null && child.signalCode === null) {
-          forced = true;
           forcedTerminations += 1;
           try {
             child.kill("SIGKILL");
@@ -462,7 +461,14 @@ export function createLocalProcessEngineRunner(options = {}) {
     });
 
     child.on("message", (message) => {
-      if (!messageShape(message, new Set(["protocol", "type", "requestId", "engineId", "output", "code"])) ||
+      const exactSchema = message?.type === "ready"
+        ? new Set(["protocol", "type", "requestId", "engineId"])
+        : message?.type === "result"
+          ? new Set(["protocol", "type", "requestId", "output"])
+          : message?.type === "failure"
+            ? new Set(["protocol", "type", "requestId", "code"])
+            : new Set();
+      if (!exactSchema.size || !messageShape(message, exactSchema) ||
           message.protocol !== PROTOCOL || message.requestId !== requestId) {
         failureCode = "PROCESS_PROTOCOL_INVALID";
         terminate("PROCESS_PROTOCOL_INVALID");
