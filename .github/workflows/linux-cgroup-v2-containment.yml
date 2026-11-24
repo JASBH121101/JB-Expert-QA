@@ -1,0 +1,80 @@
+name: Linux cgroup v2 containment lab
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "src/agent/execution-process-runner.js"
+      - "src/agent/linux-cgroup-v2-resource-controller.js"
+      - "tests/execution-process-runner.test.js"
+      - "tests/linux-cgroup-v2-resource-controller.test.js"
+      - ".github/workflows/linux-cgroup-v2-containment.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/agent/execution-process-runner.js"
+      - "src/agent/linux-cgroup-v2-resource-controller.js"
+      - "tests/execution-process-runner.test.js"
+      - "tests/linux-cgroup-v2-resource-controller.test.js"
+      - ".github/workflows/linux-cgroup-v2-containment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-cgroup-v2-containment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cgroup-v2-lab:
+    name: Real cgroup v2 lab / Ubuntu 24.04 / Node ${{ matrix.node-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Prepare ephemeral delegated cgroup v2 subtree
+        shell: bash
+        run: |
+          set -euo pipefail
+          CGROUP_ROOT=/sys/fs/cgroup
+          for controller in cpu memory pids; do
+            if ! grep -qw "$controller" "$CGROUP_ROOT/cgroup.controllers"; then
+              echo "Required cgroup v2 controller is unavailable: $controller" >&2
+              exit 1
+            fi
+          done
+          printf '+cpu +memory +pids\n' | sudo tee "$CGROUP_ROOT/cgroup.subtree_control" >/dev/null
+          DELEGATED="$CGROUP_ROOT/jbqa-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ matrix.node-version }}"
+          sudo mkdir "$DELEGATED"
+          printf '+cpu +memory +pids\n' | sudo tee "$DELEGATED/cgroup.subtree_control" >/dev/null
+          test "$(cat "$DELEGATED/cgroup.type")" = "domain"
+          for controller in cpu memory pids; do
+            grep -qw "$controller" "$DELEGATED/cgroup.controllers"
+            grep -qw "$controller" "$DELEGATED/cgroup.subtree_control"
+          done
+          echo "JBQA_CGROUP_V2_TEST_ROOT=$DELEGATED" >> "$GITHUB_ENV"
+      - name: Run real cgroup v2 resource enforcement and descendant cleanup
+        run: sudo -E "$(command -v node)" --test tests/linux-cgroup-v2-resource-controller.test.js tests/execution-process-runner.test.js
+      - name: Remove ephemeral delegated cgroup subtree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${JBQA_CGROUP_V2_TEST_ROOT:-}" ] && [ -d "$JBQA_CGROUP_V2_TEST_ROOT" ]; then
+            sudo rmdir "$JBQA_CGROUP_V2_TEST_ROOT"
+          fi
