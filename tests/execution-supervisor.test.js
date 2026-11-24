@@ -393,3 +393,35 @@ test("operator recovery and inspection APIs reject access once supervisor shutdo
   assert.throws(() => supervisor.failInterrupted("any"), (error) => error.code === "SUPERVISOR_CLOSED");
   assert.throws(() => supervisor.retryFailed("any"), (error) => error.code === "SUPERVISOR_CLOSED");
 });
+
+
+test("legacy queue adapters remain compatible and unsupported recovery capabilities fail closed", () => {
+  const queue = {
+    enqueue: () => null,
+    stats: () => ({ queued: 0, total: 0 }),
+    close: () => undefined
+  };
+  const runtime = {
+    getStatus: () => ({ enabled: true, state: "ready" }),
+    close: () => undefined
+  };
+  const worker = {
+    getStatus: () => ({ state: "stopped" }),
+    start: () => undefined,
+    runNext: async () => null,
+    drain: async () => null,
+    stop: async () => undefined,
+    cancelActive: () => false
+  };
+  const supervisor = createExecutionLifecycleSupervisor({ queue, runtime, worker });
+
+  for (const operation of [
+    () => supervisor.getJob("legacy-job"),
+    () => supervisor.listJobs(),
+    () => supervisor.recoverInterrupted("legacy-job"),
+    () => supervisor.failInterrupted("legacy-job"),
+    () => supervisor.retryFailed("legacy-job")
+  ]) {
+    assert.throws(operation, (error) => error.code === "QUEUE_CAPABILITY_UNAVAILABLE");
+  }
+});
