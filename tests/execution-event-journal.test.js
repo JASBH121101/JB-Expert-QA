@@ -85,3 +85,61 @@ test("journal rejects accessors, unknown options and invalid clocks", () => {
   const journal = createExecutionEventJournal({ now: () => "not-a-date" });
   assert.throws(() => journal.recordEvent({ eventType: "JOB_CREATED" }), (error) => error.code === "INVALID_CLOCK_VALUE");
 });
+
+
+import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
+import { createExecutionWorker } from "../src/agent/execution-worker.js";
+import { createExecutionLifecycleSupervisor } from "../src/agent/execution-supervisor.js";
+
+test("queue, worker and supervisor emit one ordered operational timeline", async () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  const queue = createExecutionJobQueue({ eventJournal: journal });
+  const runtime = Object.freeze({
+    getStatus: () => Object.freeze({ enabled: true, state: "ready" }),
+    execute: async (_payload, options) => ({ status: "succeeded", executionId: options.executionId }),
+    close: async () => undefined
+  });
+  const worker = createExecutionWorker({ queue, runtime, eventJournal: journal, workerId: "worker-test" });
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime,
+    worker,
+    eventJournal: journal,
+    supervisorId: "supervisor-test"
+  });
+
+  supervisor.enqueue({ plan: "metadata-only-example" }, { id: "timeline-job" });
+  supervisor.start();
+  const completed = await supervisor.runNext();
+  assert.equal(completed.state, "completed");
+  await supervisor.close();
+
+  const events = journal.getEventsForJob("timeline-job");
+  assert.deepEqual(events.map((event) => event.eventType), [
+    "JOB_CREATED",
+    "JOB_QUEUED",
+    "JOB_CLAIMED",
+    "EXECUTION_STARTED",
+    "JOB_COMPLETED",
+    "EXECUTION_SUCCEEDED"
+  ]);
+  assert.equal(events[2].attempt, 1);
+  assert.equal(events[3].workerId, "worker-test");
+  assert.equal(journal.listEvents().some((event) => event.eventType === "SUPERVISOR_STARTED"), true);
+  assert.equal(journal.listEvents().some((event) => event.eventType === "SUPERVISOR_SHUTDOWN_COMPLETED"), true);
+  assert.equal(journal.listEvents().some((event) => event.supervisorId === "supervisor-test"), true);
+});
+
+test("journal failures are isolated from queue state transitions and counted", () => {
+  const eventJournal = Object.freeze({
+    recordEvent() {
+      throw new Error("private failure detail must not escape");
+    }
+  });
+  const queue = createExecutionJobQueue({ eventJournal });
+  const job = queue.enqueue({ plan: "still-queued" }, { id: "journal-unavailable" });
+
+  assert.equal(job.state, "queued");
+  assert.equal(queue.getJob(job.id).state, "queued");
+  assert.equal(queue.stats().eventEmissionFailures, 2);
+});
