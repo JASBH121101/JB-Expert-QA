@@ -264,3 +264,77 @@ test("journal records containment lifecycle metadata and correlates events by ex
   );
   assert.equal(journal.getStatus().retainedEvents, 4);
 });
+
+
+test("journal stores sanitized numeric resource snapshots correlated by execution", () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  const executionId = "12345678-1234-4234-8234-123456789012";
+  const snapshot = journal.recordEvent({
+    eventType: "CONTAINMENT_RESOURCE_SNAPSHOT",
+    engineId: "jb.test.resource-evidence",
+    executionId,
+    stage: "containment",
+    code: "RESOURCE_USAGE_CAPTURED",
+    memoryCurrentBytes: 1048576,
+    memoryPeakBytes: 2097152,
+    memoryLimitBytes: 268435456,
+    cpuUsageMicros: 1700,
+    cpuLimitPercent: 50,
+    cpuPeriods: 12,
+    cpuThrottledPeriods: 2,
+    cpuThrottledMicros: 400,
+    processCount: 1,
+    processLimit: 16,
+    totalProcesses: 3,
+    terminatedProcesses: 2,
+    memoryMaxEvents: 0,
+    memoryOomEvents: 0,
+    memoryOomKillEvents: 0
+  });
+
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(snapshot.memoryPeakBytes, 2097152);
+  assert.equal(snapshot.cpuThrottledPeriods, 2);
+  assert.equal(snapshot.processLimit, 16);
+  assert.deepEqual(journal.getEventsForExecution(executionId), [snapshot]);
+  assert.equal(journal.getEventsByType("CONTAINMENT_RESOURCE_SNAPSHOT", {
+    engineId: "jb.test.resource-evidence",
+    executionId
+  }).length, 1);
+  assert.equal(Object.hasOwn(snapshot, "pid"), false);
+  assert.equal(Object.hasOwn(snapshot, "attachedPid"), false);
+  assert.equal(Object.hasOwn(snapshot, "input"), false);
+});
+
+test("journal rejects unsafe, non-integral, negative and unapproved resource metrics", () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  const base = {
+    eventType: "CONTAINMENT_RESOURCE_SNAPSHOT",
+    engineId: "jb.test.resource-evidence",
+    executionId: "12345678-1234-4234-8234-123456789012"
+  };
+
+  for (const value of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => journal.recordEvent({ ...base, cpuUsageMicros: value }),
+      (error) => error.code === "INVALID_RESOURCE_METRIC"
+    );
+  }
+  assert.throws(
+    () => journal.recordEvent({ ...base, pid: 1234, cpuUsageMicros: 1 }),
+    (error) => error.code === "UNSUPPORTED_OPTION"
+  );
+  assert.throws(
+    () => journal.recordEvent({ ...base, memoryEvents: { oom: 0 }, cpuUsageMicros: 1 }),
+    (error) => error.code === "UNSUPPORTED_OPTION"
+  );
+  assert.throws(
+    () => journal.recordEvent({ ...base, eventType: "CONTAINMENT_SCOPE_CLOSED", cpuUsageMicros: 1 }),
+    (error) => error.code === "RESOURCE_METRICS_EVENT_MISMATCH"
+  );
+  assert.throws(
+    () => journal.recordEvent(base),
+    (error) => error.code === "RESOURCE_SNAPSHOT_EMPTY"
+  );
+  assert.equal(journal.getStatus().retainedEvents, 0);
+});

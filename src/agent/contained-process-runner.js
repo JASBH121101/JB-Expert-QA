@@ -61,6 +61,30 @@ function readEventJournal(value) {
   return descriptor.value.bind(value);
 }
 
+function appendSafeMetric(target, key, value) {
+  if (Number.isSafeInteger(value) && value >= 0) target[key] = value;
+}
+
+function normalizeResourceUsageSnapshot(usage, policy) {
+  const metrics = Object.create(null);
+  appendSafeMetric(metrics, "memoryCurrentBytes", usage?.memoryCurrentBytes);
+  appendSafeMetric(metrics, "memoryPeakBytes", usage?.memoryPeakBytes ?? usage?.peakJobMemoryBytes);
+  appendSafeMetric(metrics, "memoryLimitBytes", policy?.limits?.memoryBytes ?? usage?.committedMemoryLimitBytes);
+  appendSafeMetric(metrics, "cpuUsageMicros", usage?.cpuUsageMicros ?? usage?.totalCpuTimeMicros);
+  appendSafeMetric(metrics, "cpuLimitPercent", policy?.limits?.cpuPercent ?? usage?.cpuRateLimitPercent);
+  appendSafeMetric(metrics, "cpuPeriods", usage?.cpuPeriods);
+  appendSafeMetric(metrics, "cpuThrottledPeriods", usage?.cpuThrottledPeriods);
+  appendSafeMetric(metrics, "cpuThrottledMicros", usage?.cpuThrottledMicros);
+  appendSafeMetric(metrics, "processCount", usage?.processCount);
+  appendSafeMetric(metrics, "processLimit", policy?.limits?.processCount ?? usage?.maxProcesses);
+  appendSafeMetric(metrics, "totalProcesses", usage?.totalProcesses);
+  appendSafeMetric(metrics, "terminatedProcesses", usage?.terminatedProcesses);
+  appendSafeMetric(metrics, "memoryMaxEvents", usage?.memoryEvents?.max);
+  appendSafeMetric(metrics, "memoryOomEvents", usage?.memoryEvents?.oom);
+  appendSafeMetric(metrics, "memoryOomKillEvents", usage?.memoryEvents?.oom_kill);
+  return Object.freeze(metrics);
+}
+
 function safeEventCode(error) {
   return typeof error?.code === "string" && EVENT_CODE_PATTERN.test(error.code)
     ? error.code
@@ -198,6 +222,28 @@ export function createContainedLocalProcessEngineRunner(options = {}) {
           }
         },
         async close() {
+          if (dispatcher.getStatus().enforced === true) {
+            try {
+              const metrics = normalizeResourceUsageSnapshot(scope.getUsage(), dispatcher.getPolicy());
+              if (Object.keys(metrics).length > 0) {
+                emitEvent("CONTAINMENT_RESOURCE_SNAPSHOT", {
+                  engineId,
+                  executionId,
+                  code: "RESOURCE_USAGE_CAPTURED",
+                  ...metrics
+                });
+              } else {
+                emitFailure(
+                  engineId,
+                  executionId,
+                  { code: "RESOURCE_USAGE_UNAVAILABLE" },
+                  "resource_snapshot"
+                );
+              }
+            } catch (error) {
+              emitFailure(engineId, executionId, error, "resource_snapshot");
+            }
+          }
           try {
             const result = await scope.close();
             emitEvent("CONTAINMENT_SCOPE_CLOSED", { engineId, executionId });

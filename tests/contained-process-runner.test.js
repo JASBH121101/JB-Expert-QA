@@ -45,7 +45,8 @@ async function createFixture(options = {}) {
 }
 
 test("contained runner owns dispatch and reports an explicit uncontained fallback", async () => {
-  const item = await createFixture();
+  const journal = createExecutionEventJournal();
+  const item = await createFixture({ eventJournal: journal });
   try {
     const before = item.runner.getStatus();
     assert.equal(before.containmentDispatcher.mode, "uncontained-fallback");
@@ -59,6 +60,9 @@ test("contained runner owns dispatch and reports an explicit uncontained fallbac
       executed: true
     });
     assert.equal(item.runner.getStatus().containmentDispatcher.activeScopes, 0);
+    assert.equal(journal.getEventsByType("CONTAINMENT_RESOURCE_SNAPSHOT", {
+      engineId: "jb.test.contained"
+    }).length, 0);
   } finally {
     await item.cleanup();
   }

@@ -83,9 +83,21 @@ test("native containment dispatcher integrates with the contained runner and lif
       [
         "CONTAINMENT_SCOPE_CREATED",
         "CONTAINMENT_PROCESS_ATTACHED",
+        "CONTAINMENT_RESOURCE_SNAPSHOT",
         "CONTAINMENT_SCOPE_CLOSED"
-      ]
+      ],
+      "correlated containment evidence: " + JSON.stringify(correlated)
     );
+    const resourceSnapshot = correlated.find((event) =>
+      event.eventType === "CONTAINMENT_RESOURCE_SNAPSHOT"
+    );
+    assert.equal(resourceSnapshot.memoryLimitBytes, 268435456);
+    assert.equal(resourceSnapshot.cpuLimitPercent, 50);
+    assert.equal(resourceSnapshot.processLimit, 16);
+    assert.ok(Number.isSafeInteger(resourceSnapshot.cpuUsageMicros));
+    assert.ok(Number.isSafeInteger(resourceSnapshot.processCount));
+    assert.equal(Object.hasOwn(resourceSnapshot, "pid"), false);
+    assert.equal(Object.hasOwn(resourceSnapshot, "attachedPid"), false);
 
     const closed = await runner.close();
     assert.equal(closed.containmentDispatcher.state, "closed");

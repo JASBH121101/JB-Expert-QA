@@ -11,7 +11,7 @@ const EVENT_TYPES = new Set([
   "CONTAINMENT_SCOPE_CREATED", "CONTAINMENT_PROCESS_ATTACHED",
   "CONTAINMENT_FALLBACK_USED", "CONTAINMENT_SCOPE_TERMINATED",
   "CONTAINMENT_SCOPE_CLOSED", "CONTAINMENT_CONTROLLER_CLOSED",
-  "CONTAINMENT_FAILURE",
+  "CONTAINMENT_RESOURCE_SNAPSHOT", "CONTAINMENT_FAILURE",
   "RUNTIME_READY", "SUPERVISOR_STARTED", "SUPERVISOR_SHUTDOWN_STARTED",
   "SUPERVISOR_SHUTDOWN_COMPLETED", "SHUTDOWN_FAILURE"
 ]);
@@ -19,6 +19,23 @@ const SEVERITIES = new Set(["info", "warning", "error"]);
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u;
 const TOKEN_PATTERN = /^[A-Z][A-Z0-9_]{0,79}$/u;
 const STAGE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
+const RESOURCE_METRIC_KEYS = Object.freeze([
+  "memoryCurrentBytes",
+  "memoryPeakBytes",
+  "memoryLimitBytes",
+  "cpuUsageMicros",
+  "cpuLimitPercent",
+  "cpuPeriods",
+  "cpuThrottledPeriods",
+  "cpuThrottledMicros",
+  "processCount",
+  "processLimit",
+  "totalProcesses",
+  "terminatedProcesses",
+  "memoryMaxEvents",
+  "memoryOomEvents",
+  "memoryOomKillEvents"
+]);
 
 export class ExecutionEventJournalError extends Error {
   constructor(code, message) {
@@ -72,9 +89,9 @@ function freezeRecord(value) {
 
 /**
  * Creates a bounded, in-memory operational journal for Phase 5 lifecycle events.
- * It stores identifiers and fixed metadata only; payloads and free-form messages
- * are deliberately not accepted. Oldest records roll off at maxEvents and the
- * droppedEvents counter makes that retention boundary visible.
+ * It stores identifiers, fixed metadata and allowlisted numeric resource counters;
+ * payloads, PIDs and free-form messages are deliberately not accepted. Oldest
+ * records roll off at maxEvents and the droppedEvents counter exposes eviction.
  */
 export function createExecutionEventJournal(options = {}) {
   const config = readRecord(options, "options", new Set(["maxEvents", "now"]));
@@ -104,7 +121,8 @@ export function createExecutionEventJournal(options = {}) {
   function recordEvent(input) {
     const data = readRecord(input, "event", new Set([
       "eventType", "severity", "supervisorId", "workerId", "jobId",
-      "engineId", "executionId", "attempt", "stage", "code"
+      "engineId", "executionId", "attempt", "stage", "code",
+      ...RESOURCE_METRIC_KEYS
     ]));
 
     if (typeof data.eventType !== "string" || !EVENT_TYPES.has(data.eventType)) {
@@ -145,6 +163,30 @@ export function createExecutionEventJournal(options = {}) {
       throw new ExecutionEventJournalError("INVALID_STAGE", "stage has an invalid format");
     }
     const code = token(data.code, "code");
+    const hasResourceMetrics = RESOURCE_METRIC_KEYS.some((key) => data[key] !== undefined);
+    if (hasResourceMetrics && data.eventType !== "CONTAINMENT_RESOURCE_SNAPSHOT") {
+      throw new ExecutionEventJournalError(
+        "RESOURCE_METRICS_EVENT_MISMATCH",
+        "resource metrics are valid only on containment resource snapshot events"
+      );
+    }
+    if (data.eventType === "CONTAINMENT_RESOURCE_SNAPSHOT" && !hasResourceMetrics) {
+      throw new ExecutionEventJournalError(
+        "RESOURCE_SNAPSHOT_EMPTY",
+        "containment resource snapshot must contain at least one numeric metric"
+      );
+    }
+    for (const key of RESOURCE_METRIC_KEYS) {
+      const value = data[key];
+      if (value === undefined) continue;
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new ExecutionEventJournalError(
+          "INVALID_RESOURCE_METRIC",
+          key + " must be a non-negative safe integer"
+        );
+      }
+      record[key] = value;
+    }
     if (supervisorId !== undefined) record.supervisorId = supervisorId;
     if (workerId !== undefined) record.workerId = workerId;
     if (jobId !== undefined) record.jobId = jobId;
