@@ -241,9 +241,16 @@ export function createLinuxCgroupV2ResourceController(options = {}) {
     let terminated = false;
 
     try {
-      for (const filePath of Object.values(controls)) {
+      for (const filePath of [
+        controls.memoryMax, controls.memorySwapMax, controls.cpuMax,
+        controls.pidsMax, controls.cgroupProcs, controls.cgroupKill,
+        controls.cgroupEvents, controls.memoryCurrent, controls.memoryEvents,
+        controls.cpuStat, controls.pidsCurrent
+      ]) {
         lstatSync(filePath);
       }
+      let hasMemoryPeak = true;
+      try { lstatSync(controls.memoryPeak); } catch { hasMemoryPeak = false; }
       writeText(controls.memoryMax, limits.maxMemoryBytes, "CGROUP_MEMORY_LIMIT_FAILED");
       writeText(controls.memorySwapMax, limits.maxSwapBytes, "CGROUP_SWAP_LIMIT_FAILED");
       writeText(controls.cpuMax, limits.cpuQuotaMicros + " " + limits.cpuPeriodMicros, "CGROUP_CPU_LIMIT_FAILED");
@@ -293,7 +300,7 @@ export function createLinuxCgroupV2ResourceController(options = {}) {
           state: "active",
           attachedPid,
           memoryCurrentBytes: Number(readText(controls.memoryCurrent, "CGROUP_USAGE_UNAVAILABLE")),
-          memoryPeakBytes: Number(readText(controls.memoryPeak, "CGROUP_USAGE_UNAVAILABLE")),
+          memoryPeakBytes: hasMemoryPeak ? Number(readText(controls.memoryPeak, "CGROUP_USAGE_UNAVAILABLE")) : null,
           cpuUsageMicros: cpu.usage_usec ?? 0,
           processCount: Number(readText(controls.pidsCurrent, "CGROUP_USAGE_UNAVAILABLE")),
           memoryEvents
