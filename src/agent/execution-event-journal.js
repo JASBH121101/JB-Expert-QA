@@ -13,6 +13,7 @@ const EVENT_TYPES = new Set([
 const SEVERITIES = new Set(["info", "warning", "error"]);
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u;
 const TOKEN_PATTERN = /^[A-Z][A-Z0-9_]{0,79}$/u;
+const STAGE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 
 export class ExecutionEventJournalError extends Error {
   constructor(code, message) {
@@ -129,7 +130,10 @@ export function createExecutionEventJournal(options = {}) {
     const supervisorId = identifier(data.supervisorId, "supervisorId");
     const workerId = identifier(data.workerId, "workerId");
     const jobId = identifier(data.jobId, "jobId");
-    const stage = token(data.stage, "stage");
+    const stage = data.stage;
+    if (stage !== undefined && (typeof stage !== "string" || !STAGE_PATTERN.test(stage))) {
+      throw new ExecutionEventJournalError("INVALID_STAGE", "stage has an invalid format");
+    }
     const code = token(data.code, "code");
     if (supervisorId !== undefined) record.supervisorId = supervisorId;
     if (workerId !== undefined) record.workerId = workerId;
