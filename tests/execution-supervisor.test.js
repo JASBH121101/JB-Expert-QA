@@ -425,3 +425,66 @@ test("legacy queue adapters remain compatible and unsupported recovery capabilit
     assert.throws(operation, (error) => error.code === "QUEUE_CAPABILITY_UNAVAILABLE");
   }
 });
+
+
+test("supervisor closes isolated process runners after runtime and before durable queue storage", async () => {
+  const calls = [];
+  const { queue, runtime, worker } = createHarness();
+  const originalWorkerStop = worker.stop;
+  const wrappedWorker = Object.freeze({
+    ...worker,
+    stop: async () => {
+      calls.push("worker.stop");
+      return originalWorkerStop();
+    }
+  });
+  const wrappedRuntime = Object.freeze({
+    ...runtime.runtime,
+    close: async () => {
+      calls.push("runtime.close");
+      return runtime.runtime.close();
+    }
+  });
+  const wrappedQueue = Object.freeze({
+    enqueue: queue.enqueue,
+    stats: queue.stats,
+    getJob: queue.getJob,
+    listJobs: queue.listJobs,
+    requeueInterrupted: queue.requeueInterrupted,
+    failInterrupted: queue.failInterrupted,
+    retryFailed: queue.retryFailed,
+    close: () => { calls.push("queue.close"); }
+  });
+  const processRunner = Object.freeze({
+    getStatus: () => Object.freeze({ state: "ready", active: false }),
+    close: async () => { calls.push("processRunner.close"); }
+  });
+  const supervisor = createExecutionLifecycleSupervisor({
+    worker: wrappedWorker,
+    runtime: wrappedRuntime,
+    queue: wrappedQueue,
+    processRunners: [processRunner]
+  });
+
+  assert.equal(supervisor.getStatus().processRunners.length, 1);
+  await supervisor.close();
+  assert.deepEqual(calls, [
+    "worker.stop",
+    "runtime.close",
+    "processRunner.close",
+    "queue.close"
+  ]);
+});
+
+test("supervisor rejects malformed isolated process runner dependencies", () => {
+  const { queue, runtime, worker } = createHarness();
+  assert.throws(
+    () => createExecutionLifecycleSupervisor({
+      queue,
+      runtime: runtime.runtime,
+      worker,
+      processRunners: [{}]
+    }),
+    (error) => error.code === "INVALID_DEPENDENCY"
+  );
+});
