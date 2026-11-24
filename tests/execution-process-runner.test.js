@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalProcessEngineRunner } from "../src/agent/execution-process-runner.js";
@@ -221,7 +221,8 @@ test("process runner attaches the child to its OS resource scope before adapter 
         assert.equal(engineId, "jb.test.process");
         assert.match(requestId, /^[0-9a-f-]{36}$/iu);
         return Object.freeze({
-          attachProcess(pid) {
+          async attachProcess(pid) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
             state.attachCalls += 1;
             state.attachedPid = pid;
             writeFileSync(join(root, "scope-attached.marker"), "attached");
@@ -250,7 +251,10 @@ test("process runner attaches the child to its OS resource scope before adapter 
 test("process runner kills the entire resource scope after cooperative grace expires", async () => {
   const state = { attachCalls: 0, closeCalls: 0, terminateCalls: 0 };
   const item = await fixture(`
+    import { writeFileSync } from "node:fs";
+    import { join } from "node:path";
     export async function run() {
+      writeFileSync(join(process.cwd(), "adapter-started.marker"), "started");
       setInterval(() => {}, 1000);
       return await new Promise(() => {});
     }
@@ -276,6 +280,12 @@ test("process runner kills the entire resource scope after cooperative grace exp
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     assert.equal(state.attachCalls, 1);
+    const startedMarker = join(item.root, "adapter-started.marker");
+    const startedDeadline = Date.now() + 5000;
+    while (!existsSync(startedMarker) && Date.now() < startedDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(existsSync(startedMarker), true, "adapter must be executing before cancellation");
     controller.abort();
     await assert.rejects(active, (error) => error.code === "EXECUTION_CANCELLED");
     assert.equal(state.terminateCalls, 1);

@@ -177,6 +177,8 @@ jobs:
         run: |
           node scripts/build-expert-qa-package.js
           node --test packages/expert-qa/package-tests/complete-engine.spec.js packages/expert-qa/package-tests/browser-audit.spec.js
+      - name: Run local process isolation and native resource containment tests
+        run: node --test tests/execution-process-runner.test.js tests/windows-job-object-resource-controller.test.js
 
   threat-lab:
     name: Threat Lab safety and six-tier certification / ${{ matrix.os }} / Node ${{ matrix.node }}
