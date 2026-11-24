@@ -54,6 +54,18 @@ function readStatus(value, label) {
   return value;
 }
 
+function readOptionalMethod(target, name, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+  if (!descriptor) return null;
+  if (!Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+    throw new ExecutionLifecycleSupervisorError(
+      "INVALID_DEPENDENCY",
+      label + " must expose a trusted " + name + "() method when provided"
+    );
+  }
+  return descriptor.value.bind(target);
+}
+
 function normalizeSupervisorId(value) {
   const id = value ?? "supervisor-" + randomUUID();
   if (typeof id !== "string" || !ID_PATTERN.test(id)) {
@@ -95,11 +107,11 @@ export function createExecutionLifecycleSupervisor(options = {}) {
   const enqueueJob = readMethod(config.queue, "enqueue", "queue");
   const getQueueStats = readMethod(config.queue, "stats", "queue");
   const closeQueue = readMethod(config.queue, "close", "queue");
-  const getQueueJob = readMethod(config.queue, "getJob", "queue");
-  const listQueueJobs = readMethod(config.queue, "listJobs", "queue");
-  const requeueInterruptedJob = readMethod(config.queue, "requeueInterrupted", "queue");
-  const failInterruptedJob = readMethod(config.queue, "failInterrupted", "queue");
-  const retryFailedJob = readMethod(config.queue, "retryFailed", "queue");
+  const getQueueJob = readOptionalMethod(config.queue, "getJob", "queue");
+  const listQueueJobs = readOptionalMethod(config.queue, "listJobs", "queue");
+  const requeueInterruptedJob = readOptionalMethod(config.queue, "requeueInterrupted", "queue");
+  const failInterruptedJob = readOptionalMethod(config.queue, "failInterrupted", "queue");
+  const retryFailedJob = readOptionalMethod(config.queue, "retryFailed", "queue");
 
   const supervisorId = normalizeSupervisorId(config.supervisorId);
   let state = "idle";
@@ -150,20 +162,30 @@ export function createExecutionLifecycleSupervisor(options = {}) {
     return enqueueJob(payload, jobOptions);
   }
 
+  function callQueueCapability(method, name, ...args) {
+    if (method === null) {
+      throw new ExecutionLifecycleSupervisorError(
+        "QUEUE_CAPABILITY_UNAVAILABLE",
+        "queue does not support the optional " + name + "() operation"
+      );
+    }
+    return method(...args);
+  }
+
   // Operator recovery remains explicit and never consumes a queued job.
   function getJob(id) {
     assertAccepting();
-    return getQueueJob(id);
+    return callQueueCapability(getQueueJob, "getJob", id);
   }
 
   function listJobs(listOptions = {}) {
     assertAccepting();
-    return listQueueJobs(listOptions);
+    return callQueueCapability(listQueueJobs, "listJobs", listOptions);
   }
 
   function recoverInterrupted(id) {
     assertAccepting();
-    return requeueInterruptedJob(id);
+    return callQueueCapability(requeueInterruptedJob, "requeueInterrupted", id);
   }
 
   function failInterrupted(id, reason) {
@@ -176,13 +198,13 @@ export function createExecutionLifecycleSupervisor(options = {}) {
       );
     }
     return reason === undefined
-      ? failInterruptedJob(id)
-      : failInterruptedJob(id, reason);
+      ? callQueueCapability(failInterruptedJob, "failInterrupted", id)
+      : callQueueCapability(failInterruptedJob, "failInterrupted", id, reason);
   }
 
   function retryFailed(id, retryOptions = {}) {
     assertAccepting();
-    return retryFailedJob(id, retryOptions);
+    return callQueueCapability(retryFailedJob, "retryFailed", id, retryOptions);
   }
 
   function runNext() {
