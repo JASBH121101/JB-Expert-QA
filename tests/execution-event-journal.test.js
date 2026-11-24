@@ -172,3 +172,29 @@ test("persistent queue restart records interrupted jobs without replaying them",
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("worker and supervisor continue explicit execution when the journal sink fails", async () => {
+  const eventJournal = Object.freeze({
+    recordEvent() {
+      throw new Error("observer unavailable");
+    }
+  });
+  const queue = createExecutionJobQueue({ eventJournal });
+  const runtime = Object.freeze({
+    getStatus: () => Object.freeze({ enabled: true, state: "ready" }),
+    execute: async (_payload, options) => ({ status: "succeeded", executionId: options.executionId }),
+    close: async () => undefined
+  });
+  const worker = createExecutionWorker({ queue, runtime, eventJournal });
+  const supervisor = createExecutionLifecycleSupervisor({ queue, runtime, worker, eventJournal });
+
+  supervisor.enqueue({ plan: "explicit-execution" }, { id: "observer-failure-job" });
+  supervisor.start();
+  const result = await supervisor.runNext();
+  assert.equal(result.state, "completed");
+  assert.ok(queue.stats().eventEmissionFailures > 0);
+  assert.ok(worker.getStatus().eventEmissionFailures > 0);
+  await supervisor.close();
+  assert.ok(supervisor.getStatus().eventEmissionFailures > 0);
+});
