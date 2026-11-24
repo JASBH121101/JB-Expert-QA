@@ -198,3 +198,69 @@ test("worker and supervisor continue explicit execution when the journal sink fa
   await supervisor.close();
   assert.ok(supervisor.getStatus().eventEmissionFailures > 0);
 });
+
+
+test("journal records containment lifecycle metadata and correlates events by execution", () => {
+  const journal = createExecutionEventJournal({ now: clock() });
+  const engineId = "jb.test.engine";
+  const executionId = "12345678-1234-4234-8234-123456789012";
+
+  journal.recordEvent({
+    eventType: "CONTAINMENT_CONTROLLER_READY",
+    engineId,
+    stage: "containment",
+    code: "LINUX_CGROUP_V2_READY"
+  });
+  journal.recordEvent({
+    eventType: "CONTAINMENT_SCOPE_CREATED",
+    engineId,
+    executionId,
+    stage: "containment"
+  });
+  journal.recordEvent({
+    eventType: "CONTAINMENT_FALLBACK_USED",
+    engineId,
+    executionId,
+    severity: "warning",
+    stage: "containment",
+    code: "UNCONTAINED_PROCESS_ATTACHMENT"
+  });
+  journal.recordEvent({
+    eventType: "CONTAINMENT_SCOPE_CLOSED",
+    engineId,
+    executionId,
+    stage: "containment"
+  });
+
+  assert.deepEqual(
+    journal.getEventsForExecution(executionId).map((event) => event.eventType),
+    ["CONTAINMENT_SCOPE_CREATED", "CONTAINMENT_FALLBACK_USED", "CONTAINMENT_SCOPE_CLOSED"]
+  );
+  assert.equal(journal.getEventsForEngine(engineId).length, 4);
+  assert.equal(
+    journal.getEventsByType("CONTAINMENT_FALLBACK_USED", {
+      engineId,
+      executionId
+    })[0].severity,
+    "warning"
+  );
+  assert.throws(
+    () => journal.recordEvent({
+      eventType: "CONTAINMENT_FAILURE",
+      engineId,
+      executionId,
+      message: "token=must-not-be-stored"
+    }),
+    (error) => error.code === "UNSUPPORTED_OPTION"
+  );
+  assert.throws(
+    () => journal.recordEvent({
+      eventType: "CONTAINMENT_FAILURE",
+      engineId,
+      executionId,
+      code: "token=must-not-be-stored"
+    }),
+    (error) => error.code === "INVALID_TOKEN"
+  );
+  assert.equal(journal.getStatus().retainedEvents, 4);
+});
