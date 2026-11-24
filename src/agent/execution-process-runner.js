@@ -289,6 +289,7 @@ export function createLocalProcessEngineRunner(options = {}) {
   let timedOutProcesses = 0;
   let cancelledProcesses = 0;
   let forcedTerminations = 0;
+  let activeResourceScopes = 0;
 
   function safeResourceUsage(scope) {
     try { return scope.getUsage(); } catch { return Object.freeze({ state: "unavailable" }); }
@@ -305,6 +306,7 @@ export function createLocalProcessEngineRunner(options = {}) {
       killGraceMs,
       maxInputBytes,
       maxOutputBytes,
+      activeResourceScopes,
       resourceContainment: Object.freeze({
         required: requireResourceContainment,
         configured: resourceController !== null,
@@ -349,10 +351,24 @@ export function createLocalProcessEngineRunner(options = {}) {
     let resourceScope = null;
     if (resourceController) {
       try {
-        resourceScope = readResourceScope(resourceController.createScope({
+        const rawScope = resourceController.createScope({
           engineId: config.engineId,
           requestId
-        }));
+        });
+        const scope = readResourceScope(rawScope);
+        let scopeReleased = false;
+        resourceScope = Object.freeze({
+          attachProcess: scope.attachProcess,
+          terminateAll: scope.terminateAll,
+          getUsage: scope.getUsage,
+          close: async () => {
+            if (scopeReleased) return;
+            await scope.close();
+            scopeReleased = true;
+            activeResourceScopes = Math.max(0, activeResourceScopes - 1);
+          }
+        });
+        activeResourceScopes += 1;
       } catch (error) {
         return Promise.reject(error instanceof LocalProcessEngineRunnerError
           ? error
@@ -641,6 +657,12 @@ export function createLocalProcessEngineRunner(options = {}) {
       if (pending) {
         pending.terminate?.("RUNNER_CLOSED");
         await pending.completion.then(() => undefined, () => undefined);
+      }
+      if (activeResourceScopes !== 0) {
+        throw new LocalProcessEngineRunnerError(
+          "RESOURCE_CLEANUP_FAILED",
+          "one or more OS resource scopes remain active after runner shutdown"
+        );
       }
       return getStatus();
     })();
