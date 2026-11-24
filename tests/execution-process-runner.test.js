@@ -43,6 +43,14 @@ async function fixture(source, options = {}) {
   };
 }
 
+async function waitForMarker(markerPath, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(markerPath) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return existsSync(markerPath);
+}
+
 function makePolicy() {
   return {
     id: "process-runner-test-policy",
@@ -131,14 +139,22 @@ test("local process runner applies its configured output byte limit in the child
 
 test("local process runner force-terminates a non-cooperative adapter at its deadline", async () => {
   const item = await fixture(`
+    import { writeFileSync } from "node:fs";
     export async function run() {
+      writeFileSync("adapter-started.marker", "started");
       setInterval(() => {}, 1000);
       return await new Promise(() => {});
     }
-  `, { timeoutMs: 120, killGraceMs: 60 });
+  `, { timeoutMs: 3000, killGraceMs: 60 });
   try {
+    const active = item.runner.run({ value: "hang" });
+    assert.equal(
+      await waitForMarker(join(item.root, "adapter-started.marker"), 2500),
+      true,
+      "adapter must be running before its execution deadline is tested"
+    );
     await assert.rejects(
-      item.runner.run({ value: "hang" }),
+      active,
       (error) => error.code === "EXECUTION_TIMEOUT"
     );
     const status = item.runner.getStatus();
@@ -175,14 +191,20 @@ test("external AbortSignal cancels the child and a runner rejects overlapping in
 
 test("runner close force-terminates active work and permanently stops admission", async () => {
   const item = await fixture(`
+    import { writeFileSync } from "node:fs";
     export async function run() {
+      writeFileSync("adapter-started.marker", "started");
       setInterval(() => {}, 1000);
       return await new Promise(() => {});
     }
   `, { timeoutMs: 5000, killGraceMs: 60 });
   try {
     const active = item.runner.run({ value: "close" });
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(
+      await waitForMarker(join(item.root, "adapter-started.marker"), 4500),
+      true,
+      "adapter must be running before runner shutdown is tested"
+    );
     await item.runner.close();
     await assert.rejects(active, (error) => error.code === "RUNNER_CLOSED");
     assert.equal(item.runner.getStatus().state, "closed");
