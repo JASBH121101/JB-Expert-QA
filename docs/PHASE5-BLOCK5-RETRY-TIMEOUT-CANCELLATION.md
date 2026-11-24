@@ -71,3 +71,8 @@ node --test tests/execution-job-queue.test.js tests/execution-job-persistence.te
 ```
 
 The pull request must also pass the repository's normal certification checks before any merge to `main`.
+
+
+## Phase 5 Block 6 follow-up
+
+The lifecycle supervisor can request `cancelActive()` before graceful worker stop, then close the runtime and queue in dependency order. Cancellation remains cooperative and no background process is introduced. See `PHASE5-BLOCK6-EXECUTION-LIFECYCLE-SUPERVISOR.md`.
