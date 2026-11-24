@@ -11,6 +11,8 @@ let engineId = null;
 let requestId = null;
 let runner = null;
 let controller = null;
+let maxInputBytes = 32768;
+let maxOutputBytes = 32768;
 
 function validRecord(value, allowedKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
@@ -136,6 +138,8 @@ async function initialize(message) {
     if (typeof candidate !== "function") throw new Error("RUNNER_EXPORT_MISSING");
     engineId = message.engineId;
     requestId = message.requestId;
+    maxInputBytes = message.maxInputBytes;
+    maxOutputBytes = message.maxOutputBytes;
     runner = candidate;
     initialization = "ready";
     send({
@@ -177,12 +181,12 @@ async function execute(message) {
   initialization = "running";
   controller = new AbortController();
   try {
-    const input = cloneJson(message.input, 1048576);
+    const input = cloneJson(message.input, maxInputBytes);
     if (!input || typeof input !== "object" || Array.isArray(input)) {
       throw new Error("INVALID_INPUT");
     }
     const output = await runner(input, { signal: controller.signal });
-    const safeOutput = cloneJson(output, 1048576);
+    const safeOutput = cloneJson(output, maxOutputBytes);
     sendAndExit({
       protocol: PROTOCOL,
       type: "result",
