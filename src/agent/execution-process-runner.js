@@ -515,6 +515,11 @@ export function createLocalProcessEngineRunner(options = {}) {
         return;
       }
       if (message.type === "failure") {
+        if (phase !== "starting" && phase !== "running") {
+          failureCode = "PROCESS_PROTOCOL_INVALID";
+          terminate("PROCESS_PROTOCOL_INVALID");
+          return;
+        }
         failureCode = normalizeCode(message.code, "ENGINE_FAILED");
         phase = "failed";
         return;
