@@ -55,9 +55,9 @@ test("Windows Job Object controller enforces native limits and terminates descen
     "process.stdin.setEncoding('utf8');",
     "process.stdin.on('data', chunk => {",
     "  buffer += chunk;",
-    "  if (buffer.includes('\\n')) {",
+    "  if (buffer.includes('\n')) {",
     "    const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-    "    process.stdout.write(String(descendant.pid) + '\\n');",
+    "    process.stdout.write(String(descendant.pid) + '\n');",
     "  }",
     "});",
     "setInterval(() => {}, 1000);"
@@ -112,6 +112,7 @@ test("Windows Job Object controller integrates with the process runner before ad
 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "jbqa-windows-job-runner-"));
   const modulePath = join(root, "runner.mjs");
+  await writeFile(modulePath, "export function run(input) { return { value: input.value, pid: process.pid }; }", "utf8");
   const resourceController = createWindowsJobObjectResourceController({
     limits: { maxMemoryBytes: 512 * 1024 * 1024, cpuRatePercent: 50, maxProcesses: 8 }
   });
@@ -124,7 +125,6 @@ test("Windows Job Object controller integrates with the process runner before ad
     requireResourceContainment: true
   });
   try {
-    await writeFile(modulePath, "export function run(input) { return { value: input.value, pid: process.pid }; }", "utf8");
     const result = await runner.run({ value: "contained" });
     assert.equal(result.value, "contained");
     assert.ok(Number.isSafeInteger(result.pid) && result.pid > 0);
