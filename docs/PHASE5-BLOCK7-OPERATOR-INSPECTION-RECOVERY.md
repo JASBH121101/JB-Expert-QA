@@ -14,7 +14,7 @@ The following methods are added to the object returned by createExecutionLifecyc
 - failInterrupted(id, reason?) — explicitly finalize an interrupted job as failed when an operator decides it must not be replayed.
 - retryFailed(id, { delayMs? }) — explicitly requeue a failed job using the queue's existing attempt limit and retry-delay rules.
 
-These methods are available while the supervisor is idle or running. They reject access once shutdown begins. Queue validation remains authoritative for unknown jobs, invalid transitions, queue capacity and attempt limits.
+These methods are available while the supervisor is idle or running and reject access once shutdown begins. The built-in queue implementations support all five methods. Existing custom queue adapters that only implement the original lifecycle contract remain compatible; when an adapter omits one of these optional inspection/recovery methods, the corresponding supervisor operation fails closed with QUEUE_CAPABILITY_UNAVAILABLE. Queue validation remains authoritative for unknown jobs, invalid transitions, queue capacity and attempt limits.
 
 ## Recovery workflow
 
