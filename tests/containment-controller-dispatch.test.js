@@ -49,6 +49,16 @@ test("Linux dispatch permits uncontained fallback only when explicitly authorize
   assert.equal(dispatcher.getStatus().activeScopes, 1);
   await scope.close();
   assert.equal(dispatcher.getStatus().activeScopes, 0);
+  await dispatcher.close();
+  assert.equal(dispatcher.getStatus().state, "closed");
+  assert.equal(dispatcher.getStatus().accepting, false);
+  assert.throws(
+    () => dispatcher.createScope({
+      engineId: "expert-qa",
+      requestId: "12345678-1234-4234-8234-123456789012"
+    }),
+    (error) => error.code === "CONTROLLER_CLOSED"
+  );
 });
 
 
