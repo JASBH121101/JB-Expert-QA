@@ -85,7 +85,8 @@ test("native containment dispatcher integrates with the contained runner and lif
         "CONTAINMENT_PROCESS_ATTACHED",
         "CONTAINMENT_RESOURCE_SNAPSHOT",
         "CONTAINMENT_SCOPE_CLOSED"
-      ]
+      ],
+      "correlated containment evidence: " + JSON.stringify(correlated)
     );
     const resourceSnapshot = correlated.find((event) =>
       event.eventType === "CONTAINMENT_RESOURCE_SNAPSHOT"
