@@ -162,6 +162,34 @@ function cloneJson(value, label, maxBytes) {
   return JSON.parse(serialized);
 }
 
+function readTrustedMethod(target, name, label) {
+  if (!target || typeof target !== "object" || Array.isArray(target)) {
+    throw new LocalProcessEngineRunnerError("INVALID_RESOURCE_CONTROLLER", label + " is required");
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+  if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+    throw new LocalProcessEngineRunnerError("INVALID_RESOURCE_CONTROLLER", label + " must expose a trusted " + name + "() method");
+  }
+  return descriptor.value.bind(target);
+}
+
+function readResourceController(value) {
+  if (value === undefined) return null;
+  return Object.freeze({
+    createScope: readTrustedMethod(value, "createScope", "resourceController"),
+    getStatus: readTrustedMethod(value, "getStatus", "resourceController")
+  });
+}
+
+function readResourceScope(value) {
+  return Object.freeze({
+    attachProcess: readTrustedMethod(value, "attachProcess", "resourceScope"),
+    terminateAll: readTrustedMethod(value, "terminateAll", "resourceScope"),
+    getUsage: readTrustedMethod(value, "getUsage", "resourceScope"),
+    close: readTrustedMethod(value, "close", "resourceScope")
+  });
+}
+
 function normalizeSignal(signal) {
   if (signal === undefined) return null;
   if (!signal || typeof signal.aborted !== "boolean" ||
@@ -215,7 +243,8 @@ function messageShape(value, requiredKeys) {
 export function createLocalProcessEngineRunner(options = {}) {
   const config = readRecord(options, "options", new Set([
     "engineId", "moduleRoot", "modulePath", "exportName", "cwd",
-    "timeoutMs", "killGraceMs", "maxInputBytes", "maxOutputBytes"
+    "timeoutMs", "killGraceMs", "maxInputBytes", "maxOutputBytes",
+    "resourceController", "requireResourceContainment"
   ]));
 
   if (typeof config.engineId !== "string" || !ENGINE_ID_PATTERN.test(config.engineId)) {
@@ -241,6 +270,14 @@ export function createLocalProcessEngineRunner(options = {}) {
     }
   }
 
+  const requireResourceContainment = config.requireResourceContainment ?? false;
+  if (typeof requireResourceContainment !== "boolean") {
+    throw new LocalProcessEngineRunnerError("INVALID_RESOURCE_REQUIREMENT", "requireResourceContainment must be boolean");
+  }
+  const resourceController = readResourceController(config.resourceController);
+  if (requireResourceContainment && resourceController === null) {
+    throw new LocalProcessEngineRunnerError("RESOURCE_CONTAINMENT_REQUIRED", "resource containment was required but no trusted OS resource controller was supplied");
+  }
   const paths = resolveTrustedPaths(config);
   const env = childEnvironment();
   let closed = false;
@@ -253,6 +290,10 @@ export function createLocalProcessEngineRunner(options = {}) {
   let cancelledProcesses = 0;
   let forcedTerminations = 0;
 
+  function safeResourceUsage(scope) {
+    try { return scope.getUsage(); } catch { return Object.freeze({ state: "unavailable" }); }
+  }
+
   function getStatus() {
     return Object.freeze({
       engineId: config.engineId,
@@ -264,6 +305,12 @@ export function createLocalProcessEngineRunner(options = {}) {
       killGraceMs,
       maxInputBytes,
       maxOutputBytes,
+      resourceContainment: Object.freeze({
+        required: requireResourceContainment,
+        configured: resourceController !== null,
+        controller: resourceController ? resourceController.getStatus() : Object.freeze({ mode: "none", available: false }),
+        activeUsage: active?.resourceScope ? safeResourceUsage(active.resourceScope) : null
+      }),
       startedProcesses,
       completedProcesses,
       failedProcesses,
@@ -299,6 +346,19 @@ export function createLocalProcessEngineRunner(options = {}) {
     }
 
     const requestId = randomUUID();
+    let resourceScope = null;
+    if (resourceController) {
+      try {
+        resourceScope = readResourceScope(resourceController.createScope({
+          engineId: config.engineId,
+          requestId
+        }));
+      } catch (error) {
+        return Promise.reject(error instanceof LocalProcessEngineRunnerError
+          ? error
+          : new LocalProcessEngineRunnerError("RESOURCE_SCOPE_CREATE_FAILED", "OS resource scope could not be created"));
+      }
+    }
     let resolveCompletion;
     let rejectCompletion;
     const completion = new Promise((resolve, reject) => {
@@ -312,6 +372,7 @@ export function createLocalProcessEngineRunner(options = {}) {
     let failureCode = null;
     let terminationReason = null;
     let finished = false;
+    let finishing = false;
     let phase = "starting";
     let logBytes = 0;
     let timeoutHandle = null;
@@ -320,6 +381,7 @@ export function createLocalProcessEngineRunner(options = {}) {
     const execution = {
       requestId,
       child: null,
+      resourceScope,
       completion,
       terminate: null
     };
@@ -331,10 +393,22 @@ export function createLocalProcessEngineRunner(options = {}) {
       if (signal) signal.removeEventListener("abort", onAbort);
     }
 
-    function finish(error, value) {
-      if (finished) return;
-      finished = true;
+    async function finish(error, value) {
+      if (finished || finishing) return;
+      finishing = true;
       clearTimersAndListeners();
+      if (resourceScope) {
+        try {
+          await resourceScope.close();
+        } catch {
+          failedProcesses += 1;
+          error = new LocalProcessEngineRunnerError(
+            "RESOURCE_CLEANUP_FAILED",
+            "OS resource scope could not be fully cleaned up; execution is not reported as successful"
+          );
+        }
+      }
+      finished = true;
       if (active === execution) active = null;
       if (error) rejectCompletion(error);
       else resolveCompletion(value);
@@ -357,6 +431,11 @@ export function createLocalProcessEngineRunner(options = {}) {
       killHandle = setTimeout(() => {
         if (!exitInfo && child && child.exitCode === null && child.signalCode === null) {
           forcedTerminations += 1;
+          try {
+            resourceScope?.terminateAll();
+          } catch {
+            failureCode = "RESOURCE_TREE_TERMINATION_FAILED";
+          }
           try {
             child.kill("SIGKILL");
           } catch {
@@ -437,6 +516,17 @@ export function createLocalProcessEngineRunner(options = {}) {
 
     child.on("spawn", () => {
       if (terminationReason || finished) return;
+      if (resourceScope) {
+        try {
+          // Attach before sending initialize: the child bootstrap cannot load the adapter before this point.
+          resourceScope.attachProcess(child.pid);
+        } catch {
+          failureCode = "RESOURCE_ATTACH_FAILED";
+          terminationReason = "RESOURCE_ATTACH_FAILED";
+          try { child.kill("SIGKILL"); } catch {}
+          return;
+        }
+      }
       try {
         child.send({
           protocol: PROTOCOL,
