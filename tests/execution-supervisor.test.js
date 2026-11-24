@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createPersistentExecutionJobQueue } from "../src/agent/execution-job-persistence.js";
 import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
 import { createExecutionWorker } from "../src/agent/execution-worker.js";
 import {
@@ -297,4 +301,95 @@ test("supervisor rejects invalid dependencies, accessor options and invalid shut
     () => manager.close({ reason: "x".repeat(501) }),
     (error) => error.code === "INVALID_SHUTDOWN_REASON"
   );
+});
+
+
+test("operator recovery facade inspects interrupted jobs and requires an explicit recovery decision", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jbqa-phase5-block7-"));
+  const filePath = join(directory, "jobs.json");
+  try {
+    const initial = createPersistentExecutionJobQueue({ filePath });
+    initial.enqueue({ plan: "recover-me" }, { id: "recover-me" });
+    initial.enqueue({ plan: "do-not-replay" }, { id: "do-not-replay" });
+    initial.claimNext();
+    initial.claimNext();
+    initial.close();
+
+    const queue = createPersistentExecutionJobQueue({ filePath });
+    const runtime = createRuntime();
+    const worker = createExecutionWorker({ queue, runtime: runtime.runtime });
+    const supervisor = createExecutionLifecycleSupervisor({
+      queue,
+      runtime: runtime.runtime,
+      worker
+    });
+
+    const interrupted = supervisor.listJobs({ state: "interrupted" });
+    assert.equal(interrupted.length, 2);
+    assert.equal(supervisor.getJob("recover-me").state, "interrupted");
+
+    const recovered = supervisor.recoverInterrupted("recover-me");
+    assert.equal(recovered.state, "queued");
+    assert.equal(recovered.attempts, 1);
+    const abandoned = supervisor.failInterrupted("do-not-replay", "Operator declined replay");
+    assert.equal(abandoned.state, "failed");
+    assert.equal(abandoned.error, "Operator declined replay");
+
+    // Recovery decisions only change queue state; they never start execution.
+    assert.equal(runtime.calls, 0);
+    assert.equal(supervisor.getStatus().queue.queued, 1);
+    assert.equal(supervisor.getStatus().queue.failed, 1);
+    assert.throws(
+      () => supervisor.failInterrupted("missing-reason", "x".repeat(501)),
+      (error) => error.code === "INVALID_RECOVERY_REASON"
+    );
+
+    supervisor.start();
+    const result = await supervisor.runNext();
+    assert.equal(result.id, "recover-me");
+    assert.equal(result.state, "completed");
+    assert.equal(runtime.calls, 1);
+    assert.equal(supervisor.getJob("do-not-replay").state, "failed");
+    await supervisor.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("operator retry of failed work is manual, bounded and does not execute during recovery", async () => {
+  const queue = createExecutionJobQueue({ maxAttempts: 3 });
+  queue.enqueue({ plan: "retry-me" }, { id: "failed-job" });
+  queue.claimNext();
+  queue.fail("failed-job", new Error("temporary failure"));
+
+  const runtime = createRuntime();
+  const worker = createExecutionWorker({ queue, runtime: runtime.runtime });
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker
+  });
+
+  assert.equal(supervisor.listJobs({ state: "failed" }).length, 1);
+  const retried = supervisor.retryFailed("failed-job", { delayMs: 0 });
+  assert.equal(retried.state, "queued");
+  assert.equal(retried.attempts, 1);
+  assert.equal(runtime.calls, 0);
+
+  supervisor.start();
+  const completed = await supervisor.runNext();
+  assert.equal(completed.state, "completed");
+  assert.equal(completed.attempts, 2);
+  assert.equal(runtime.calls, 1);
+  await supervisor.close();
+});
+
+test("operator recovery and inspection APIs reject access once supervisor shutdown begins", async () => {
+  const { supervisor } = createHarness();
+  await supervisor.close();
+  assert.throws(() => supervisor.getJob("any"), (error) => error.code === "SUPERVISOR_CLOSED");
+  assert.throws(() => supervisor.listJobs(), (error) => error.code === "SUPERVISOR_CLOSED");
+  assert.throws(() => supervisor.recoverInterrupted("any"), (error) => error.code === "SUPERVISOR_CLOSED");
+  assert.throws(() => supervisor.failInterrupted("any"), (error) => error.code === "SUPERVISOR_CLOSED");
+  assert.throws(() => supervisor.retryFailed("any"), (error) => error.code === "SUPERVISOR_CLOSED");
 });
