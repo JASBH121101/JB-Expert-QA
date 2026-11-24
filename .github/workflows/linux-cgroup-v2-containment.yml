@@ -19,6 +19,7 @@ on:
       - "tests/containment-controller-dispatch.test.js"
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - ".github/workflows/linux-cgroup-v2-containment.yml"
   pull_request:
@@ -39,6 +40,7 @@ on:
       - "tests/containment-controller-dispatch.test.js"
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/contained-process-runner-supervisor.integration.test.js"
       - "tests/execution-event-journal.test.js"
       - ".github/workflows/linux-cgroup-v2-containment.yml"
   workflow_dispatch:
@@ -93,7 +95,7 @@ jobs:
           done
           echo "JBQA_CGROUP_V2_TEST_ROOT=$DELEGATED" >> "$GITHUB_ENV"
       - name: Run real cgroup v2 resource enforcement and descendant cleanup
-        run: sudo -E "$(command -v node)" --test tests/linux-cgroup-v2-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/execution-event-journal.test.js
+        run: sudo -E "$(command -v node)" --test tests/linux-cgroup-v2-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/contained-process-runner-supervisor.integration.test.js tests/execution-event-journal.test.js
       - name: Remove ephemeral delegated cgroup subtree
         if: always()
         shell: bash
