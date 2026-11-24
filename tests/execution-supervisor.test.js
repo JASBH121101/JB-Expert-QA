@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPersistentExecutionJobQueue } from "../src/agent/execution-job-persistence.js";
+import { createPersistentExecutionEventJournal } from "../src/agent/execution-event-journal-persistence.js";
 import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
 import { createExecutionWorker } from "../src/agent/execution-worker.js";
 import {
@@ -487,4 +488,151 @@ test("supervisor rejects malformed isolated process runner dependencies", () => 
     }),
     (error) => error.code === "INVALID_DEPENDENCY"
   );
+});
+
+
+test("supervisor explicitly owns and closes a durable event journal after recording shutdown completion", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jbqa-supervisor-journal-owner-"));
+  const filePath = join(directory, "events.json");
+  const journal = createPersistentExecutionEventJournal({ filePath, maxEvents: 100 });
+  const queue = createExecutionJobQueue({ eventJournal: journal });
+  const runtime = createRuntime();
+  const worker = createExecutionWorker({
+    queue,
+    runtime: runtime.runtime,
+    eventJournal: journal
+  });
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    supervisorId: "supervisor-journal-owner",
+    eventJournal: journal,
+    closeEventJournal: true
+  });
+
+  try {
+    supervisor.enqueue({ plan: "durable-supervised-audit" }, { id: "durable-supervised-job" });
+    supervisor.start();
+    const completed = await supervisor.runNext();
+    assert.equal(completed.state, "completed");
+
+    const finalStatus = await supervisor.close();
+    assert.equal(finalStatus.state, "closed");
+    assert.deepEqual(finalStatus.eventJournal, { owned: true, closed: true });
+    assert.equal(journal.getStatus().closed, true);
+    assert.throws(
+      () => journal.recordEvent({ eventType: "JOB_CREATED", jobId: "after-supervisor-close" }),
+      (error) => error.code === "JOURNAL_CLOSED"
+    );
+
+    const reopened = createPersistentExecutionEventJournal({ filePath, maxEvents: 100 });
+    try {
+      const events = reopened.listEvents();
+      const types = events.map((event) => event.eventType);
+      assert.ok(types.includes("JOB_CREATED"));
+      assert.ok(types.includes("JOB_COMPLETED"));
+      assert.ok(types.includes("SUPERVISOR_SHUTDOWN_STARTED"));
+      assert.ok(types.includes("SUPERVISOR_SHUTDOWN_COMPLETED"));
+      const completedEvent = events.find((event) =>
+        event.eventType === "SUPERVISOR_SHUTDOWN_COMPLETED"
+      );
+      assert.ok(completedEvent);
+      assert.equal(completedEvent.supervisorId, "supervisor-journal-owner");
+      assert.ok(events.every((event, index) => index === 0 || events[index - 1].sequence < event.sequence));
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    if (!journal.getStatus().closed) journal.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("supervisor leaves shared event journals open unless ownership is explicitly enabled", async () => {
+  let closeCalls = 0;
+  const journal = Object.freeze({
+    recordEvent: () => undefined,
+    close: () => { closeCalls += 1; }
+  });
+  const { queue, runtime, worker } = createHarness();
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    eventJournal: journal
+  });
+
+  const finalStatus = await supervisor.close();
+  assert.equal(closeCalls, 0);
+  assert.deepEqual(finalStatus.eventJournal, { owned: false, closed: false });
+});
+
+test("supervisor rejects event journal ownership without a trusted close method", () => {
+  const { queue, runtime, worker } = createHarness();
+  const journal = Object.freeze({ recordEvent: () => undefined });
+
+  assert.throws(
+    () => createExecutionLifecycleSupervisor({
+      queue,
+      runtime: runtime.runtime,
+      worker,
+      eventJournal: journal,
+      closeEventJournal: true
+    }),
+    (error) => error.code === "INVALID_DEPENDENCY"
+  );
+  assert.throws(
+    () => createExecutionLifecycleSupervisor({
+      queue,
+      runtime: runtime.runtime,
+      worker,
+      closeEventJournal: true
+    }),
+    (error) => error.code === "INVALID_EVENT_JOURNAL_OWNERSHIP"
+  );
+});
+
+
+test("supervisor records an event journal close failure and retries lock release once", async () => {
+  const events = [];
+  let closeCalls = 0;
+  const journal = Object.freeze({
+    recordEvent: (event) => { events.push(event.eventType); },
+    close: () => {
+      closeCalls += 1;
+      if (closeCalls === 1) {
+        const error = new Error("private lock failure detail");
+        error.code = "PERSISTENCE_CLOSE_FAILED";
+        throw error;
+      }
+    }
+  });
+  const { queue, runtime, worker } = createHarness();
+  const supervisor = createExecutionLifecycleSupervisor({
+    queue,
+    runtime: runtime.runtime,
+    worker,
+    eventJournal: journal,
+    closeEventJournal: true
+  });
+
+  await assert.rejects(
+    supervisor.close(),
+    (error) => {
+      assert.equal(error.code, "SHUTDOWN_FAILED");
+      assert.deepEqual(error.failures, [
+        { stage: "eventJournal.close", code: "PERSISTENCE_CLOSE_FAILED" }
+      ]);
+      assert.equal(error.message.includes("private lock failure detail"), false);
+      return true;
+    }
+  );
+  assert.equal(closeCalls, 2);
+  assert.deepEqual(supervisor.getStatus().eventJournal, { owned: true, closed: true });
+  assert.deepEqual(events, [
+    "SUPERVISOR_SHUTDOWN_STARTED",
+    "SUPERVISOR_SHUTDOWN_COMPLETED",
+    "SHUTDOWN_FAILURE"
+  ]);
 });
