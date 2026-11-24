@@ -22,7 +22,7 @@ on:
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
       - "tests/contained-process-runner-supervisor.integration.test.js"
-      - "tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   pull_request:
@@ -46,7 +46,7 @@ on:
       - "tests/contained-process-runner.test.js"
       - "tests/contained-process-runner-containment.integration.test.js"
       - "tests/contained-process-runner-supervisor.integration.test.js"
-      - "tests/execution-event-journal.test.js tests/execution-event-journal-persistence.test.js"
+      - "tests/execution-event-journal.test.js"
       - "tests/execution-event-journal-persistence.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   workflow_dispatch:
