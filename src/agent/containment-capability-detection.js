@@ -35,7 +35,7 @@ export function detectContainmentCapabilities(options = {}) {
   }
 
   const powershellAvailable = platform === "win32" &&
-    powershellCandidates.some((candidate) => exists(candidate);
+    powershellCandidates.some((candidate) => exists(candidate));
 
   const capabilities = {
     schemaVersion: 1,
