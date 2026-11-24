@@ -78,12 +78,16 @@ test("native containment protects the full registry-to-supervisor pipeline and s
 
     export async function run(input) {
       if (input.behavior === "hang") {
-        writeFileSync(join(process.cwd(), "adapter-started.marker"), "started");
-        spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+        const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
           stdio: "ignore",
           windowsHide: true,
           detached: false
         });
+        await new Promise((resolve, reject) => {
+          descendant.once("spawn", resolve);
+          descendant.once("error", reject);
+        });
+        writeFileSync(join(process.cwd(), "adapter-started.marker"), "started");
         setInterval(() => {}, 1000);
         return await new Promise(() => {});
       }
