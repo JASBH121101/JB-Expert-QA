@@ -129,6 +129,57 @@
         <pre id="phase4-audit-result" class="phase4-execution-result" aria-live="polite">Execution ledger is unavailable until the host configures Phase 4 execution.</pre>
         <p class="insight-footnote">Evidence is redacted and view-only. Raw inputs, outputs, approval receipts and secrets are never exposed by this endpoint. Hash-chain verification detects tampering but does not replace OS-level or remote immutable storage controls.</p>
       </section>
+      <section class="panel phase5-events-panel">
+        <div class="panel-heading phase5-events-heading">
+          <div>
+            <p class="eyebrow">PHASE 5 / OPERATIONAL JOURNAL</p>
+            <h2>Execution event timeline</h2>
+            <p class="section-subtitle">Read-only lifecycle, containment and resource evidence from the host supervisor.</p>
+          </div>
+          <div class="history-actions">
+            <span id="phase5-events-state" class="assessment-tag">UNAVAILABLE</span>
+            <button type="button" id="phase5-events-refresh" class="secondary-button">Refresh events</button>
+          </div>
+        </div>
+        <div class="phase5-event-filters" aria-label="Event filters">
+          <label class="phase5-event-filter">
+            <span>Event type</span>
+            <select id="phase5-event-type" class="target-input">
+              <option value="">All event types</option>
+              <option value="JOB_CREATED">Job created</option>
+              <option value="JOB_COMPLETED">Job completed</option>
+              <option value="JOB_FAILED">Job failed</option>
+              <option value="EXECUTION_STARTED">Execution started</option>
+              <option value="EXECUTION_SUCCEEDED">Execution succeeded</option>
+              <option value="EXECUTION_FAILED">Execution failed</option>
+              <option value="CONTAINMENT_RESOURCE_SNAPSHOT">Resource snapshot</option>
+              <option value="CONTAINMENT_FAILURE">Containment failure</option>
+              <option value="SUPERVISOR_STARTED">Supervisor started</option>
+              <option value="SUPERVISOR_SHUTDOWN_COMPLETED">Supervisor shutdown</option>
+            </select>
+          </label>
+          <label class="phase5-event-filter">
+            <span>Engine ID</span>
+            <input id="phase5-event-engine" class="target-input" type="text" maxlength="80" autocomplete="off" placeholder="Filter by engine">
+          </label>
+          <label class="phase5-event-filter">
+            <span>Job ID</span>
+            <input id="phase5-event-job" class="target-input" type="text" maxlength="80" autocomplete="off" placeholder="Filter by job">
+          </label>
+          <label class="phase5-event-filter">
+            <span>Execution ID</span>
+            <input id="phase5-event-execution" class="target-input" type="text" maxlength="80" autocomplete="off" placeholder="Filter by execution">
+          </label>
+        </div>
+        <div id="phase5-event-feed" class="phase5-event-feed" role="log" aria-live="polite">
+          <p class="empty-insight">Connect a Phase 5 supervisor to inspect operational events.</p>
+        </div>
+        <div class="phase5-event-pagination">
+          <span id="phase5-event-count" class="history-count">0 EVENTS</span>
+          <button type="button" id="phase5-events-load-older" class="secondary-button" disabled>Load older events</button>
+        </div>
+        <p class="insight-footnote">Operational evidence is read-only, locally retained and limited to sanitized event metadata. It does not authorize or execute actions.</p>
+      </section>
       <section class="panel intelligence-panel">
         <div class="panel-heading intelligence-heading">
           <div><p class="eyebrow">04 / INTELLIGENCE</p><h2>QA Intelligence &amp; Certification</h2><p class="section-subtitle">Portfolio-level trends across the latest saved engine and target snapshots.</p></div>
