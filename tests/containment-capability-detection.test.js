@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { join } from "node:path";
 import { detectContainmentCapabilities } from "../src/agent/containment-capability-detection.js";
 
 test("reports Linux cgroup v2 controller prerequisites from injected probes", () => {
   const files = new Set([
-    "/fake/cgroup/cgroup.controllers",
-    "/fake/cgroup/cgroup.subtree_control"
+    join("/fake/cgroup", "cgroup.controllers"),
+    join("/fake/cgroup", "cgroup.subtree_control")
   ]);
   const report = detectContainmentCapabilities({
     platform: "linux",

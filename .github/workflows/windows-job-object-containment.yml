@@ -1,13 +1,47 @@
 name: Windows Job Object resource containment
 
 on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "src/agent/execution-process-runner.js"
+      - "src/agent/linux-cgroup-v2-resource-controller.js"
+      - "src/agent/windows-job-object-resource-controller.js"
+      - "src/agent/containment-policy.js"
+      - "src/agent/containment-capability-detection.js"
+      - "src/agent/containment-controller-dispatch.js"
+      - "src/agent/contained-process-runner.js"
+      - "src/agent/execution-event-journal.js"
+      - "tests/execution-process-runner.test.js"
+      - "tests/linux-cgroup-v2-resource-controller.test.js"
+      - "tests/windows-job-object-resource-controller.test.js"
+      - "tests/containment-policy.test.js"
+      - "tests/containment-capability-detection.test.js"
+      - "tests/containment-controller-dispatch.test.js"
+      - "tests/contained-process-runner.test.js"
+      - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/execution-event-journal.test.js"
+      - ".github/workflows/windows-job-object-containment.yml"
   pull_request:
     branches: [main]
     paths:
       - "src/agent/execution-process-runner.js"
+      - "src/agent/linux-cgroup-v2-resource-controller.js"
       - "src/agent/windows-job-object-resource-controller.js"
+      - "src/agent/containment-policy.js"
+      - "src/agent/containment-capability-detection.js"
+      - "src/agent/containment-controller-dispatch.js"
+      - "src/agent/contained-process-runner.js"
+      - "src/agent/execution-event-journal.js"
       - "tests/execution-process-runner.test.js"
+      - "tests/linux-cgroup-v2-resource-controller.test.js"
       - "tests/windows-job-object-resource-controller.test.js"
+      - "tests/containment-policy.test.js"
+      - "tests/containment-capability-detection.test.js"
+      - "tests/containment-controller-dispatch.test.js"
+      - "tests/contained-process-runner.test.js"
+      - "tests/contained-process-runner-containment.integration.test.js"
+      - "tests/execution-event-journal.test.js"
       - ".github/workflows/windows-job-object-containment.yml"
   workflow_dispatch:
 
@@ -40,4 +74,4 @@ jobs:
       - name: Run native Job Object integration and process-runner tests
         shell: pwsh
         run: |
-          node --test tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js
+          node --test tests/windows-job-object-resource-controller.test.js tests/execution-process-runner.test.js tests/containment-policy.test.js tests/containment-capability-detection.test.js tests/containment-controller-dispatch.test.js tests/contained-process-runner.test.js tests/contained-process-runner-containment.integration.test.js tests/execution-event-journal.test.js
