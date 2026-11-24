@@ -115,7 +115,7 @@ try {
   run(node, [
     "--input-type=module",
     "-e",
-    'import { auditProject, auditUrl, auditViewports, comparePngBuffers, runAutopilot, createSecurityBridgeCoordinator } from "@jb/expert-qa"; for (const fn of [auditProject,auditUrl,auditViewports,comparePngBuffers,runAutopilot,createSecurityBridgeCoordinator]) if (typeof fn !== "function") process.exit(1);'
+    'import { auditProject, auditUrl, auditViewports, comparePngBuffers, runAutopilot, createSecurityBridgeCoordinator, createExecutionLifecycleSupervisor } from "@jb/expert-qa"; import { createExecutionLifecycleSupervisor as createStandaloneSupervisor } from "@jb/expert-qa/execution-supervisor"; for (const fn of [auditProject,auditUrl,auditViewports,comparePngBuffers,runAutopilot,createSecurityBridgeCoordinator,createExecutionLifecycleSupervisor,createStandaloneSupervisor]) if (typeof fn !== "function") process.exit(1);'
   ], { cwd: expertInstall });
 
   for (const bin of [
