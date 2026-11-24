@@ -85,6 +85,7 @@ const requiredFiles = [
   "src/agent/execution-worker.js",
   "src/agent/execution-supervisor.js",
   "src/agent/execution-event-journal.js",
+  "src/agent/execution-event-journal-persistence.js",
   "src/agent/execution-process-runner.js",
   "src/agent/execution-process-runner-child.js",
   "src/agent/linux-cgroup-v2-resource-controller.js",
