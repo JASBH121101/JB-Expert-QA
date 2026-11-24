@@ -220,7 +220,12 @@ export function createExecutionEventJournal(options = {}) {
     if (typeof eventType !== "string" || !EVENT_TYPES.has(eventType)) {
       throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
     }
-    return listEvents({ ...readRecord(options, "type query options", new Set(["afterSequence", "limit", "jobId"])), eventType });
+    return listEvents({
+      ...readRecord(options, "type query options", new Set([
+        "afterSequence", "limit", "jobId", "engineId", "executionId"
+      ])),
+      eventType
+    });
   }
 
   function getStatus() {
