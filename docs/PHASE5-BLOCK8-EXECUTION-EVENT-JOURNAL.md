@@ -9,13 +9,16 @@ The Phase 4 execution ledger remains the source for policy-gated execution evide
 ## Public API
 
 - `createExecutionEventJournal({ maxEvents, now })`
+- `createPersistentExecutionEventJournal({ filePath, maxEvents, now })`
 - `recordEvent({ eventType, severity, supervisorId, workerId, jobId, attempt, stage, code })`
 - `listEvents({ afterSequence, limit, eventType, jobId })`
 - `getEventsForJob(jobId, options)`
 - `getEventsByType(eventType, options)`
 - `getStatus()`
 
-The journal is synchronous and in-memory in this block. It maintains monotonically increasing sequence numbers and immutable event snapshots. When the configured rolling window is full, the oldest record is evicted and `droppedEvents` increases; the retained sequence range and eviction count remain visible. There is deliberately no clear/delete API.
+The default journal is synchronous and in-memory. It maintains monotonically increasing sequence numbers and immutable event snapshots. When the configured rolling window is full, the oldest record is evicted and `droppedEvents` increases; the retained sequence range and eviction count remain visible. There is deliberately no clear/delete API.
+
+Phase 5 Block 12.10 adds the optional `createPersistentExecutionEventJournal({ filePath, maxEvents, now })` adapter. It stores the bounded journal state in the existing hardened local JSON file store, preserving event IDs, timestamps, sequence cursors and eviction counts across restarts. The default `createExecutionEventJournal()` remains memory-only. Both modes expose `close()`; persistent mode must be closed to release its exclusive store lock.
 
 ## Integration
 
@@ -23,7 +26,7 @@ The journal is synchronous and in-memory in this block. It maintains monotonical
 - Worker emits worker lifecycle and execution outcome events.
 - Supervisor emits supervisor startup/shutdown and operator recovery/retry events.
 - Event emission is best-effort and cannot alter queue transitions, worker execution or orchestrator policy. Each integration exposes an event-emission failure count in its status/stats where applicable.
-- Persistent job queue state remains durable, but the Block 8 event journal is not persisted across process restarts. A later durable journal adapter can be designed against the existing append-only execution-ledger contracts without changing execution authority.
+- The default Block 8 event journal remains memory-only. Phase 5 Block 12.10 adds an optional durable local adapter that stores the bounded event window using the existing hardened JSON file store. It preserves event IDs, timestamps, sequence cursors and eviction counts across restarts without changing execution authority.
 
 ## Safety / non-goals
 

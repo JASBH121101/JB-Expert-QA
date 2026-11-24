@@ -15,7 +15,7 @@ import { createAutonomousExecutionRuntime } from "../src/agent/execution-runtime
 import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
 import { createExecutionWorker } from "../src/agent/execution-worker.js";
 import { createExecutionLifecycleSupervisor } from "../src/agent/execution-supervisor.js";
-import { createExecutionEventJournal } from "../src/agent/execution-event-journal.js";
+import { createPersistentExecutionEventJournal } from "../src/agent/execution-event-journal-persistence.js";
 import { createContainedLocalProcessEngineRunner } from "../src/agent/contained-process-runner.js";
 
 const linuxCgroupRoot = process.env.JBQA_CGROUP_V2_TEST_ROOT;
@@ -95,7 +95,8 @@ test("native containment protects the full registry-to-supervisor pipeline and s
     }
   `, "utf8");
 
-  const journal = createExecutionEventJournal({ maxEvents: 500 });
+  const journalPath = join(root, "execution-events.json");
+  const journal = createPersistentExecutionEventJournal({ filePath: journalPath, maxEvents: 500 });
   const containment = {
     policy: {
       required: true,
@@ -315,12 +316,48 @@ test("native containment protects the full registry-to-supervisor pipeline and s
     assert.ok(controllerClosed);
     assert.ok(shutdownCompleted);
     assert.ok(shutdownCompleted.sequence > controllerClosed.sequence);
+
+    const durableStatus = journal.getStatus();
+    assert.equal(durableStatus.mode, "persistent");
+    assert.equal(durableStatus.persistent, true);
+    const engineEventSummary = engineEvents.map((event) => ({
+      eventId: event.eventId,
+      sequence: event.sequence,
+      eventType: event.eventType,
+      executionId: event.executionId
+    }));
+    journal.close();
+
+    const recoveredJournal = createPersistentExecutionEventJournal({
+      filePath: journalPath,
+      maxEvents: 500
+    });
+    try {
+      assert.equal(recoveredJournal.getStatus().lastSequence, durableStatus.lastSequence);
+      assert.equal(recoveredJournal.getStatus().droppedEvents, durableStatus.droppedEvents);
+      assert.deepEqual(
+        recoveredJournal.getEventsForEngine(ENGINE_ID).map((event) => ({
+          eventId: event.eventId,
+          sequence: event.sequence,
+          eventType: event.eventType,
+          executionId: event.executionId
+        })),
+        engineEventSummary
+      );
+      assert.equal(recoveredJournal.getEventsByType("CONTAINMENT_RESOURCE_SNAPSHOT", {
+        engineId: ENGINE_ID
+      }).length, 2);
+      assert.equal(recoveredJournal.getEventsByType("SUPERVISOR_SHUTDOWN_COMPLETED").length, 1);
+    } finally {
+      recoveredJournal.close();
+    }
   } finally {
     if (supervisor) {
       await supervisor.close({ abortActive: true }).catch(() => undefined);
     } else {
       await runner.close().catch(() => undefined);
     }
+    try { journal.close(); } catch {}
     await rm(root, { recursive: true, force: true });
   }
 });

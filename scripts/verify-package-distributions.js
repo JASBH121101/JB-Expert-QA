@@ -120,6 +120,11 @@ try {
 
   run(node, [
     "--input-type=module", "-e",
+    'import { createPersistentExecutionEventJournal as rootFactory } from "@jb/expert-qa"; import { createPersistentExecutionEventJournal as subpathFactory } from "@jb/expert-qa/execution-event-journal-persistence"; import { mkdtemp, rm } from "node:fs/promises"; import { tmpdir } from "node:os"; import { join } from "node:path"; if (typeof rootFactory !== "function" || rootFactory !== subpathFactory) process.exit(1); const directory = await mkdtemp(join(tmpdir(), "jb-qa-durable-journal-package-")); const filePath = join(directory, "events.json"); try { const first = rootFactory({ filePath, maxEvents: 4 }); first.recordEvent({ eventType: "JOB_CREATED", jobId: "package-durable-smoke" }); first.close(); const second = subpathFactory({ filePath, maxEvents: 4 }); if (second.getStatus().mode !== "persistent" || second.getEventsForJob("package-durable-smoke").length !== 1) process.exit(1); second.close(); } finally { await rm(directory, { recursive: true, force: true }); }'
+  ], { cwd: expertInstall });
+
+  run(node, [
+    "--input-type=module", "-e",
     'import { createWindowsJobObjectResourceController as rootController } from "@jb/expert-qa"; import { createWindowsJobObjectResourceController as subpathController } from "@jb/expert-qa/windows-job-object-resource-controller"; if (typeof rootController !== "function" || typeof subpathController !== "function") process.exit(1);'
   ], { cwd: expertInstall });
 

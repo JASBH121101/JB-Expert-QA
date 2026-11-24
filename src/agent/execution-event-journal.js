@@ -36,6 +36,13 @@ const RESOURCE_METRIC_KEYS = Object.freeze([
   "memoryOomEvents",
   "memoryOomKillEvents"
 ]);
+const STORED_EVENT_KEYS = new Set([
+  "eventId", "sequence", "timestamp", "eventType", "severity",
+  "supervisorId", "workerId", "jobId", "engineId", "executionId",
+  "attempt", "stage", "code", ...RESOURCE_METRIC_KEYS
+]);
+const JOURNAL_STATE_KEYS = new Set(["schemaVersion", "sequence", "droppedEvents", "events"]);
+const EVENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export class ExecutionEventJournalError extends Error {
   constructor(code, message) {
@@ -87,14 +94,120 @@ function freezeRecord(value) {
   return Object.freeze(value);
 }
 
+function normalizePersistence(value) {
+  if (value === undefined) return null;
+  const data = readRecord(value, "persistence", new Set(["filePath", "load", "save", "close"]));
+  if (typeof data.load !== "function" || typeof data.save !== "function" ||
+      (data.close !== undefined && typeof data.close !== "function")) {
+    throw new ExecutionEventJournalError(
+      "INVALID_PERSISTENCE",
+      "persistence must expose synchronous load() and save() functions"
+    );
+  }
+  return Object.freeze({
+    load: data.load.bind(value),
+    save: data.save.bind(value),
+    close: data.close === undefined ? () => undefined : data.close.bind(value)
+  });
+}
+
+function normalizeStoredEvent(value, expectedSequence) {
+  const data = readRecord(value, "stored event", STORED_EVENT_KEYS);
+  if (typeof data.eventId !== "string" || !EVENT_ID_PATTERN.test(data.eventId)) {
+    throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "stored event ID is invalid");
+  }
+  if (!Number.isSafeInteger(data.sequence) || data.sequence !== expectedSequence || data.sequence < 1) {
+    throw new ExecutionEventJournalError("PERSISTED_SEQUENCE_INVALID", "stored event sequence is invalid");
+  }
+  if (typeof data.timestamp !== "string") {
+    throw new ExecutionEventJournalError("PERSISTED_TIMESTAMP_INVALID", "stored event timestamp is invalid");
+  }
+  const timestamp = new Date(data.timestamp);
+  if (!Number.isFinite(timestamp.getTime()) || timestamp.toISOString() !== data.timestamp) {
+    throw new ExecutionEventJournalError("PERSISTED_TIMESTAMP_INVALID", "stored event timestamp is invalid");
+  }
+  if (typeof data.eventType !== "string" || !EVENT_TYPES.has(data.eventType) ||
+      !SEVERITIES.has(data.severity)) {
+    throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "stored event type or severity is invalid");
+  }
+  const attempt = data.attempt;
+  if (attempt !== undefined && (!Number.isSafeInteger(attempt) || attempt < 0 || attempt > 10)) {
+    throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "stored event attempt is invalid");
+  }
+  const record = {
+    eventId: data.eventId,
+    sequence: data.sequence,
+    timestamp: data.timestamp,
+    eventType: data.eventType,
+    severity: data.severity
+  };
+  const hasResourceMetrics = RESOURCE_METRIC_KEYS.some((key) => data[key] !== undefined);
+  if (hasResourceMetrics && data.eventType !== "CONTAINMENT_RESOURCE_SNAPSHOT") {
+    throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "resource metrics are attached to an unsupported event type");
+  }
+  if (data.eventType === "CONTAINMENT_RESOURCE_SNAPSHOT" && !hasResourceMetrics) {
+    throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "resource snapshot contains no metrics");
+  }
+  for (const key of RESOURCE_METRIC_KEYS) {
+    const metric = data[key];
+    if (metric === undefined) continue;
+    if (!Number.isSafeInteger(metric) || metric < 0) {
+      throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "stored resource metric is invalid");
+    }
+    record[key] = metric;
+  }
+  for (const key of ["supervisorId", "workerId", "jobId", "engineId", "executionId"]) {
+    const id = identifier(data[key], key);
+    if (id !== undefined) record[key] = id;
+  }
+  if (attempt !== undefined) record.attempt = attempt;
+  if (data.stage !== undefined) {
+    if (typeof data.stage !== "string" || !STAGE_PATTERN.test(data.stage)) {
+      throw new ExecutionEventJournalError("PERSISTED_EVENT_INVALID", "stored event stage is invalid");
+    }
+    record.stage = data.stage;
+  }
+  const code = token(data.code, "code");
+  if (code !== undefined) record.code = code;
+  return freezeRecord(record);
+}
+
+function normalizeStoredState(value) {
+  const data = readRecord(value, "persisted journal state", JOURNAL_STATE_KEYS);
+  if (data.schemaVersion !== 1 ||
+      !Number.isSafeInteger(data.sequence) || data.sequence < 0 ||
+      !Number.isSafeInteger(data.droppedEvents) || data.droppedEvents < 0 ||
+      !Array.isArray(data.events) || data.events.length > 100000) {
+    throw new ExecutionEventJournalError("PERSISTED_STATE_INVALID", "persisted journal state is invalid");
+  }
+  if (data.events.length === 0) {
+    if (data.sequence !== 0 || data.droppedEvents !== 0) {
+      throw new ExecutionEventJournalError("PERSISTED_STATE_INVALID", "empty journal state has inconsistent sequence counters");
+    }
+    return { sequence: 0, droppedEvents: 0, events: [] };
+  }
+  const firstSequence = data.droppedEvents + 1;
+  if (!Number.isSafeInteger(firstSequence) ||
+      data.sequence !== firstSequence + data.events.length - 1) {
+    throw new ExecutionEventJournalError("PERSISTED_STATE_INVALID", "persisted journal sequence range is inconsistent");
+  }
+  const events = data.events.map((event, index) =>
+    normalizeStoredEvent(event, firstSequence + index)
+  );
+  return {
+    sequence: data.sequence,
+    droppedEvents: data.droppedEvents,
+    events
+  };
+}
+
 /**
- * Creates a bounded, in-memory operational journal for Phase 5 lifecycle events.
- * It stores identifiers, fixed metadata and allowlisted numeric resource counters;
- * payloads, PIDs and free-form messages are deliberately not accepted. Oldest
- * records roll off at maxEvents and the droppedEvents counter exposes eviction.
+ * Creates a bounded operational journal for Phase 5 lifecycle events. By
+ * default it is in-memory; an optional synchronous persistence adapter can
+ * durably commit every append. Payloads, PIDs and free-form messages are rejected.
  */
 export function createExecutionEventJournal(options = {}) {
-  const config = readRecord(options, "options", new Set(["maxEvents", "now"]));
+  const config = readRecord(options, "options", new Set(["maxEvents", "now", "persistence"]));
   const maxEvents = config.maxEvents ?? 5000;
   const now = config.now ?? (() => new Date());
 
@@ -106,8 +219,45 @@ export function createExecutionEventJournal(options = {}) {
   }
 
   const events = [];
+  const persistence = normalizePersistence(config.persistence);
   let sequence = 0;
   let droppedEvents = 0;
+  let closed = false;
+
+  if (persistence) {
+    let stored;
+    try {
+      stored = persistence.load();
+      if (stored && typeof stored.then === "function") {
+        Promise.resolve(stored).catch(() => undefined);
+        throw new ExecutionEventJournalError("ASYNC_PERSISTENCE_UNSUPPORTED", "journal persistence must be synchronous");
+      }
+    } catch (error) {
+      if (error instanceof ExecutionEventJournalError) throw error;
+      throw new ExecutionEventJournalError("PERSISTENCE_LOAD_FAILED", "durable journal state could not be loaded");
+    }
+    if (stored !== null && stored !== undefined) {
+      const restored = normalizeStoredState(stored);
+      sequence = restored.sequence;
+      droppedEvents = restored.droppedEvents;
+      events.push(...restored.events);
+      if (events.length > maxEvents) {
+        const trimCount = events.length - maxEvents;
+        events.splice(0, trimCount);
+        droppedEvents += trimCount;
+        try {
+          persistence.save({
+            schemaVersion: 1,
+            sequence,
+            droppedEvents,
+            events: events.slice()
+          });
+        } catch {
+          throw new ExecutionEventJournalError("PERSISTENCE_SAVE_FAILED", "restored journal retention window could not be committed");
+        }
+      }
+    }
+  }
 
   function normalizeTimestamp() {
     const value = now();
@@ -119,6 +269,12 @@ export function createExecutionEventJournal(options = {}) {
   }
 
   function recordEvent(input) {
+    if (closed) {
+      throw new ExecutionEventJournalError("JOURNAL_CLOSED", "event journal is closed");
+    }
+    if (sequence >= Number.MAX_SAFE_INTEGER) {
+      throw new ExecutionEventJournalError("SEQUENCE_EXHAUSTED", "event journal sequence limit has been reached");
+    }
     const data = readRecord(input, "event", new Set([
       "eventType", "severity", "supervisorId", "workerId", "jobId",
       "engineId", "executionId", "attempt", "stage", "code",
@@ -197,12 +353,35 @@ export function createExecutionEventJournal(options = {}) {
     if (code !== undefined) record.code = code;
 
     const immutable = freezeRecord(record);
-    sequence += 1;
-    events.push(immutable);
-    if (events.length > maxEvents) {
-      events.shift();
-      droppedEvents += 1;
+    const nextSequence = sequence + 1;
+    const nextEvents = events.concat(immutable);
+    let nextDroppedEvents = droppedEvents;
+    if (nextEvents.length > maxEvents) {
+      nextEvents.shift();
+      nextDroppedEvents += 1;
     }
+    if (persistence) {
+      try {
+        const saved = persistence.save({
+          schemaVersion: 1,
+          sequence: nextSequence,
+          droppedEvents: nextDroppedEvents,
+          events: nextEvents
+        });
+        if (saved && typeof saved.then === "function") {
+          Promise.resolve(saved).catch(() => undefined);
+          throw new ExecutionEventJournalError("ASYNC_PERSISTENCE_UNSUPPORTED", "journal persistence must be synchronous");
+        }
+      } catch (error) {
+        if (error instanceof ExecutionEventJournalError &&
+            error.code === "ASYNC_PERSISTENCE_UNSUPPORTED") throw error;
+        throw new ExecutionEventJournalError("PERSISTENCE_FAILED", "event could not be committed to durable journal storage");
+      }
+    }
+    sequence = nextSequence;
+    events.push(immutable);
+    if (events.length > maxEvents) events.shift();
+    droppedEvents = nextDroppedEvents;
     return immutable;
   }
 
@@ -272,7 +451,9 @@ export function createExecutionEventJournal(options = {}) {
 
   function getStatus() {
     return Object.freeze({
-      mode: "memory",
+      mode: persistence ? "persistent" : "memory",
+      persistent: persistence !== null,
+      closed,
       retainedEvents: events.length,
       maxEvents,
       droppedEvents,
@@ -283,6 +464,19 @@ export function createExecutionEventJournal(options = {}) {
     });
   }
 
+  function close() {
+    if (closed) return getStatus();
+    if (persistence) {
+      try {
+        persistence.close();
+      } catch {
+        throw new ExecutionEventJournalError("PERSISTENCE_CLOSE_FAILED", "durable journal lock could not be released");
+      }
+    }
+    closed = true;
+    return getStatus();
+  }
+
   return Object.freeze({
     recordEvent,
     listEvents,
@@ -290,6 +484,7 @@ export function createExecutionEventJournal(options = {}) {
     getEventsForExecution,
     getEventsForEngine,
     getEventsByType,
-    getStatus
+    getStatus,
+    close
   });
 }

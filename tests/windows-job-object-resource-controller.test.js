@@ -11,6 +11,17 @@ import {
 } from "../src/agent/windows-job-object-resource-controller.js";
 import { createLocalProcessEngineRunner } from "../src/agent/execution-process-runner.js";
 
+test("Windows Job Object helper startup uses the bounded 30-second CI tolerance", {
+  skip: process.platform !== "win32"
+}, async () => {
+  const controller = createWindowsJobObjectResourceController();
+  try {
+    assert.equal(controller.getStatus().limits.startupTimeoutMs, 30000);
+  } finally {
+    await controller.close();
+  }
+});
+
 test("Windows Job Object controller rejects invalid policy values", () => {
   assert.throws(
     () => createWindowsJobObjectResourceController({ limits: { cpuRatePercent: 0 } }),
