@@ -116,6 +116,29 @@ function compactRecord(record) {
     comparison: record.comparison, screenshots: record.screenshots
   };
 }
+function readPhase5Supervisor(value) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("phase5Supervisor must be a trusted read-only execution supervisor");
+  }
+  function method(name) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, name);
+    if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+      throw new TypeError("phase5Supervisor must expose its own " + name + "() method");
+    }
+    return descriptor.value.bind(value);
+  }
+  return Object.freeze({
+    listEvents: method("listEvents"),
+    getEventJournalStatus: method("getEventJournalStatus")
+  });
+}
+function readSingleQueryValue(searchParams, name) {
+  const values = searchParams.getAll(name);
+  if (values.length > 1) return { valid: false };
+  return { valid: true, value: values[0] };
+}
+
 function markdown(value) {
   return cleanText(value, 240).replace(/\|/g, "\\|");
 }
@@ -282,7 +305,8 @@ export function createDashboardServer({
   maximumHistoryRecords = DEFAULT_DASHBOARD_HISTORY_LIMIT,
   maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
   phase4Registry = createDashboardPhase4Catalog(),
-  phase4Execution = null
+  phase4Execution = null,
+  phase5Supervisor = null
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
@@ -300,6 +324,7 @@ export function createDashboardServer({
   if (phase4Execution !== null && !isDashboardPhase4ExecutionBoundTo(phase4Execution, phase4Registry)) {
     throw new TypeError("phase4Execution must be created for the same sealed phase4Registry");
   }
+  const phase5EventInspection = readPhase5Supervisor(phase5Supervisor);
   const dataDir = resolve(storageDirectory);
   const rateWindow = [];
   const phase4ExecutionRateWindow = [];
@@ -370,6 +395,97 @@ export function createDashboardServer({
             }));
           } catch {
             fail(response, 500, "audit_unavailable", "The Phase 4 execution evidence could not be read safely"); 
+          }
+          return;
+        }
+        if (pathname === "/api/phase5/events/status") {
+          if (!phase5EventInspection) {
+            json(response, 200, {
+              enabled: false,
+              reason: "Phase 5 event inspection is unavailable until the host supplies a lifecycle supervisor"
+            });
+            return;
+          }
+          try {
+            json(response, 200, {
+              enabled: true,
+              journal: phase5EventInspection.getEventJournalStatus()
+            });
+          } catch {
+            fail(response, 503, "event_journal_unavailable", "The Phase 5 event journal is not available for inspection");
+          }
+          return;
+        }
+        if (pathname === "/api/phase5/events") {
+          if (!phase5EventInspection) {
+            fail(response, 503, "event_journal_unavailable", "The host has not connected a Phase 5 execution supervisor");
+            return;
+          }
+          const allowedQueryKeys = new Set(["limit", "before", "eventType", "jobId", "engineId", "executionId"]);
+          const repeatedOrUnknown = [...requestUrl.searchParams.keys()].some((key) =>
+            !allowedQueryKeys.has(key) || requestUrl.searchParams.getAll(key).length !== 1
+          );
+          if (repeatedOrUnknown) {
+            fail(response, 400, "invalid_event_query", "Event filters must be supported and appear only once");
+            return;
+          }
+          const limitText = readSingleQueryValue(requestUrl.searchParams, "limit").value ?? "50";
+          const limit = /^(?:[1-9][0-9]?|100)$/u.test(limitText) ? Number(limitText) : NaN;
+          const beforeText = readSingleQueryValue(requestUrl.searchParams, "before").value;
+          const beforeSequence = beforeText === undefined ? undefined :
+            (/^[1-9][0-9]*$/u.test(beforeText) ? Number(beforeText) : NaN);
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+              (beforeSequence !== undefined && (!Number.isSafeInteger(beforeSequence) || beforeSequence < 2))) {
+            fail(response, 400, "invalid_event_query", "Use limit 1–100 and an optional before cursor of 2 or greater");
+            return;
+          }
+          const filters = {};
+          for (const key of ["eventType", "jobId", "engineId", "executionId"]) {
+            const value = readSingleQueryValue(requestUrl.searchParams, key).value;
+            if (value !== undefined) {
+              if (!value || value.length > 80) {
+                fail(response, 400, "invalid_event_query", "Event filters must contain between 1 and 80 characters");
+                return;
+              }
+              filters[key] = value;
+            }
+          }
+          try {
+            const journal = phase5EventInspection.getEventJournalStatus();
+            const candidates = phase5EventInspection.listEvents({
+              limit: limit + 1,
+              ...(beforeSequence === undefined ? {} : { beforeSequence }),
+              ...filters
+            });
+            const hasMore = candidates.length > limit;
+            const events = hasMore ? candidates.slice(1) : candidates;
+            json(response, 200, {
+              enabled: true,
+              journal: {
+                mode: journal.mode,
+                persistent: journal.persistent,
+                closed: journal.closed,
+                retainedEvents: journal.retainedEvents,
+                droppedEvents: journal.droppedEvents,
+                firstSequence: journal.firstSequence,
+                lastSequence: journal.lastSequence
+              },
+              pagination: {
+                limit,
+                beforeSequence: beforeSequence ?? null,
+                returned: events.length,
+                hasMore,
+                nextBeforeSequence: hasMore && events.length ? events[0].sequence : null
+              },
+              events
+            });
+          } catch (error) {
+            const invalidCodes = new Set(["INVALID_EVENT_TYPE", "INVALID_IDENTIFIER", "INVALID_CURSOR", "INVALID_QUERY_LIMIT"]);
+            if (invalidCodes.has(error?.code)) {
+              fail(response, 400, "invalid_event_query", "The event journal rejected one or more filters or cursors");
+            } else {
+              fail(response, 503, "event_journal_unavailable", "The Phase 5 event journal is not available for inspection");
+            }
           }
           return;
         }
