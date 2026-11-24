@@ -88,6 +88,7 @@ const requiredFiles = [
   "src/agent/execution-process-runner.js",
   "src/agent/execution-process-runner-child.js",
   "src/agent/linux-cgroup-v2-resource-controller.js",
+  "src/agent/containment-policy.js",
   "src/agent/windows-job-object-resource-controller.js",
   "src/agent/execution-ledger.js",
   "src/security-bridge/index.js",

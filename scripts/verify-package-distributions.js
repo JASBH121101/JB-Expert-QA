@@ -123,6 +123,11 @@ try {
     'import { createWindowsJobObjectResourceController as rootController } from "@jb/expert-qa"; import { createWindowsJobObjectResourceController as subpathController } from "@jb/expert-qa/windows-job-object-resource-controller"; if (typeof rootController !== "function" || typeof subpathController !== "function") process.exit(1);'
   ], { cwd: expertInstall });
 
+  run(node, [
+    "--input-type=module", "-e",
+    'import { createContainmentPolicy as rootPolicy } from "@jb/expert-qa"; import { createContainmentPolicy as subpathPolicy } from "@jb/expert-qa/containment-policy"; for (const factory of [rootPolicy, subpathPolicy]) { if (typeof factory !== "function") process.exit(1); const policy = factory({ required: true, memoryLimit: "512MiB", cpuLimit: 50, processLimit: 8 }); if (policy.schemaVersion !== 1 || policy.limits.memoryBytes !== 536870912 || policy.limits.processCount !== 8) process.exit(1); }'
+  ], { cwd: expertInstall });
+
   for (const bin of [
     "jb-qa", "jb-qa-project", "jb-qa-url", "jb-qa-security",
     "jb-qa-security-url", "jb-qa-autopilot"
