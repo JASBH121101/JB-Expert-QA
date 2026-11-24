@@ -196,7 +196,7 @@ export function createExecutionEventJournal(options = {}) {
       nextSequence: sequence + 1,
       firstSequence: events.length ? events[0].sequence : null,
       lastSequence: events.length ? events[events.length - 1].sequence : null,
-      capacityReached: sequence >= maxEvents
+      retentionWindowFull: events.length === maxEvents
     });
   }
 
