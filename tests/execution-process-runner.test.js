@@ -6,6 +6,9 @@ import { join } from "node:path";
 import { createLocalProcessEngineRunner } from "../src/agent/execution-process-runner.js";
 import { createQaEngineOrchestrator, getQaEngineActionType, QA_ENGINE_EXECUTION_PERMISSION } from "../src/engine-registry/orchestrator.js";
 import { createQaEngineRegistry } from "../src/engine-registry/index.js";
+import { createExecutionJobQueue } from "../src/agent/execution-job-queue.js";
+import { createExecutionWorker } from "../src/agent/execution-worker.js";
+import { createExecutionLifecycleSupervisor } from "../src/agent/execution-supervisor.js";
 
 async function fixture(source, options = {}) {
   const root = await mkdtemp(join(tmpdir(), "jbqa-process-runner-"));
@@ -228,6 +231,52 @@ test("parent orchestrator policy and human approval gate process startup", async
     assert.equal(result.status, "succeeded");
     assert.deepEqual(result.actions[0].output, { accepted: "allowed" });
     assert.equal(item.runner.getStatus().startedProcesses, 1);
+  } finally {
+    await item.cleanup();
+  }
+});
+
+
+test("supervisor aborts a non-cooperative child and closes it before queue persistence", async () => {
+  const item = await fixture(`
+    export async function run() {
+      setInterval(() => {}, 1000);
+      return await new Promise(() => {});
+    }
+  `, { timeoutMs: 10000, killGraceMs: 80 });
+
+  try {
+    const queue = createExecutionJobQueue();
+    const runtime = Object.freeze({
+      getStatus: () => Object.freeze({ enabled: true, state: "ready" }),
+      execute: async (input, options) => item.runner.run(input, { signal: options.signal }),
+      close: async () => undefined
+    });
+    const worker = createExecutionWorker({ queue, runtime });
+    const supervisor = createExecutionLifecycleSupervisor({
+      queue,
+      runtime,
+      worker,
+      processRunners: [item.runner]
+    });
+
+    supervisor.enqueue({ value: "hang" }, { id: "isolated-shutdown-job" });
+    supervisor.start();
+    const active = supervisor.runNext();
+
+    const deadline = Date.now() + 5000;
+    while (!item.runner.getStatus().active && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(item.runner.getStatus().active, true);
+
+    await supervisor.close({ abortActive: true });
+    const cancelled = await active;
+    assert.equal(cancelled.state, "cancelled");
+    assert.equal(item.runner.getStatus().state, "closed");
+    assert.equal(item.runner.getStatus().active, false);
+    assert.equal(supervisor.getStatus().processRunners[0].state, "closed");
+    assert.equal(queue.stats().running, 0);
   } finally {
     await item.cleanup();
   }
