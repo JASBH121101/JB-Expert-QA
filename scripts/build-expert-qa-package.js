@@ -83,6 +83,7 @@ const requiredFiles = [
   "src/agent/execution-job-queue.js",
   "src/agent/execution-job-persistence.js",
   "src/agent/execution-worker.js",
+  "src/agent/execution-supervisor.js",
   "src/agent/execution-ledger.js",
   "src/security-bridge/index.js",
   "packages/localization-engine/src/catalog.js",
