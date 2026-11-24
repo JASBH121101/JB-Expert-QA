@@ -228,6 +228,9 @@ function renderPhase5Events() {
   refresh.disabled = state.phase5EventLoading;
   older.disabled = state.phase5EventLoading || !enabled || state.phase5EventPagination?.hasMore !== true;
   older.textContent = state.phase5EventLoading ? "Loading…" : "Load older events";
+  const exportDisabled = !enabled || state.phase5Events.length === 0 || state.phase5EventLoading;
+  $("phase5-events-export-json").disabled = exportDisabled;
+  $("phase5-events-export-csv").disabled = exportDisabled;
 }
 
 async function refreshPhase5Events({ beforeSequence, appendOlder = false } = {}) {
@@ -279,6 +282,24 @@ async function loadOlderPhase5Events() {
   const beforeSequence = state.phase5EventPagination?.nextBeforeSequence;
   if (!Number.isSafeInteger(beforeSequence)) return;
   await refreshPhase5Events({ beforeSequence, appendOlder: true });
+}
+
+function downloadPhase5EventExport(format) {
+  if (!state.phase5Events.length || !window.JBPhase5EventExport) return;
+  const exporter = window.JBPhase5EventExport;
+  const content = format === "csv" ? exporter.toCsv(state.phase5Events) : exporter.toJson(state.phase5Events);
+  const mime = format === "csv" ? "text/csv;charset=utf-8" : "application/json;charset=utf-8";
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  link.href = url;
+  link.download = "jb-expert-qa-phase5-events-" + stamp + "." + format;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function refreshPhase4Execution() {
@@ -951,6 +972,8 @@ $("phase4-audit-refresh").addEventListener("click", async () => {
 });
 $("phase5-events-refresh").addEventListener("click", () => refreshPhase5Events());
 $("phase5-events-load-older").addEventListener("click", loadOlderPhase5Events);
+$("phase5-events-export-json").addEventListener("click", () => downloadPhase5EventExport("json"));
+$("phase5-events-export-csv").addEventListener("click", () => downloadPhase5EventExport("csv"));
 for (const id of ["phase5-event-type", "phase5-event-engine", "phase5-event-job", "phase5-event-execution"]) {
   $(id).addEventListener("change", () => refreshPhase5Events());
 }
