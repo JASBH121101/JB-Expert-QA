@@ -7,6 +7,11 @@ const EVENT_TYPES = new Set([
   "WORKER_STARTED", "WORKER_STOPPING", "WORKER_STOPPED",
   "EXECUTION_STARTED", "EXECUTION_SUCCEEDED", "EXECUTION_FAILED",
   "EXECUTION_TIMEOUT", "EXECUTION_CANCEL_REQUESTED", "EXECUTION_CANCELLED",
+  "CONTAINMENT_CONTROLLER_READY", "CONTAINMENT_FALLBACK_ACTIVE",
+  "CONTAINMENT_SCOPE_CREATED", "CONTAINMENT_PROCESS_ATTACHED",
+  "CONTAINMENT_FALLBACK_USED", "CONTAINMENT_SCOPE_TERMINATED",
+  "CONTAINMENT_SCOPE_CLOSED", "CONTAINMENT_CONTROLLER_CLOSED",
+  "CONTAINMENT_FAILURE",
   "RUNTIME_READY", "SUPERVISOR_STARTED", "SUPERVISOR_SHUTDOWN_STARTED",
   "SUPERVISOR_SHUTDOWN_COMPLETED", "SHUTDOWN_FAILURE"
 ]);
@@ -99,16 +104,19 @@ export function createExecutionEventJournal(options = {}) {
   function recordEvent(input) {
     const data = readRecord(input, "event", new Set([
       "eventType", "severity", "supervisorId", "workerId", "jobId",
-      "attempt", "stage", "code"
+      "engineId", "executionId", "attempt", "stage", "code"
     ]));
 
     if (typeof data.eventType !== "string" || !EVENT_TYPES.has(data.eventType)) {
       throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
     }
     const severity = data.severity ?? (
-      ["JOB_FAILED", "EXECUTION_FAILED", "EXECUTION_TIMEOUT", "SHUTDOWN_FAILURE"].includes(data.eventType)
+      ["JOB_FAILED", "EXECUTION_FAILED", "EXECUTION_TIMEOUT", "CONTAINMENT_FAILURE", "SHUTDOWN_FAILURE"].includes(data.eventType)
         ? "error"
-        : ["JOB_INTERRUPTED", "EXECUTION_CANCELLED", "INTERRUPTED_JOB_FAILED"].includes(data.eventType)
+        : [
+          "JOB_INTERRUPTED", "EXECUTION_CANCELLED", "INTERRUPTED_JOB_FAILED",
+          "CONTAINMENT_FALLBACK_ACTIVE", "CONTAINMENT_FALLBACK_USED"
+        ].includes(data.eventType)
           ? "warning"
           : "info"
     );
@@ -130,6 +138,8 @@ export function createExecutionEventJournal(options = {}) {
     const supervisorId = identifier(data.supervisorId, "supervisorId");
     const workerId = identifier(data.workerId, "workerId");
     const jobId = identifier(data.jobId, "jobId");
+    const engineId = identifier(data.engineId, "engineId");
+    const executionId = identifier(data.executionId, "executionId");
     const stage = data.stage;
     if (stage !== undefined && (typeof stage !== "string" || !STAGE_PATTERN.test(stage))) {
       throw new ExecutionEventJournalError("INVALID_STAGE", "stage has an invalid format");
@@ -138,6 +148,8 @@ export function createExecutionEventJournal(options = {}) {
     if (supervisorId !== undefined) record.supervisorId = supervisorId;
     if (workerId !== undefined) record.workerId = workerId;
     if (jobId !== undefined) record.jobId = jobId;
+    if (engineId !== undefined) record.engineId = engineId;
+    if (executionId !== undefined) record.executionId = executionId;
     if (attempt !== undefined) record.attempt = attempt;
     if (stage !== undefined) record.stage = stage;
     if (code !== undefined) record.code = code;
@@ -153,7 +165,9 @@ export function createExecutionEventJournal(options = {}) {
   }
 
   function normalizeQuery(options = {}) {
-    const query = readRecord(options, "query options", new Set(["afterSequence", "limit", "eventType", "jobId"]));
+    const query = readRecord(options, "query options", new Set([
+      "afterSequence", "limit", "eventType", "jobId", "engineId", "executionId"
+    ]));
     const afterSequence = query.afterSequence ?? 0;
     const limit = query.limit ?? 100;
     if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
@@ -166,7 +180,9 @@ export function createExecutionEventJournal(options = {}) {
       throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
     }
     const jobId = identifier(query.jobId, "jobId");
-    return { afterSequence, limit, eventType: query.eventType, jobId };
+    const engineId = identifier(query.engineId, "engineId");
+    const executionId = identifier(query.executionId, "executionId");
+    return { afterSequence, limit, eventType: query.eventType, jobId, engineId, executionId };
   }
 
   function listEvents(options = {}) {
@@ -174,7 +190,9 @@ export function createExecutionEventJournal(options = {}) {
     const matches = events.filter((event) =>
       event.sequence > query.afterSequence &&
       (query.eventType === undefined || event.eventType === query.eventType) &&
-      (query.jobId === undefined || event.jobId === query.jobId)
+      (query.jobId === undefined || event.jobId === query.jobId) &&
+      (query.engineId === undefined || event.engineId === query.engineId) &&
+      (query.executionId === undefined || event.executionId === query.executionId)
     );
     return Object.freeze(matches.slice(-query.limit));
   }
@@ -182,6 +200,20 @@ export function createExecutionEventJournal(options = {}) {
   function getEventsForJob(jobId, options = {}) {
     const query = readRecord(options, "job query options", new Set(["afterSequence", "limit", "eventType"]));
     return listEvents({ ...query, jobId });
+  }
+
+  function getEventsForExecution(executionId, options = {}) {
+    const query = readRecord(options, "execution query options", new Set([
+      "afterSequence", "limit", "eventType", "engineId"
+    ]));
+    return listEvents({ ...query, executionId });
+  }
+
+  function getEventsForEngine(engineId, options = {}) {
+    const query = readRecord(options, "engine query options", new Set([
+      "afterSequence", "limit", "eventType", "executionId", "jobId"
+    ]));
+    return listEvents({ ...query, engineId });
   }
 
   function getEventsByType(eventType, options = {}) {
@@ -208,6 +240,8 @@ export function createExecutionEventJournal(options = {}) {
     recordEvent,
     listEvents,
     getEventsForJob,
+    getEventsForExecution,
+    getEventsForEngine,
     getEventsByType,
     getStatus
   });
