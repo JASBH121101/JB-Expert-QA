@@ -1,0 +1,210 @@
+import { randomUUID } from "node:crypto";
+
+const EVENT_TYPES = new Set([
+  "JOB_CREATED", "JOB_QUEUED", "JOB_CLAIMED", "JOB_COMPLETED", "JOB_FAILED",
+  "JOB_CANCELLED", "JOB_INTERRUPTED", "JOB_REQUEUED", "RECOVERY_COMPLETED",
+  "INTERRUPTED_JOB_FAILED", "RETRY_REQUESTED", "RETRY_QUEUED",
+  "WORKER_STARTED", "WORKER_STOPPING", "WORKER_STOPPED",
+  "EXECUTION_STARTED", "EXECUTION_SUCCEEDED", "EXECUTION_FAILED",
+  "EXECUTION_TIMEOUT", "EXECUTION_CANCEL_REQUESTED", "EXECUTION_CANCELLED",
+  "RUNTIME_READY", "SUPERVISOR_STARTED", "SUPERVISOR_SHUTDOWN_STARTED",
+  "SUPERVISOR_SHUTDOWN_COMPLETED", "SHUTDOWN_FAILURE"
+]);
+const SEVERITIES = new Set(["info", "warning", "error"]);
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u;
+const TOKEN_PATTERN = /^[A-Z][A-Z0-9_]{0,79}$/u;
+
+export class ExecutionEventJournalError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "ExecutionEventJournalError";
+    this.code = code;
+  }
+}
+
+function readRecord(value, label, allowedKeys) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new ExecutionEventJournalError("INVALID_OPTIONS", label + " must be a plain object");
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new ExecutionEventJournalError("INVALID_OPTIONS", label + " must be a plain object");
+  }
+  const output = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string" || !allowedKeys.has(key)) {
+      throw new ExecutionEventJournalError("UNSUPPORTED_OPTION", label + " contains an unsupported field");
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new ExecutionEventJournalError("ACCESSOR_NOT_ALLOWED", label + " cannot contain accessors");
+    }
+    output[key] = descriptor.value;
+  }
+  return output;
+}
+
+function identifier(value, label) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !ID_PATTERN.test(value)) {
+    throw new ExecutionEventJournalError("INVALID_IDENTIFIER", label + " has an invalid format");
+  }
+  return value;
+}
+
+function token(value, label) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !TOKEN_PATTERN.test(value)) {
+    throw new ExecutionEventJournalError("INVALID_TOKEN", label + " has an invalid format");
+  }
+  return value;
+}
+
+function freezeRecord(value) {
+  return Object.freeze(value);
+}
+
+/**
+ * Creates a bounded, in-memory operational journal for Phase 5 lifecycle events.
+ * It stores identifiers and fixed metadata only; payloads and free-form messages
+ * are deliberately not accepted. Oldest records roll off at maxEvents and the
+ * droppedEvents counter makes that retention boundary visible.
+ */
+export function createExecutionEventJournal(options = {}) {
+  const config = readRecord(options, "options", new Set(["maxEvents", "now"]));
+  const maxEvents = config.maxEvents ?? 5000;
+  const now = config.now ?? (() => new Date());
+
+  if (!Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > 100000) {
+    throw new ExecutionEventJournalError("INVALID_EVENT_LIMIT", "maxEvents must be an integer from 1 to 100000");
+  }
+  if (typeof now !== "function") {
+    throw new ExecutionEventJournalError("INVALID_CLOCK", "now must be a function");
+  }
+
+  const events = [];
+  let sequence = 0;
+  let droppedEvents = 0;
+
+  function normalizeTimestamp() {
+    const value = now();
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+      throw new ExecutionEventJournalError("INVALID_CLOCK_VALUE", "journal clock must return a valid date");
+    }
+    return date.toISOString();
+  }
+
+  function recordEvent(input) {
+    const data = readRecord(input, "event", new Set([
+      "eventType", "severity", "supervisorId", "workerId", "jobId",
+      "attempt", "stage", "code"
+    ]));
+
+    if (typeof data.eventType !== "string" || !EVENT_TYPES.has(data.eventType)) {
+      throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
+    }
+    const severity = data.severity ?? (
+      ["JOB_FAILED", "EXECUTION_FAILED", "EXECUTION_TIMEOUT", "SHUTDOWN_FAILURE"].includes(data.eventType)
+        ? "error"
+        : ["JOB_INTERRUPTED", "EXECUTION_CANCELLED", "INTERRUPTED_JOB_FAILED"].includes(data.eventType)
+          ? "warning"
+          : "info"
+    );
+    if (!SEVERITIES.has(severity)) {
+      throw new ExecutionEventJournalError("INVALID_SEVERITY", "severity is not supported");
+    }
+    const attempt = data.attempt;
+    if (attempt !== undefined && (!Number.isSafeInteger(attempt) || attempt < 0 || attempt > 10)) {
+      throw new ExecutionEventJournalError("INVALID_ATTEMPT", "attempt must be an integer from 0 to 10");
+    }
+
+    const record = {
+      eventId: randomUUID(),
+      sequence: sequence + 1,
+      timestamp: normalizeTimestamp(),
+      eventType: data.eventType,
+      severity
+    };
+    const supervisorId = identifier(data.supervisorId, "supervisorId");
+    const workerId = identifier(data.workerId, "workerId");
+    const jobId = identifier(data.jobId, "jobId");
+    const stage = token(data.stage, "stage");
+    const code = token(data.code, "code");
+    if (supervisorId !== undefined) record.supervisorId = supervisorId;
+    if (workerId !== undefined) record.workerId = workerId;
+    if (jobId !== undefined) record.jobId = jobId;
+    if (attempt !== undefined) record.attempt = attempt;
+    if (stage !== undefined) record.stage = stage;
+    if (code !== undefined) record.code = code;
+
+    const immutable = freezeRecord(record);
+    sequence += 1;
+    events.push(immutable);
+    if (events.length > maxEvents) {
+      events.shift();
+      droppedEvents += 1;
+    }
+    return immutable;
+  }
+
+  function normalizeQuery(options = {}) {
+    const query = readRecord(options, "query options", new Set(["afterSequence", "limit", "eventType", "jobId"]));
+    const afterSequence = query.afterSequence ?? 0;
+    const limit = query.limit ?? 100;
+    if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
+      throw new ExecutionEventJournalError("INVALID_CURSOR", "afterSequence must be a non-negative safe integer");
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+      throw new ExecutionEventJournalError("INVALID_QUERY_LIMIT", "limit must be an integer from 1 to 1000");
+    }
+    if (query.eventType !== undefined && (typeof query.eventType !== "string" || !EVENT_TYPES.has(query.eventType))) {
+      throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
+    }
+    const jobId = identifier(query.jobId, "jobId");
+    return { afterSequence, limit, eventType: query.eventType, jobId };
+  }
+
+  function listEvents(options = {}) {
+    const query = normalizeQuery(options);
+    const matches = events.filter((event) =>
+      event.sequence > query.afterSequence &&
+      (query.eventType === undefined || event.eventType === query.eventType) &&
+      (query.jobId === undefined || event.jobId === query.jobId)
+    );
+    return Object.freeze(matches.slice(-query.limit));
+  }
+
+  function getEventsForJob(jobId, options = {}) {
+    const query = readRecord(options, "job query options", new Set(["afterSequence", "limit", "eventType"]));
+    return listEvents({ ...query, jobId });
+  }
+
+  function getEventsByType(eventType, options = {}) {
+    if (typeof eventType !== "string" || !EVENT_TYPES.has(eventType)) {
+      throw new ExecutionEventJournalError("INVALID_EVENT_TYPE", "eventType is not supported");
+    }
+    return listEvents({ ...readRecord(options, "type query options", new Set(["afterSequence", "limit", "jobId"])), eventType });
+  }
+
+  function getStatus() {
+    return Object.freeze({
+      mode: "memory",
+      retainedEvents: events.length,
+      maxEvents,
+      droppedEvents,
+      nextSequence: sequence + 1,
+      firstSequence: events.length ? events[0].sequence : null,
+      lastSequence: events.length ? events[events.length - 1].sequence : null,
+      capacityReached: sequence >= maxEvents
+    });
+  }
+
+  return Object.freeze({
+    recordEvent,
+    listEvents,
+    getEventsForJob,
+    getEventsByType,
+    getStatus
+  });
+}
