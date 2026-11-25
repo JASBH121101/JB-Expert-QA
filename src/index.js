@@ -206,3 +206,4 @@ export { createPhase4AutonomousHostBootstrap, Phase4AutonomousHostIntegrationErr
 
 export { createLocalApprovalGate, LocalApprovalGateError } from "./agent/local-approval-gate.js";
 export { validateWindowsStorageSecurityReport, WindowsStorageSecurityError } from "./agent/windows-storage-security.js";
+export { createWindowsPowerShellStorageSecurityVerifier, WindowsPowerShellStorageVerifierError } from "./agent/windows-storage-security-powershell.js";
