@@ -262,6 +262,11 @@ try {
 `, "utf8");
   run(node, [browserCheck], { cwd: expertInstall });
 
+  run(node, [
+    "--input-type=module", "-e",
+    'import { EventEmitter } from "node:events"; import { mkdtemp, rm } from "node:fs/promises"; import { tmpdir } from "node:os"; import { join } from "node:path"; import { createAutonomousExecutionHost, createAutonomousExecutionHostService as rootService } from "@jb/expert-qa"; import { createAutonomousExecutionHostService as subpathService } from "@jb/expert-qa/autonomous-execution-host-service"; if (typeof rootService !== "function" || rootService !== subpathService) process.exit(1); const orchestrator = { listEngines: () => [], getPolicy: () => ({ id: "service-package-policy" }), verifyLedger: () => ({ valid: true, entries: 0 }), execute: async (_plan, options) => ({ status: "succeeded", executionId: options.executionId }) }; const directory = await mkdtemp(join(tmpdir(), "jb-qa-host-service-package-")); try { const host = createAutonomousExecutionHost({ orchestrator, storageDirectory: directory, enabled: true }); const signalSource = new EventEmitter(); const service = rootService({ host, signalSource }); if (service.getStatus().state !== "idle") process.exit(1); service.start(); if (service.getStatus().state !== "running" || signalSource.listenerCount("SIGTERM") !== 1) process.exit(1); const status = await service.stop(); if (status.state !== "closed" || signalSource.listenerCount("SIGTERM") !== 0) process.exit(1); } finally { await rm(directory, { recursive: true, force: true }); }'
+  ], { cwd: expertInstall });
+
   progress("Expert QA browser checks passed");
   // JB Security Guard.
   progress("Packing standalone Security Guard tarball");
