@@ -185,3 +185,5 @@ export { createContainmentControllerDispatcher, ContainmentControllerDispatchErr
 export { createContainedLocalProcessEngineRunner, ContainedProcessEngineRunnerError } from "./agent/contained-process-runner.js";
 
 export { createAutonomousExecutionRunner, AutonomousExecutionRunnerError } from "./agent/autonomous-execution-runner.js";
+
+export { createAutonomousExecutionHost, AutonomousExecutionHostError } from "./agent/autonomous-execution-host.js";
