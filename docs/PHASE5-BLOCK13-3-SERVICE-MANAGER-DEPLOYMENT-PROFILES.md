@@ -93,6 +93,34 @@ The default failure sequence restarts after 10 seconds, restarts once more after
 
 ## Shared lifecycle contract
 
+The configured `entryPoint` is an application-owned Node.js module. It must construct the trusted orchestrator and explicitly bind the host to the generated storage-directory environment variable:
+
+```js
+import {
+  createAutonomousExecutionHost,
+  createAutonomousExecutionHostService
+} from "@jb/expert-qa";
+
+const orchestrator = await createTrustedApplicationOrchestrator();
+const storageDirectory = process.env.JB_EXPERT_QA_STORAGE_DIRECTORY;
+if (!storageDirectory) throw new Error("Host storage directory is not configured");
+
+const host = createAutonomousExecutionHost({
+  orchestrator,
+  storageDirectory,
+  enabled: true
+});
+const service = createAutonomousExecutionHostService({
+  host,
+  signalSource: process,
+  onError: error => logger.error({ code: error.code }, "host shutdown failed")
+});
+
+service.start();
+```
+
+`createTrustedApplicationOrchestrator()` is supplied by the embedding application; it is intentionally not invented or created by the deployment-profile package. The host remains disabled unless the entrypoint explicitly opts in.
+
 - The entrypoint must construct the trusted orchestrator and policy, create the autonomous host with `enabled: true`, create `createAutonomousExecutionHostService({ host, signalSource: process })` and explicitly call `service.start()`.
 - Construction remains inert; the operating-system service manager owns boot activation and process-level restart policy.
 - Linux systemd delivers `SIGTERM`; WinSW's console stop path delivers Ctrl+C to the Node process, which is handled through `SIGINT`.
