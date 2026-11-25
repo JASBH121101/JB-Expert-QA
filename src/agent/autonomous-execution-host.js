@@ -141,7 +141,7 @@ export function createAutonomousExecutionHost(options = {}) {
     });
 
     const runtimeStatus = readMethod(runtime, "getStatus");
-    const verifyLedger = readMethod(runtime, "verifyLedger");
+    const verifyLedgerSnapshot = readMethod(runtime, "verifyLedger");
     let state = "idle";
     let closePromise = null;
 
@@ -221,6 +221,11 @@ export function createAutonomousExecutionHost(options = {}) {
     function getEventJournalStatus() {
       assertOpen();
       return supervisor.getEventJournalStatus();
+    }
+
+    function verifyLedger() {
+      assertOpen();
+      return verifyLedgerSnapshot();
     }
 
     function start() {
