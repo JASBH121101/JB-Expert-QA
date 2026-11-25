@@ -22,3 +22,5 @@ export {
   bootstrapAutonomousExecutionHost,
   AutonomousExecutionHostBootstrapError
 } from "./agent/autonomous-execution-host-bootstrap.js";
+
+export { createPhase4AutonomousHostBootstrap, Phase4AutonomousHostIntegrationError } from "./agent/phase4-autonomous-host-bootstrap.js";
