@@ -158,7 +158,7 @@ test("bootstrap starts only after preflight, owns both persistent locks and repo
     assert.equal(signalSource.listenerCount("SIGTERM"), 0);
     assert.equal(getExecutions(), 0);
     await bootstrap.stop();
-    assert.throws(() => bootstrap.start(),
+    await assert.rejects(() => bootstrap.start(),
       error => error instanceof AutonomousExecutionHostBootstrapError && error.code === "BOOTSTRAP_TERMINAL");
   });
 });
