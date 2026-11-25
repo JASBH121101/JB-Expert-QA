@@ -205,3 +205,4 @@ export {
 export { createPhase4AutonomousHostBootstrap, Phase4AutonomousHostIntegrationError } from "./agent/phase4-autonomous-host-bootstrap.js";
 
 export { createLocalApprovalGate, LocalApprovalGateError } from "./agent/local-approval-gate.js";
+export { validateWindowsStorageSecurityReport, WindowsStorageSecurityError } from "./agent/windows-storage-security.js";
