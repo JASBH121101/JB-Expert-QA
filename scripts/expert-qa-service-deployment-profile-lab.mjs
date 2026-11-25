@@ -317,8 +317,6 @@ async function certifyWindowsScm() {
   const configureProtectedStateAcl = async () => {
     assertCommand(await command("icacls.exe", [storageDirectory, "/inheritance:r"]),
       "remove inherited Windows state-directory ACL entries");
-    assertCommand(await command("icacls.exe", [storageDirectory, "/setowner", "*S-1-5-19"]),
-      "set LocalService as Windows state-directory owner");
     assertCommand(await command("icacls.exe", [
       storageDirectory,
       "/grant:r",
@@ -326,6 +324,8 @@ async function certifyWindowsScm() {
       "*S-1-5-18:(OI)(CI)(F)",
       "*S-1-5-32-544:(OI)(CI)(F)"
     ]), "apply explicit protected Windows state-directory DACL");
+    assertCommand(await command("icacls.exe", [storageDirectory, "/setowner", "*S-1-5-19"]),
+      "set LocalService as Windows state-directory owner");
   };
 
   const fixture = [
