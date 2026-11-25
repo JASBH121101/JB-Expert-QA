@@ -84,12 +84,31 @@ async function waitFor(predicate, timeoutMs = 4000) {
   assert.fail("timed out waiting for bootstrap host state");
 }
 
+function windowsStorageSecurityTestOptions() {
+  if (process.platform !== "win32") return {};
+  return {
+    expectedWindowsServiceSid: "S-1-5-19",
+    windowsStorageSecurityVerifier: ({ directory, expectedServiceSid }) => ({
+      directory,
+      processIdentitySid: expectedServiceSid,
+      ownerSid: expectedServiceSid,
+      daclProtected: true,
+      accessEntries: [
+        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+      ]
+    })
+  };
+}
+
 function options(orchestrator, storageDirectory, signalSource = new EventEmitter(), extra = {}) {
   return {
     orchestrator,
     storageDirectory,
     signalSource,
     enabled: true,
+    ...windowsStorageSecurityTestOptions(),
     hostOptions: { pollIntervalMs: 100, ...extra.hostOptions },
     ...(extra.onDiagnostic ? { onDiagnostic: extra.onDiagnostic } : {}),
     ...(extra.signals ? { signals: extra.signals } : {})
