@@ -1,14 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { isAbsolute } from "node:path";
+import { validateWindowsStorageSecurityReport, WindowsStorageSecurityError } from "./windows-storage-security.js";
 
 const SERVICE_SIDS = new Set(["S-1-5-19", "S-1-5-20"]);
 
-export class WindowsStorageSecurityError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.name = "WindowsStorageSecurityError";
-    this.code = code;
-  }
-}
 
 /**
  * Query the effective process SID and the complete NTFS directory DACL using
@@ -24,7 +19,7 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_PLATFORM_UNSUPPORTED",
       "Windows storage security inspection is available only on Windows");
   }
-  if (typeof directory !== "string" || !directory || !SERVICE_SIDS.has(expectedServiceSid)) {
+  if (typeof directory !== "string" || !isAbsolute(directory) || directory.length > 4096 || directory.includes("\0") || !SERVICE_SIDS.has(expectedServiceSid)) {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID",
       "an absolute directory and a supported Windows service SID are required");
   }
@@ -32,6 +27,7 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
   const encodedPath = Buffer.from(directory, "utf16le").toString("base64");
   const script = [
     "$ErrorActionPreference = 'Stop'",
+    "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)",
     "$path = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('" + encodedPath + "'))",
     "$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()",
     "$acl = Get-Acl -LiteralPath $path",
@@ -94,4 +90,4 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
   }
 }
 
-export { validateWindowsStorageSecurityReport } from "./windows-storage-security.js";
+export { validateWindowsStorageSecurityReport, WindowsStorageSecurityError };
