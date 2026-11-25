@@ -9,7 +9,7 @@ Generate reviewable, platform-native service definitions for the existing autono
 The builders are available from the package root and the standalone `@jb/expert-qa/autonomous-execution-service-deployment` subpath:
 
 - `createSystemdHostServiceProfile(options)` returns a systemd unit profile.
-- `createWindowsHostServiceProfile(options)` returns a WinSW XML profile for Windows SCM; the caller supplies and verifies the wrapper binary.
+- `createWindowsHostServiceProfile(options)` returns a WinSW v2-compatible XML profile for Windows SCM; the caller supplies and verifies the wrapper binary.
 - Both return immutable metadata and a `content` string. The caller decides where to write the content and when an operator may apply it.
 
 ## Linux — systemd
@@ -50,9 +50,9 @@ The default restart policy is `on-failure`, with a 10-second delay and a limit o
 5. Run `systemd-analyze verify` against the unit. After review, an operator may reload systemd, enable/start the unit and inspect its active state and journal.
 6. If the restart limit is reached, inspect logs and durable job state first. Do not automatically replay interrupted jobs; use the host's explicit operator recovery API after reviewing each job.
 
-## Windows — Service Control Manager with WinSW XML
+## Windows — Service Control Manager with WinSW v2 XML
 
-The Windows profile emits WinSW-compatible XML. The wrapper binary is not bundled, downloaded or installed by this package. Obtain a supported stable WinSW release separately from the official release channel, verify its provenance and integrity, and keep it in a controlled installation directory. WinSW's own project status distinguishes stable 2.x releases from 3.x pre-releases; do not treat a 3.x pre-release as a stable production dependency.
+The Windows profile emits WinSW-compatible XML. The wrapper binary is not bundled, downloaded or installed by this package. Obtain a supported stable WinSW release separately from the official release channel, verify its provenance and integrity, and keep it in a controlled installation directory. WinSW's official release page currently lists v2.14.0 as the latest stable release; 3.x remains a pre-release line. The CI lab pins the v2.14.0 x64 asset and verifies its published SHA-256 before execution.
 
 Example:
 
@@ -77,7 +77,7 @@ const profile = createWindowsHostServiceProfile({
 console.log(profile.content);
 ```
 
-Place the verified WinSW executable and generated XML beside one another using the same base name (for example, `JBExpertQA.exe` and `JBExpertQA.xml`). The XML launches the configured Node executable and the quoted host entrypoint. It sets the storage directory as an environment variable, keeps logs under the configured log path and hides the child console window. The generated profile defaults to the built-in `NT AUTHORITY\\LocalService` account; `serviceAccount: "NetworkService"` is the only alternative. `LocalSystem` and password-bearing custom account data are intentionally not accepted.
+Place the verified WinSW v2 executable and generated XML beside one another using the same base name (for example, `JBExpertQA.exe` and `JBExpertQA.xml`). The XML launches the configured Node executable and the quoted host entrypoint. It sets the storage directory as an environment variable, keeps logs under the configured log path and hides the child console window. The generated profile uses WinSW v2's documented `<serviceaccount><domain>NT AUTHORITY</domain><user>LocalService</user></serviceaccount>` format by default; `serviceAccount: "NetworkService"` is the only alternative. `LocalSystem` and password-bearing custom account data are intentionally not accepted. Delayed automatic startup is rendered using WinSW v2's empty `<delayedAutoStart />` element.
 
 The wrapper's stop behavior and `stoptimeout` must be confirmed against the exact WinSW release selected for deployment. The Phase 5 service lifecycle handles `SIGINT`; allow enough time for the worker's configured execution timeout, queue/journal flush and graceful close. A forced termination can leave a job marked interrupted; the host deliberately requires operator review rather than automatic replay.
 
@@ -88,7 +88,7 @@ The default failure sequence restarts after 10 seconds, restarts once more after
 1. Use the generated `LocalService` identity by default, or select `NetworkService` when its additional network identity is required. Provision only the necessary NTFS access; the profile does not grant folder permissions automatically.
 2. Grant read/execute access to the application and Node installation directories. Grant modify access only to the configured state and log directories. Do not run the service as LocalSystem simply to bypass permissions.
 3. Place the separately verified WinSW binary and generated XML in a controlled directory. Review the executable, entrypoint, service ID, start mode, retry sequence, state path and stop timeout.
-4. Install the service using the documented WinSW command for the exact pinned version, then inspect its registered identity and configuration before starting it.
+4. Install the service using the documented WinSW v2 command for the exact pinned version, then inspect its registered identity and configuration before starting it.
 5. Start the service only after confirming the service account can read the application and write the configured state/log paths. Verify status and logs through the Windows service-management tools.
 6. If the bounded restart sequence is exhausted, investigate the service logs and durable queue. Restarting the process does not authorize automatic recovery of interrupted jobs.
 
