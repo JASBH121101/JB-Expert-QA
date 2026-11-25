@@ -181,3 +181,31 @@ The package exports `createDashboardPhase4Catalog` and `createDashboardPhase4Exe
 ## Phase 4 Execution Audit & Evidence
 
 The policy-gated Dashboard bridge exposes `getAuditTrail({ limit, beforeSequence })` and the local Dashboard serves the read-only `GET /api/phase4/audit` endpoint. Audit records are explicitly projected: event identifiers, timestamps, policy/action metadata, SHA-256 input/output/scope digests and hash-chain links are retained, while raw inputs, outputs, approval receipts and secrets are excluded. Results are paginated (1–100 records), and the chain verification status is reported independently of the page. See [Phase 4 Block 14 — Execution Audit & Evidence](../../docs/PHASE4-BLOCK14-EXECUTION-AUDIT-EVIDENCE.md).
+
+
+## Autonomous Host Bootstrap & Operational Readiness
+
+Applications that already construct a trusted, sealed QA engine registry and policy can use the explicit host bootstrap API:
+
+    import { bootstrapAutonomousExecutionHost } from "@jb/expert-qa";
+
+    const host = await bootstrapAutonomousExecutionHost({
+      orchestrator: trustedApplicationOrchestrator,
+      storageDirectory: "/var/lib/jb-expert-qa",
+      enabled: true,
+      signalSource: process,
+      onDiagnostic: event => logger.info(event)
+    });
+
+    const readiness = await host.getReadiness();
+    if (!readiness.ready) throw new Error("JB Expert QA host is not ready");
+
+The bootstrap is inert when imported or constructed. It requires enabled: true and an application-provided orchestrator; it does not register engines, create approval providers, install an OS service, elevate privileges or open a network port.
+
+Before starting the runner it validates engine metadata, the policy permission and allowlist, ledger integrity, and a private writable storage directory. It then creates the durable host and verifies that both exclusive job/event store locks belong to the current process. On POSIX, the storage directory must be owned by the service UID and must not grant group/other access. Windows ACLs remain an operator responsibility, provisioned using the LocalService profile documented in Block 13.4.
+
+Use getLiveness() for a lightweight process-state probe and await getReadiness() for asynchronous service, persistence, lock and ledger checks. await getDiagnostics() returns bounded sanitized metadata only; it excludes paths, job/engine IDs, payloads, raw messages and stack traces. These are local library methods, not HTTP endpoints.
+
+Interrupted jobs remain quarantined. Recovery is never automatic: after reviewing an individual job, an operator may explicitly call recoverInterrupted(id), failInterrupted(id, reason) or retryFailed(id, options). Call await host.stop() for an ordered graceful shutdown.
+
+See [Phase 5 Block 13.5 — Host Bootstrap & Operational Readiness](../../docs/PHASE5-BLOCK13-5-HOST-BOOTSTRAP-READINESS.md) for the full contract and validation scope.
