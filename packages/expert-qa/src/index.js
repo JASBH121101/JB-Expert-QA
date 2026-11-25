@@ -16,3 +16,9 @@ export { createAuditEngineRegistry, AUDIT_ENGINE_IDS } from "./audit-engines/ind
 export { createDashboardServer, startDashboard, DEFAULT_DASHBOARD_PORT, DEFAULT_DASHBOARD_HOST } from "./dashboard/server.js";
 
 export { buildDashboardAnalytics, buildConsolidatedReport } from "./dashboard/analytics.js";
+
+export {
+  createAutonomousExecutionHostBootstrap,
+  bootstrapAutonomousExecutionHost,
+  AutonomousExecutionHostBootstrapError
+} from "./agent/autonomous-execution-host-bootstrap.js";

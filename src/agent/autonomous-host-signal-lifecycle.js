@@ -79,10 +79,12 @@ export function attachHostSignalLifecycle(options = {}) {
     state = "shutting-down";
     shutdownPromise = Promise.resolve().then(() => host.close()).then(
       () => {
+        detach();
         state = "closed";
         return status();
       },
       error => {
+        detach();
         state = "failed";
         closeErrorCode = typeof error?.code === "string" ? error.code.slice(0, 80) : "HOST_CLOSE_FAILED";
         try { onError?.(error, signal); } catch {}

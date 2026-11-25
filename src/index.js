@@ -195,3 +195,9 @@ export {
   createWindowsHostServiceProfile,
   AutonomousExecutionServiceDeploymentError
 } from "./agent/autonomous-execution-service-deployment.js";
+
+export {
+  createAutonomousExecutionHostBootstrap,
+  bootstrapAutonomousExecutionHost,
+  AutonomousExecutionHostBootstrapError
+} from "./agent/autonomous-execution-host-bootstrap.js";

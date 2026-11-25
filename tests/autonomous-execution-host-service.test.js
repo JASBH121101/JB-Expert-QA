@@ -73,6 +73,8 @@ test("service signal shutdown delegates to the host once and exposes terminal st
 
   assert.equal(calls.close, 1);
   assert.equal(service.getStatus().signalLifecycle.shutdownSignal, "SIGTERM");
+  assert.equal(signalSource.listenerCount("SIGTERM"), 0);
+  assert.equal(signalSource.listenerCount("SIGINT"), 0);
   await service.stop();
   assert.equal(calls.close, 1);
 });
