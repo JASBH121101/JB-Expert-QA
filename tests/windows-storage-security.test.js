@@ -15,9 +15,9 @@ function validReport(overrides = {}) {
     ownerSid: SERVICE_SID,
     daclProtected: true,
     accessEntries: [
-      { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false },
-      { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
-      { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+      { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+      { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+      { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
     ],
     ...overrides
   };
