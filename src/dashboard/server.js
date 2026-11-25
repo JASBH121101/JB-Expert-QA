@@ -133,6 +133,129 @@ function readPhase5Supervisor(value) {
     getEventJournalStatus: method("getEventJournalStatus")
   });
 }
+function readPhase5HostBootstrap(value) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("phase5HostBootstrap must be a trusted host bootstrap controller");
+  }
+  const methods = Object.create(null);
+  for (const name of ["getStatus", "getReadiness", "getLiveness", "getDiagnostics", "start", "stop"]) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, name);
+    if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+      throw new TypeError("phase5HostBootstrap must expose its own " + name + "() method");
+    }
+    methods[name] = descriptor.value.bind(value);
+  }
+  return Object.freeze(methods);
+}
+
+function safeHostState(value) {
+  return ["idle", "starting", "running", "stopping", "closed", "failed"].includes(value) ? value : "unknown";
+}
+function safeHostComponentState(value) {
+  return ["idle", "starting", "ready", "running", "stopping", "stopped", "closed", "failed", "unavailable"].includes(value)
+    ? value : "unknown";
+}
+function safeHostCode(value) {
+  return typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(value) ? value : null;
+}
+function safeHostTimestamp(value) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+}
+function safeHostCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+function safeHostChecks(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 32).map((item) => ({
+    name: typeof item?.name === "string" && /^[a-z][a-z0-9-]{0,63}$/u.test(item.name) ? item.name : "unknown-check",
+    status: item?.status === "passed" ? "passed" : "failed",
+    ...(safeHostCode(item?.code) ? { code: safeHostCode(item.code) } : {})
+  }));
+}
+function createPhase5HostSnapshot({ status, readiness, liveness, diagnostics }) {
+  const preflight = status?.preflight && typeof status.preflight === "object" ? status.preflight : null;
+  const host = status?.host && typeof status.host === "object" ? status.host : null;
+  const queue = diagnostics?.queue && typeof diagnostics.queue === "object" ? diagnostics.queue : null;
+  const events = Array.isArray(diagnostics?.recentEvents) ? diagnostics.recentEvents : [];
+  const diagnosticEvents = Array.isArray(diagnostics?.recentDiagnostics) ? diagnostics.recentDiagnostics : [];
+  return Object.freeze({
+    enabled: status?.enabled === true,
+    state: safeHostState(status?.state),
+    started: status?.started === true,
+    host: host ? Object.freeze({
+      state: safeHostState(host.state),
+      runtimeState: safeHostComponentState(host.runtimeState),
+      supervisorState: safeHostComponentState(host.supervisorState),
+      runnerState: safeHostComponentState(host.runnerState),
+      queuePersistenceEnabled: host.queuePersistenceEnabled === true,
+      eventJournalPersistenceEnabled: host.eventJournalPersistenceEnabled === true
+    }) : null,
+    preflight: preflight ? Object.freeze({
+      passed: preflight.passed === true,
+      checkedAt: safeHostTimestamp(preflight.checkedAt),
+      engineCount: safeHostCount(preflight.engineCount),
+      allowedEngineCount: safeHostCount(preflight.allowedEngineCount),
+      checks: safeHostChecks(preflight.checks),
+      failures: Array.isArray(preflight.failures) ? preflight.failures.slice(0, 16).map(safeHostCode).filter(Boolean) : []
+    }) : null,
+    liveness: Object.freeze({
+      alive: liveness?.alive === true,
+      state: safeHostState(liveness?.state)
+    }),
+    readiness: Object.freeze({
+      ready: readiness?.ready === true,
+      state: safeHostState(readiness?.state),
+      checks: safeHostChecks(readiness?.checks)
+    }),
+    queue: queue ? Object.freeze({
+      queued: safeHostCount(queue.queued),
+      running: safeHostCount(queue.running),
+      completed: safeHostCount(queue.completed),
+      failed: safeHostCount(queue.failed),
+      interrupted: safeHostCount(queue.interrupted)
+    }) : null,
+    lastFailureCode: safeHostCode(diagnostics?.lastFailureCode ?? status?.lastFailureCode),
+    recentDiagnostics: diagnosticEvents.slice(-10).map((item) => ({
+      timestamp: safeHostTimestamp(item?.timestamp),
+      event: typeof item?.event === "string" && /^[a-z][a-z0-9_]{0,63}$/u.test(item.event) ? item.event : "unknown_event",
+      ...(safeHostCode(item?.code) ? { code: safeHostCode(item.code) } : {})
+    })),
+    recentEvents: events.slice(-10).map((item) => ({
+      sequence: Number.isSafeInteger(item?.sequence) && item.sequence > 0 ? item.sequence : null,
+      timestamp: safeHostTimestamp(item?.timestamp),
+      eventType: typeof item?.eventType === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(item.eventType) ? item.eventType : "UNKNOWN_EVENT",
+      severity: ["info", "warning", "error"].includes(item?.severity) ? item.severity : "info",
+      ...(safeHostCode(item?.code) ? { code: safeHostCode(item.code) } : {}),
+      ...(typeof item?.stage === "string" && /^[a-z][a-z0-9_-]{0,31}$/u.test(item.stage) ? { stage: item.stage } : {})
+    }))
+  });
+}
+async function readPhase5HostSnapshot(controller) {
+  if (!controller) {
+    return Object.freeze({
+      enabled: false,
+      state: "unavailable",
+      started: false,
+      host: null,
+      preflight: null,
+      liveness: { alive: false, state: "unavailable" },
+      readiness: { ready: false, state: "unavailable", checks: [] },
+      queue: null,
+      lastFailureCode: null,
+      recentDiagnostics: [],
+      recentEvents: []
+    });
+  }
+  const [status, readiness, liveness, diagnostics] = await Promise.all([
+    controller.getStatus(),
+    controller.getReadiness(),
+    controller.getLiveness(),
+    controller.getDiagnostics()
+  ]);
+  return createPhase5HostSnapshot({ status, readiness, liveness, diagnostics });
+}
+
 function readSingleQueryValue(searchParams, name) {
   const values = searchParams.getAll(name);
   if (values.length > 1) return { valid: false };
@@ -306,7 +429,8 @@ export function createDashboardServer({
   maximumBodyBytes = DEFAULT_DASHBOARD_BODY_LIMIT,
   phase4Registry = createDashboardPhase4Catalog(),
   phase4Execution = null,
-  phase5Supervisor = null
+  phase5Supervisor = null,
+  phase5HostBootstrap = null
 } = {}) {
   if (!registry || typeof registry.list !== "function" || typeof registry.get !== "function" || typeof registry.run !== "function") {
     throw new TypeError("A valid QA audit engine registry is required");
@@ -325,9 +449,12 @@ export function createDashboardServer({
     throw new TypeError("phase4Execution must be created for the same sealed phase4Registry");
   }
   const phase5EventInspection = readPhase5Supervisor(phase5Supervisor);
+  const phase5HostControl = readPhase5HostBootstrap(phase5HostBootstrap);
   const dataDir = resolve(storageDirectory);
   const rateWindow = [];
   const phase4ExecutionRateWindow = [];
+  const phase5HostOperationRateWindow = [];
+  let phase5HostOperating = false;
   let busy = false;
 
   const server = createServer(async (request, response) => {
@@ -346,6 +473,14 @@ export function createDashboardServer({
       if (request.method === "GET") {
         const asset = await publicAsset(pathname);
         if (asset) { send(response, 200, asset.body, asset.type); return; }
+        if (pathname === "/api/phase5/host/status") {
+          try {
+            json(response, 200, await readPhase5HostSnapshot(phase5HostControl));
+          } catch {
+            fail(response, 503, "phase5_host_unavailable", "The autonomous host status could not be read safely");
+          }
+          return;
+        }
         if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }
         if (pathname === "/api/phase4/engines") {
           const engines = phase4Registry.list();
@@ -544,6 +679,41 @@ export function createDashboardServer({
         fail(response, 404, "not_found", "Route not found"); return;
       }
 
+      const phase5HostOperation = /^\/api\/phase5\/host\/(start|stop)$/u.exec(pathname);
+      if (request.method === "POST" && phase5HostOperation) {
+        if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
+        if (!phase5HostControl) { fail(response, 503, "phase5_host_unavailable", "No application-owned autonomous host is connected"); return; }
+        if (requestUrl.search) { fail(response, 400, "invalid_host_operation", "Host operation routes do not accept query parameters"); return; }
+        if (!rateAllowed(phase5HostOperationRateWindow, 5)) { fail(response, 429, "phase5_host_rate_limited", "The host control request limit was reached"); return; }
+        if (phase5HostOperating) { fail(response, 409, "phase5_host_busy", "Another host lifecycle operation is already in progress"); return; }
+        const body = await readBody(request, maximumBodyBytes);
+        if (Object.keys(body).length !== 0) { fail(response, 400, "invalid_host_operation", "Host lifecycle requests must use an empty JSON object"); return; }
+        const operation = phase5HostOperation[1];
+        phase5HostOperating = true;
+        try {
+          const current = await phase5HostControl.getStatus();
+          if (operation === "start" && current?.state !== "idle") {
+            fail(response, 409, "phase5_host_start_not_allowed", "The host can only be started from its idle state"); return;
+          }
+          if (operation === "stop" && current?.state !== "running") {
+            fail(response, 409, "phase5_host_stop_not_allowed", "The host can only be stopped while running"); return;
+          }
+          if (operation === "start") await phase5HostControl.start();
+          else await phase5HostControl.stop();
+          json(response, 200, await readPhase5HostSnapshot(phase5HostControl));
+        } catch (error) {
+          const code = safeHostCode(error?.code);
+          json(response, 409, {
+            error: "phase5_host_operation_failed",
+            message: "The host lifecycle operation failed; inspect sanitized host diagnostics",
+            ...(code ? { code } : {})
+          });
+        } finally {
+          phase5HostOperating = false;
+        }
+        return;
+      }
+
       if (request.method === "POST" && pathname === "/api/phase4/execute") {
         if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
         if (!phase4Execution) { fail(response, 503, "phase4_execution_disabled", "Phase 4 execution is disabled until the host supplies an explicit policy and external approval provider"); return; }
@@ -646,9 +816,24 @@ export function createDashboardServer({
   return server;
 }
 
-export async function startDashboard({ port = DEFAULT_DASHBOARD_PORT, storageDirectory, registry, phase4Registry, phase4Execution } = {}) {
+export async function startDashboard({
+  port = DEFAULT_DASHBOARD_PORT,
+  storageDirectory,
+  registry,
+  phase4Registry,
+  phase4Execution,
+  phase5Supervisor,
+  phase5HostBootstrap
+} = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new TypeError("port must be an integer between 0 and 65535");
-  const server = createDashboardServer({ storageDirectory, registry, phase4Registry, phase4Execution });
+  const server = createDashboardServer({
+    storageDirectory,
+    registry,
+    phase4Registry,
+    phase4Execution,
+    phase5Supervisor,
+    phase5HostBootstrap
+  });
   await new Promise((resolveListen, rejectListen) => {
     const onError = (error) => { server.off("listening", onListening); rejectListen(error); };
     const onListening = () => { server.off("error", onError); resolveListen(); };
