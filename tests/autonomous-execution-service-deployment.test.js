@@ -153,6 +153,28 @@ test("Windows profile rejects malformed paths, unsafe service IDs and invalid re
   })), error => error.code === "INVALID_DELAYED_START");
 });
 
+test("Windows profile rejects expansion markers and accessor-backed retry arrays", () => {
+  assert.throws(() => createWindowsHostServiceProfile(validWindows({
+    displayName: "JB Expert QA %PATH%"
+  })), error => error.code === "INVALID_DISPLAY_NAME");
+  assert.throws(() => createWindowsHostServiceProfile(validWindows({
+    description: "Service %SystemRoot%"
+  })), error => error.code === "INVALID_DESCRIPTION");
+
+  const delays = [10];
+  let called = false;
+  Object.defineProperty(delays, "0", {
+    get() {
+      called = true;
+      return 10;
+    }
+  });
+  assert.throws(() => createWindowsHostServiceProfile(validWindows({
+    restartDelaysSeconds: delays
+  })), error => error.code === "INVALID_RESTART_DELAYS");
+  assert.equal(called, false);
+});
+
 test("Windows profile rejects accessors and unknown fields", () => {
   const options = validWindows();
   let called = false;
