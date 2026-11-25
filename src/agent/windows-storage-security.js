@@ -80,10 +80,11 @@ export function validateWindowsStorageSecurityReport(report, options = {}) {
       throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "accessEntries cannot contain holes or accessors");
     }
     const entry = readPlainRecord(descriptor.value,
-      new Set(["sid", "type", "access", "inherited"]), "access entry");
+      new Set(["sid", "type", "access", "inherited", "containerInherit", "objectInherit", "inheritOnly"]), "access entry");
 
     if (typeof entry.sid !== "string" || !SID_PATTERN.test(entry.sid) ||
-        seen.has(entry.sid) || entry.type !== "allow" || entry.inherited !== false) {
+        seen.has(entry.sid) || entry.type !== "allow" || entry.inherited !== false ||
+        entry.containerInherit !== true || entry.objectInherit !== true || entry.inheritOnly !== false) {
       throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "only unique explicit allow entries are permitted");
     }
     seen.add(entry.sid);
