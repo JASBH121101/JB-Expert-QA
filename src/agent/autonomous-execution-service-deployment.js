@@ -246,7 +246,7 @@ export function createWindowsHostServiceProfile(options = {}) {
   return Object.freeze({
     platform: "windows-scm",
     fileName: serviceId + ".xml",
-    wrapper: "WinSW v3 (operator-supplied and separately verified)",
+    wrapper: "WinSW XML (stable operator-supplied wrapper; independently verified)",
     content: xml,
     serviceId,
     storageDirectory,
