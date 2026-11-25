@@ -189,7 +189,7 @@ export function createSystemdHostServiceProfile(options = {}) {
  */
 export function createWindowsHostServiceProfile(options = {}) {
   const config = readOptions(options, "Windows options", new Set([
-    "serviceId", "displayName", "description", "nodeExecutable",
+    "serviceId", "displayName", "description", "serviceAccount", "nodeExecutable",
     "entryPoint", "workingDirectory", "storageDirectory", "logDirectory",
     "startMode", "delayedAutoStart", "restartDelaysSeconds", "stopTimeoutSeconds"
   ]));
@@ -200,6 +200,10 @@ export function createWindowsHostServiceProfile(options = {}) {
     "display name", /^[^\u0000-\u001F\u007F<>%]{1,120}$/u, 120);
   const description = requiredText(config.description ?? "JB Expert QA local autonomous execution host",
     "description", /^[^\u0000-\u001F\u007F%]{1,240}$/u, 240);
+  const serviceAccount = config.serviceAccount ?? "LocalService";
+  if (!["LocalService", "NetworkService"].includes(serviceAccount)) {
+    throw new AutonomousExecutionServiceDeploymentError("INVALID_SERVICE_ACCOUNT", "serviceAccount must be LocalService or NetworkService");
+  }
   const nodeExecutable = validateWindowsPath(config.nodeExecutable, "nodeExecutable");
   const entryPoint = validateWindowsPath(config.entryPoint, "entryPoint");
   const workingDirectory = validateWindowsPath(config.workingDirectory, "workingDirectory");
@@ -226,11 +230,15 @@ export function createWindowsHostServiceProfile(options = {}) {
     "  <id>" + xmlEscape(serviceId) + "</id>",
     "  <name>" + xmlEscape(displayName) + "</name>",
     "  <description>" + xmlEscape(description) + "</description>",
+    "  <serviceaccount>",
+    "    <domain>NT AUTHORITY</domain>",
+    "    <user>" + serviceAccount + "</user>",
+    "  </serviceaccount>",
     "  <executable>" + xmlEscape(nodeExecutable) + "</executable>",
     "  <arguments>\"" + xmlEscape(entryPoint) + "\"</arguments>",
     "  <workingdirectory>" + xmlEscape(workingDirectory) + "</workingdirectory>",
     "  <startmode>" + startMode + "</startmode>",
-    ...(startMode === "Automatic" ? ["  <delayedAutoStart>" + delayedAutoStart + "</delayedAutoStart>"] : []),
+    ...(delayedAutoStart ? ["  <delayedAutoStart />"] : []),
     "  <stoptimeout>" + stopTimeoutSeconds + "sec</stoptimeout>",
     "  <logpath>" + xmlEscape(logDirectory) + "</logpath>",
     '  <log mode="roll" />',
@@ -246,9 +254,10 @@ export function createWindowsHostServiceProfile(options = {}) {
   return Object.freeze({
     platform: "windows-scm",
     fileName: serviceId + ".xml",
-    wrapper: "WinSW v3 (operator-supplied and separately verified)",
+    wrapper: "WinSW v2 XML (stable operator-supplied wrapper; independently verified)",
     content: xml,
     serviceId,
+    serviceAccount,
     storageDirectory,
     logDirectory,
     startMode,
