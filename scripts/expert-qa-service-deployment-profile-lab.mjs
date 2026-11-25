@@ -17,8 +17,6 @@ import {
   createSystemdHostServiceProfile,
   createWindowsHostServiceProfile
 } from "../src/agent/autonomous-execution-service-deployment.js";
-import { readWindowsStorageSecurityReport } from "../src/agent/windows-storage-security-native.js";
-import { validateWindowsStorageSecurityReport } from "../src/agent/windows-storage-security.js";
 
 const execFileAsync = promisify(execFile);
 const timeoutMs = 30_000;
