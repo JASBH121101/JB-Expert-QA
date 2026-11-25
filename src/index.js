@@ -183,3 +183,5 @@ export { createContainmentPolicy, ContainmentPolicyError } from "./agent/contain
 export { createContainmentControllerDispatcher, ContainmentControllerDispatchError } from "./agent/containment-controller-dispatch.js";
 
 export { createContainedLocalProcessEngineRunner, ContainedProcessEngineRunnerError } from "./agent/contained-process-runner.js";
+
+export { createAutonomousExecutionRunner, AutonomousExecutionRunnerError } from "./agent/autonomous-execution-runner.js";
