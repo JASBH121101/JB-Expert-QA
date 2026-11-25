@@ -102,7 +102,7 @@ test("real Static QA action runs through host queue, orchestrator policy and ext
     assert.equal(approvals.length, 1);
     assert.equal(approvals[0].actionType, STATIC_ACTION);
     assert.equal(host.orchestrator.verifyLedger().valid, true);
-    assert.equal(host.getStatus().host.queuePersistenceEnabled, true);
+    assert.equal((await host.getStatus()).host.queuePersistenceEnabled, true);
   } finally {
     await host.stop();
     await rm(storage, { recursive: true, force: true });
