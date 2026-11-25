@@ -190,3 +190,8 @@ export { createAutonomousExecutionHost, AutonomousExecutionHostError } from "./a
 
 export { attachHostSignalLifecycle, HostSignalLifecycleError } from "./agent/autonomous-host-signal-lifecycle.js";
 export { createAutonomousExecutionHostService, AutonomousExecutionHostServiceError } from "./agent/autonomous-execution-host-service.js";
+export {
+  createSystemdHostServiceProfile,
+  createWindowsHostServiceProfile,
+  AutonomousExecutionServiceDeploymentError
+} from "./agent/autonomous-execution-service-deployment.js";
