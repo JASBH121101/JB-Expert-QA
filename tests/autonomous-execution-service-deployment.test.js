@@ -118,7 +118,6 @@ test("Windows profile renders WinSW XML with quoted entry point and finite resta
   assert.equal(profile.delayedAutoStart, true);
   assert.equal(profile.restartExhaustionAction, "none");
   assert.deepEqual(profile.restartDelaysSeconds, [15, 45]);
-  assert.match(profile.content, /<displayName>/u); // The generated XML uses the documented <name> element.
   assert.match(profile.content, /<name>JB Expert QA &amp; Autonomous Host<\/name>/u);
   assert.match(profile.content, /<description>Local QA host &lt;managed&gt;<\/description>/u);
   assert.match(profile.content, /<executable>C:\\Program Files\\nodejs\\node\.exe<\/executable>/u);
