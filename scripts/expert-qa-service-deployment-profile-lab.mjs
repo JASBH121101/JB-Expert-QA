@@ -317,13 +317,14 @@ async function certifyWindowsScm() {
   const configureProtectedStateAcl = async () => {
     assertCommand(await command("icacls.exe", [storageDirectory, "/inheritance:r"]),
       "remove inherited Windows state-directory ACL entries");
-    assertCommand(await command("icacls.exe", [
-      storageDirectory,
-      "/grant:r",
-      "*S-1-5-19:(OI)(CI)(M)",
-      "*S-1-5-18:(OI)(CI)(F)",
-      "*S-1-5-32-544:(OI)(CI)(F)"
-    ]), "apply explicit protected Windows state-directory DACL");
+    for (const [sid, rights] of [
+      ["*S-1-5-19", "(OI)(CI)(M)"],
+      ["*S-1-5-18", "(OI)(CI)(F)"],
+      ["*S-1-5-32-544", "(OI)(CI)(F)"]
+    ]) {
+      assertCommand(await command("icacls.exe", [storageDirectory, "/grant:r", sid + ":" + rights]),
+        "apply explicit Windows state-directory ACE for " + sid);
+    }
     assertCommand(await command("icacls.exe", [storageDirectory, "/setowner", "*S-1-5-19"]),
       "set LocalService as Windows state-directory owner");
   };
@@ -481,7 +482,7 @@ async function certifyWindowsScm() {
       storageIdentityVerified: first.storageIdentityVerified,
       storageAclVerified: first.storageAclVerified,
       applicationAcl: "LocalService read/execute",
-      stateAcl: "LocalService modify",
+      stateAcl: "protected; LocalService Modify; LocalSystem and Administrators Full Control; object/container inheritance",
       logAcl: "LocalService modify",
       storageDirectory,
       profileSha256: createHash("sha256").update(profile.content).digest("hex"),
