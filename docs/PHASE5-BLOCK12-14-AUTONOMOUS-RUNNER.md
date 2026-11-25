@@ -2,42 +2,49 @@
 
 ## Objective
 
-Close the operational gap between the existing explicitly-driven execution supervisor and a continuously operating local host. The runner must drive the already policy-gated queue/worker lifecycle on the host itself, without GitHub Actions, CI polling, a paid service, or a remote scheduler.
+Close the operational gap between the existing explicitly-driven execution supervisor and a continuously operating local host. The runner drives the existing policy-gated queue/worker lifecycle on the host itself, without GitHub Actions, CI polling, a paid service, or a remote scheduler.
 
 ## Scope
 
-- Add a separate opt-in host runner that wraps the existing supervisor; do not make supervisor construction or Dashboard startup implicitly execute jobs.
-- Provide explicit start/stop lifecycle and a bounded idle polling interval. It must drain queued work in bounded batches, then wait when no eligible work exists.
-- Reuse existing runtime, queue, worker, containment, policy, approval and durable event journal. No alternate execution path.
-- Enforce single-runner ownership per instance; reject duplicate starts and serialize tick/drain operations.
-- Expose sanitized status: state, last tick, last activity, processed counts, consecutive runner errors, next poll estimate and whether queue persistence is enabled.
-- Handle graceful shutdown: stop admitting runner ticks, wait for in-flight bounded drain, then leave resource closing to the supervisor/host owner.
-- Add an optional maximum consecutive runner error threshold that stops the runner in fail-closed state; never silently restart the QA runtime or replay interrupted jobs.
-- Add bounded and validated configuration; no unbounded drain, auto-retry policy, or automatic recovery of interrupted/running jobs.
-- Add lifecycle event journal records for runner start/stop/failure and productive ticks using the existing sanitized event schema. The host may pass the same journal instance to the runner; idle polls are not journaled.
+- Add a separate opt-in host runner that wraps the existing supervisor; supervisor construction and Dashboard startup remain inert.
+- Provide explicit start/stop lifecycle and a bounded idle polling interval. Drain queued work in bounded batches, then wait when no eligible work exists.
+- Reuse the existing runtime, queue, worker, containment, policy, approval and durable event-journal path. No alternate execution path.
+- Serialize tick/drain operations and reject unsafe dependency/configuration shapes.
+- Expose sanitized status: state, last tick, last activity, processed counts, consecutive runner errors, next poll timestamp, event emission failures and queue persistence state.
+- Handle graceful shutdown: stop admitting runner ticks, wait for an in-flight bounded drain, then leave resource closing to the supervisor/host owner.
+- Stop in a fail-closed state after the configured consecutive-error threshold. Never silently restart the QA runtime or replay interrupted jobs.
+- Use the existing event schema for runner start/stop/failure and productive-tick records. The host passes the same journal instance used by the supervisor; idle polls are not journaled to avoid filling the journal with empty events.
 
 ## Explicit exclusions
 
 - No GitHub Actions dependency for runtime execution.
 - No shell/command execution, AI-plan trust, policy bypass, permission escalation, approvals auto-granted, or side-effect handlers added.
 - No remote server, cloud queue, paid service, distributed multi-host mode or background startup installation.
-- No auto-replay of interrupted jobs; these remain operator-reviewed.
-- No changes to Dashboard execution controls or implicit runner creation.
+- No automatic replay of interrupted jobs; these remain operator-reviewed.
+- No Dashboard execution-control changes or implicit runner creation.
 
 ## Safety invariants
 
-1. Execution requires an explicitly enabled and ready runtime, supervisor start, and runner start.
-2. Runner can only call the existing supervisor drain/run surface.
+1. Execution requires an explicitly enabled and ready runtime, supervisor start, and explicit runner start.
+2. The runner can only invoke the existing supervisor drain surface.
 3. All jobs retain queue capacity, runtime admission, orchestrator policy, permission, approval, containment and audit constraints.
 4. Work is bounded per tick; poll intervals and batch sizes have strict limits.
 5. Shutdown does not force-kill in-process tasks; cancellation remains cooperative.
-6. The runner does not execute from construction and is not started by importing modules.
+6. Construction and module import never execute jobs or start timers.
 
-## Implementation progress\n\n- Initial runner module added at `src/agent/autonomous-execution-runner.js`.\n- Public export added to the root module and package subpath.\n- Focused runner tests added for inert construction, bounded tick processing, idle shutdown wake-up, fail-closed threshold and configuration validation.\n- CI and certification remain pending; implementation is not yet certified.\n\n## Validation plan
+## Implementation progress
 
-- Unit tests: inert construction, invalid config, explicit start, duplicate start, bounded batch, idle wait scheduling, tick concurrency protection, stop during idle and stop during active drain, threshold-triggered fail-closed state, safe event emission.
-- Integration: persistent queue plus supervisor plus runner across queued work; prove normal queued work executes without CI, interrupted jobs remain un-replayed.
+- Initial runner module and public root/package exports are present.
+- Status telemetry now reports the actual queue persistence field and next poll timestamp.
+- Runner event records share the existing sanitized event journal schema; productive ticks are recorded while idle polls are omitted.
+- Focused tests cover inert construction, bounded drains, idle and in-flight shutdown, fail-closed handling, status telemetry, journal events and a real queue/worker/supervisor integration path.
+- Current CI results for the earlier candidate were green. The updated candidate requires a fresh full CI run and native integration certification.
+
+## Validation plan
+
+- Unit tests: inert construction, invalid config, explicit start, duplicate start behavior, bounded batch, idle wait scheduling, tick serialization, stop during idle and active drain, threshold-triggered fail-closed state, sanitized event emission and accurate persistence reporting.
+- Integration: queued work completes through the actual queue, worker and supervisor when the host runner is started; interrupted jobs remain operator-reviewed and are not replayed.
 - Regression: worker, queue, supervisor, runtime, containment and event-journal suites.
 - Certification: Core Validation, Security QA, Security Guard multi-runtime, JB Engines Certification, Linux and Windows native labs.
 
-**Block 12.14 remains incomplete until implementation, focused tests, full required checks and post-merge certification pass on one verified main SHA.**
+**Block 12.14 remains incomplete until focused tests, full required checks and native/post-merge certification pass on one verified main SHA.**
