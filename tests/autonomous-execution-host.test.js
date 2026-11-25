@@ -184,8 +184,9 @@ test("host close waits for active work, closes both durable stores and is idempo
     host.start();
     await started;
     let closed = false;
-    const closing = host.close().then((result) => { closed = true; return result; });
-    assert.equal(host.close(), closing);
+    const closePromise = host.close();
+    const closing = closePromise.then((result) => { closed = true; return result; });
+    assert.equal(host.close(), closePromise);
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.equal(closed, false);
     releaseExecution();
