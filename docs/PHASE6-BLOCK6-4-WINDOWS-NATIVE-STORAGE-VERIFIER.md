@@ -57,7 +57,7 @@ Only drive-letter local paths are accepted. UNC/network paths are rejected. The 
 - The script source is fixed and Base64-encoded as UTF-16LE for -EncodedCommand.
 - Directory and expected SID are passed as environment values, not interpolated into script source or command text.
 - Default timeout is 5 seconds; accepted configuration is 1–15 seconds.
-- Captured output is capped at 64 KiB.
+- The inspector refuses to serialize more than 64 ACEs (it never truncates the DACL); captured output is capped at 64 KiB.
 - Profiles are disabled and execution is non-interactive.
 - Errors are mapped to bounded error codes; stderr and raw system messages are not surfaced in the host diagnostics.
 
