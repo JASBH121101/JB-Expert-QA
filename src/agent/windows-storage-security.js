@@ -33,12 +33,10 @@ function readPlainRecord(value, allowedKeys, label) {
 }
 
 /**
- * Validate an application-supplied Windows token/NTFS ACL attestation.
- *
- * The verifier that creates this report is a trusted deployment integration:
- * it must inspect the effective process token and the complete, effective
- * directory DACL using native Windows security APIs. This function validates
- * the report contract; it does not query or modify Windows ACLs itself.
+ * Validate a Windows token/NTFS ACL report. The native PowerShell adapter
+ * supplies the report for standard LocalService/NetworkService deployments;
+ * a separately reviewed application adapter may supply the same contract.
+ * This function validates the report and never changes Windows ACLs.
  */
 export function validateWindowsStorageSecurityReport(report, options = {}) {
   const config = readPlainRecord(options, new Set(["directory", "expectedServiceSid"]), "validation options");
