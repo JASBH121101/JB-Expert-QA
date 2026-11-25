@@ -187,3 +187,5 @@ export { createContainedLocalProcessEngineRunner, ContainedProcessEngineRunnerEr
 export { createAutonomousExecutionRunner, AutonomousExecutionRunnerError } from "./agent/autonomous-execution-runner.js";
 
 export { createAutonomousExecutionHost, AutonomousExecutionHostError } from "./agent/autonomous-execution-host.js";
+
+export { attachHostSignalLifecycle, HostSignalLifecycleError } from "./agent/autonomous-host-signal-lifecycle.js";
