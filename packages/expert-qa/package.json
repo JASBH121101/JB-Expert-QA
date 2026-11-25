@@ -58,7 +58,8 @@
     "./autonomous-execution-runner": "./src/agent/autonomous-execution-runner.js",
     "./autonomous-execution-host": "./src/agent/autonomous-execution-host.js",
     "./autonomous-host-signal-lifecycle": "./src/agent/autonomous-host-signal-lifecycle.js",
-    "./autonomous-execution-host-service": "./src/agent/autonomous-execution-host-service.js"
+    "./autonomous-execution-host-service": "./src/agent/autonomous-execution-host-service.js",
+    "./autonomous-execution-service-deployment": "./src/agent/autonomous-execution-service-deployment.js"
   },
   "files": [
     "src/**",
