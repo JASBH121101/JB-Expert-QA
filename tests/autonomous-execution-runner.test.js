@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createAutonomousExecutionRunner, AutonomousExecutionRunnerError } from "../src/agent/autonomous-execution-runner.js";
+import { createAutonomousExecutionRunner } from "../src/agent/autonomous-execution-runner.js";
+import { createExecutionEventJournal } from "../src/agent/execution-event-journal.js";
 
-function supervisor({ drain = async () => ({ processed: 0 }), start = () => ({ state: "running" }) } = {}) {
+function supervisor({
+  drain = async () => ({ processed: 0 }),
+  start = () => ({ state: "running" }),
+  persistent = false
+} = {}) {
   let state = "idle";
   let starts = 0;
   let drains = 0;
   return {
     value: {
-      getStatus: () => ({ state, queue: { queued: 0 } }),
+      getStatus: () => ({ supervisorId: "supervisor-runner-test", state, queue: { persistent } }),
       start: () => { starts += 1; state = "running"; return start(); },
       drain: async (options) => { drains += 1; return drain(options); }
     },
@@ -18,17 +23,20 @@ function supervisor({ drain = async () => ({ processed: 0 }), start = () => ({ s
 }
 
 test("runner construction is inert and explicit start begins bounded loop", async () => {
-  const sup = supervisor({ drain: async (options) => ({ processed: options.maxJobs }) });
+  const sup = supervisor({ drain: async (options) => ({ processed: options.maxJobs }), persistent: true });
   const runner = createAutonomousExecutionRunner({ supervisor: sup.value, pollIntervalMs: 100, maxJobsPerTick: 2 });
   assert.equal(runner.getStatus().state, "idle");
   assert.equal(sup.starts, 0);
+  assert.equal(runner.getStatus().queuePersistenceEnabled, true);
   runner.start();
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(sup.starts, 1);
   assert.equal(sup.drains, 1);
   assert.equal(runner.getStatus().processed, 2);
+  assert.equal(typeof runner.getStatus().nextPollAt, "string");
   await runner.stop();
   assert.equal(runner.getStatus().state, "stopped");
+  assert.equal(runner.getStatus().nextPollAt, null);
 });
 
 test("runner stop wakes idle loop and does not hang", async () => {
@@ -41,20 +49,69 @@ test("runner stop wakes idle loop and does not hang", async () => {
   assert.equal(stopped.stopRequested, true);
 });
 
+test("runner waits for an active bounded drain before graceful stop completes", async () => {
+  let release;
+  const sup = supervisor({ drain: () => new Promise((resolve) => { release = resolve; }) });
+  const runner = createAutonomousExecutionRunner({ supervisor: sup.value, pollIntervalMs: 5000 });
+  runner.start();
+  let stopCompleted = false;
+  const stopping = runner.stop().then((value) => { stopCompleted = true; return value; });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(stopCompleted, false);
+  release({ processed: 1 });
+  const result = await stopping;
+  assert.equal(result.state, "stopped");
+  assert.equal(result.processed, 1);
+});
+
 test("runner fail-closes after consecutive drain errors and does not restart", async () => {
-  const sup = supervisor({ drain: async () => { const e = new Error("private"); e.code = "EXPECTED_FAIL"; throw e; } });
-  const runner = createAutonomousExecutionRunner({ supervisor: sup.value, pollIntervalMs: 100, maxConsecutiveErrors: 1 });
+  const sup = supervisor({ drain: async () => { const error = new Error("private"); error.code = "EXPECTED_FAIL"; throw error; } });
+  const journal = createExecutionEventJournal();
+  const runner = createAutonomousExecutionRunner({
+    supervisor: sup.value,
+    eventJournal: journal,
+    pollIntervalMs: 100,
+    maxConsecutiveErrors: 1
+  });
   runner.start();
   await new Promise((resolve) => setTimeout(resolve, 20));
   const status = runner.getStatus();
   assert.equal(status.state, "failed");
   assert.equal(status.lastErrorCode, "EXPECTED_FAIL");
-  assert.throws(() => runner.start(), (e) => e.code === "RUNNER_TERMINAL");
+  assert.throws(() => runner.start(), (error) => error.code === "RUNNER_TERMINAL");
+  assert.ok(journal.listEvents().some((event) => event.eventType === "AUTONOMOUS_RUNNER_FAILED"));
 });
 
-test("runner validates configuration and trusted supervisor methods", () => {
-  assert.throws(() => createAutonomousExecutionRunner({ supervisor: {}, pollIntervalMs: 10 }), (e) => e.code === "INVALID_SUPERVISOR");
+test("runner records lifecycle and productive tick events without journaling idle polls", async () => {
+  const sup = supervisor({ drain: async () => ({ processed: 1 }) });
+  const journal = createExecutionEventJournal();
+  const runner = createAutonomousExecutionRunner({
+    supervisor: sup.value,
+    eventJournal: journal,
+    pollIntervalMs: 5000
+  });
+  runner.start();
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  await runner.stop();
+  const events = journal.listEvents();
+  assert.deepEqual(events.map((event) => event.eventType), [
+    "AUTONOMOUS_RUNNER_STARTED",
+    "AUTONOMOUS_RUNNER_TICK",
+    "AUTONOMOUS_RUNNER_STOPPED"
+  ]);
+  assert.ok(events.every((event) => event.supervisorId === "supervisor-runner-test"));
+  assert.equal(runner.getStatus().eventEmissionFailures, 0);
+});
+
+test("runner validates configuration, dependencies and supervisor lifecycle", () => {
   const sup = supervisor();
-  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, maxJobsPerTick: 101 }), (e) => e.code === "INVALID_BATCH_SIZE");
-  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, maxConsecutiveErrors: 21 }), (e) => e.code === "INVALID_ERROR_THRESHOLD");
+  assert.throws(() => createAutonomousExecutionRunner({ supervisor: {}, pollIntervalMs: 10 }), (error) => error.code === "INVALID_SUPERVISOR");
+  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, maxJobsPerTick: 101 }), (error) => error.code === "INVALID_BATCH_SIZE");
+  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, maxConsecutiveErrors: 21 }), (error) => error.code === "INVALID_ERROR_THRESHOLD");
+  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, pollIntervalMs: 60001 }), (error) => error.code === "INVALID_POLL_INTERVAL");
+  assert.throws(() => createAutonomousExecutionRunner({ supervisor: sup.value, eventJournal: {} }), (error) => error.code === "INVALID_EVENT_JOURNAL");
+  const closed = supervisor();
+  closed.value.getStatus = () => ({ state: "closed", queue: { persistent: false } });
+  const runner = createAutonomousExecutionRunner({ supervisor: closed.value });
+  assert.throws(() => runner.start(), (error) => error.code === "SUPERVISOR_CLOSED");
 });
