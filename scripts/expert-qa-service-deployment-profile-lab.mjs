@@ -90,7 +90,7 @@ async function startupRecordsAsRoot(directory, runPrivileged) {
     await runPrivileged("find", [directory, "-maxdepth", "1", "-type", "f", "-name", "started-*.json", "-print0"]),
     "list private host startup evidence"
   );
-  const paths = listing.stdout.split("\\0").filter(Boolean).sort();
+  const paths = listing.stdout.split("\0").filter(Boolean).sort();
   const records = [];
   for (const filePath of paths) {
     const body = assertCommand(await runPrivileged("cat", [filePath]), "read private host startup evidence");
