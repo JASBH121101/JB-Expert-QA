@@ -22,7 +22,7 @@ Importing the module performs no filesystem writes, starts no worker, installs n
 
 await bootstrap.preflight() checks the application-provided trusted orchestrator before creating the host:
 
-1. The storage path is absolute and non-root. A missing leaf directory may be created with owner-only permissions; existing directories are never silently chmodded.
+1. The storage path is absolute and non-root. On POSIX, a missing leaf directory may be created with owner-only permissions; existing directories are never silently chmodded. On Windows, the state directory must already exist with its protected service-account ACL and is never created by bootstrap.
 2. The directory is not a symbolic link. On POSIX, its canonical path must match, its owner must match the current service UID and group/other permissions must be absent. A private create/write/fsync/delete probe verifies writability.
 3. The engine catalog contains 1–256 unique, correctly namespaced IDs. Discovery calls metadata methods only; it never invokes a runner.
 4. The policy snapshot has a valid ID and execution limits, grants qa:engine-execute, and allowlists at least one action belonging to the registered engine catalog. No new permissions or action types are synthesized.
@@ -68,7 +68,7 @@ The bootstrap relies on the hardened persistent stores already owned by the host
 - execution-jobs.json and execution-events.json use the existing checksummed, atomic persistence implementation.
 - Both stores must hold their exclusive lock files for the lifetime of this host.
 - POSIX storage directory permissions are checked without silently changing an existing directory. The existing store implementation continues to protect its data and lock files.
-- Windows filesystem ACLs are not changed by this Node module. As of Phase 6 Block 6.3, Windows startup requires an application-supplied native token/NTFS ACL verifier and an expected LocalService or NetworkService SID. The bootstrap validates the complete attestation fail-closed and does not create a missing Windows state directory. The verifier remains an application/operator responsibility; see `docs/PHASE6-BLOCK6-3-WINDOWS-STORAGE-ACL-GATE.md`.
+- Windows filesystem ACLs are not changed by this Node module. As of Phase 6 Blocks 6.3–6.4, bootstrap requires an expected LocalService or NetworkService SID and, by default, invokes the built-in read-only `readWindowsStorageSecurityReport()` PowerShell/.NET inspector. A custom trusted native verifier can replace it. The report validator checks process identity, directory owner, protected DACL, approved explicit principals, Modify/Full Control rights, and inheritance to child files/directories. The Windows state directory must already exist; bootstrap never creates or repairs its ACL. Service-account and directory provisioning remain operator responsibilities; see `docs/PHASE6-BLOCK6-3-LOCAL-HOST-PROVISIONING-RUNBOOK.md` and `docs/PHASE6-BLOCK6-4-NATIVE-WINDOWS-ACL-INSPECTION.md`.
 
 A second process cannot pass startup while another process owns the durable locks. The bootstrap does not remove a live lock or ask for elevated permissions to bypass it.
 
