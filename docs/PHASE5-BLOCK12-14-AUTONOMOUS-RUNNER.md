@@ -14,7 +14,7 @@ Close the operational gap between the existing explicitly-driven execution super
 - Handle graceful shutdown: stop admitting runner ticks, wait for in-flight bounded drain, then leave resource closing to the supervisor/host owner.
 - Add an optional maximum consecutive runner error threshold that stops the runner in fail-closed state; never silently restart the QA runtime or replay interrupted jobs.
 - Add bounded and validated configuration; no unbounded drain, auto-retry policy, or automatic recovery of interrupted/running jobs.
-- Add lifecycle event journal records for runner start/stop/tick/failure using existing sanitized event schema.
+- Add lifecycle event journal records for runner start/stop/failure and productive ticks using the existing sanitized event schema. The host may pass the same journal instance to the runner; idle polls are not journaled.
 
 ## Explicit exclusions
 
