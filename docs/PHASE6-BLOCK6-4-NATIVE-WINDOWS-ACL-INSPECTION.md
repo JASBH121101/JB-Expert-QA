@@ -33,4 +33,4 @@ The query confirms the current process SID and directory DACL at preflight/readi
 
 ## Status
 
-Implementation is submitted for CI and review. A passing test suite does not mean a service has been installed or activated.
+**Merged into `main` through PR #299** at commit `cdfc56a66a5202c12359c84f9f0abc6aa9f0c563` on 2026-11-25. The required Core, Security, Security Guard, package-distribution and JB Engines certification workflows completed successfully for the merged PR head. The native query is restricted to the configured LocalService/NetworkService runtime identity; ordinary hosted Windows CI does not run it as either service account. This merge does not provision a production account or DACL and does not install or activate an OS service.
