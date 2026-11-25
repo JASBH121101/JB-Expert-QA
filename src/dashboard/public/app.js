@@ -12,7 +12,9 @@ const state = {
   phase5Events: [],
   phase5EventPagination: null,
   phase5EventLoading: false,
-  phase5EventError: null
+  phase5EventError: null,
+  phase5Host: null,
+  phase5HostLoading: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -733,6 +735,102 @@ async function downloadConsolidatedReport() {
   } catch (error) { showToast(error.message); }
 }
 
+function renderPhase5Host(data) {
+  state.phase5Host = data;
+  const enabled = data?.enabled === true;
+  const currentState = data?.state || "unavailable";
+  const stateTag = $("phase5-host-state");
+  stateTag.textContent = !enabled ? "NOT CONNECTED" : currentState.replace(/-/g, " ").toUpperCase();
+  stateTag.className = "assessment-tag " + (enabled && currentState === "running" ? "pass" :
+    currentState === "failed" ? "fail" : enabled ? "warn" : "");
+
+  $("phase5-host-lifecycle").textContent = enabled ? currentState.toUpperCase() : "Unavailable";
+  $("phase5-host-liveness").textContent = enabled
+    ? (data.liveness?.alive === true ? "ALIVE" : "NOT ALIVE")
+    : "Unavailable";
+  $("phase5-host-readiness").textContent = enabled
+    ? (data.readiness?.ready === true ? "READY" : "NOT READY")
+    : "Not connected";
+  $("phase5-host-preflight").textContent = !enabled ? "Not connected" :
+    data.preflight ? (data.preflight.passed === true ? "PASSED" : "FAILED") : "Not checked";
+
+  const queue = data?.queue;
+  $("phase5-host-queue").textContent = !enabled || !queue ? "No persistent queue status" :
+    "Queued " + queue.queued + " · Running " + queue.running + " · Completed " + queue.completed +
+    " · Failed " + queue.failed + " · Interrupted " + queue.interrupted;
+
+  const message = !enabled
+    ? "No application-owned bootstrap controller is connected. Host execution remains disabled in this dashboard."
+    : data.lastFailureCode
+      ? "Host reports a controlled failure (" + data.lastFailureCode + "). Review diagnostics before recreating the controller."
+      : currentState === "running" && data.readiness?.ready === true
+        ? "Host is running and all readiness checks currently pass."
+        : currentState === "running"
+          ? "Host is running, but one or more readiness checks have not passed."
+          : currentState === "idle"
+            ? "Host is idle. Start is explicit and will run the complete preflight before acquiring persistent locks."
+            : "Host is " + currentState + ". No automatic restart or interrupted-job recovery is performed.";
+  $("phase5-host-message").textContent = message;
+
+  const diagnostics = {
+    preflightChecks: data.preflight?.checks ?? [],
+    readinessChecks: data.readiness?.checks ?? [],
+    recentDiagnostics: data.recentDiagnostics ?? [],
+    recentEvents: data.recentEvents ?? [],
+    lastFailureCode: data.lastFailureCode ?? null
+  };
+  $("phase5-host-diagnostics").textContent = JSON.stringify(diagnostics, null, 2);
+
+  $("phase5-host-start").disabled = !enabled || currentState !== "idle" || state.phase5HostLoading;
+  $("phase5-host-stop").disabled = !enabled || currentState !== "running" || state.phase5HostLoading;
+  $("phase5-host-refresh").disabled = state.phase5HostLoading;
+}
+async function refreshPhase5Host() {
+  if (state.phase5HostLoading) return;
+  state.phase5HostLoading = true;
+  $("phase5-host-refresh").disabled = true;
+  try {
+    const response = await fetch("/api/phase5/host/status", {
+      headers: { "Accept": "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Could not read autonomous host status.");
+    renderPhase5Host(data);
+  } catch (error) {
+    $("phase5-host-state").textContent = "UNAVAILABLE";
+    $("phase5-host-state").className = "assessment-tag";
+    $("phase5-host-message").textContent = error.message || "Could not read autonomous host status.";
+    $("phase5-host-start").disabled = true;
+    $("phase5-host-stop").disabled = true;
+  } finally {
+    state.phase5HostLoading = false;
+    if (state.phase5Host) renderPhase5Host(state.phase5Host);
+    $("phase5-host-refresh").disabled = false;
+  }
+}
+async function operatePhase5Host(operation) {
+  if (state.phase5HostLoading || !["start", "stop"].includes(operation)) return;
+  state.phase5HostLoading = true;
+  renderPhase5Host(state.phase5Host ?? { enabled: false, state: "unavailable" });
+  try {
+    const response = await fetch("/api/phase5/host/" + operation, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: "{}"
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Host lifecycle operation failed.");
+    renderPhase5Host(data);
+    showToast(operation === "start" ? "Autonomous host started." : "Autonomous host stopped gracefully.");
+  } catch (error) {
+    showToast(error.message || "Host lifecycle operation failed.");
+    try { await refreshPhase5Host(); } catch {}
+  } finally {
+    state.phase5HostLoading = false;
+    if (state.phase5Host) renderPhase5Host(state.phase5Host);
+  }
+}
+
 async function refreshHistory() {
   const response = await fetch("/api/history", { headers: { "Accept": "application/json" } });
   const data = await response.json();
@@ -949,6 +1047,9 @@ $("phase4-audit-refresh").addEventListener("click", async () => {
   try { await refreshPhase4Audit(); }
   catch (error) { $("phase4-audit-result").textContent = error.message; }
 });
+$("phase5-host-refresh").addEventListener("click", refreshPhase5Host);
+$("phase5-host-start").addEventListener("click", () => operatePhase5Host("start"));
+$("phase5-host-stop").addEventListener("click", () => operatePhase5Host("stop"));
 $("phase5-events-refresh").addEventListener("click", () => refreshPhase5Events());
 $("phase5-events-load-older").addEventListener("click", loadOlderPhase5Events);
 for (const id of ["phase5-event-type", "phase5-event-engine", "phase5-event-job", "phase5-event-execution"]) {
@@ -962,6 +1063,7 @@ async function initialize() {
     await refreshPhase4Execution();
     await refreshPhase4Audit();
     await refreshPhase5Events();
+    await refreshPhase5Host();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");
