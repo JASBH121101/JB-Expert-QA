@@ -192,7 +192,7 @@ export function createWindowsHostServiceProfile(options = {}) {
   if (!["Automatic", "Manual"].includes(startMode)) {
     throw new AutonomousExecutionServiceDeploymentError("INVALID_START_MODE", "startMode must be Automatic or Manual");
   }
-  const delayedAutoStart = config.delayedAutoStart ?? true;
+  const delayedAutoStart = config.delayedAutoStart ?? (startMode === "Automatic");
   if (typeof delayedAutoStart !== "boolean" || (startMode === "Manual" && delayedAutoStart)) {
     throw new AutonomousExecutionServiceDeploymentError("INVALID_DELAYED_START", "delayedAutoStart must be boolean and cannot be enabled for Manual start mode");
   }
