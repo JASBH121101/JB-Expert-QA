@@ -106,12 +106,14 @@ async function certifySystemd() {
     assertCommand(await command("sudo", ["-n", executable, ...args], timeout), label);
 
   const fixture = [
-    'import { writeFileSync } from "node:fs";',
+    'import { existsSync, writeFileSync } from "node:fs";',
     'import { join } from "node:path";',
     'const storage = process.env.JB_EXPERT_QA_STORAGE_DIRECTORY;',
     'if (!storage) throw new Error("missing host storage directory");',
-    'const record = { pid: process.pid, uid: process.getuid(), storage, node: process.version };',
+    'const failing = existsSync(join(storage, "fail-on-start"));',
+    'const record = { pid: process.pid, uid: process.getuid(), storage, node: process.version, failing }',
     'writeFileSync(join(storage, "started-" + process.pid + ".json"), JSON.stringify(record));',
+    "if (failing) process.exit(23);",
     'function close(signal) {',
     '  writeFileSync(join(storage, "shutdown-" + process.pid + ".txt"), signal);',
     '  process.exit(0);',
@@ -159,12 +161,13 @@ async function certifySystemd() {
     writeFileSync(profileSource, profile.content, { mode: 0o600 });
     const verify = await command("systemd-analyze", ["verify", profileSource], 20_000);
     assertCommand(verify, "systemd-analyze verify generated unit");
-    const security = await command("systemd-analyze", ["security", "--no-pager", profileSource], 20_000);
     assertCommand(security, "systemd-analyze security generated unit");
     assertCommand(await privileged("install", ["-m", "0644", profileSource, "/run/systemd/system/" + unitName]),
       "install disposable generated systemd unit");
     unitInstalled = true;
     assertCommand(await privileged("systemctl", ["daemon-reload"]), "systemd daemon-reload");
+    const security = await command("systemd-analyze", ["security", "--no-pager", unitName], 20_000);
+    assertCommand(security, "systemd-analyze security generated unit");
     assertCommand(await privileged("systemctl", ["enable", unitName]), "enable generated systemd unit");
     unitEnabled = true;
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit is enabled");
@@ -195,6 +198,17 @@ async function certifySystemd() {
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "SIGTERM graceful shutdown marker after systemd stop");
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit remains configured for boot start");
 
+    assertCommand(await privileged("install", ["-o", serviceUser, "-g", serviceUser, "-m", "0600", "/dev/null", join(storageDirectory, "fail-on-start")]),
+      "enable intentional disposable failure fixture");
+    await command("sudo", ["-n", "systemctl", "start", unitName], 20_000);
+    await waitFor(async () => {
+      const active = await privileged("systemctl", ["show", "--property=ActiveState", "--value", unitName]);
+      return active.stdout.trim() === "failed";
+    }, "systemd generated start-limit exhaustion", 25_000);
+    const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
+    assert(failedAttempts.length === profile.restartLimit.burst, "systemd start-limit burst was not enforced exactly");
+    await privileged("systemctl", ["reset-failed", unitName]);
+
     return {
       platform: "linux-systemd",
       systemdVersion: version.stdout.split("\n")[0].trim(),
@@ -212,6 +226,8 @@ async function certifySystemd() {
       pidBefore: firstPid,
       pidAfter: secondPid,
       finalState: "inactive",
+      restartLimitAttempts: failedAttempts.length,
+      restartLimitEnforced: true,
       interruptedJobReplay: false
     };
   } finally {
@@ -253,8 +269,8 @@ async function certifyWindowsScm() {
   const storageDirectory = join(serviceRoot, "state");
   const logDirectory = join(serviceRoot, "logs");
   const wrapperDirectory = mkdtempSync(join(tmpdir(), "jbqa-winsw-profile-"));
-  const wrapperPath = join(wrapperDirectory, serviceId + ".exe");
-  const wrapperConfig = join(wrapperDirectory, serviceId + ".xml");
+  const wrapperPath = join(appDirectory, serviceId + ".exe");
+  const wrapperConfig = join(appDirectory, serviceId + ".xml");
   let installed = false;
   let wrapper = null;
   let firstPid = null;
@@ -269,15 +285,17 @@ async function certifyWindowsScm() {
   };
 
   const fixture = [
-    'import { writeFileSync } from "node:fs";',
+    'import { existsSync, writeFileSync } from "node:fs";',
     'import { execFileSync } from "node:child_process";',
     'import { join } from "node:path";',
     'const storage = process.env.JB_EXPERT_QA_STORAGE_DIRECTORY;',
     'if (!storage) throw new Error("missing host storage directory");',
     'const whoami = join(process.env.SystemRoot, "System32", "whoami.exe");',
     'const account = execFileSync(whoami, [], { encoding: "utf8" }).trim();',
-    'const record = { pid: process.pid, account, storage, node: process.version };',
+    'const failing = existsSync(join(storage, "fail-on-start"));',
+    'const record = { pid: process.pid, account, storage, node: process.version, failing }',
     'writeFileSync(join(storage, "started-" + process.pid + ".json"), JSON.stringify(record));',
+    "if (failing) process.exit(23);",
     'function close(signal) {',
     '  writeFileSync(join(storage, "shutdown-" + process.pid + ".txt"), signal);',
     '  process.exit(0);',
@@ -292,11 +310,13 @@ async function certifyWindowsScm() {
     mkdirSync(appDirectory, { recursive: true });
     mkdirSync(storageDirectory, { recursive: true });
     mkdirSync(logDirectory, { recursive: true });
-    icacls(appDirectory, "(RX)");
-    icacls(storageDirectory, "(M)");
-    icacls(logDirectory, "(M)");
+    icacls(serviceRoot, "(OI)(CI)(RX)");
+    icacls(appDirectory, "(OI)(CI)(RX)");
+    icacls(storageDirectory, "(OI)(CI)(M)");
+    icacls(logDirectory, "(OI)(CI)(M)");
 
     wrapper = await downloadVerifiedWinSw(wrapperDirectory);
+    writeFileSync(wrapperPath, readFileSync(wrapper.path), { mode: 0o700 });
     const profile = createWindowsHostServiceProfile({
       serviceId,
       displayName: "JB Expert QA generated profile CI lab",
@@ -309,11 +329,10 @@ async function certifyWindowsScm() {
       logDirectory,
       startMode: "Manual",
       delayedAutoStart: false,
-      restartDelaysSeconds: [5, 10],
+      restartDelaysSeconds: [1, 2],
       stopTimeoutSeconds: 45
     });
     assert(profile.serviceAccount === "LocalService", "Windows profile did not select LocalService");
-    writeFileSync(wrapperPath, readFileSync(wrapper.path), { mode: 0o700 });
     writeFileSync(wrapperConfig, profile.content, { mode: 0o600 });
     writeFileSync(join(appDirectory, "host.mjs"), fixture, { mode: 0o644 });
 
@@ -331,31 +350,46 @@ async function certifyWindowsScm() {
     assert(first.storage === storageDirectory, "WinSW profile did not pass the configured storage directory");
     assert(/^nt authority\\local service$/iu.test(first.account), "WinSW host did not run as NT AUTHORITY\\LocalService: " + first.account);
 
-    const queryBefore = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service before restart");
-    const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
+    const queryBefore = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service before SCM restart");
+    const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\\s*:\\s*(\\d+)/iu)?.[1]);
     assert(Number.isSafeInteger(wrapperPidBefore) && wrapperPidBefore > 1, "Windows service wrapper PID was not available");
 
-    assertCommand(await command(wrapperPath, ["restart"]), "WinSW restart generated service profile");
-    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + firstPid + ".txt")), "Ctrl+C graceful shutdown marker after WinSW restart");
+    assertCommand(await command("sc.exe", ["stop", serviceId]), "stop generated Windows service through SCM");
+    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + firstPid + ".txt")), "Ctrl+C graceful shutdown marker after SCM stop");
+    await waitFor(async () => {
+      const current = await command("sc.exe", ["query", serviceId]);
+      return /STATE\\s*:\\s*\\d+\\s+STOPPED/iu.test(current.stdout);
+    }, "Windows SCM stop before restart");
+    assertCommand(await command("sc.exe", ["start", serviceId]), "restart generated Windows service through SCM");
     const secondFile = await waitFor(() => {
       const found = startupFiles(storageDirectory);
       return found.find(item => readJson(item).pid !== firstPid) ?? null;
     }, "second WinSW host process start");
     const second = readJson(secondFile);
     secondPid = second.pid;
-    assert(secondPid !== firstPid, "WinSW restart did not replace the host process");
-    assert(/^nt authority\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
+    assert(secondPid !== firstPid, "SCM restart did not replace the host process");
+    assert(/^nt authority\\\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
 
-    const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after restart");
-    const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
+    const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after SCM restart");
+    const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\\s*:\\s*(\\d+)/iu)?.[1]);
     assert(Number.isSafeInteger(wrapperPidAfter) && wrapperPidAfter > 1, "Windows service wrapper PID after restart was not available");
-    assert(wrapperPidAfter !== wrapperPidBefore, "WinSW restart did not replace its wrapper process");
+    assert(wrapperPidAfter !== wrapperPidBefore, "SCM restart did not replace the WinSW wrapper process");
 
+    assertCommand(await command("sc.exe", ["stop", serviceId]), "stop generated Windows service through SCM");
+    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after SCM stop");
     assertCommand(await command(wrapperPath, ["stop"]), "WinSW stop generated service profile");
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after WinSW stop");
     const stopped = await command("sc.exe", ["queryex", serviceId]);
     assert(stopped.exitCode !== 0 || /STATE\\s*:\\s*\d+\\s+STOPPED/iu.test(stopped.stdout),
       "Windows SCM did not report the generated service as STOPPED");
+    writeFileSync(join(storageDirectory, "fail-on-start"), "1", { mode: 0o600 });
+    assertCommand(await command("sc.exe", ["start", serviceId]), "start intentionally failing WinSW profile fixture");
+    await waitFor(async () => {
+      const current = await command("sc.exe", ["query", serviceId]);
+      return /STATE\\s*:\\s*\\d+\\s+STOPPED/iu.test(current.stdout);
+    }, "WinSW generated failure-action exhaustion", 30_000);
+    const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
+    assert(failedAttempts.length === profile.restartDelaysSeconds.length + 1, "WinSW generated failure-action sequence was not enforced exactly");
     assertCommand(await command(wrapperPath, ["uninstall"]), "WinSW uninstall disposable generated service");
     installed = false;
 
@@ -378,6 +412,8 @@ async function certifyWindowsScm() {
       wrapperPidAfter,
       finalState: "stopped",
       serviceUninstalled: true,
+      restartLimitAttempts: failedAttempts.length,
+      restartLimitEnforced: true,
       interruptedJobReplay: false
     };
   } finally {
