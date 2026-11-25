@@ -85,6 +85,27 @@ function startupFiles(directory) {
     .map(name => join(directory, name));
 }
 
+async function startupRecordsAsRoot(directory, runPrivileged) {
+  const listing = assertCommand(
+    await runPrivileged("find", [directory, "-maxdepth", "1", "-type", "f", "-name", "started-*.json", "-print0"]),
+    "list private host startup evidence"
+  );
+  const paths = listing.stdout.split("\\0").filter(Boolean).sort();
+  const records = [];
+  for (const filePath of paths) {
+    const body = assertCommand(await runPrivileged("cat", [filePath]), "read private host startup evidence");
+    records.push(JSON.parse(body.stdout));
+  }
+  return records;
+}
+
+async function privateFileExistsAsRoot(filePath) {
+  const result = await command("sudo", ["-n", "test", "-f", filePath], 10_000);
+  if (result.exitCode === 0) return true;
+  if (result.exitCode === 1) return false;
+  throw new Error("Could not inspect private host shutdown marker (exit " + result.exitCode + ")");
+}
+
 async function certifySystemd() {
   const suffix = String(process.env.GITHUB_RUN_ID ?? process.pid).replace(/[^0-9]/gu, "").slice(-12) || String(process.pid);
   const serviceId = "jbqa-profile-lab-" + suffix;
@@ -173,11 +194,10 @@ async function certifySystemd() {
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit is enabled");
     assertCommand(await privileged("systemctl", ["start", unitName]), "start generated systemd unit");
 
-    const firstFile = await waitFor(() => {
-      const found = startupFiles(storageDirectory);
+    const first = await waitFor(async () => {
+      const found = await startupRecordsAsRoot(storageDirectory, privileged);
       return found.length >= 1 ? found[0] : null;
     }, "first systemd host process start");
-    const first = readJson(firstFile);
     firstPid = first.pid;
     assert(first.uid > 0, "systemd profile ran the host fixture as root");
     const expectedUidResult = assertCommand(await command("id", ["-u", serviceUser]), "resolve disposable systemd service UID");
@@ -187,18 +207,17 @@ async function certifySystemd() {
     assertCommand(await privileged("systemctl", ["is-active", "--quiet", unitName]), "verify generated systemd service is active");
 
     assertCommand(await privileged("systemctl", ["restart", unitName]), "restart generated systemd unit");
-    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + firstPid + ".txt")), "SIGTERM graceful shutdown marker after systemd restart");
-    const secondFile = await waitFor(() => {
-      const found = startupFiles(storageDirectory);
-      return found.find(item => readJson(item).pid !== firstPid) ?? null;
+    await waitFor(() => privateFileExistsAsRoot(join(storageDirectory, "shutdown-" + firstPid + ".txt")), "SIGTERM graceful shutdown marker after systemd restart");
+    const second = await waitFor(async () => {
+      const found = await startupRecordsAsRoot(storageDirectory, privileged);
+      return found.find(item => item.pid !== firstPid) ?? null;
     }, "second systemd host process start");
-    const second = readJson(secondFile);
     secondPid = second.pid;
     assert(secondPid !== firstPid, "systemd restart did not replace the host process");
     assertCommand(await privileged("systemctl", ["is-active", "--quiet", unitName]), "verify systemd service active after restart");
 
     assertCommand(await privileged("systemctl", ["stop", unitName]), "stop generated systemd unit");
-    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "SIGTERM graceful shutdown marker after systemd stop");
+    await waitFor(() => privateFileExistsAsRoot(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "SIGTERM graceful shutdown marker after systemd stop");
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit remains configured for boot start");
 
     await privileged("systemctl", ["reset-failed", unitName]);
@@ -209,7 +228,7 @@ async function certifySystemd() {
       const active = await privileged("systemctl", ["show", "--property=ActiveState", "--value", unitName]);
       return active.stdout.trim() === "failed";
     }, "systemd generated start-limit exhaustion", 25_000);
-    const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
+    const failedAttempts = (await startupRecordsAsRoot(storageDirectory, privileged)).filter(item => item.failing);
     assert(failedAttempts.length === profile.restartLimit.burst, "systemd start-limit burst was not enforced exactly");
     await privileged("systemctl", ["reset-failed", unitName]);
 
