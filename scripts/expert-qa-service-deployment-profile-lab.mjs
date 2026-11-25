@@ -97,7 +97,6 @@ async function certifySystemd() {
   let appCreated = false;
   let storageCreated = false;
   let unitInstalled = false;
-  let unitEnabled = false;
   let firstPid = null;
   let secondPid = null;
 
@@ -140,6 +139,10 @@ async function certifySystemd() {
     assertCommand(await privileged("install", ["-o", "root", "-g", "root", "-m", "0644", fixtureSource, join(appDirectory, "host.mjs")]),
       "install disposable Node.js host fixture");
 
+    const stateStat = assertCommand(await command("stat", ["-c", "%U:%G:%a", storageDirectory]), "inspect systemd state directory permissions");
+    assert(stateStat.stdout.trim() === serviceUser + ":" + serviceUser + ":700", "systemd state directory is not restricted to the service account");
+    const appStat = assertCommand(await command("stat", ["-c", "%U:%G:%a", appDirectory]), "inspect systemd application directory permissions");
+    assert(appStat.stdout.trim() === "root:root:755", "systemd application directory is not root-owned and read-only to the service identity");
     const profile = createSystemdHostServiceProfile({
       unitName,
       description: "JB Expert QA generated profile CI validation",
@@ -167,7 +170,6 @@ async function certifySystemd() {
     const security = await command("systemd-analyze", ["security", "--no-pager", unitName], 20_000);
     assertCommand(security, "systemd-analyze security generated unit");
     assertCommand(await privileged("systemctl", ["enable", unitName]), "enable generated systemd unit");
-    unitEnabled = true;
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit is enabled");
     assertCommand(await privileged("systemctl", ["start", unitName]), "start generated systemd unit");
 
@@ -178,6 +180,9 @@ async function certifySystemd() {
     const first = readJson(firstFile);
     firstPid = first.pid;
     assert(first.uid > 0, "systemd profile ran the host fixture as root");
+    const expectedUidResult = assertCommand(await command("id", ["-u", serviceUser]), "resolve disposable systemd service UID");
+    const expectedUid = Number(expectedUidResult.stdout.trim());
+    assert(first.uid === expectedUid, "systemd process UID did not match the configured service user");
     assert(first.storage === storageDirectory, "systemd profile did not pass the configured storage directory");
     assertCommand(await privileged("systemctl", ["is-active", "--quiet", unitName]), "verify generated systemd service is active");
 
@@ -216,6 +221,9 @@ async function certifySystemd() {
       serviceGroup: serviceUser,
       storageDirectory,
       profileSha256: createHash("sha256").update(profile.content).digest("hex"),
+      stateDirectoryPermissions: stateStat.stdout.trim(),
+      applicationDirectoryPermissions: appStat.stdout.trim(),
+      effectiveUid: expectedUid,
       systemdAnalyzeVerify: "passed",
       systemdAnalyzeSecurity: "passed",
       enabledState: "enabled",
@@ -232,7 +240,7 @@ async function certifySystemd() {
   } finally {
     if (unitInstalled) {
       await privileged("systemctl", ["stop", unitName]).catch(() => {});
-      if (unitEnabled) await privileged("systemctl", ["disable", unitName]).catch(() => {});
+      await privileged("systemctl", ["disable", unitName]).catch(() => {});
       await privileged("rm", ["-f", "/etc/systemd/system/" + unitName]).catch(() => {});
       await privileged("systemctl", ["daemon-reload"]).catch(() => {});
     }
@@ -314,6 +322,12 @@ async function certifyWindowsScm() {
     icacls(appDirectory, "(OI)(CI)(RX)");
     icacls(storageDirectory, "(OI)(CI)(M)");
     icacls(logDirectory, "(OI)(CI)(M)");
+    const appAcl = assertCommand(await command("icacls.exe", [appDirectory]), "verify Windows application directory ACL");
+    assert(/LOCAL SERVICE.*RX/iu.test(appAcl.stdout), "LocalService does not have read/execute access to the application directory");
+    const storageAcl = assertCommand(await command("icacls.exe", [storageDirectory]), "verify Windows state directory ACL");
+    assert(/LOCAL SERVICE.*M/iu.test(storageAcl.stdout), "LocalService does not have modify access to the state directory");
+    const logAcl = assertCommand(await command("icacls.exe", [logDirectory]), "verify Windows log directory ACL");
+    assert(/LOCAL SERVICE.*M/iu.test(logAcl.stdout), "LocalService does not have modify access to the log directory");
 
     wrapper = await downloadVerifiedWinSw(wrapperDirectory);
     writeFileSync(wrapperPath, readFileSync(wrapper.path), { mode: 0o700 });
@@ -407,6 +421,9 @@ async function certifyWindowsScm() {
       wrapperSizeBytes: wrapper.sizeBytes,
       serviceId,
       serviceAccount: first.account,
+      applicationAcl: "LocalService read/execute",
+      stateAcl: "LocalService modify",
+      logAcl: "LocalService modify",
       storageDirectory,
       profileSha256: createHash("sha256").update(profile.content).digest("hex"),
       startup: "passed",
