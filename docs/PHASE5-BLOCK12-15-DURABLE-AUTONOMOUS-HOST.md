@@ -13,7 +13,8 @@ import {
   createQaEngineOrchestrator
 } from "@jb/expert-qa";
 
-const registry = createQaEngineRegistry({ adapters: trustedAdapters });
+const registry = createQaEngineRegistry();
+for (const adapter of trustedAdapters) registry.register(adapter);
 registry.seal();
 
 const orchestrator = createQaEngineOrchestrator({
