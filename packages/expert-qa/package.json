@@ -56,7 +56,8 @@
     "./contained-process-runner": "./src/agent/contained-process-runner.js",
     "./execution-event-journal-persistence": "./src/agent/execution-event-journal-persistence.js",
     "./autonomous-execution-runner": "./src/agent/autonomous-execution-runner.js",
-    "./autonomous-execution-host": "./src/agent/autonomous-execution-host.js"
+    "./autonomous-execution-host": "./src/agent/autonomous-execution-host.js",
+    "./autonomous-host-signal-lifecycle": "./src/agent/autonomous-host-signal-lifecycle.js"
   },
   "files": [
     "src/**",
