@@ -40,7 +40,8 @@
     "qa:local": "node scripts/local-certification.mjs --profile=core",
     "qa:local:full": "node scripts/local-certification.mjs --profile=full",
     "test:dashboard": "node --test tests/dashboard.test.js tests/dashboard-analytics.test.js",
-    "test:api-testing": "npm --workspace @jb/api-testing-engine run check"
+    "test:api-testing": "npm --workspace @jb/api-testing-engine run check",
+    "test:autonomous-host-operations": "node --test tests/autonomous-execution-host-operations.test.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
