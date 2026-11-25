@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAutonomousExecutionHost } from "../src/agent/autonomous-execution-host.js";
 import { createPersistentExecutionJobQueue } from "../src/agent/execution-job-persistence.js";
-import { createPersistentExecutionEventJournal } from "../src/agent/execution-event-journal-persistence.js";
 
 const PLAN = Object.freeze({
   id: "host-test-plan",
@@ -192,7 +191,7 @@ test("host close waits for active work, closes both durable stores and is idempo
     releaseExecution();
     const result = await closing;
     assert.equal(result.state, "closed");
-    assert.equal(host.getJob("host-close-job").state, "completed");
+    assert.equal(result.queue.completed, 1);
 
     const reopened = createAutonomousExecutionHost({
       orchestrator: makeOrchestrator(),
