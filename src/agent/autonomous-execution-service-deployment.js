@@ -204,7 +204,6 @@ export function createWindowsHostServiceProfile(options = {}) {
   if (!["LocalService", "NetworkService"].includes(serviceAccount)) {
     throw new AutonomousExecutionServiceDeploymentError("INVALID_SERVICE_ACCOUNT", "serviceAccount must be LocalService or NetworkService");
   }
-  const serviceAccountName = "NT AUTHORITY\\" + serviceAccount;
   const nodeExecutable = validateWindowsPath(config.nodeExecutable, "nodeExecutable");
   const entryPoint = validateWindowsPath(config.entryPoint, "entryPoint");
   const workingDirectory = validateWindowsPath(config.workingDirectory, "workingDirectory");
