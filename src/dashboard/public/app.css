@@ -224,3 +224,29 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.035em; } .panel-index { borde
   .phase5-event-head { align-items:flex-start; flex-direction:column; }
   .phase5-event-pagination { align-items:flex-start; }
 }
+
+.phase5-host-panel { margin-top:16px; padding:22px; }
+.phase5-host-heading { align-items:flex-start; }
+.phase5-host-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:18px; }
+.phase5-host-metric { min-width:0; padding:13px; border:1px solid var(--line); border-radius:10px; background:#0f1725; }
+.phase5-host-metric span { display:block; color:var(--faint); font-size:8px; font-weight:800; letter-spacing:.1em; }
+.phase5-host-metric strong { display:block; margin-top:9px; color:var(--text); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.phase5-host-metric-wide { grid-column:span 2; }
+.phase5-host-footer { align-items:center; }
+.phase5-host-footer p { max-width:560px; }
+.phase5-host-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.phase5-host-actions .primary-button { min-height:38px; }
+.phase5-host-diagnostics { margin-top:15px; padding:12px; border:1px solid var(--line); border-radius:9px; background:#0c1421; }
+.phase5-host-diagnostics summary { color:#a99fff; cursor:pointer; font-size:9px; font-weight:700; }
+.phase5-host-diagnostics pre { max-height:300px; overflow:auto; margin:10px 0 0; color:#c8d5ea; font:9px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:900px) { .phase5-host-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:640px) {
+  .phase5-host-panel { padding:16px; }
+  .phase5-host-heading { flex-direction:column; }
+  .phase5-host-heading .history-actions { width:100%; justify-content:space-between; }
+  .phase5-host-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .phase5-host-metric-wide { grid-column:1/-1; }
+  .phase5-host-footer { align-items:stretch; }
+  .phase5-host-actions { display:grid; grid-template-columns:1fr 1fr; }
+  .phase5-host-actions button { width:100%; }
+}
