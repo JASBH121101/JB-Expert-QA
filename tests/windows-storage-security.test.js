@@ -132,3 +132,20 @@ test("Windows storage attestation requires a supported service identity and dens
   });
   assert.throws(() => validate(sparse), error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID");
 });
+
+test("Windows storage attestation rejects accessor-backed ACE slots without invoking getters", () => {
+  let invoked = false;
+  const entries = new Array(1);
+  Object.defineProperty(entries, "0", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false };
+    }
+  });
+  assert.throws(
+    () => validate(validReport({ accessEntries: entries })),
+    error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
+  );
+  assert.equal(invoked, false);
+});
