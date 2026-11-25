@@ -32,7 +32,7 @@ This block prepares the operator to provision a dedicated local JB Expert QA aut
 1. Use a dedicated standard service identity; do not use an interactive personal account or LocalSystem.
 2. Keep application files in an administrator-managed directory outside user profiles. Runtime identity has read/execute only.
 3. Create a separate state directory and configure NTFS ACLs so only the service identity and administrators have access. Verify inherited broad permissions are removed.
-4. **Current limitation:** bootstrap does not verify Windows ACL ownership/permissions. A successful bootstrap is not proof that ACLs are secure. Manual ACL inspection is required; automated ACL verification must be implemented and tested before unattended activation is certified.
+4. Configure `expectedWindowsServiceSid` to match the service identity (`S-1-5-19` for LocalService or `S-1-5-20` for NetworkService). Block 6.4 adds a read-only PowerShell verifier that checks the active process SID, directory owner, protected DACL, approved explicit principals, required Modify/Full Control grants, and inheritance to child files/directories. The verifier does not change ACLs; the operator must provision the protected DACL before startup. Query or policy failures block preflight.
 5. If using WinSW, obtain the wrapper from an official source and verify its signature/hash against the vendor release. Review XML and account settings before installation.
 6. Do not install, enable, or start a Windows service until the PR and host readiness checklist are approved.
 
@@ -59,7 +59,7 @@ Record locally (do not commit private paths, usernames, secrets, or hostnames):
 - [ ] Runtime identity is dedicated, non-admin, and verified.
 - [ ] Application files are read-only to runtime identity.
 - [ ] State path is private, non-symlink, and write-probe verified.
-- [ ] On Windows, ACLs manually verified (automated ACL verification remains a release blocker for unattended use).
+- [ ] On Windows, the state directory is pre-provisioned with a protected DACL for the configured service SID, SYSTEM, and Administrators; host preflight confirms the identity, owner, access grants, and child inheritance.
 - [ ] Dashboard is loopback-only; no public network binding.
 - [ ] Human approval gate wired and tested; approvals never automatic.
 - [ ] Engine allowlist and policy limits reviewed.
