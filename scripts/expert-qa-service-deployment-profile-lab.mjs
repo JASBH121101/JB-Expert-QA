@@ -167,7 +167,6 @@ async function certifySystemd() {
     assertCommand(await privileged("systemctl", ["daemon-reload"]), "systemd daemon-reload");
     const security = await command("systemd-analyze", ["security", "--no-pager", unitName], 20_000);
     assertCommand(security, "systemd-analyze security generated unit");
-    assertCommand(security, "systemd-analyze security generated unit");
     assertCommand(await privileged("systemctl", ["enable", unitName]), "enable generated systemd unit");
     unitEnabled = true;
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit is enabled");
@@ -377,7 +376,6 @@ async function certifyWindowsScm() {
 
     assertCommand(await command("sc.exe", ["stop", serviceId]), "stop generated Windows service through SCM");
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after SCM stop");
-    await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after WinSW stop");
     const stopped = await command("sc.exe", ["queryex", serviceId]);
     assert(stopped.exitCode !== 0 || /STATE\s*:\s*\d+\s+STOPPED/iu.test(stopped.stdout),
       "Windows SCM did not report the generated service as STOPPED");
@@ -385,7 +383,9 @@ async function certifyWindowsScm() {
     await command("sc.exe", ["start", serviceId]);
     await waitFor(async () => {
       const current = await command("sc.exe", ["query", serviceId]);
-      return /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
+      const failedCount = startupFiles(storageDirectory).map(readJson).filter(item => item.failing).length;
+      return failedCount === profile.restartDelaysSeconds.length + 1 &&
+        /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
     }, "WinSW generated failure-action exhaustion", 30_000);
     const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
     assert(failedAttempts.length === profile.restartDelaysSeconds.length + 1, "WinSW generated failure-action sequence was not enforced exactly");
