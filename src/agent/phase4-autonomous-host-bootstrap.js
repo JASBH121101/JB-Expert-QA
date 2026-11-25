@@ -9,7 +9,6 @@ import { registerPerformanceQaEngine } from "../engine-registry/adapters/perform
 import { registerVisualQaEngine } from "../engine-registry/adapters/visual-qa.js";
 import { registerReportCertificationEngine } from "../engine-registry/adapters/report-certification.js";
 import { createAutonomousExecutionHostBootstrap } from "./autonomous-execution-host-bootstrap.js";
-import { readWindowsStorageSecurityReport } from "./windows-storage-security-native.js";
 
 export class Phase4AutonomousHostIntegrationError extends Error {
   constructor(code, message) {
@@ -148,7 +147,9 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
     ...(config.hostOptions === undefined ? {} : { hostOptions: config.hostOptions }),
     ...(config.onDiagnostic === undefined ? {} : { onDiagnostic: config.onDiagnostic }),
     ...(config.expectedWindowsServiceSid === undefined ? {} : {
-      windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier ?? readWindowsStorageSecurityReport,
+      ...(config.windowsStorageSecurityVerifier === undefined ? {} : {
+        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier
+      }),
       expectedWindowsServiceSid: config.expectedWindowsServiceSid
     })
   });
