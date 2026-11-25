@@ -17,6 +17,24 @@ function makePolicy() {
     limits: { maxActions: 3, maxExecutionMs: 20000, maxActionMs: 10000, approvalTimeoutMs: 5000, maxInputBytes: 4096, maxOutputBytes: 16384 }
   };
 }
+function windowsStorageSecurityTestOptions() {
+  if (process.platform !== "win32") return {};
+  return {
+    expectedWindowsServiceSid: "S-1-5-19",
+    windowsStorageSecurityVerifier: ({ directory, expectedServiceSid }) => ({
+      directory,
+      processIdentitySid: expectedServiceSid,
+      ownerSid: expectedServiceSid,
+      daclProtected: true,
+      accessEntries: [
+        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+      ]
+    })
+  };
+}
+
 function options(storageDirectory, extra = {}) {
   return {
     storageDirectory,
@@ -26,6 +44,7 @@ function options(storageDirectory, extra = {}) {
     policy: makePolicy(),
     requestApproval: async request => ({ approved: true, approvalId: "lab-approval-" + request.executionId }),
     hostOptions: { pollIntervalMs: 100 },
+    ...windowsStorageSecurityTestOptions(),
     ...extra
   };
 }
