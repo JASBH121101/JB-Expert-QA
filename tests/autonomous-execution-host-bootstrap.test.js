@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
 import {
   chmod,
   mkdtemp,
@@ -162,6 +163,25 @@ test("bootstrap starts only after preflight, owns both persistent locks and repo
   });
 });
 
+test("external SIGTERM updates bootstrap liveness and readiness after graceful service close", async () => {
+  await withTempDir(async storageDirectory => {
+    const { orchestrator } = makeOrchestrator();
+    const signalSource = new EventEmitter();
+    const bootstrap = createAutonomousExecutionHostBootstrap(options(orchestrator, storageDirectory, signalSource));
+    await bootstrap.start();
+    assert.equal(bootstrap.getLiveness().alive, true);
+    signalSource.emit("SIGTERM");
+    await waitFor(() => bootstrap.getLiveness().alive === false);
+    const status = await bootstrap.getStatus();
+    assert.equal(status.state, "closed");
+    assert.equal(status.liveness.status, "not_alive");
+    assert.equal(status.readiness.ready, false);
+    assert.equal(signalSource.listenerCount("SIGINT"), 0);
+    assert.equal(signalSource.listenerCount("SIGTERM"), 0);
+    await bootstrap.stop();
+  });
+});
+
 test("diagnostics expose bounded event metadata but never job IDs, payloads, paths or event messages", async () => {
   await withTempDir(async storageDirectory => {
     const { orchestrator } = makeOrchestrator();
@@ -216,6 +236,8 @@ test("invalid policy permission fails preflight without installing signal handle
     assert.equal(signalSource.listenerCount("SIGINT"), 0);
     assert.equal(signalSource.listenerCount("SIGTERM"), 0);
     assert.equal(bootstrap.getLiveness().status, "not_alive");
+    assert.equal(existsSync(join(storageDirectory, "execution-jobs.json.lock")), false);
+    assert.equal(existsSync(join(storageDirectory, "execution-events.json.lock")), false);
   });
 });
 
