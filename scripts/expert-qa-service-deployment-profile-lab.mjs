@@ -368,7 +368,7 @@ async function certifyWindowsScm() {
     const second = readJson(secondFile);
     secondPid = second.pid;
     assert(secondPid !== firstPid, "SCM restart did not replace the host process");
-    assert(/^nt authority\\\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
+    assert(/^nt authority\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
 
     const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after SCM restart");
     const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
@@ -379,10 +379,10 @@ async function certifyWindowsScm() {
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after SCM stop");
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after WinSW stop");
     const stopped = await command("sc.exe", ["queryex", serviceId]);
-    assert(stopped.exitCode !== 0 || /STATE\\s*:\\s*\d+\\s+STOPPED/iu.test(stopped.stdout),
+    assert(stopped.exitCode !== 0 || /STATE\s*:\s*\d+\s+STOPPED/iu.test(stopped.stdout),
       "Windows SCM did not report the generated service as STOPPED");
     writeFileSync(join(storageDirectory, "fail-on-start"), "1", { mode: 0o600 });
-    assertCommand(await command("sc.exe", ["start", serviceId]), "start intentionally failing WinSW profile fixture");
+    await command("sc.exe", ["start", serviceId]);
     await waitFor(async () => {
       const current = await command("sc.exe", ["query", serviceId]);
       return /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
