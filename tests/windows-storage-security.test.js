@@ -65,7 +65,7 @@ test("Windows storage attestation rejects inherited, unprotected and deny ACEs",
   assert.throws(
     () => validate(validReport({
       accessEntries: [
-        { sid: SERVICE_SID, type: "allow", access: "modify", inherited: true }
+        { sid: SERVICE_SID, type: "allow", access: "modify", inherited: true, containerInherit: true, objectInherit: true, inheritOnly: false }
       ]
     })),
     error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
@@ -73,7 +73,7 @@ test("Windows storage attestation rejects inherited, unprotected and deny ACEs",
   assert.throws(
     () => validate(validReport({
       accessEntries: [
-        { sid: SERVICE_SID, type: "deny", access: "modify", inherited: false }
+        { sid: SERVICE_SID, type: "deny", access: "modify", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
       ]
     })),
     error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
@@ -85,8 +85,8 @@ test("Windows storage attestation rejects broad principals and unexpected ACEs",
     assert.throws(
       () => validate(validReport({
         accessEntries: [
-          { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false },
-          { sid, type: "allow", access: "full-control", inherited: false }
+          { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+          { sid, type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
         ]
       })),
       error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
@@ -95,7 +95,30 @@ test("Windows storage attestation rejects broad principals and unexpected ACEs",
   assert.throws(
     () => validate(validReport({
       accessEntries: [
-        { sid: SERVICE_SID, type: "allow", access: "read", inherited: false }
+        { sid: SERVICE_SID, type: "allow", access: "read", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
+      ]
+    })),
+    error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
+  );
+});
+
+test("Windows storage attestation requires ACEs to apply to child files and directories", () => {
+  assert.throws(
+    () => validate(validReport({
+      accessEntries: [
+        { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false, containerInherit: true, objectInherit: false, inheritOnly: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
+      ]
+    })),
+    error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
+  );
+  assert.throws(
+    () => validate(validReport({
+      accessEntries: [
+        { sid: SERVICE_SID, type: "allow", access: "modify", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: true },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
       ]
     })),
     error => error.code === "WINDOWS_STORAGE_SECURITY_INVALID"
