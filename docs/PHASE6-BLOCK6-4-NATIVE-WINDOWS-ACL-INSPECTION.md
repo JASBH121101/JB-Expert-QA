@@ -29,7 +29,7 @@ The query confirms the current process SID and directory DACL at preflight/readi
 
 - Existing report-contract tests validate owner, identity, protected DACL, explicit allow-only principals, access levels, and accessor/hole rejection.
 - This block adds validation that ACEs cover child files and directories and are not inherit-only.
-- The native PowerShell query is only executed by Windows under the configured LocalService or NetworkService identity; ordinary Windows CI runners do not satisfy that deployment identity and must not weaken the test contract to pass.
+- Phase 6 Block 6.5 invokes the native PowerShell query inside a disposable WinSW process running as LocalService. The enclosing CI runner is not used as the service identity; it only provisions and removes the isolated test service and state directory. NetworkService and production hosts remain outside this lab's evidence.
 
 ## Status
 
