@@ -57,7 +57,8 @@
     "./execution-event-journal-persistence": "./src/agent/execution-event-journal-persistence.js",
     "./autonomous-execution-runner": "./src/agent/autonomous-execution-runner.js",
     "./autonomous-execution-host": "./src/agent/autonomous-execution-host.js",
-    "./autonomous-host-signal-lifecycle": "./src/agent/autonomous-host-signal-lifecycle.js"
+    "./autonomous-host-signal-lifecycle": "./src/agent/autonomous-host-signal-lifecycle.js",
+    "./autonomous-execution-host-service": "./src/agent/autonomous-execution-host-service.js"
   },
   "files": [
     "src/**",

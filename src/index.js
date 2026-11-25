@@ -189,3 +189,4 @@ export { createAutonomousExecutionRunner, AutonomousExecutionRunnerError } from 
 export { createAutonomousExecutionHost, AutonomousExecutionHostError } from "./agent/autonomous-execution-host.js";
 
 export { attachHostSignalLifecycle, HostSignalLifecycleError } from "./agent/autonomous-host-signal-lifecycle.js";
+export { createAutonomousExecutionHostService, AutonomousExecutionHostServiceError } from "./agent/autonomous-execution-host-service.js";
