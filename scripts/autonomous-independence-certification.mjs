@@ -108,8 +108,13 @@ async function visitModule(relativePath) {
 }
 
 function readStaticExport(source, name) {
-  const pattern = new RegExp("export\\s*\\{[^}]*\\b" + name + "\\b[^}]*\\}\\s*from\\s*[\\\"']([^\\\"']+)[\\\"']", "u");
-  return pattern.test(source) || new RegExp("\\b" + name + "\\b", "u").test(source);
+  const ast = parse(source, { ecmaVersion: "latest", sourceType: "module" });
+  return ast.body.some(statement =>
+    statement.type === "ExportNamedDeclaration" &&
+    statement.specifiers.some(specifier =>
+      specifier.exported?.name === name || specifier.exported?.value === name
+    )
+  );
 }
 
 async function main() {
