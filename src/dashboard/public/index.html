@@ -209,6 +209,23 @@
         <details class="phase5-host-diagnostics">
           <summary>Sanitized host diagnostics</summary>
           <pre id="phase5-host-diagnostics">No host diagnostics available.</pre>
+        <section class="phase5-approval-console" aria-labelledby="phase5-approval-title">
+          <div class="panel-heading phase5-approval-heading">
+            <div>
+              <p class="eyebrow">PHASE 6 / HUMAN APPROVAL</p>
+              <h3 id="phase5-approval-title">Pending operator decisions</h3>
+              <p class="section-subtitle">Only sanitized action metadata is shown. Task inputs and scopes remain private to the host.</p>
+            </div>
+            <div class="history-actions">
+              <span id="phase5-approval-state" class="assessment-tag">NOT CONNECTED</span>
+              <button type="button" id="phase5-approvals-refresh" class="secondary-button">Refresh approvals</button>
+            </div>
+          </div>
+          <div id="phase5-approval-list" class="phase5-approval-list" role="list" aria-live="polite">
+            <p class="empty-insight">No local approval gate is connected.</p>
+          </div>
+          <p class="insight-footnote">Approve only requests you recognize and intend to authorize. Decisions are single-use; denial, expiry, cancellation or gate shutdown blocks execution. The dashboard cannot change policy or permissions.</p>
+        </section>
         </details>
         <p class="insight-footnote">Starting the host requires an explicitly injected application bootstrap and a manual local action. Stopping is graceful. A stopped or failed bootstrap is terminal and must be recreated by the application; the dashboard cannot restart it or recover interrupted jobs.</p>
       </section>
