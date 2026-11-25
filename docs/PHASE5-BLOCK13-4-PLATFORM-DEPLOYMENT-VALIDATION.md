@@ -32,7 +32,7 @@ The Windows Server 2022 lab:
 3. Grants `NT AUTHORITY\\LOCAL SERVICE` read/execute access to the application tree and modify access to logs. The state directory is more restrictive: inherited ACEs are removed, the owner is set to LocalService, and the protected DACL contains only LocalService (Modify), LocalSystem (Full Control), and built-in Administrators (Full Control), with object/container inheritance enabled.
 4. Generates the Windows profile using `createWindowsHostServiceProfile()`. The profile explicitly uses WinSW v2's `<serviceaccount><domain>NT AUTHORITY</domain><user>LocalService</user></serviceaccount>` format.
 5. Places the verified WinSW executable beside the generated XML, installs the service and starts it.
-6. The Node fixture records its effective `whoami` account, PID and storage path; the lab verifies the process actually runs as LocalService.
+6. The Node fixture runs as LocalService, loads the native Windows storage inspector and ACL report validator from the isolated app directory, and queries its live process token plus the protected state-directory DACL. It must validate the expected service SID, owner, explicit ACE allowlist and child file/directory inheritance before writing its startup record. The lab fails if any native verification flag is false.
 7. Stops and restarts the service through `sc.exe`, verifies Ctrl+C graceful shutdown markers, a new Node PID and a new SCM service-process PID.
 8. Stops the service gracefully again.
 9. Makes the fixture exit non-zero and verifies the generated WinSW failure sequence (one-second retry, two-second retry, then `none`) results in exactly three failing starts and a stopped service.
