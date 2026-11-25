@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { isAbsolute, join, parse, resolve } from "node:path";
 import { createAutonomousExecutionHost } from "./autonomous-execution-host.js";
+import { validateWindowsStorageSecurityReport } from "./windows-storage-security.js";
 import { createAutonomousExecutionHostService } from "./autonomous-execution-host-service.js";
 import {
   getQaEngineActionType,
@@ -97,13 +98,32 @@ function validPath(value) {
     value.length <= 4096 && !value.includes("\0") && isAbsolute(value);
 }
 
-function inspectStorageDirectory(storageDirectory, { create = false, probeWrite = false } = {}) {
+function inspectStorageDirectory(storageDirectory, {
+  create = false,
+  probeWrite = false,
+  windowsStorageSecurityVerifier,
+  expectedWindowsServiceSid
+} = {}) {
   const directory = resolve(storageDirectory);
   if (!validPath(storageDirectory) || directory === parse(directory).root) {
     throw new AutonomousExecutionHostBootstrapError("INVALID_STORAGE_DIRECTORY", "storage directory must be an absolute non-root path");
   }
 
+  if (process.platform === "win32" &&
+      (typeof windowsStorageSecurityVerifier !== "function" || expectedWindowsServiceSid === undefined)) {
+    throw new AutonomousExecutionHostBootstrapError(
+      "WINDOWS_STORAGE_SECURITY_REQUIRED",
+      "Windows host storage requires a trusted token and NTFS ACL verifier"
+    );
+  }
+
   if (create && !existsSync(directory)) {
+    if (process.platform === "win32") {
+      throw new AutonomousExecutionHostBootstrapError(
+        "STORAGE_DIRECTORY_MISSING",
+        "Windows storage must be provisioned with its protected ACL before host startup"
+      );
+    }
     try {
       mkdirSync(directory, { recursive: true, mode: 0o700 });
     } catch {
@@ -139,6 +159,33 @@ function inspectStorageDirectory(storageDirectory, { create = false, probeWrite 
     }
   }
 
+  let windowsSecurity = null;
+  if (process.platform === "win32") {
+    let report;
+    try {
+      report = windowsStorageSecurityVerifier(Object.freeze({
+        directory,
+        expectedServiceSid: expectedWindowsServiceSid
+      }));
+    } catch {
+      throw new AutonomousExecutionHostBootstrapError(
+        "WINDOWS_STORAGE_SECURITY_VERIFICATION_FAILED",
+        "Windows storage security verification failed"
+      );
+    }
+    try {
+      windowsSecurity = validateWindowsStorageSecurityReport(report, {
+        directory,
+        expectedServiceSid: expectedWindowsServiceSid
+      });
+    } catch {
+      throw new AutonomousExecutionHostBootstrapError(
+        "WINDOWS_STORAGE_SECURITY_INVALID",
+        "Windows storage identity or NTFS ACL does not meet the required policy"
+      );
+    }
+  }
+
   if (probeWrite) {
     const probePath = join(directory, ".jbqa-bootstrap-probe-" + process.pid + "-" + randomUUID());
     let descriptor;
@@ -164,8 +211,14 @@ function inspectStorageDirectory(storageDirectory, { create = false, probeWrite 
 
   return Object.freeze({
     directory,
-    ownerVerified: process.platform !== "win32" && typeof process.getuid === "function",
-    permissionsVerified: process.platform !== "win32",
+    ownerVerified: process.platform === "win32"
+      ? windowsSecurity.ownerVerified
+      : typeof process.getuid === "function",
+    permissionsVerified: process.platform === "win32"
+      ? windowsSecurity.permissionsVerified
+      : true,
+    identityVerified: process.platform === "win32" ? windowsSecurity.identityVerified : null,
+    aclVerified: process.platform === "win32" ? windowsSecurity.daclProtected : null,
     writeProbe: probeWrite
   });
 }
@@ -221,7 +274,8 @@ function sanitizeEvent(event) {
 export function createAutonomousExecutionHostBootstrap(options = {}) {
   const config = readOptions(options, new Set([
     "orchestrator", "storageDirectory", "enabled", "signalSource",
-    "signals", "hostOptions", "onDiagnostic"
+    "signals", "hostOptions", "onDiagnostic",
+    "windowsStorageSecurityVerifier", "expectedWindowsServiceSid"
   ]), "bootstrap options");
 
   const orchestrator = config.orchestrator;
@@ -229,6 +283,12 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     throw new AutonomousExecutionHostBootstrapError("INVALID_ORCHESTRATOR", "a trusted QA engine orchestrator is required");
   }
   const storageDirectory = config.storageDirectory;
+  if (config.windowsStorageSecurityVerifier !== undefined && typeof config.windowsStorageSecurityVerifier !== "function") {
+    throw new AutonomousExecutionHostBootstrapError("INVALID_WINDOWS_STORAGE_SECURITY_VERIFIER", "windowsStorageSecurityVerifier must be a function");
+  }
+  if ((config.windowsStorageSecurityVerifier === undefined) !== (config.expectedWindowsServiceSid === undefined)) {
+    throw new AutonomousExecutionHostBootstrapError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid and windowsStorageSecurityVerifier must be supplied together");
+  }
   if (!validPath(storageDirectory) || resolve(storageDirectory) === parse(resolve(storageDirectory)).root) {
     throw new AutonomousExecutionHostBootstrapError("INVALID_STORAGE_DIRECTORY", "storageDirectory must be an absolute non-root path");
   }
@@ -287,7 +347,12 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     let storage = null;
 
     try {
-      storage = inspectStorageDirectory(storageDirectory, { create: true, probeWrite: true });
+      storage = inspectStorageDirectory(storageDirectory, {
+        create: true,
+        probeWrite: true,
+        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier,
+        expectedWindowsServiceSid: config.expectedWindowsServiceSid
+      });
       checks.push(freezeCheck("storage-directory", true));
     } catch (error) {
       checks.push(freezeCheck("storage-directory", false, safeErrorCode(error)));
@@ -380,6 +445,8 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       storageDirectory: storage ? Object.freeze({
         ownerVerified: storage.ownerVerified,
         permissionsVerified: storage.permissionsVerified,
+        identityVerified: storage.identityVerified,
+        aclVerified: storage.aclVerified,
         writeProbe: storage.writeProbe
       }) : null,
       checks: Object.freeze(checks),
@@ -436,7 +503,10 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     checks.push(freezeCheck("event-journal-persistent", currentHost?.eventJournalPersistenceEnabled === true));
 
     try {
-      inspectStorageDirectory(storageDirectory);
+      inspectStorageDirectory(storageDirectory, {
+        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier,
+        expectedWindowsServiceSid: config.expectedWindowsServiceSid
+      });
       checks.push(freezeCheck("storage-directory-secure", true));
     } catch (error) {
       checks.push(freezeCheck("storage-directory-secure", false, safeErrorCode(error)));
