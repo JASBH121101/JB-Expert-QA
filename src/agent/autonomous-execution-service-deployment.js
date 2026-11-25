@@ -67,6 +67,27 @@ function boundedInteger(value, label, minimum, maximum, fallback) {
   return normalized;
 }
 
+function readRestartDelays(value) {
+  if (value === undefined) return Object.freeze([10, 30]);
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 5) {
+    throw new AutonomousExecutionServiceDeploymentError("INVALID_RESTART_DELAYS", "restartDelaysSeconds must be a plain array of at most five delays");
+  }
+  const output = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+        !Number.isSafeInteger(descriptor.value) || descriptor.value < 1 || descriptor.value > 3600) {
+      throw new AutonomousExecutionServiceDeploymentError("INVALID_RESTART_DELAYS", "restartDelaysSeconds must contain only integer delays from 1 to 3600 seconds");
+    }
+    output.push(descriptor.value);
+  }
+  const allowedKeys = new Set(["length", ...output.map((_, index) => String(index))]);
+  if (Reflect.ownKeys(value).some(key => typeof key !== "string" || !allowedKeys.has(key))) {
+    throw new AutonomousExecutionServiceDeploymentError("INVALID_RESTART_DELAYS", "restartDelaysSeconds cannot contain extra fields");
+  }
+  return Object.freeze(output);
+}
+
 function xmlEscape(value) {
   return String(value)
     .replace(/&/gu, "&amp;")
@@ -197,11 +218,7 @@ export function createWindowsHostServiceProfile(options = {}) {
     throw new AutonomousExecutionServiceDeploymentError("INVALID_DELAYED_START", "delayedAutoStart must be boolean and cannot be enabled for Manual start mode");
   }
   const stopTimeoutSeconds = boundedInteger(config.stopTimeoutSeconds, "stop timeout", 5, 300, 90);
-  const restartDelays = config.restartDelaysSeconds ?? [10, 30];
-  if (!Array.isArray(restartDelays) || restartDelays.length > 5 ||
-      restartDelays.some(delay => !Number.isSafeInteger(delay) || delay < 1 || delay > 3600)) {
-    throw new AutonomousExecutionServiceDeploymentError("INVALID_RESTART_DELAYS", "restartDelaysSeconds must contain at most five integer delays from 1 to 3600 seconds");
-  }
+  const restartDelays = readRestartDelays(config.restartDelaysSeconds);
 
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
