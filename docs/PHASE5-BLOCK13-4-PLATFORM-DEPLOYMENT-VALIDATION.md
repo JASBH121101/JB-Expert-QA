@@ -29,7 +29,7 @@ The Windows Server 2022 lab:
 
 1. Downloads the official WinSW v2.14.0 x64 release asset and verifies its pinned SHA-256 before executing it.
 2. Creates a unique disposable application, state and log directory under `C:\\ProgramData`.
-3. Grants the built-in `NT AUTHORITY\\LOCAL SERVICE` identity read/execute access to the application tree and modify access only to state/log directories.
+3. Grants `NT AUTHORITY\\LOCAL SERVICE` read/execute access to the application tree and modify access to logs. The state directory is more restrictive: inherited ACEs are removed, the owner is set to LocalService, and the protected DACL contains only LocalService (Modify), LocalSystem (Full Control), and built-in Administrators (Full Control), with object/container inheritance enabled.
 4. Generates the Windows profile using `createWindowsHostServiceProfile()`. The profile explicitly uses WinSW v2's `<serviceaccount><domain>NT AUTHORITY</domain><user>LocalService</user></serviceaccount>` format.
 5. Places the verified WinSW executable beside the generated XML, installs the service and starts it.
 6. The Node fixture records its effective `whoami` account, PID and storage path; the lab verifies the process actually runs as LocalService.
