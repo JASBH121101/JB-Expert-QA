@@ -50,6 +50,9 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
     "      type = $rule.AccessControlType.ToString().ToLowerInvariant()",
     "      access = $access",
     "      inherited = [bool]$rule.IsInherited",
+    "      containerInherit = [bool]($rule.InheritanceFlags -band [System.Security.AccessControl.InheritanceFlags]::ContainerInherit)",
+    "      objectInherit = [bool]($rule.InheritanceFlags -band [System.Security.AccessControl.InheritanceFlags]::ObjectInherit)",
+    "      inheritOnly = [bool]($rule.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly)",
     "    }",
     "  }",
     ")",
@@ -80,7 +83,7 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
   }
 
   try {
-    const report = JSON.parse(String(output).replace(/^\\uFEFF/u, "").trim());
+    const report = JSON.parse(String(output).replace(/^\uFEFF/u, "").trim());
     if (!report || report.directory !== directory || report.processIdentitySid !== expectedServiceSid) {
       throw new Error("unexpected identity or path");
     }
