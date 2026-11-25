@@ -66,6 +66,7 @@ export function createAutonomousExecutionRunner(options = {}) {
   let loopPromise = null;
   let tickPromise = null;
   let timer = null;
+  let wakeWait = null;
   let lastTickAt = null;
   let lastActivityAt = null;
   let ticks = 0;
@@ -119,7 +120,8 @@ export function createAutonomousExecutionRunner(options = {}) {
 
   function wait() {
     return new Promise((resolve) => {
-      timer = setTimeout(() => { timer = null; resolve(); }, pollIntervalMs);
+      wakeWait = resolve;
+      timer = setTimeout(() => { timer = null; wakeWait = null; resolve(); }, pollIntervalMs);
     });
   }
 
@@ -153,6 +155,7 @@ export function createAutonomousExecutionRunner(options = {}) {
     if (state === "stopped" || state === "closed") return status();
     stopRequested = true;
     if (timer) { clearTimeout(timer); timer = null; }
+    if (wakeWait) { const wake = wakeWait; wakeWait = null; wake(); }
     if (state !== "failed") state = "stopping";
     if (tickPromise) await tickPromise;
     if (loopPromise) await loopPromise;
