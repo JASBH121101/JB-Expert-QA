@@ -84,12 +84,31 @@ async function waitFor(predicate, timeoutMs = 4000) {
   assert.fail("timed out waiting for bootstrap host state");
 }
 
+function windowsStorageSecurityTestOptions() {
+  if (process.platform !== "win32") return {};
+  return {
+    expectedWindowsServiceSid: "S-1-5-19",
+    windowsStorageSecurityVerifier: ({ directory, expectedServiceSid }) => ({
+      directory,
+      processIdentitySid: expectedServiceSid,
+      ownerSid: expectedServiceSid,
+      daclProtected: true,
+      accessEntries: [
+        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+      ]
+    })
+  };
+}
+
 function options(orchestrator, storageDirectory, signalSource = new EventEmitter(), extra = {}) {
   return {
     orchestrator,
     storageDirectory,
     signalSource,
     enabled: true,
+    ...windowsStorageSecurityTestOptions(),
     hostOptions: { pollIntervalMs: 100, ...extra.hostOptions },
     ...(extra.onDiagnostic ? { onDiagnostic: extra.onDiagnostic } : {}),
     ...(extra.signals ? { signals: extra.signals } : {})
@@ -373,4 +392,18 @@ test("application convenience entrypoint starts explicitly and rejects missing e
       error => error.code === "BOOTSTRAP_NOT_ENABLED"
     );
   });
+});
+
+test("bootstrap rejects an unsupported Windows service SID before preflight", () => {
+  const { orchestrator } = makeOrchestrator();
+  const invalidOptions = {
+    ...options(orchestrator, join(tmpdir(), "jbqa-invalid-windows-sid")),
+    expectedWindowsServiceSid: "S-1-5-18",
+    windowsStorageSecurityVerifier: () => ({})
+  };
+  assert.throws(
+    () => createAutonomousExecutionHostBootstrap(invalidOptions),
+    error => error instanceof AutonomousExecutionHostBootstrapError &&
+      error.code === "INVALID_WINDOWS_SERVICE_SID"
+  );
 });

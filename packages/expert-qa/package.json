@@ -62,7 +62,8 @@
     "./autonomous-execution-service-deployment": "./src/agent/autonomous-execution-service-deployment.js",
     "./autonomous-execution-host-bootstrap": "./src/agent/autonomous-execution-host-bootstrap.js",
     "./phase4-autonomous-host-bootstrap": "./src/agent/phase4-autonomous-host-bootstrap.js",
-    "./local-approval-gate": "./src/agent/local-approval-gate.js"
+    "./local-approval-gate": "./src/agent/local-approval-gate.js",
+    "./windows-storage-security": "./src/agent/windows-storage-security.js"
   },
   "files": [
     "src/**",

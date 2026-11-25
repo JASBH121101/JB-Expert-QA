@@ -68,7 +68,7 @@ The bootstrap relies on the hardened persistent stores already owned by the host
 - execution-jobs.json and execution-events.json use the existing checksummed, atomic persistence implementation.
 - Both stores must hold their exclusive lock files for the lifetime of this host.
 - POSIX storage directory permissions are checked without silently changing an existing directory. The existing store implementation continues to protect its data and lock files.
-- Windows filesystem ACLs are not inspected or changed by this Node module. Provision them through the operator-controlled deployment process already validated in Block 13.4 (LocalService read/execute on application files and modify on state/log directories).
+- Windows filesystem ACLs are not changed by this Node module. As of Phase 6 Block 6.3, Windows startup requires an application-supplied native token/NTFS ACL verifier and an expected LocalService or NetworkService SID. The bootstrap validates the complete attestation fail-closed and does not create a missing Windows state directory. The verifier remains an application/operator responsibility; see `docs/PHASE6-BLOCK6-3-WINDOWS-STORAGE-ACL-GATE.md`.
 
 A second process cannot pass startup while another process owns the durable locks. The bootstrap does not remove a live lock or ask for elevated permissions to bypass it.
 

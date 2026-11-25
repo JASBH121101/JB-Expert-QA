@@ -71,11 +71,27 @@ const orchestrator = Object.freeze({
   }
 });
 
+const windowsStorageSecurity = process.platform === "win32" ? {
+  expectedWindowsServiceSid: "S-1-5-19",
+  windowsStorageSecurityVerifier: ({ directory, expectedServiceSid }) => ({
+    directory,
+    processIdentitySid: expectedServiceSid,
+    ownerSid: expectedServiceSid,
+    daclProtected: true,
+    accessEntries: [
+      { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
+      { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
+      { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+    ]
+  })
+} : {};
+
 const bootstrap = createAutonomousExecutionHostBootstrap({
   orchestrator,
   storageDirectory,
   enabled: true,
   signalSource: new EventEmitter(),
+  ...windowsStorageSecurity,
   hostOptions: {
     runnerId: "ops-runner",
     supervisorId: "ops-supervisor",

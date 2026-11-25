@@ -17,6 +17,24 @@ function makePolicy() {
     limits: { maxActions: 3, maxExecutionMs: 20000, maxActionMs: 10000, approvalTimeoutMs: 5000, maxInputBytes: 4096, maxOutputBytes: 16384 }
   };
 }
+function windowsStorageSecurityTestOptions() {
+  if (process.platform !== "win32") return {};
+  return {
+    expectedWindowsServiceSid: "S-1-5-19",
+    windowsStorageSecurityVerifier: ({ directory, expectedServiceSid }) => ({
+      directory,
+      processIdentitySid: expectedServiceSid,
+      ownerSid: expectedServiceSid,
+      daclProtected: true,
+      accessEntries: [
+        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+      ]
+    })
+  };
+}
+
 function options(storageDirectory, extra = {}) {
   return {
     storageDirectory,
@@ -26,6 +44,7 @@ function options(storageDirectory, extra = {}) {
     policy: makePolicy(),
     requestApproval: async request => ({ approved: true, approvalId: "lab-approval-" + request.executionId }),
     hostOptions: { pollIntervalMs: 100 },
+    ...windowsStorageSecurityTestOptions(),
     ...extra
   };
 }
@@ -46,6 +65,16 @@ test("Phase 4 host factory requires explicit enablement, policy, approval and ex
   assert.throws(() => createPhase4AutonomousHostBootstrap(minimal), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "APPROVAL_PROVIDER_REQUIRED");
   assert.throws(() => createPhase4AutonomousHostBootstrap({ ...minimal, requestApproval: async () => ({ approved: true, approvalId: "x" }), apiAllowedOrigins: ["https://*.example.test"] }), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "INVALID_API_ORIGIN");
   assert.throws(() => createPhase4AutonomousHostBootstrap({ ...minimal, requestApproval: async () => ({ approved: true, approvalId: "x" }), apiAllowedOrigins: [] }), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "API_ORIGIN_ALLOWLIST_REQUIRED");
+  assert.throws(
+    () => createPhase4AutonomousHostBootstrap({
+      ...minimal,
+      requestApproval: async () => ({ approved: true, approvalId: "x" }),
+      expectedWindowsServiceSid: "S-1-5-18",
+      windowsStorageSecurityVerifier: () => ({})
+    }),
+    error => error instanceof Phase4AutonomousHostIntegrationError &&
+      error.code === "INVALID_WINDOWS_SERVICE_SID"
+  );
 });
 
 test("Phase 4 built-in catalog is wired to the host without starting runners during construction", async () => {
