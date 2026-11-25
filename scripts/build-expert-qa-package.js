@@ -91,6 +91,7 @@ const requiredFiles = [
   "src/agent/autonomous-execution-service-deployment.js",
   "src/agent/autonomous-execution-host-bootstrap.js",
   "src/agent/windows-storage-security.js",
+  "src/agent/windows-storage-security-native.js",
   "src/agent/execution-event-journal.js",
   "src/agent/execution-event-journal-persistence.js",
   "src/agent/execution-process-runner.js",

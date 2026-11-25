@@ -117,8 +117,8 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
       !["S-1-5-19", "S-1-5-20"].includes(config.expectedWindowsServiceSid)) {
     throw new Phase4AutonomousHostIntegrationError("INVALID_WINDOWS_SERVICE_SID", "expectedWindowsServiceSid must identify LocalService or NetworkService");
   }
-  if ((config.windowsStorageSecurityVerifier === undefined) !== (config.expectedWindowsServiceSid === undefined)) {
-    throw new Phase4AutonomousHostIntegrationError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid and windowsStorageSecurityVerifier must be supplied together");
+  if (config.windowsStorageSecurityVerifier !== undefined && config.expectedWindowsServiceSid === undefined) {
+    throw new Phase4AutonomousHostIntegrationError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid is required when a custom Windows storage verifier is supplied");
   }
   const approvalGate = config.approvalGate === undefined ? null : readApprovalGate(config.approvalGate);
   if (approvalGate && config.requestApproval !== undefined) {
@@ -146,8 +146,10 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
     ...(config.signals === undefined ? {} : { signals: config.signals }),
     ...(config.hostOptions === undefined ? {} : { hostOptions: config.hostOptions }),
     ...(config.onDiagnostic === undefined ? {} : { onDiagnostic: config.onDiagnostic }),
-    ...(config.windowsStorageSecurityVerifier === undefined ? {} : {
-      windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier,
+    ...(config.expectedWindowsServiceSid === undefined ? {} : {
+      ...(config.windowsStorageSecurityVerifier === undefined ? {} : {
+        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier
+      }),
       expectedWindowsServiceSid: config.expectedWindowsServiceSid
     })
   });

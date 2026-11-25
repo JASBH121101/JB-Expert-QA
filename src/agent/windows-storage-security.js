@@ -33,12 +33,10 @@ function readPlainRecord(value, allowedKeys, label) {
 }
 
 /**
- * Validate an application-supplied Windows token/NTFS ACL attestation.
- *
- * The verifier that creates this report is a trusted deployment integration:
- * it must inspect the effective process token and the complete, effective
- * directory DACL using native Windows security APIs. This function validates
- * the report contract; it does not query or modify Windows ACLs itself.
+ * Validate a Windows token/NTFS ACL report. The native PowerShell adapter
+ * supplies the report for standard LocalService/NetworkService deployments;
+ * a separately reviewed application adapter may supply the same contract.
+ * This function validates the report and never changes Windows ACLs.
  */
 export function validateWindowsStorageSecurityReport(report, options = {}) {
   const config = readPlainRecord(options, new Set(["directory", "expectedServiceSid"]), "validation options");
@@ -80,10 +78,11 @@ export function validateWindowsStorageSecurityReport(report, options = {}) {
       throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "accessEntries cannot contain holes or accessors");
     }
     const entry = readPlainRecord(descriptor.value,
-      new Set(["sid", "type", "access", "inherited"]), "access entry");
+      new Set(["sid", "type", "access", "inherited", "containerInherit", "objectInherit", "inheritOnly"]), "access entry");
 
     if (typeof entry.sid !== "string" || !SID_PATTERN.test(entry.sid) ||
-        seen.has(entry.sid) || entry.type !== "allow" || entry.inherited !== false) {
+        seen.has(entry.sid) || entry.type !== "allow" || entry.inherited !== false ||
+        entry.containerInherit !== true || entry.objectInherit !== true || entry.inheritOnly !== false) {
       throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "only unique explicit allow entries are permitted");
     }
     seen.add(entry.sid);
