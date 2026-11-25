@@ -33,7 +33,7 @@ Close the operational gap between the existing explicitly-driven execution super
 5. Shutdown does not force-kill in-process tasks; cancellation remains cooperative.
 6. The runner does not execute from construction and is not started by importing modules.
 
-## Validation plan
+## Implementation progress\n\n- Initial runner module added at `src/agent/autonomous-execution-runner.js`.\n- Public export added to the root module and package subpath.\n- Focused runner tests added for inert construction, bounded tick processing, idle shutdown wake-up, fail-closed threshold and configuration validation.\n- CI and certification remain pending; implementation is not yet certified.\n\n## Validation plan
 
 - Unit tests: inert construction, invalid config, explicit start, duplicate start, bounded batch, idle wait scheduling, tick concurrency protection, stop during idle and stop during active drain, threshold-triggered fail-closed state, safe event emission.
 - Integration: persistent queue plus supervisor plus runner across queued work; prove normal queued work executes without CI, interrupted jobs remain un-replayed.
