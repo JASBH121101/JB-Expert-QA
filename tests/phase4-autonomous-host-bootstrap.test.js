@@ -93,7 +93,7 @@ test("real Static QA action runs through host queue, orchestrator policy and ext
     const queued = host.enqueue({
       id: "phase5-block13-9-static-plan",
       actions: [{ id: "static-qa-run", type: STATIC_ACTION, input: { path: project } }]
-    });
+    }, { id: "phase5-block13-9-static-job" });
     const completed = await waitForJob(host, queued.id);
     assert.equal(completed.state, "completed");
     assert.equal(completed.result.status, "succeeded");
