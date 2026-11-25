@@ -60,7 +60,7 @@ The package validator rejects the report unless all of these conditions hold:
 3. The directory DACL is protected from parent inheritance.
 4. Every reported ACE is an explicit allow entry; inherited entries and deny entries are rejected.
 5. The service identity has explicit `modify` or `full-control` access.
-6. The only other permitted principals are LocalSystem (`S-1-5-18`) and local Administrators (`S-1-5-32-544)); these may have `full-control` only.
+6. The only other permitted principals are LocalSystem (`S-1-5-18`) and local Administrators (`S-1-5-32-544`); these may have `full-control` only.
 7. Broad principals such as Everyone, Authenticated Users and built-in Users, unknown SIDs, duplicate entries, accessors, sparse arrays and extra report fields are rejected.
 
 The validation helper returns only sanitized boolean evidence. Raw paths and ACL details are not copied into the bootstrap diagnostics.
