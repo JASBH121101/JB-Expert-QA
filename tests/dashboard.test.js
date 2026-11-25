@@ -20,7 +20,8 @@ async function startTestDashboard(t, options = {}) {
     registry: options.registry ?? createAuditEngineRegistry(),
     ...(Object.hasOwn(options, "phase4Registry") ? { phase4Registry: options.phase4Registry } : {}),
     ...(Object.hasOwn(options, "phase4Execution") ? { phase4Execution: options.phase4Execution } : {}),
-    ...(Object.hasOwn(options, "phase5Supervisor") ? { phase5Supervisor: options.phase5Supervisor } : {})
+    ...(Object.hasOwn(options, "phase5Supervisor") ? { phase5Supervisor: options.phase5Supervisor } : {}),
+    ...(Object.hasOwn(options, "phase5HostBootstrap") ? { phase5HostBootstrap: options.phase5HostBootstrap } : {})
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -875,5 +876,190 @@ test("Phase 5 dashboard rejects inherited event supervisor methods", async () =>
   assert.throws(
     () => createDashboardServer({ phase5Supervisor: inherited }),
     (error) => error instanceof TypeError && error.message.includes("own listEvents() method")
+  );
+});
+
+
+function createPhase5HostBootstrapFixture() {
+  let lifecycle = "idle";
+  const calls = { start: 0, stop: 0 };
+  const bootstrap = Object.freeze({
+    getStatus() {
+      return {
+        state: lifecycle,
+        enabled: true,
+        started: lifecycle === "running",
+        host: lifecycle === "running" ? {
+          state: "running",
+          runtimeState: "ready",
+          supervisorState: "running",
+          runnerState: "running",
+          queuePersistenceEnabled: true,
+          eventJournalPersistenceEnabled: true
+        } : null,
+        preflight: lifecycle === "running" ? {
+          passed: true,
+          checkedAt: "2026-11-25T00:00:00.000Z",
+          engineCount: 2,
+          allowedEngineCount: 1,
+          checks: [{ name: "storage-directory", status: "passed" }],
+          failures: []
+        } : null,
+        lastFailureCode: null
+      };
+    },
+    getReadiness() {
+      return {
+        ready: lifecycle === "running",
+        state: lifecycle,
+        checks: [{ name: "service-running", status: lifecycle === "running" ? "passed" : "failed" }]
+      };
+    },
+    getLiveness() {
+      return { alive: !["closed", "failed"].includes(lifecycle), state: lifecycle };
+    },
+    getDiagnostics() {
+      return {
+        queue: lifecycle === "running"
+          ? { queued: 2, running: 1, completed: 4, failed: 0, interrupted: 1 }
+          : null,
+        lastFailureCode: null,
+        recentDiagnostics: [{
+          timestamp: "2026-11-25T00:00:00.000Z",
+          event: "host_started",
+          code: "HOST_STARTED",
+          rawMessage: "SECRET_DIAGNOSTIC_MESSAGE"
+        }],
+        recentEvents: [{
+          sequence: 7,
+          timestamp: "2026-11-25T00:00:00.000Z",
+          eventType: "EXECUTION_STARTED",
+          severity: "info",
+          code: "EXECUTION_STARTED",
+          stage: "runner",
+          jobId: "SECRET_JOB_ID",
+          payload: { token: "SECRET_TOKEN" },
+          rawMessage: "SECRET_EVENT_MESSAGE"
+        }]
+      };
+    },
+    async start() {
+      calls.start += 1;
+      if (lifecycle !== "idle") throw Object.assign(new Error("terminal"), { code: "BOOTSTRAP_TERMINAL" });
+      lifecycle = "running";
+    },
+    async stop() {
+      calls.stop += 1;
+      if (lifecycle !== "running") throw Object.assign(new Error("not running"), { code: "BOOTSTRAP_NOT_RUNNING" });
+      lifecycle = "closed";
+    }
+  });
+  return { bootstrap, calls };
+}
+
+test("Phase 5 host control stays unavailable by default and exposes no start path without injection", async (t) => {
+  const { origin } = await startTestDashboard(t);
+  const statusResponse = await fetch(origin + "/api/phase5/host/status");
+  assert.equal(statusResponse.status, 200);
+  assert.equal(statusResponse.headers.get("cache-control"), "no-store");
+  const status = await statusResponse.json();
+  assert.equal(status.enabled, false);
+  assert.equal(status.state, "unavailable");
+
+  const startResponse = await fetch(origin + "/api/phase5/host/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: "{}"
+  });
+  assert.equal(startResponse.status, 503);
+  assert.equal((await startResponse.json()).error, "phase5_host_unavailable");
+});
+
+test("Phase 5 host control starts and stops only through same-origin explicit lifecycle requests", async (t) => {
+  const fixture = createPhase5HostBootstrapFixture();
+  const { origin } = await startTestDashboard(t, { phase5HostBootstrap: fixture.bootstrap });
+
+  const initialResponse = await fetch(origin + "/api/phase5/host/status");
+  const initial = await initialResponse.json();
+  assert.equal(initial.enabled, true);
+  assert.equal(initial.state, "idle");
+  assert.equal(initial.readiness.ready, false);
+  assert.equal(fixture.calls.start, 0);
+
+  const crossOrigin = await fetch(origin + "/api/phase5/host/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": "https://untrusted.example" },
+    body: "{}"
+  });
+  assert.equal(crossOrigin.status, 403);
+  assert.equal(fixture.calls.start, 0);
+
+  const payloadAttempt = await fetch(origin + "/api/phase5/host/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: JSON.stringify({ enabled: true, policy: { allowAll: true } })
+  });
+  assert.equal(payloadAttempt.status, 400);
+  assert.equal(fixture.calls.start, 0);
+
+  const startedResponse = await fetch(origin + "/api/phase5/host/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: "{}"
+  });
+  assert.equal(startedResponse.status, 200);
+  const started = await startedResponse.json();
+  assert.equal(started.state, "running");
+  assert.equal(started.readiness.ready, true);
+  assert.deepEqual(started.queue, {
+    queued: 2, running: 1, completed: 4, failed: 0, interrupted: 1
+  });
+  assert.equal(fixture.calls.start, 1);
+  const serialized = JSON.stringify(started);
+  assert.equal(serialized.includes("SECRET_JOB_ID"), false);
+  assert.equal(serialized.includes("SECRET_TOKEN"), false);
+  assert.equal(serialized.includes("SECRET_EVENT_MESSAGE"), false);
+  assert.equal(serialized.includes("SECRET_DIAGNOSTIC_MESSAGE"), false);
+
+  const duplicateStart = await fetch(origin + "/api/phase5/host/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: "{}"
+  });
+  assert.equal(duplicateStart.status, 409);
+  assert.equal(fixture.calls.start, 1);
+
+  const stoppedResponse = await fetch(origin + "/api/phase5/host/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: "{}"
+  });
+  assert.equal(stoppedResponse.status, 200);
+  const stopped = await stoppedResponse.json();
+  assert.equal(stopped.state, "closed");
+  assert.equal(stopped.started, false);
+  assert.equal(fixture.calls.stop, 1);
+
+  const duplicateStop = await fetch(origin + "/api/phase5/host/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Origin": origin },
+    body: "{}"
+  });
+  assert.equal(duplicateStop.status, 409);
+  assert.equal(fixture.calls.stop, 1);
+});
+
+test("Phase 5 dashboard refuses inherited host bootstrap control methods", () => {
+  const inherited = Object.create({
+    getStatus: () => ({}),
+    getReadiness: () => ({}),
+    getLiveness: () => ({}),
+    getDiagnostics: () => ({}),
+    start: async () => {},
+    stop: async () => {}
+  });
+  assert.throws(
+    () => createDashboardServer({ phase5HostBootstrap: inherited }),
+    (error) => error instanceof TypeError && error.message.includes("own getStatus() method")
   );
 });
