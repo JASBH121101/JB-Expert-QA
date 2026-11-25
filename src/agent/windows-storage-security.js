@@ -64,7 +64,10 @@ export function validateWindowsStorageSecurityReport(report, options = {}) {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "accessEntries must contain one to three explicit allow entries");
   }
 
-  const allowedArrayKeys = new Set(["length", ...entries.map((_entry, index) => String(index))]);
+  const allowedArrayKeys = new Set(["length"]);
+  for (let index = 0; index < entries.length; index += 1) {
+    allowedArrayKeys.add(String(index));
+  }
   if (Reflect.ownKeys(entries).some(key => typeof key !== "string" || !allowedArrayKeys.has(key))) {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_INVALID", "accessEntries cannot contain custom fields");
   }
