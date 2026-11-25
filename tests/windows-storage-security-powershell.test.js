@@ -61,7 +61,7 @@ test("native Windows verifier reads the process token, directory owner and compl
   };
   const first = verify(request);
 
-  assert.equal(first.directory, directory);
+  assert.equal(first.directory.toLowerCase(), directory.toLowerCase());
   assert.match(first.processIdentitySid, /^S-1-[0-9]+(?:-[0-9]+)+$/u);
   assert.match(first.ownerSid, /^S-1-[0-9]+(?:-[0-9]+)+$/u);
   assert.equal(typeof first.daclProtected, "boolean");
@@ -98,4 +98,17 @@ test("native Windows verifier rejects a request containing accessor-backed data"
       error.code === "WINDOWS_STORAGE_VERIFIER_INVALID"
   );
   assert.equal(invoked, false);
+});
+
+test("native Windows verifier rejects non-local, root and non-normalized paths before process creation", {
+  skip: process.platform !== "win32"
+}, () => {
+  const verify = createWindowsPowerShellStorageSecurityVerifier();
+  for (const directory of ["C:\\\\", "\\\\server\\\\share\\\\folder", "C:\\\\ProgramData\\\\..\\\\Windows"]) {
+    assert.throws(
+      () => verify({ directory, expectedServiceSid: "S-1-5-19" }),
+      error => error instanceof WindowsPowerShellStorageVerifierError &&
+        error.code === "WINDOWS_STORAGE_VERIFIER_INVALID"
+    );
+  }
 });
