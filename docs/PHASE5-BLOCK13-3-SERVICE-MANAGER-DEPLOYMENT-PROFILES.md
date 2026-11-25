@@ -61,6 +61,7 @@ import { createWindowsHostServiceProfile } from "@jb/expert-qa";
 
 const profile = createWindowsHostServiceProfile({
   serviceId: "JBExpertQA",
+  serviceAccount: "LocalService",
   displayName: "JB Expert QA Autonomous Host",
   description: "Local autonomous QA execution host",
   nodeExecutable: "C:\\Program Files\\nodejs\\node.exe",
@@ -76,7 +77,7 @@ const profile = createWindowsHostServiceProfile({
 console.log(profile.content);
 ```
 
-Place the verified WinSW executable and generated XML beside one another using the same base name (for example, `JBExpertQA.exe` and `JBExpertQA.xml`). The XML launches the configured Node executable and the quoted host entrypoint. It sets the storage directory as an environment variable, keeps logs under the configured log path and hides the child console window.
+Place the verified WinSW executable and generated XML beside one another using the same base name (for example, `JBExpertQA.exe` and `JBExpertQA.xml`). The XML launches the configured Node executable and the quoted host entrypoint. It sets the storage directory as an environment variable, keeps logs under the configured log path and hides the child console window. The generated profile defaults to the built-in `NT AUTHORITY\\LocalService` account; `serviceAccount: "NetworkService"` is the only alternative. `LocalSystem` and password-bearing custom account data are intentionally not accepted.
 
 The wrapper's stop behavior and `stoptimeout` must be confirmed against the exact WinSW release selected for deployment. The Phase 5 service lifecycle handles `SIGINT`; allow enough time for the worker's configured execution timeout, queue/journal flush and graceful close. A forced termination can leave a job marked interrupted; the host deliberately requires operator review rather than automatic replay.
 
@@ -84,7 +85,7 @@ The default failure sequence restarts after 10 seconds, restarts once more after
 
 ### Operator-controlled Windows rollout
 
-1. Provision a dedicated, non-administrator service identity. Configure the service's Log On account through Windows service administration and grant only the required “Log on as a service” right.
+1. Use the generated `LocalService` identity by default, or select `NetworkService` when its additional network identity is required. Provision only the necessary NTFS access; the profile does not grant folder permissions automatically.
 2. Grant read/execute access to the application and Node installation directories. Grant modify access only to the configured state and log directories. Do not run the service as LocalSystem simply to bypass permissions.
 3. Place the separately verified WinSW binary and generated XML in a controlled directory. Review the executable, entrypoint, service ID, start mode, retry sequence, state path and stop timeout.
 4. Install the service using the documented WinSW command for the exact pinned version, then inspect its registered identity and configuration before starting it.
@@ -138,4 +139,5 @@ The Windows profile requires a separately verified stable WinSW binary at deploy
 References:
 - [systemd.service — service restart and stop-timeout behavior](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)
 - [WinSW official releases and stable/pre-release status](https://github.com/winsw/winsw/releases)
+- [WinSW v2 installation guide](https://winsw.github.io/v2/doc/installation/)
 - [WinSW v2 installation guide](https://winsw.github.io/v2/doc/installation/)
