@@ -27,9 +27,9 @@ function windowsStorageSecurityTestOptions() {
       ownerSid: expectedServiceSid,
       daclProtected: true,
       accessEntries: [
-        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false },
-        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false },
-        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false }
+        { sid: expectedServiceSid, type: "allow", access: "modify", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+        { sid: "S-1-5-18", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false },
+        { sid: "S-1-5-32-544", type: "allow", access: "full-control", inherited: false, containerInherit: true, objectInherit: true, inheritOnly: false }
       ]
     })
   };
