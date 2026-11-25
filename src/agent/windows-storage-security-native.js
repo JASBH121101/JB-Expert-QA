@@ -19,7 +19,7 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_PLATFORM_UNSUPPORTED",
       "Windows storage security inspection is available only on Windows");
   }
-  if (typeof directory !== "string" || !isAbsolute(directory) || directory.length > 4096 || directory.includes("\0") || !SERVICE_SIDS.has(expectedServiceSid)) {
+  if (typeof directory !== "string" || !isAbsolute(directory) || !/^[A-Za-z]:\\/u.test(directory) || directory.length > 4096 || directory.includes("\0") || !SERVICE_SIDS.has(expectedServiceSid)) {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID",
       "an absolute directory and a supported Windows service SID are required");
   }
