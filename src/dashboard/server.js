@@ -152,6 +152,10 @@ function readPhase5HostBootstrap(value) {
 function safeHostState(value) {
   return ["idle", "starting", "running", "stopping", "closed", "failed"].includes(value) ? value : "unknown";
 }
+function safeHostComponentState(value) {
+  return ["idle", "starting", "ready", "running", "stopping", "stopped", "closed", "failed", "unavailable"].includes(value)
+    ? value : "unknown";
+}
 function safeHostCode(value) {
   return typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(value) ? value : null;
 }
@@ -181,9 +185,9 @@ function createPhase5HostSnapshot({ status, readiness, liveness, diagnostics }) 
     started: status?.started === true,
     host: host ? Object.freeze({
       state: safeHostState(host.state),
-      runtimeState: safeHostState(host.runtimeState),
-      supervisorState: safeHostState(host.supervisorState),
-      runnerState: safeHostState(host.runnerState),
+      runtimeState: safeHostComponentState(host.runtimeState),
+      supervisorState: safeHostComponentState(host.supervisorState),
+      runnerState: safeHostComponentState(host.runnerState),
       queuePersistenceEnabled: host.queuePersistenceEnabled === true,
       eventJournalPersistenceEnabled: host.eventJournalPersistenceEnabled === true
     }) : null,
@@ -675,7 +679,7 @@ export function createDashboardServer({
         fail(response, 404, "not_found", "Route not found"); return;
       }
 
-      const phase5HostOperation = /^\\/api\\/phase5\\/host\\/(start|stop)$/u.exec(pathname);
+      const phase5HostOperation = /^\/api\/phase5\/host\/(start|stop)$/u.exec(pathname);
       if (request.method === "POST" && phase5HostOperation) {
         if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
         if (!phase5HostControl) { fail(response, 503, "phase5_host_unavailable", "No application-owned autonomous host is connected"); return; }
