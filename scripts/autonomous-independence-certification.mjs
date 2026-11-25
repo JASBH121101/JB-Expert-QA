@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -108,7 +107,7 @@ async function visitModule(relativePath) {
   }
 }
 
-function readStaticExport(source, name, fileLabel) {
+function readStaticExport(source, name) {
   const pattern = new RegExp("export\\s*\\{[^}]*\\b" + name + "\\b[^}]*\\}\\s*from\\s*[\\\"']([^\\\"']+)[\\\"']", "u");
   return pattern.test(source) || new RegExp("\\b" + name + "\\b", "u").test(source);
 }
@@ -154,6 +153,10 @@ async function main() {
   addCheck("host-dependency-graph-has-no-third-party-imports",
     externalModules.size === 0,
     { externalImports: [...externalModules] });
+  addCheck("host-dependency-graph-does-not-read-github-actions-runtime-state",
+    ![...sourceByFile.values()].some(source =>
+      /process\\.env\\.(?:GITHUB_ACTIONS|CI)\\b/u.test(source)),
+    { requirement: "No Actions or CI environment state is required by the host module graph" });
   addCheck("host-dependency-graph-has-no-github-actions-runtime-dependency",
     ![...externalModules].some(item => GITHUB_PACKAGE_PREFIXES.some(prefix => item.startsWith(prefix)) ||
       /github|actions|octokit/iu.test(item)),
@@ -165,10 +168,10 @@ async function main() {
     expertPackage.exports?.["./autonomous-execution-host-bootstrap"] === "./src/agent/autonomous-execution-host-bootstrap.js",
     { export: expertPackage.exports?.["./autonomous-execution-host-bootstrap"] ?? null });
   addCheck("repository-api-bootstrap-export",
-    readStaticExport(indexSource, "createAutonomousExecutionHostBootstrap", "src/index.js"),
+    readStaticExport(indexSource, "createAutonomousExecutionHostBootstrap"),
     { entry: "src/index.js" });
   addCheck("standalone-package-root-bootstrap-export",
-    readStaticExport(expertIndexSource, "createAutonomousExecutionHostBootstrap", "packages/expert-qa/src/index.js"),
+    readStaticExport(expertIndexSource, "createAutonomousExecutionHostBootstrap"),
     { entry: "packages/expert-qa/src/index.js" });
   addCheck("dashboard-default-loopback-only",
     dashboardSource.includes('const DEFAULT_DASHBOARD_HOST = "127.0.0.1"') &&
