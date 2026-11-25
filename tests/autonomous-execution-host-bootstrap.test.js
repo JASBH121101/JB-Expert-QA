@@ -393,3 +393,20 @@ test("application convenience entrypoint starts explicitly and rejects missing e
     );
   });
 });
+
+test("bootstrap rejects an unsupported Windows service SID before preflight", () => {
+  const { orchestrator } = makeOrchestrator();
+  assert.throws(
+    () => createAutonomousExecutionHostBootstrap(options(
+      orchestrator,
+      join(tmpdir(), "jbqa-invalid-windows-sid"),
+      new EventEmitter(),
+      {
+        expectedWindowsServiceSid: "S-1-5-18",
+        windowsStorageSecurityVerifier: () => ({})
+      }
+    )),
+    error => error instanceof AutonomousExecutionHostBootstrapError &&
+      error.code === "INVALID_WINDOWS_SERVICE_SID"
+  );
+});
