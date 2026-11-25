@@ -40,7 +40,7 @@ jobs:
           echo "Deleting only listed JB Expert QA report artifacts older than ${cutoff}."
           artifact_ids="$(CUTOFF="${cutoff}" gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             --jq '.artifacts[]
-              | select(.name | test("^(expert-qa-security-node-|language-qa-benchmark-|jb-threat-lab-unified-certification-|malware-engine-benchmark$|malware-engine-benchmark-|malware-engine-calibration-|resilience-service-manager-lab-|expert-qa-service-deployment-profile-|jb-sccm-report-node-|expert-qa-benchmark-|security-guard-benchmark-|jb-expert-qa-report$|security-sbom-node-|jb-expert-qa-autonomous-independence-node-|nexora-threat-lab-certification-reports$)")
+              | select(.name | test("^(expert-qa-security-node-|language-qa-benchmark-|jb-threat-lab-unified-certification-|malware-engine-benchmark$|malware-engine-benchmark-|malware-engine-calibration-|resilience-service-manager-lab-|expert-qa-service-deployment-profile-|jb-sccm-report-node-|expert-qa-benchmark-|security-guard-benchmark-|jb-expert-qa-report$|security-sbom-node-|jb-expert-qa-autonomous-independence-node-|nexora-threat-lab-certification-reports$)"))
               | select(.created_at < env.CUTOFF)
               | .id')"
           deleted=0
