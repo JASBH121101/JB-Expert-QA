@@ -56,6 +56,12 @@ The host owns the persistent queue and event journal. Its supervisor closes the 
 
 Only one host may hold the two local store locks at a time. This is a single-process, single-host deployment model; it is not a distributed queue or HA cluster.
 
+## Durability boundaries and host integration
+
+The factory durably stores the job queue and operational event journal. It does not replace or silently reconfigure the orchestrator's execution ledger. The underlying execution engine uses an in-memory ledger by default. When durable execution-audit records are required, the embedding application must create a `createJsonlExecutionLedger(...)` instance and pass it into `createQaEngineOrchestrator({ ledger })`. The host does not assume ownership of that externally supplied ledger; close the host first, then close the ledger in the embedding application's shutdown path.
+
+This is a host library factory, not an OS service installer. It does not register systemd/Windows services or attach process signal handlers. A long-lived application or OS service must own the process lifecycle, call `host.start()` after its own startup checks, and await `host.close()` during shutdown. Runtime job execution itself has no GitHub Actions dependency.
+
 ## Restart and recovery contract
 
 - Queued jobs survive a restart and remain eligible for the explicitly started runner.
