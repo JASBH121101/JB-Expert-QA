@@ -332,7 +332,7 @@ async function certifyWindowsScm() {
     assert(/^nt authority\\local service$/iu.test(first.account), "WinSW host did not run as NT AUTHORITY\\LocalService: " + first.account);
 
     const queryBefore = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service before restart");
-    const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\\s*:\\s*(\\d+)/iu)?.[1]);
+    const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
     assert(Number.isSafeInteger(wrapperPidBefore) && wrapperPidBefore > 1, "Windows service wrapper PID was not available");
 
     assertCommand(await command(wrapperPath, ["restart"]), "WinSW restart generated service profile");
@@ -347,7 +347,7 @@ async function certifyWindowsScm() {
     assert(/^nt authority\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
 
     const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after restart");
-    const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\\s*:\\s*(\\d+)/iu)?.[1]);
+    const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
     assert(Number.isSafeInteger(wrapperPidAfter) && wrapperPidAfter > 1, "Windows service wrapper PID after restart was not available");
     assert(wrapperPidAfter !== wrapperPidBefore, "WinSW restart did not replace its wrapper process");
 
