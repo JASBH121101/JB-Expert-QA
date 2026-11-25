@@ -16,6 +16,7 @@ import { hostname } from "node:os";
 import { isAbsolute, join, parse, resolve } from "node:path";
 import { createAutonomousExecutionHost } from "./autonomous-execution-host.js";
 import { validateWindowsStorageSecurityReport } from "./windows-storage-security.js";
+import { readWindowsStorageSecurityReport } from "./windows-storage-security-native.js";
 import { createAutonomousExecutionHostService } from "./autonomous-execution-host-service.js";
 import {
   getQaEngineActionType,
@@ -290,9 +291,11 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       !["S-1-5-19", "S-1-5-20"].includes(config.expectedWindowsServiceSid)) {
     throw new AutonomousExecutionHostBootstrapError("INVALID_WINDOWS_SERVICE_SID", "expectedWindowsServiceSid must identify LocalService or NetworkService");
   }
-  if ((config.windowsStorageSecurityVerifier === undefined) !== (config.expectedWindowsServiceSid === undefined)) {
-    throw new AutonomousExecutionHostBootstrapError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid and windowsStorageSecurityVerifier must be supplied together");
+  if (config.windowsStorageSecurityVerifier !== undefined && config.expectedWindowsServiceSid === undefined) {
+    throw new AutonomousExecutionHostBootstrapError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid is required when a custom Windows storage verifier is supplied");
   }
+  const windowsStorageSecurityVerifier = config.windowsStorageSecurityVerifier ??
+    (config.expectedWindowsServiceSid === undefined ? undefined : readWindowsStorageSecurityReport);
   if (!validPath(storageDirectory) || resolve(storageDirectory) === parse(resolve(storageDirectory)).root) {
     throw new AutonomousExecutionHostBootstrapError("INVALID_STORAGE_DIRECTORY", "storageDirectory must be an absolute non-root path");
   }
@@ -354,7 +357,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       storage = inspectStorageDirectory(storageDirectory, {
         create: true,
         probeWrite: true,
-        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier,
+        windowsStorageSecurityVerifier,
         expectedWindowsServiceSid: config.expectedWindowsServiceSid
       });
       checks.push(freezeCheck("storage-directory", true));
@@ -508,7 +511,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
 
     try {
       inspectStorageDirectory(storageDirectory, {
-        windowsStorageSecurityVerifier: config.windowsStorageSecurityVerifier,
+        windowsStorageSecurityVerifier,
         expectedWindowsServiceSid: config.expectedWindowsServiceSid
       });
       checks.push(freezeCheck("storage-directory-secure", true));
