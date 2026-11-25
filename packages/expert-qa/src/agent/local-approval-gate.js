@@ -134,7 +134,6 @@ export function createLocalApprovalGate(options = {}) {
       entry.abortHandler = () => settle(id, false, "aborted");
       if (entry.signal) entry.signal.addEventListener("abort", entry.abortHandler, { once: true });
       entry.timer = setTimeout(() => settle(id, false, "expired"), timeoutMs);
-      entry.timer.unref?.();
       pending.set(id, entry);
       if (entry.signal?.aborted) settle(id, false, "aborted");
     });
