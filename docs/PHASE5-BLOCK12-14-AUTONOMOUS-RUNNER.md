@@ -9,7 +9,7 @@ Close the operational gap between the existing explicitly-driven execution super
 - Add a separate opt-in host runner that wraps the existing supervisor; supervisor construction and Dashboard startup remain inert.
 - Provide explicit start/stop lifecycle and a bounded idle polling interval. Drain queued work in bounded batches, then wait when no eligible work exists.
 - Reuse the existing runtime, queue, worker, containment, policy, approval and durable event-journal path. No alternate execution path.
-- Serialize tick/drain operations and reject unsafe dependency/configuration shapes.
+- Enforce one active runner owner per supervisor, serialize tick/drain operations, and make concurrent stop requests idempotent.
 - Expose sanitized status: state, last tick, last activity, processed counts, consecutive runner errors, next poll timestamp, event emission failures and queue persistence state.
 - Handle graceful shutdown: stop admitting runner ticks, wait for an in-flight bounded drain, then leave resource closing to the supervisor/host owner.
 - Stop in a fail-closed state after the configured consecutive-error threshold. Never silently restart the QA runtime or replay interrupted jobs.
@@ -35,14 +35,15 @@ Close the operational gap between the existing explicitly-driven execution super
 ## Implementation progress
 
 - Initial runner module and public root/package exports are present.
-- Status telemetry now reports the actual queue persistence field and next poll timestamp.
+- Status telemetry reports the actual queue persistence field and next poll timestamp.
+- Supervisor ownership is exclusive per active runner instance; concurrent stop calls share one shutdown promise.
 - Runner event records share the existing sanitized event journal schema; productive ticks are recorded while idle polls are omitted.
-- Focused tests cover inert construction, bounded drains, idle and in-flight shutdown, fail-closed handling, status telemetry, journal events and a real queue/worker/supervisor integration path.
-- Current CI results for the earlier candidate were green. The updated candidate requires a fresh full CI run and native integration certification.
+- Focused tests cover inert construction, bounded drains, ownership exclusion, concurrent stop, idle and in-flight shutdown, fail-closed handling, status telemetry, journal events and real queue/worker/supervisor integration.
+- The updated candidate requires a fresh full CI run and native integration certification.
 
 ## Validation plan
 
-- Unit tests: inert construction, invalid config, explicit start, duplicate start behavior, bounded batch, idle wait scheduling, tick serialization, stop during idle and active drain, threshold-triggered fail-closed state, sanitized event emission and accurate persistence reporting.
+- Unit tests: inert construction, invalid config, explicit start, duplicate start behavior, bounded batch, idle wait scheduling, tick serialization, supervisor ownership, concurrent stop, stop during idle and active drain, threshold-triggered fail-closed state, sanitized event emission and accurate persistence reporting.
 - Integration: queued work completes through the actual queue, worker and supervisor when the host runner is started; interrupted jobs remain operator-reviewed and are not replayed.
 - Regression: worker, queue, supervisor, runtime, containment and event-journal suites.
 - Certification: Core Validation, Security QA, Security Guard multi-runtime, JB Engines Certification, Linux and Windows native labs.
