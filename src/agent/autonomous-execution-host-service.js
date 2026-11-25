@@ -133,6 +133,25 @@ export function createAutonomousExecutionHostService(options = {}) {
     if (closePromise) return closePromise;
     if (state === "closed") return Promise.resolve(getStatus());
 
+    const currentSignalStatus = signalLifecycle?.getStatus();
+    if (currentSignalStatus &&
+        (currentSignalStatus.state === "shutting-down" ||
+         currentSignalStatus.state === "closed" ||
+         currentSignalStatus.state === "failed")) {
+      signalLifecycle.detach();
+      closePromise = signalLifecycle.shutdown().then(
+        () => {
+          state = "closed";
+          return getStatus();
+        },
+        error => {
+          state = "failed";
+          throw error;
+        }
+      );
+      return closePromise;
+    }
+
     state = "stopping";
     signalLifecycle?.detach();
     closePromise = (async () => {
