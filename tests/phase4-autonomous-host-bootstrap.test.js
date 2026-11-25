@@ -77,6 +77,26 @@ test("Phase 4 host factory requires explicit enablement, policy, approval and ex
   );
 });
 
+test("Phase 4 uses the built-in Windows ACL verifier when a service SID is configured", async t => {
+  if (process.platform === "win32") {
+    t.skip("the default verifier requires the process to run as the configured Windows service identity");
+    return;
+  }
+  const storage = await mkdtemp(join(tmpdir(), "jbqa-phase4-native-acl-"));
+  const config = options(storage, {
+    expectedWindowsServiceSid: "S-1-5-19",
+    windowsStorageSecurityVerifier: undefined
+  });
+  const host = createPhase4AutonomousHostBootstrap(config);
+  try {
+    const preflight = await host.preflight();
+    assert.equal(preflight.passed, true);
+  } finally {
+    await host.stop();
+    await rm(storage, { recursive: true, force: true });
+  }
+});
+
 test("Phase 4 built-in catalog is wired to the host without starting runners during construction", async () => {
   const directory = await mkdtemp(join(tmpdir(), "jbqa-phase4-host-inert-"));
   const config = options(directory);
