@@ -271,7 +271,7 @@ async function certifyWindowsScm() {
   const wrapperPath = join(appDirectory, serviceId + ".exe");
   const wrapperConfig = join(appDirectory, serviceId + ".xml");
   let installAttempted = false;
-  let installed = false;\n    installAttempted = false;
+  let installed = false;
   let wrapper = null;
   let firstPid = null;
   let secondPid = null;
@@ -397,6 +397,7 @@ async function certifyWindowsScm() {
     assert(failedAttempts.length === profile.restartDelaysSeconds.length + 1, "WinSW generated failure-action sequence was not enforced exactly");
     assertCommand(await command(wrapperPath, ["uninstall"]), "WinSW uninstall disposable generated service");
     installed = false;
+    installAttempted = false;
 
     return {
       platform: "windows-scm",
