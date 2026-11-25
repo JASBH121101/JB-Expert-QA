@@ -16,7 +16,7 @@ test("native Windows ACL inspection fails closed when invoked on a non-Windows h
       expectedServiceSid: "S-1-5-19"
     }),
     error => error instanceof WindowsStorageSecurityError &&
-      error.code === "WINDOWS_STORAGE_SECURITY_PLATFORM_UNSUPPORTED"
+      error.code === "WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID"
   );
 });
 
