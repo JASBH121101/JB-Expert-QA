@@ -189,7 +189,7 @@ export function createSystemdHostServiceProfile(options = {}) {
  */
 export function createWindowsHostServiceProfile(options = {}) {
   const config = readOptions(options, "Windows options", new Set([
-    "serviceId", "displayName", "description", "nodeExecutable",
+    "serviceId", "displayName", "description", "serviceAccount", "nodeExecutable",
     "entryPoint", "workingDirectory", "storageDirectory", "logDirectory",
     "startMode", "delayedAutoStart", "restartDelaysSeconds", "stopTimeoutSeconds"
   ]));
@@ -199,6 +199,11 @@ export function createWindowsHostServiceProfile(options = {}) {
   const displayName = requiredText(config.displayName ?? "JB Expert QA Autonomous Host",
     "display name", /^[^\u0000-\u001F\u007F<>%]{1,120}$/u, 120);
   const description = requiredText(config.description ?? "JB Expert QA local autonomous execution host",
+  const serviceAccount = config.serviceAccount ?? "LocalService";
+  if (!["LocalService", "NetworkService"].includes(serviceAccount)) {
+    throw new AutonomousExecutionServiceDeploymentError("INVALID_SERVICE_ACCOUNT", "serviceAccount must be LocalService or NetworkService");
+  }
+  const serviceAccountName = "NT AUTHORITY\\" + serviceAccount;
     "description", /^[^\u0000-\u001F\u007F%]{1,240}$/u, 240);
   const nodeExecutable = validateWindowsPath(config.nodeExecutable, "nodeExecutable");
   const entryPoint = validateWindowsPath(config.entryPoint, "entryPoint");
@@ -226,6 +231,9 @@ export function createWindowsHostServiceProfile(options = {}) {
     "  <id>" + xmlEscape(serviceId) + "</id>",
     "  <name>" + xmlEscape(displayName) + "</name>",
     "  <description>" + xmlEscape(description) + "</description>",
+    "  <serviceaccount>",
+    "    <username>" + serviceAccountName + "</username>",
+    "  </serviceaccount>",
     "  <executable>" + xmlEscape(nodeExecutable) + "</executable>",
     "  <arguments>\"" + xmlEscape(entryPoint) + "\"</arguments>",
     "  <workingdirectory>" + xmlEscape(workingDirectory) + "</workingdirectory>",
@@ -249,6 +257,7 @@ export function createWindowsHostServiceProfile(options = {}) {
     wrapper: "WinSW XML (stable operator-supplied wrapper; independently verified)",
     content: xml,
     serviceId,
+    serviceAccount,
     storageDirectory,
     logDirectory,
     startMode,
