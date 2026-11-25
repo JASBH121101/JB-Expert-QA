@@ -95,7 +95,7 @@ test("real Static QA action runs through host queue, orchestrator policy and ext
       actions: [{ id: "static-qa-run", type: STATIC_ACTION, input: { path: project } }]
     });
     const completed = await waitForJob(host, queued.id);
-    assert.equal(completed.status, "completed");
+    assert.equal(completed.state, "completed");
     assert.equal(completed.result.status, "succeeded");
     assert.equal(completed.result.actions[0].status, "succeeded");
     assert.equal(completed.result.actions[0].output.adapter, "jb.static-qa-engine");
