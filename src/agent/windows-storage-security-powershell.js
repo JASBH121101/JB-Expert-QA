@@ -101,7 +101,7 @@ export function createWindowsPowerShellStorageSecurityVerifier(options = {}) {
         request.directory.length > 4096 ||
         request.directory.includes("\0") ||
         !win32.isAbsolute(request.directory) ||
-        !/^[A-Za-z]:\\\\$/u.test(win32.parse(request.directory).root) ||
+        !/^[A-Za-z]:\\$/u.test(win32.parse(request.directory).root) ||
         !SERVICE_SIDS.has(request.expectedServiceSid)) {
       throw new WindowsPowerShellStorageVerifierError(
         "WINDOWS_STORAGE_VERIFIER_INVALID",
