@@ -2,83 +2,40 @@
 
 ## Objective
 
-Make Windows host startup fail closed when the process identity and state-directory NTFS permissions cannot be verified. The gate closes the gap identified in the Phase 5 independence certificate: POSIX owner/mode checks were performed by the bootstrap, while Windows ACLs were left to manual operator verification.
+Make Windows autonomous-host startup fail closed unless the live process identity and persistent state-directory NTFS permissions are verified. The policy is enforced by the repository's report validator and is connected to the native inspector delivered in Block 6.4.
 
-This block does not install an operating-system service, create a Windows account, change NTFS permissions or elevate privileges.
+This block does not create Windows accounts, change ACLs, install services, elevate privileges or modify a host machine.
 
 ## Windows startup contract
 
-On Windows, the bootstrap now requires both:
+When running on Windows, bootstrap requires:
+- `expectedWindowsServiceSid`: `S-1-5-19` (LocalService) or `S-1-5-20` (NetworkService), matching the service profile.
+- A pre-existing local state directory. Windows bootstrap deliberately does not create it.
 
-- `expectedWindowsServiceSid`: exactly `S-1-5-19` (LocalService) or `S-1-5-20` (NetworkService), matching the selected service profile.
-- `windowsStorageSecurityVerifier`: a synchronous, trusted application/deployment callback that inspects the actual process token and the complete effective DACL for the configured state directory.
+When the embedding application does not provide a custom `windowsStorageSecurityVerifier`, the bootstrap uses the built-in `readWindowsStorageSecurityReport()` inspector from Block 6.4. A custom verifier remains possible but must be a trusted, separately reviewed native integration that returns the same report contract.
 
-The state directory must already exist. The bootstrap does not create a Windows directory using inherited/default ACLs and then assume it is private.
-
-The callback receives a frozen object:
-
-```js
-{
-  directory: "C:\\ProgramData\\JB Expert QA",
-  expectedServiceSid: "S-1-5-19"
-}
-```
-
-It must return a plain data object with this exact schema:
-
-```js
-{
-  directory: "C:\\ProgramData\\JB Expert QA",
-  processIdentitySid: "S-1-5-19",
-  ownerSid: "S-1-5-19",
-  daclProtected: true,
-  accessEntries: [
-    {
-      sid: "S-1-5-19",
-      type: "allow",
-      access: "modify",
-      inherited: false
-    },
-    {
-      sid: "S-1-5-18",
-      type: "allow",
-      access: "full-control",
-      inherited: false
-    }
-  ]
-}
-```
-
-The example is a schema illustration, not a report to hardcode in production. The callback must obtain the current process token SID and directory owner from Windows security APIs, enumerate the complete DACL, and report every effective ACE. It must not infer permissions from the directory's existence or from a successful write test.
+The built-in inspector reads the current process token SID, directory owner SID, DACL protection state and every explicit/inherited access entry. The validator independently decides whether the evidence satisfies policy.
 
 ## Validation policy
 
-The package validator rejects the report unless all of these conditions hold:
+The report is accepted only when:
+1. The inspected directory matches the configured storage directory.
+2. The current process identity and directory owner both match the expected LocalService or NetworkService SID.
+3. The DACL is protected from parent inheritance.
+4. Every ACE is an explicit allow entry; deny and inherited ACEs are rejected.
+5. The service identity has explicit Modify or Full Control.
+6. The only additional principals are LocalSystem (`S-1-5-18`) and local Administrators (`S-1-5-32-544`), with Full Control only.
+7. Every permitted ACE applies to both child files and child directories and is not inherit-only.
+8. Broad principals, unknown/duplicate SIDs, unsupported rights, accessors, sparse arrays and extra report fields are rejected.
 
-1. The reported path exactly matches the normalized configured state directory.
-2. The actual process identity and directory owner both match the expected LocalService or NetworkService SID.
-3. The directory DACL is protected from parent inheritance.
-4. Every reported ACE is an explicit allow entry; inherited entries and deny entries are rejected.
-5. The service identity has explicit `modify` or `full-control` access.
-6. The only other permitted principals are LocalSystem (`S-1-5-18`) and local Administrators (`S-1-5-32-544`); these may have `full-control` only.
-7. Broad principals such as Everyone, Authenticated Users and built-in Users, unknown SIDs, duplicate entries, accessors, sparse arrays and extra report fields are rejected.
-
-The validation helper returns only sanitized boolean evidence. Raw paths and ACL details are not copied into the bootstrap diagnostics.
+The validator returns sanitized boolean evidence only. Raw paths and ACL details are not copied into bootstrap diagnostics.
 
 ## Application wiring
 
-```js
-import {
-  createPhase4AutonomousHostBootstrap,
-  validateWindowsStorageSecurityReport
-} from "@jb/expert-qa";
+For a LocalService deployment:
 
-// Implement this callback with a trusted native Windows security adapter.
-// The adapter must inspect the live process token and full effective NTFS DACL.
-function windowsStorageSecurityVerifier({ directory, expectedServiceSid }) {
-  const nativeReport = readActualWindowsSecurityState(directory);
-  return nativeReport;
-}
+```js
+import { createPhase4AutonomousHostBootstrap } from "@jb/expert-qa";
 
 const host = createPhase4AutonomousHostBootstrap({
   enabled: true,
@@ -87,26 +44,25 @@ const host = createPhase4AutonomousHostBootstrap({
   apiAllowedOrigins: ["https://api.example.test"],
   policy: productionPolicy,
   approvalGate,
-  expectedWindowsServiceSid: "S-1-5-19",
-  windowsStorageSecurityVerifier
+  expectedWindowsServiceSid: "S-1-5-19"
 });
 ```
 
-`readActualWindowsSecurityState()` above is intentionally an application-owned placeholder, not an exported package function. The application must implement and independently review it against the host's real token and NTFS ACL. The package's `validateWindowsStorageSecurityReport()` validates the returned contract; it does not itself query Windows or make an untrusted callback trustworthy.
+For NetworkService, use `expectedWindowsServiceSid: "S-1-5-20"`. The built-in inspector is selected automatically when the expected SID is supplied and no custom verifier is configured.
 
-The same options pass through the Phase 4 integration factory into the autonomous host bootstrap. POSIX startup continues to use the existing realpath, owner, mode and private write-probe checks.
+POSIX continues using the existing realpath, owner, mode and private write/fsync/delete probe checks.
 
 ## Failure behavior
 
-- Missing verifier or expected SID: `WINDOWS_STORAGE_SECURITY_REQUIRED`.
-- Verifier execution failure: `WINDOWS_STORAGE_SECURITY_VERIFICATION_FAILED`.
-- Malformed, mismatched or overbroad ACL attestation: `WINDOWS_STORAGE_SECURITY_INVALID`.
-- Missing Windows state directory: `STORAGE_DIRECTORY_MISSING`; the bootstrap does not create it.
-- Any failed preflight prevents host construction, lock acquisition, signal registration and runner startup.
-- The same verification is repeated by readiness checks while the host is running.
+- Missing expected SID or verifier: Windows storage preflight fails closed.
+- Native PowerShell query failure or malformed report: startup is blocked.
+- Mismatched identity/owner, unprotected DACL or unsupported ACE: `WINDOWS_STORAGE_SECURITY_INVALID`.
+- Missing Windows state directory: `STORAGE_DIRECTORY_MISSING`; no directory is created.
+- Failed preflight prevents host construction, lock acquisition, signal registration and runner startup.
+- Storage security is rechecked during readiness.
 
 ## Verification scope
 
-Unit tests cover exact report shape, service SID and owner matching, protected DACL, explicit allow-only ACEs, allowed principals, rights, duplicate entries, inherited/deny ACEs and accessor rejection. The Windows CI host fixtures use a synthetic verifier to exercise the fail-closed integration contract; they do not constitute evidence of ACL correctness on a production machine.
+The validator unit tests cover identity/owner matching, protected DACL, explicit allow-only principals, rights, duplicate entries, inherited/deny ACEs, child file/directory inheritance, inherit-only rejection and accessor/hole rejection. The native inspector's real PowerShell query is deliberately not run under ordinary hosted Windows CI identities because those runners are not LocalService/NetworkService; the CI suite verifies the surrounding contracts under its permitted test identities.
 
-Production activation still requires an independently implemented native Windows verifier, operator-provisioned service identity and directory ACL, a reviewed WinSW profile, and an operator-controlled installation. No host machine or service is modified by this block.
+The built-in native inspector is documented in `docs/PHASE6-BLOCK6-4-NATIVE-WINDOWS-ACL-INSPECTION.md`. Production still requires operator provisioning of the service identity and protected state-directory DACL, plus a reviewed service profile and operator-controlled installation. No machine or service is modified by these code blocks.
