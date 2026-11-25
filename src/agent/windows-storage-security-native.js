@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { isAbsolute } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { validateWindowsStorageSecurityReport, WindowsStorageSecurityError } from "./windows-storage-security.js";
 
 const SERVICE_SIDS = new Set(["S-1-5-19", "S-1-5-20"]);
@@ -27,7 +27,7 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
   const encodedPath = Buffer.from(directory, "utf16le").toString("base64");
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)",
+    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
     "$path = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('" + encodedPath + "'))",
     "$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()",
     "$acl = Get-Acl -LiteralPath $path",
@@ -64,7 +64,10 @@ export function readWindowsStorageSecurityReport({ directory, expectedServiceSid
 
   let output;
   try {
-    output = execFileSync("powershell.exe", [
+    const windowsRoot = process.env.SystemRoot || "C:\\Windows";
+    const powershellExecutable = join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    if (!isAbsolute(powershellExecutable)) throw new Error("invalid Windows PowerShell path");
+    output = execFileSync(powershellExecutable, [
       "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encodedCommand
     ], {
       encoding: "utf8",
