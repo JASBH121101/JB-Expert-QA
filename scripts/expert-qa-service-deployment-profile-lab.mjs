@@ -434,6 +434,8 @@ async function certifyWindowsScm() {
     secondPid = second.pid;
     assert(secondPid !== firstPid, "SCM restart did not replace the host process");
     assert(/^nt authority\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
+    assert(second.storageAclVerified === true && second.storageOwnerVerified === true && second.storageIdentityVerified === true,
+      "native Windows ACL inspection failed after the SCM restart");
 
     const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after SCM restart");
     const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
@@ -458,6 +460,8 @@ async function certifyWindowsScm() {
         /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
     }, "WinSW generated failure-action exhaustion", 30_000);
     const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
+    assert(failedAttempts.every(item => item.storageAclVerified === true && item.storageOwnerVerified === true && item.storageIdentityVerified === true),
+      "a WinSW failure-action restart bypassed native LocalService ACL verification");
     assert(failedAttempts.length === profile.restartDelaysSeconds.length + 1, "WinSW generated failure-action sequence was not enforced exactly");
     assertCommand(await command(wrapperPath, ["uninstall"]), "WinSW uninstall disposable generated service");
     installed = false;
