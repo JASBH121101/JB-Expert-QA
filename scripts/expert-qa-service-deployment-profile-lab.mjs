@@ -9,7 +9,6 @@ import {
   readdirSync,
   rmSync,
   writeFileSync,
-  chmodSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -126,7 +125,7 @@ async function certifySystemd() {
 
   try {
     const version = assertCommand(await command("systemd-analyze", ["--version"]), "systemd-analyze --version");
-    const userAdd = await privileged("useradd", [
+    await privileged("useradd", [
       "--system", "--user-group", "--no-create-home",
       "--home-dir", "/nonexistent", "--shell", "/usr/sbin/nologin", serviceUser
     ], "create disposable non-root systemd identity");
