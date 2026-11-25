@@ -329,7 +329,6 @@ async function certifyWindowsScm() {
   };
 
   const fixture = [
-
     'import { existsSync, writeFileSync } from "node:fs";',
     'import { execFileSync } from "node:child_process";',
     'import { join } from "node:path";',
@@ -514,7 +513,7 @@ async function main() {
       : (() => { throw new Error("Unsupported platform for host deployment profile lab"); })();
 
   const evidence = {
-    schema: "jb.expert-qa.host-service-deployment-lab/v1",
+    schema: "jb.expert-qa.host-service-deployment-lab/v2",
     generatedAt: new Date().toISOString(),
     commit: process.env.GITHUB_SHA || null,
     workflowRunId: process.env.GITHUB_RUN_ID || null,
