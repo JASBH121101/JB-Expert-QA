@@ -113,7 +113,7 @@ test("Windows profile renders WinSW XML with quoted entry point and finite resta
 
   assert.equal(profile.platform, "windows-scm");
   assert.equal(profile.fileName, "JBExpertQA.xml");
-  assert.equal(profile.wrapper, "WinSW v3 (operator-supplied and separately verified)");
+  assert.equal(profile.wrapper, "WinSW XML (stable operator-supplied wrapper; independently verified)");
   assert.equal(profile.startMode, "Automatic");
   assert.equal(profile.delayedAutoStart, true);
   assert.equal(profile.restartExhaustionAction, "none");
