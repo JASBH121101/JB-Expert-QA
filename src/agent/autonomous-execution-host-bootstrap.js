@@ -331,18 +331,21 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
           !limits || typeof limits !== "object" || Array.isArray(limits)) {
         throw new AutonomousExecutionHostBootstrapError("POLICY_SNAPSHOT_INVALID", "policy snapshot is incomplete");
       }
-      if (!permissions.includes(QA_ENGINE_EXECUTION_PERMISSION)) {
-        throw new AutonomousExecutionHostBootstrapError("POLICY_PERMISSION_MISSING", "policy does not grant the QA engine execution permission");
+      if (!permissions.includes(QA_ENGINE_EXECUTION_PERMISSION) ||
+          new Set(permissions).size !== permissions.length) {
+        throw new AutonomousExecutionHostBootstrapError("POLICY_PERMISSION_MISSING", "policy does not grant a unique QA engine execution permission");
       }
       for (const key of REQUIRED_POLICY_LIMITS) {
         const limit = readDataProperty(limits, key, "policy limits");
-        if (!Number.isSafeInteger(limit) || limit < 1) {
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 600000 ||
+            (key === "maxActions" && limit > 50)) {
           throw new AutonomousExecutionHostBootstrapError("POLICY_LIMIT_INVALID", "policy contains an invalid execution limit");
         }
       }
       const registeredActions = new Set((engines ?? []).map(engine => getQaEngineActionType(readDataProperty(engine, "id", "engine metadata"))));
-      if (!allowedActions.every(action => typeof action === "string" && registeredActions.has(action))) {
-        throw new AutonomousExecutionHostBootstrapError("POLICY_ACTION_INVALID", "policy contains an action outside the registered engine catalog");
+      if (!allowedActions.every(action => typeof action === "string" && registeredActions.has(action)) ||
+          new Set(allowedActions).size !== allowedActions.length) {
+        throw new AutonomousExecutionHostBootstrapError("POLICY_ACTION_INVALID", "policy contains an action outside the registered engine catalog or duplicate actions");
       }
       allowedEngineCount = allowedActions.length;
       if (allowedEngineCount < 1) {
