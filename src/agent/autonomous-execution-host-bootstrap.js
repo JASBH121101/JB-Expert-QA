@@ -286,6 +286,10 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
   if (config.windowsStorageSecurityVerifier !== undefined && typeof config.windowsStorageSecurityVerifier !== "function") {
     throw new AutonomousExecutionHostBootstrapError("INVALID_WINDOWS_STORAGE_SECURITY_VERIFIER", "windowsStorageSecurityVerifier must be a function");
   }
+  if (config.expectedWindowsServiceSid !== undefined &&
+      !["S-1-5-19", "S-1-5-20"].includes(config.expectedWindowsServiceSid)) {
+    throw new AutonomousExecutionHostBootstrapError("INVALID_WINDOWS_SERVICE_SID", "expectedWindowsServiceSid must identify LocalService or NetworkService");
+  }
   if ((config.windowsStorageSecurityVerifier === undefined) !== (config.expectedWindowsServiceSid === undefined)) {
     throw new AutonomousExecutionHostBootstrapError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID", "expectedWindowsServiceSid and windowsStorageSecurityVerifier must be supplied together");
   }
