@@ -114,12 +114,14 @@ test("Windows profile renders WinSW XML with quoted entry point and finite resta
   assert.equal(profile.platform, "windows-scm");
   assert.equal(profile.fileName, "JBExpertQA.xml");
   assert.equal(profile.wrapper, "WinSW XML (stable operator-supplied wrapper; independently verified)");
+  assert.equal(profile.serviceAccount, "LocalService");
   assert.equal(profile.startMode, "Automatic");
   assert.equal(profile.delayedAutoStart, true);
   assert.equal(profile.restartExhaustionAction, "none");
   assert.deepEqual(profile.restartDelaysSeconds, [15, 45]);
   assert.match(profile.content, /<name>JB Expert QA &amp; Autonomous Host<\/name>/u);
   assert.match(profile.content, /<description>Local QA host &lt;managed&gt;<\/description>/u);
+  assert.ok(profile.content.includes("<username>NT AUTHORITY\\LocalService</username>"));
   assert.match(profile.content, /<executable>C:\\Program Files\\nodejs\\node\.exe<\/executable>/u);
   assert.match(profile.content, /<arguments>"C:\\Program Files\\JB Expert QA\\host-service\.mjs"<\/arguments>/u);
   assert.match(profile.content, /<stoptimeout>75sec<\/stoptimeout>/u);
@@ -136,6 +138,14 @@ test("Windows Manual start mode defaults to no delayed automatic startup", () =>
   assert.equal(profile.delayedAutoStart, false);
   assert.match(profile.content, /<startmode>Manual<\/startmode>/u);
   assert.doesNotMatch(profile.content, /delayedAutoStart/u);
+});
+
+test("Windows profile only permits least-privilege built-in service identities", () => {
+  const network = createWindowsHostServiceProfile(validWindows({ serviceAccount: "NetworkService" }));
+  assert.equal(network.serviceAccount, "NetworkService");
+  assert.ok(network.content.includes("<username>NT AUTHORITY\\NetworkService</username>"));
+  assert.throws(() => createWindowsHostServiceProfile(validWindows({ serviceAccount: "LocalSystem" })),
+    error => error.code === "INVALID_SERVICE_ACCOUNT");
 });
 
 test("Windows profile rejects malformed paths, unsafe service IDs and invalid retry policy", () => {
