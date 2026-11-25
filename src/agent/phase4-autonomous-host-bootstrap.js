@@ -26,7 +26,7 @@ function readOptions(value) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Phase4AutonomousHostIntegrationError("INVALID_OPTIONS", "options must be a plain object");
   }
-  const allowed = new Set(["storageDirectory", "enabled", "signalSource", "apiAllowedOrigins", "policy", "requestApproval", "signals", "hostOptions", "onDiagnostic"]);
+  const allowed = new Set(["storageDirectory", "enabled", "signalSource", "apiAllowedOrigins", "policy", "requestApproval", "approvalGate", "signals", "hostOptions", "onDiagnostic"]);
   const output = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== "string" || !allowed.has(key)) {
@@ -39,6 +39,21 @@ function readOptions(value) {
     output[key] = descriptor.value;
   }
   return output;
+}
+
+function readApprovalGate(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Phase4AutonomousHostIntegrationError("INVALID_APPROVAL_GATE", "approvalGate must be a trusted local approval gate");
+  }
+  const methods = Object.create(null);
+  for (const name of ["requestApproval", "listPending", "getStatus", "approve", "deny"]) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, name);
+    if (!descriptor || !Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+      throw new Phase4AutonomousHostIntegrationError("INVALID_APPROVAL_GATE", "approvalGate must expose its own " + name + "() method");
+    }
+    methods[name] = descriptor.value.bind(value);
+  }
+  return Object.freeze(methods);
 }
 
 function validateOrigins(value) {
@@ -95,8 +110,13 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
   if (!config.policy || typeof config.policy !== "object" || Array.isArray(config.policy)) {
     throw new Phase4AutonomousHostIntegrationError("POLICY_REQUIRED", "a trusted host execution policy is required");
   }
-  if (typeof config.requestApproval !== "function") {
-    throw new Phase4AutonomousHostIntegrationError("APPROVAL_PROVIDER_REQUIRED", "a real external approval provider is required");
+  const approvalGate = config.approvalGate === undefined ? null : readApprovalGate(config.approvalGate);
+  if (approvalGate && config.requestApproval !== undefined) {
+    throw new Phase4AutonomousHostIntegrationError("APPROVAL_PROVIDER_CONFLICT", "provide approvalGate or requestApproval, not both");
+  }
+  const requestApproval = approvalGate?.requestApproval ?? config.requestApproval;
+  if (typeof requestApproval !== "function") {
+    throw new Phase4AutonomousHostIntegrationError("APPROVAL_PROVIDER_REQUIRED", "a real external approval provider or local approvalGate is required");
   }
   if (!config.signalSource || typeof config.signalSource.on !== "function" || typeof config.signalSource.off !== "function") {
     throw new Phase4AutonomousHostIntegrationError("SIGNAL_SOURCE_REQUIRED", "signalSource must expose on() and off()");
@@ -106,7 +126,7 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
   const orchestrator = createQaEngineOrchestrator({
     registry,
     policy: config.policy,
-    requestApproval: config.requestApproval
+    requestApproval
   });
   const bootstrap = createAutonomousExecutionHostBootstrap({
     orchestrator,
@@ -132,6 +152,12 @@ export function createPhase4AutonomousHostBootstrap(options = {}) {
     enqueue: bootstrap.enqueue,
     getJob: bootstrap.getJob,
     listJobs: bootstrap.listJobs,
-    listEvents: bootstrap.listEvents
+    listEvents: bootstrap.listEvents,
+    ...(approvalGate ? {
+      listApprovals: approvalGate.listPending,
+      getApprovalStatus: approvalGate.getStatus,
+      approveApproval: approvalGate.approve,
+      denyApproval: approvalGate.deny
+    } : {})
   });
 }

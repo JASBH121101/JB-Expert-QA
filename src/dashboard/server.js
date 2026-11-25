@@ -146,7 +146,81 @@ function readPhase5HostBootstrap(value) {
     }
     methods[name] = descriptor.value.bind(value);
   }
+  const approvalNames = ["listApprovals", "getApprovalStatus", "approveApproval", "denyApproval"];
+  const approvalDescriptors = approvalNames.map((name) => Object.getOwnPropertyDescriptor(value, name));
+  const approvalCount = approvalDescriptors.filter(Boolean).length;
+  if (approvalCount !== 0 && approvalCount !== approvalNames.length) {
+    throw new TypeError("phase5HostBootstrap must expose the complete local approval gate method set");
+  }
+  if (approvalCount === approvalNames.length) {
+    for (let index = 0; index < approvalNames.length; index += 1) {
+      const descriptor = approvalDescriptors[index];
+      if (!Object.hasOwn(descriptor, "value") || typeof descriptor.value !== "function") {
+        throw new TypeError("phase5HostBootstrap must expose its own " + approvalNames[index] + "() method");
+      }
+      methods[approvalNames[index]] = descriptor.value.bind(value);
+    }
+  }
   return Object.freeze(methods);
+}
+
+function safeApprovalRequest(value) {
+  if (!isRecord(value)) return null;
+  const read = (key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : undefined;
+  };
+  const id = read("id");
+  const executionId = read("executionId");
+  const actionId = read("actionId");
+  const actionType = read("actionType");
+  const risk = read("risk");
+  const permissions = read("permissions");
+  const inputDigest = read("inputDigest");
+  const createdAt = read("createdAt");
+  const expiresAt = read("expiresAt");
+  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/iu.test(id) ||
+      typeof executionId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(executionId) ||
+      typeof actionId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(actionId) ||
+      typeof actionType !== "string" || !/^qa\.engine\.[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u.test(actionType) ||
+      !["low", "medium", "high"].includes(risk) ||
+      !Array.isArray(permissions) || permissions.length < 1 || permissions.length > 16 ||
+      permissions.some((item) => typeof item !== "string" || !/^[a-z][a-z0-9:-]{0,79}$/u.test(item)) ||
+      typeof inputDigest !== "string" || !/^[a-f0-9]{64}$/u.test(inputDigest) ||
+      !safeHostTimestamp(createdAt) || !safeHostTimestamp(expiresAt)) return null;
+  return Object.freeze({
+    id, executionId, actionId, actionType, risk,
+    permissions: Object.freeze([...permissions]),
+    inputDigest, createdAt, expiresAt
+  });
+}
+
+async function readPhase5ApprovalSnapshot(controller) {
+  if (!controller || typeof controller.listApprovals !== "function" ||
+      typeof controller.getApprovalStatus !== "function") {
+    return Object.freeze({ enabled: false, status: null, pending: [] });
+  }
+  const [status, pending] = await Promise.all([
+    controller.getApprovalStatus(),
+    controller.listApprovals()
+  ]);
+  if (!isRecord(status) || !Array.isArray(pending)) {
+    throw new TypeError("Local approval gate returned an invalid status snapshot");
+  }
+  const safePending = pending.slice(0, 32).map(safeApprovalRequest).filter(Boolean);
+  return Object.freeze({
+    enabled: status.enabled === true && status.closed !== true,
+    status: Object.freeze({
+      closed: status.closed === true,
+      pendingCount: safeHostCount(status.pendingCount),
+      approvedCount: safeHostCount(status.approvedCount),
+      deniedCount: safeHostCount(status.deniedCount),
+      expiredCount: safeHostCount(status.expiredCount),
+      maxPending: safeHostCount(status.maxPending),
+      timeoutMs: safeHostCount(status.timeoutMs)
+    }),
+    pending: Object.freeze(safePending)
+  });
 }
 
 function safeHostState(value) {
@@ -481,6 +555,14 @@ export function createDashboardServer({
           }
           return;
         }
+        if (pathname === "/api/phase5/host/approvals") {
+          try {
+            json(response, 200, await readPhase5ApprovalSnapshot(phase5HostControl));
+          } catch {
+            fail(response, 503, "phase5_approvals_unavailable", "Local approval requests could not be read safely");
+          }
+          return;
+        }
         if (pathname === "/api/engines") { json(response, 200, { engines: registry.list() }); return; }
         if (pathname === "/api/phase4/engines") {
           const engines = phase4Registry.list();
@@ -677,6 +759,30 @@ export function createDashboardServer({
           }); return;
         }
         fail(response, 404, "not_found", "Route not found"); return;
+      }
+
+      const phase5ApprovalOperation = new RegExp("^/api/phase5/host/approvals/([0-9a-f-]{36})/(approve|deny)$", "iu").exec(pathname);
+      if (request.method === "POST" && phase5ApprovalOperation) {
+        if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
+        if (!phase5HostControl || typeof phase5HostControl.approveApproval !== "function" ||
+            typeof phase5HostControl.denyApproval !== "function") {
+          fail(response, 503, "phase5_approvals_unavailable", "No local operator approval gate is connected"); return;
+        }
+        if (requestUrl.search) { fail(response, 400, "invalid_approval_decision", "Approval decisions do not accept query parameters"); return; }
+        if (!rateAllowed(phase5HostOperationRateWindow, 10)) { fail(response, 429, "phase5_approval_rate_limited", "The approval decision request limit was reached"); return; }
+        const body = await readBody(request, maximumBodyBytes);
+        if (Object.keys(body).length !== 0) { fail(response, 400, "invalid_approval_decision", "Approval decisions must use an empty JSON object"); return; }
+        const [, id, decision] = phase5ApprovalOperation;
+        const accepted = decision.toLowerCase() === "approve"
+          ? phase5HostControl.approveApproval(id)
+          : phase5HostControl.denyApproval(id);
+        if (accepted !== true) { fail(response, 409, "approval_decision_rejected", "This approval request is expired, closed, or already decided"); return; }
+        try {
+          json(response, 200, await readPhase5ApprovalSnapshot(phase5HostControl));
+        } catch {
+          fail(response, 503, "phase5_approvals_unavailable", "The approval decision was recorded but its updated status could not be read");
+        }
+        return;
       }
 
       const phase5HostOperation = /^\/api\/phase5\/host\/(start|stop)$/u.exec(pathname);

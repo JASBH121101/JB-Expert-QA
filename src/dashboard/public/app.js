@@ -14,7 +14,9 @@ const state = {
   phase5EventLoading: false,
   phase5EventError: null,
   phase5Host: null,
-  phase5HostLoading: false
+  phase5HostLoading: false,
+  phase5Approvals: null,
+  phase5ApprovalLoading: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -831,6 +833,135 @@ async function operatePhase5Host(operation) {
   }
 }
 
+async function refreshPhase5Approvals() {
+  if (state.phase5ApprovalLoading) return;
+  state.phase5ApprovalLoading = true;
+  const refresh = document.getElementById("phase5-approvals-refresh");
+  if (refresh) refresh.disabled = true;
+  try {
+    const response = await fetch("/api/phase5/host/approvals", {
+      headers: { "Accept": "application/json" }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Could not load pending approvals.");
+    state.phase5Approvals = data;
+    renderPhase5Approvals(data);
+  } catch (error) {
+    const list = document.getElementById("phase5-approval-list");
+    if (list) list.textContent = error.message || "Could not load pending approvals.";
+    const tag = document.getElementById("phase5-approval-state");
+    if (tag) tag.textContent = "UNAVAILABLE";
+  } finally {
+    state.phase5ApprovalLoading = false;
+    if (refresh) refresh.disabled = false;
+  }
+}
+
+function renderPhase5Approvals(data) {
+  const tag = document.getElementById("phase5-approval-state");
+  const list = document.getElementById("phase5-approval-list");
+  if (!tag || !list) return;
+  const pending = Array.isArray(data?.pending) ? data.pending : [];
+  const enabled = data?.enabled === true;
+  tag.textContent = !enabled ? "NOT CONNECTED" : pending.length ? pending.length + " PENDING" : "NO PENDING";
+  tag.className = "assessment-tag " + (enabled && pending.length ? "warn" : "");
+  list.replaceChildren();
+
+  if (!enabled) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = "No local approval gate is connected. Supply approvalGate to the application host bootstrap.";
+    list.append(empty);
+    return;
+  }
+  if (!pending.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-insight";
+    empty.textContent = data.status?.closed ? "The approval gate is closed." : "No action is waiting for an operator decision.";
+    list.append(empty);
+    return;
+  }
+
+  for (const item of pending) {
+    const card = document.createElement("article");
+    card.className = "phase5-approval-card";
+    card.setAttribute("role", "listitem");
+
+    const heading = document.createElement("div");
+    heading.className = "phase5-approval-card-heading";
+    const action = document.createElement("strong");
+    action.textContent = item.actionType;
+    const risk = document.createElement("span");
+    risk.className = "assessment-tag " + (item.risk === "high" ? "warn" : "");
+    risk.textContent = String(item.risk || "unknown").toUpperCase() + " RISK";
+    heading.append(action, risk);
+
+    const metadata = document.createElement("div");
+    metadata.className = "phase5-approval-meta";
+    const fields = [
+      ["EXECUTION", item.executionId],
+      ["ACTION", item.actionId],
+      ["PERMISSIONS", Array.isArray(item.permissions) ? item.permissions.join(", ") : ""],
+      ["EXPIRES", item.expiresAt ? formatDate(item.expiresAt) : "Unknown"]
+    ];
+    for (const [label, value] of fields) {
+      const row = document.createElement("span");
+      row.textContent = label + " · " + String(value || "—");
+      metadata.append(row);
+    }
+    const digest = document.createElement("code");
+    digest.className = "phase5-approval-digest";
+    digest.textContent = "Input SHA-256 · " + String(item.inputDigest || "").slice(0, 20) + "…";
+
+    const actions = document.createElement("div");
+    actions.className = "phase5-approval-actions";
+    const approve = document.createElement("button");
+    approve.type = "button";
+    approve.className = "primary-button";
+    approve.textContent = "Approve";
+    approve.disabled = state.phase5ApprovalLoading;
+    approve.addEventListener("click", () => decidePhase5Approval(item.id, "approve", item.actionType));
+    const deny = document.createElement("button");
+    deny.type = "button";
+    deny.className = "secondary-button";
+    deny.textContent = "Deny";
+    deny.disabled = state.phase5ApprovalLoading;
+    deny.addEventListener("click", () => decidePhase5Approval(item.id, "deny", item.actionType));
+    actions.append(approve, deny);
+
+    card.append(heading, metadata, digest, actions);
+    list.append(card);
+  }
+}
+
+async function decidePhase5Approval(id, decision, actionType) {
+  if (state.phase5ApprovalLoading || !/^[0-9a-f-]{36}$/iu.test(String(id)) ||
+      !["approve", "deny"].includes(decision)) return;
+  const message = decision === "approve"
+    ? "Approve this high-risk QA action? The engine will run only if the host policy also allows it.\n\n" + String(actionType || "")
+    : "Deny this QA action? It will remain blocked.";
+  if (!window.confirm(message)) return;
+  state.phase5ApprovalLoading = true;
+  try {
+    const response = await fetch("/api/phase5/host/approvals/" + encodeURIComponent(id) + "/" + decision, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: "{}"
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "The approval decision was rejected.");
+    state.phase5Approvals = data;
+    renderPhase5Approvals(data);
+    showToast(decision === "approve" ? "Approval recorded. The host still enforces its policy." : "Request denied.");
+  } catch (error) {
+    showToast(error.message || "The approval decision failed.");
+    await refreshPhase5Approvals();
+  } finally {
+    state.phase5ApprovalLoading = false;
+    if (state.phase5Approvals) renderPhase5Approvals(state.phase5Approvals);
+  }
+}
+
 async function refreshHistory() {
   const response = await fetch("/api/history", { headers: { "Accept": "application/json" } });
   const data = await response.json();
@@ -1048,6 +1179,7 @@ $("phase4-audit-refresh").addEventListener("click", async () => {
   catch (error) { $("phase4-audit-result").textContent = error.message; }
 });
 $("phase5-host-refresh").addEventListener("click", refreshPhase5Host);
+$("phase5-approvals-refresh").addEventListener("click", () => refreshPhase5Approvals());
 $("phase5-host-start").addEventListener("click", () => operatePhase5Host("start"));
 $("phase5-host-stop").addEventListener("click", () => operatePhase5Host("stop"));
 $("phase5-events-refresh").addEventListener("click", () => refreshPhase5Events());
@@ -1064,6 +1196,7 @@ async function initialize() {
     await refreshPhase4Audit();
     await refreshPhase5Events();
     await refreshPhase5Host();
+    await refreshPhase5Approvals();
     await refreshHistory();
     await refreshAnalytics();
     setTargetMode("website");
@@ -1073,3 +1206,6 @@ async function initialize() {
   }
 }
 initialize();
+window.setInterval(() => {
+  if (!state.phase5ApprovalLoading && document.visibilityState === "visible") void refreshPhase5Approvals();
+}, 2500);
