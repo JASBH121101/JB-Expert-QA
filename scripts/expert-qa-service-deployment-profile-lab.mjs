@@ -270,7 +270,8 @@ async function certifyWindowsScm() {
   const wrapperDirectory = mkdtempSync(join(tmpdir(), "jbqa-winsw-profile-"));
   const wrapperPath = join(appDirectory, serviceId + ".exe");
   const wrapperConfig = join(appDirectory, serviceId + ".xml");
-  let installed = false;
+  let installAttempted = false;
+  let installed = false;\n    installAttempted = false;
   let wrapper = null;
   let firstPid = null;
   let secondPid = null;
@@ -335,6 +336,7 @@ async function certifyWindowsScm() {
     writeFileSync(wrapperConfig, profile.content, { mode: 0o600 });
     writeFileSync(join(appDirectory, "host.mjs"), fixture, { mode: 0o644 });
 
+    installAttempted = true;
     const install = await command(wrapperPath, ["install"]);
     assertCommand(install, "WinSW install generated service profile");
     installed = true;
@@ -420,7 +422,7 @@ async function certifyWindowsScm() {
       interruptedJobReplay: false
     };
   } finally {
-    if (installed && wrapper) {
+    if ((installed || installAttempted) && wrapper) {
       await command(wrapperPath, ["stop"]);
       await command(wrapperPath, ["uninstall"]);
       await command("sc.exe", ["delete", serviceId]);
