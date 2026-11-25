@@ -118,6 +118,9 @@ async function main() {
   const indexSource = await readFile(resolve(ROOT, "src/index.js"), "utf8");
   const expertIndexSource = await readFile(resolve(ROOT, "packages/expert-qa/src/index.js"), "utf8");
   const dashboardSource = await readFile(resolve(ROOT, "src/dashboard/server.js"), "utf8");
+  const dashboardCliSource = await readFile(resolve(ROOT, "src/dashboard-cli.js"), "utf8");
+  const deploymentSource = await readFile(resolve(ROOT, "src/agent/autonomous-execution-service-deployment.js"), "utf8");
+  const deploymentDoc = await readFile(resolve(ROOT, "docs/PHASE5-BLOCK13-3-SERVICE-MANAGER-DEPLOYMENT-PROFILES.md"), "utf8");
   const bootstrapTests = await readFile(resolve(ROOT, "tests/autonomous-execution-host-bootstrap.test.js"), "utf8");
   const operationsTestPath = resolve(ROOT, "tests/autonomous-execution-host-operations.test.js");
   const operationsTest = await readFile(operationsTestPath, "utf8");
@@ -173,6 +176,17 @@ async function main() {
   addCheck("standalone-package-root-bootstrap-export",
     readStaticExport(expertIndexSource, "createAutonomousExecutionHostBootstrap"),
     { entry: "packages/expert-qa/src/index.js" });
+  addCheck("service-manager-profiles-are-available-but-not-installed-automatically",
+    indexSource.includes("createSystemdHostServiceProfile") &&
+      indexSource.includes("createWindowsHostServiceProfile") &&
+      expertPackage.exports?.["./autonomous-execution-service-deployment"] === "./src/agent/autonomous-execution-service-deployment.js" &&
+      deploymentSource.includes("never installs or starts a Windows service") &&
+      deploymentDoc.includes("does not install, register, start, stop, enable"),
+    { platforms: ["Linux systemd", "Windows SCM / WinSW v2"], provisioning: "operator-controlled" });
+  addCheck("default-dashboard-cli-requires-application-bootstrap-injection",
+    !dashboardCliSource.includes("phase5HostBootstrap") &&
+      dashboardCliSource.includes("startDashboard({ port: options.port })"),
+    { defaultState: "host controls disconnected until trusted bootstrap is injected by the application" });
   addCheck("dashboard-default-loopback-only",
     dashboardSource.includes('const DEFAULT_DASHBOARD_HOST = "127.0.0.1"') &&
       dashboardSource.includes("server.listen(port, DEFAULT_DASHBOARD_HOST)"),
@@ -210,6 +224,10 @@ async function main() {
       remoteQueueRequired: false,
       cloudSchedulerRequired: false,
       paidApiRequiredByHostCore: false,
+      dashboardRequiresApplicationBootstrapInjection: true,
+      serviceManagerProvisioning: "optional and operator-controlled",
+      productionOrchestratorAndApprovalProviderRequired: true,
+      configuredEnginesMayRequireNetwork: true,
       multiHostOrDistributedExecutionCertified: false,
       productionOrchestratorAndApprovalProviderCertified: false
     },
