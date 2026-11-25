@@ -65,6 +65,16 @@ test("Phase 4 host factory requires explicit enablement, policy, approval and ex
   assert.throws(() => createPhase4AutonomousHostBootstrap(minimal), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "APPROVAL_PROVIDER_REQUIRED");
   assert.throws(() => createPhase4AutonomousHostBootstrap({ ...minimal, requestApproval: async () => ({ approved: true, approvalId: "x" }), apiAllowedOrigins: ["https://*.example.test"] }), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "INVALID_API_ORIGIN");
   assert.throws(() => createPhase4AutonomousHostBootstrap({ ...minimal, requestApproval: async () => ({ approved: true, approvalId: "x" }), apiAllowedOrigins: [] }), error => error instanceof Phase4AutonomousHostIntegrationError && error.code === "API_ORIGIN_ALLOWLIST_REQUIRED");
+  assert.throws(
+    () => createPhase4AutonomousHostBootstrap({
+      ...minimal,
+      requestApproval: async () => ({ approved: true, approvalId: "x" }),
+      expectedWindowsServiceSid: "S-1-5-18",
+      windowsStorageSecurityVerifier: () => ({})
+    }),
+    error => error instanceof Phase4AutonomousHostIntegrationError &&
+      error.code === "INVALID_WINDOWS_SERVICE_SID"
+  );
 });
 
 test("Phase 4 built-in catalog is wired to the host without starting runners during construction", async () => {
