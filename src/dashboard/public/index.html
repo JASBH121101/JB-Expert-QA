@@ -180,6 +180,39 @@
         </div>
         <p class="insight-footnote">Operational evidence is read-only, locally retained and limited to sanitized event metadata. It does not authorize or execute actions.</p>
       </section>
+      <section class="panel phase5-host-panel">
+        <div class="panel-heading phase5-host-heading">
+          <div>
+            <p class="eyebrow">PHASE 5 / HOST OPERATIONS</p>
+            <h2>Autonomous host control</h2>
+            <p class="section-subtitle">Local application-owned host lifecycle, readiness and sanitized operational health.</p>
+          </div>
+          <div class="history-actions">
+            <span id="phase5-host-state" class="assessment-tag">NOT CONNECTED</span>
+            <button type="button" id="phase5-host-refresh" class="secondary-button">Refresh host</button>
+          </div>
+        </div>
+        <div class="phase5-host-grid">
+          <article class="phase5-host-metric"><span>LIFECYCLE</span><strong id="phase5-host-lifecycle">Unavailable</strong></article>
+          <article class="phase5-host-metric"><span>LIVENESS</span><strong id="phase5-host-liveness">Unavailable</strong></article>
+          <article class="phase5-host-metric"><span>READINESS</span><strong id="phase5-host-readiness">Not ready</strong></article>
+          <article class="phase5-host-metric"><span>PREFLIGHT</span><strong id="phase5-host-preflight">Not checked</strong></article>
+          <article class="phase5-host-metric phase5-host-metric-wide"><span>QUEUE COUNTS</span><strong id="phase5-host-queue">Not connected</strong></article>
+        </div>
+        <div class="run-footer phase5-host-footer">
+          <p id="phase5-host-message">No application-owned bootstrap controller is connected. Host execution remains disabled in this dashboard.</p>
+          <div class="phase5-host-actions">
+            <button type="button" id="phase5-host-start" class="primary-button" disabled>Start host</button>
+            <button type="button" id="phase5-host-stop" class="secondary-button" disabled>Stop host</button>
+          </div>
+        </div>
+        <details class="phase5-host-diagnostics">
+          <summary>Sanitized host diagnostics</summary>
+          <pre id="phase5-host-diagnostics">No host diagnostics available.</pre>
+        </details>
+        <p class="insight-footnote">Starting the host requires an explicitly injected application bootstrap and a manual local action. Stopping is graceful. A stopped or failed bootstrap is terminal and must be recreated by the application; the dashboard cannot restart it or recover interrupted jobs.</p>
+      </section>
+
       <section class="panel intelligence-panel">
         <div class="panel-heading intelligence-heading">
           <div><p class="eyebrow">04 / INTELLIGENCE</p><h2>QA Intelligence &amp; Certification</h2><p class="section-subtitle">Portfolio-level trends across the latest saved engine and target snapshots.</p></div>
