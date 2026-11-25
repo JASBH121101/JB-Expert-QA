@@ -50,7 +50,7 @@ The official WinSW release page identifies v2.14.0 as the stable 2.x release; th
 
 Each successful platform job emits one JSON artifact using schema:
 
-`jb.expert-qa.host-service-deployment-lab/v1`
+`jb.expert-qa.host-service-deployment-lab/v2`
 
 The report binds:
 - source commit SHA and workflow run ID;
