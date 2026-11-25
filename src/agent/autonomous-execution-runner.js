@@ -1,4 +1,5 @@
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/u;
+const RUNNER_OWNERS = new WeakMap();
 
 export class AutonomousExecutionRunnerError extends Error {
   constructor(code, message) {
@@ -49,6 +50,8 @@ export function createAutonomousExecutionRunner(options = {}) {
   const getSupervisorStatus = ownMethod(config.supervisor, "getStatus");
   const startSupervisor = ownMethod(config.supervisor, "start");
   const drainSupervisor = ownMethod(config.supervisor, "drain");
+  const supervisorRef = config.supervisor;
+  const ownershipToken = Object.freeze({});
   const recordEvent = config.eventJournal === undefined
     ? null
     : ownMethod(config.eventJournal, "recordEvent", "INVALID_EVENT_JOURNAL");
@@ -74,6 +77,7 @@ export function createAutonomousExecutionRunner(options = {}) {
   let stopRequested = false;
   let loopPromise = null;
   let tickPromise = null;
+  let stopPromise = null;
   let timer = null;
   let wakeWait = null;
   let nextPollAt = null;
@@ -191,7 +195,17 @@ export function createAutonomousExecutionRunner(options = {}) {
     if (supervisorStatus?.state === "closed" || supervisorStatus?.state === "closing") {
       throw new AutonomousExecutionRunnerError("SUPERVISOR_CLOSED", "supervisor is closing or closed");
     }
-    startSupervisor();
+    const currentOwner = RUNNER_OWNERS.get(supervisorRef);
+    if (currentOwner && currentOwner !== ownershipToken) {
+      throw new AutonomousExecutionRunnerError("RUNNER_ALREADY_ATTACHED", "another runner already owns this supervisor");
+    }
+    RUNNER_OWNERS.set(supervisorRef, ownershipToken);
+    try {
+      startSupervisor();
+    } catch (error) {
+      if (RUNNER_OWNERS.get(supervisorRef) === ownershipToken) RUNNER_OWNERS.delete(supervisorRef);
+      throw error;
+    }
     state = "running";
     stopRequested = false;
     emitEvent("AUTONOMOUS_RUNNER_STARTED", "info", "RUNNER_STARTED");
@@ -199,26 +213,31 @@ export function createAutonomousExecutionRunner(options = {}) {
     return status();
   }
 
-  async function stop() {
+  function stop() {
+    if (stopPromise) return stopPromise;
     if (state === "idle") {
       state = "stopped";
       stopRequested = true;
       emitEvent("AUTONOMOUS_RUNNER_STOPPED", "info", "RUNNER_STOPPED");
-      return status();
+      return Promise.resolve(status());
     }
-    if (state === "stopped" || state === "closed") return status();
+    if (state === "stopped" || state === "closed") return Promise.resolve(status());
     stopRequested = true;
     if (timer) { clearTimeout(timer); timer = null; }
     nextPollAt = null;
     if (wakeWait) { const wake = wakeWait; wakeWait = null; wake(); }
     if (state !== "failed") state = "stopping";
-    if (tickPromise) await tickPromise;
-    if (loopPromise) await loopPromise;
-    if (state !== "failed") {
-      state = "stopped";
-      emitEvent("AUTONOMOUS_RUNNER_STOPPED", "info", "RUNNER_STOPPED");
-    }
-    return status();
+    stopPromise = (async () => {
+      if (tickPromise) await tickPromise;
+      if (loopPromise) await loopPromise;
+      if (state !== "failed") {
+        state = "stopped";
+        emitEvent("AUTONOMOUS_RUNNER_STOPPED", "info", "RUNNER_STOPPED");
+      }
+      if (RUNNER_OWNERS.get(supervisorRef) === ownershipToken) RUNNER_OWNERS.delete(supervisorRef);
+      return status();
+    })();
+    return stopPromise;
   }
 
   return Object.freeze({ runnerId, getStatus: status, tick, start, stop });
