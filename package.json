@@ -41,7 +41,8 @@
     "qa:local:full": "node scripts/local-certification.mjs --profile=full",
     "test:dashboard": "node --test tests/dashboard.test.js tests/dashboard-analytics.test.js",
     "test:api-testing": "npm --workspace @jb/api-testing-engine run check",
-    "test:autonomous-host-operations": "node --test tests/autonomous-execution-host-operations.test.js"
+    "test:autonomous-host-operations": "node --test tests/autonomous-execution-host-operations.test.js",
+    "certify:autonomous-independence": "node scripts/autonomous-independence-certification.mjs"
   },
   "dependencies": {
     "axe-core": "4.14.0",
