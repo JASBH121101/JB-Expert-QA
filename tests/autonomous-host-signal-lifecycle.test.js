@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createAutonomousExecutionHost } from "../src/agent/autonomous-execution-host.js";
 import { attachHostSignalLifecycle, HostSignalLifecycleError } from "../src/agent/autonomous-host-signal-lifecycle.js";
 
 function mockHost(close = async () => ({ state: "closed" })) {
@@ -75,4 +79,23 @@ test("signal attachment failure rolls back already attached listeners", () => {
     error => error.code === "SIGNAL_ATTACH_FAILED");
   assert.equal(source.listenerCount("SIGINT"), 0);
   assert.equal(source.listenerCount("SIGTERM"), 0);
+});
+
+test("signal adapter gracefully closes the actual durable host composition", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "jb-host-signal-integration-"));
+  const source = new EventEmitter();
+  const orchestrator = {
+    listEngines: () => [],
+    getPolicy: () => ({ id: "signal-integration-policy" }),
+    verifyLedger: () => ({ valid: true, entries: 0 }),
+    execute: async (_plan, options) => ({ status: "succeeded", executionId: options.executionId })
+  };
+  const host = createAutonomousExecutionHost({ orchestrator, storageDirectory: directory, enabled: false });
+  const lifecycle = attachHostSignalLifecycle({ host, signalSource: source, signals: ["SIGTERM"] });
+  source.emit("SIGTERM");
+  const status = await lifecycle.shutdown();
+  assert.equal(status.state, "closed");
+  assert.equal(host.getStatus().state, "closed");
+  lifecycle.detach();
+  await rm(directory, { recursive: true, force: true });
 });
