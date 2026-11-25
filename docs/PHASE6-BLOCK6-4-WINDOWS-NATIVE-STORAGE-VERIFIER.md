@@ -46,7 +46,7 @@ For each bootstrap preflight and readiness check, the adapter executes the fixed
 2. The state directory owner SID from the directory security descriptor.
 3. The complete DACL, including explicit and inherited ACEs, with SID, allow/deny type, normalized rights and inheritance flag.
 4. Whether the directory DACL is protected from parent inheritance.
-5. Whether the target directory or any ancestor is a reparse point.
+5. Whether the target directory or any ancestor is a reparse point. The report is rejected when the ACL exceeds 64 ACEs rather than silently truncating it.
 
 Only drive-letter local paths are accepted. UNC/network paths are rejected. The PowerShell program does not alter ACLs or directory metadata.
 
