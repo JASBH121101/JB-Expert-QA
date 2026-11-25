@@ -33,7 +33,7 @@ async function waitForJob(host, id, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const job = host.getJob(id);
-    if (["completed", "failed", "interrupted"].includes(job.status)) return job;
+    if (["completed", "failed", "interrupted"].includes(job.state)) return job;
     await new Promise(resolve => setTimeout(resolve, 20));
   }
   assert.fail("timed out waiting for autonomous host job");
@@ -58,7 +58,7 @@ test("Phase 4 built-in catalog is wired to the host without starting runners dur
   assert.equal(host.registry.isSealed(), true);
   assert.equal(host.registry.list().length, 8);
   assert.equal(host.orchestrator.listEngines().length, 8);
-  assert.equal(host.getStatus().state, "idle");
+  assert.equal((await host.getStatus()).state, "idle");
   assert.equal(signalSource.listenerCount("SIGINT"), 0);
   assert.equal(signalSource.listenerCount("SIGTERM"), 0);
   assert.equal(approvals, 0);
