@@ -15,13 +15,17 @@ const SERVICE_SIDS = new Set(["S-1-5-19", "S-1-5-20"]);
  * shell, with a fixed script, a bounded timeout, and a bounded output buffer.
  */
 export function readWindowsStorageSecurityReport({ directory, expectedServiceSid } = {}) {
+  if (!SERVICE_SIDS.has(expectedServiceSid)) {
+    throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID",
+      "a supported Windows service SID is required");
+  }
   if (process.platform !== "win32") {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_PLATFORM_UNSUPPORTED",
       "Windows storage security inspection is available only on Windows");
   }
-  if (typeof directory !== "string" || !isAbsolute(directory) || !/^[A-Za-z]:\\/u.test(directory) || directory.length > 4096 || directory.includes("\0") || !SERVICE_SIDS.has(expectedServiceSid)) {
+  if (typeof directory !== "string" || !isAbsolute(directory) || !/^[A-Za-z]:\\/u.test(directory) || directory.length > 4096 || directory.includes("\0")) {
     throw new WindowsStorageSecurityError("WINDOWS_STORAGE_SECURITY_CONFIGURATION_INVALID",
-      "an absolute directory and a supported Windows service SID are required");
+      "an absolute local Windows directory is required");
   }
 
   const encodedPath = Buffer.from(directory, "utf16le").toString("base64");
