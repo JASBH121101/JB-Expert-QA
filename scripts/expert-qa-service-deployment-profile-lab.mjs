@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  copyFileSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -16,6 +17,8 @@ import {
   createSystemdHostServiceProfile,
   createWindowsHostServiceProfile
 } from "../src/agent/autonomous-execution-service-deployment.js";
+import { readWindowsStorageSecurityReport } from "../src/agent/windows-storage-security-native.js";
+import { validateWindowsStorageSecurityReport } from "../src/agent/windows-storage-security.js";
 
 const execFileAsync = promisify(execFile);
 const timeoutMs = 30_000;
@@ -312,15 +315,33 @@ async function certifyWindowsScm() {
   };
 
   const fixture = [
+  const configureProtectedStateAcl = async () => {
+    assertCommand(await command("icacls.exe", [storageDirectory, "/inheritance:r"]),
+      "remove inherited Windows state-directory ACL entries");
+    assertCommand(await command("icacls.exe", [storageDirectory, "/setowner", "*S-1-5-19"]),
+      "set LocalService as Windows state-directory owner");
+    assertCommand(await command("icacls.exe", [
+      storageDirectory,
+      "/grant:r",
+      "*S-1-5-19:(OI)(CI)(M)",
+      "*S-1-5-18:(OI)(CI)(F)",
+      "*S-1-5-32-544:(OI)(CI)(F)"
+    ]), "apply explicit protected Windows state-directory DACL");
+  };
+
     'import { existsSync, writeFileSync } from "node:fs";',
     'import { execFileSync } from "node:child_process";',
     'import { join } from "node:path";',
+    'import { readWindowsStorageSecurityReport } from "./windows-storage-security-native.js";',
+    'import { validateWindowsStorageSecurityReport } from "./windows-storage-security.js";',
     'const storage = process.env.JB_EXPERT_QA_STORAGE_DIRECTORY;',
     'if (!storage) throw new Error("missing host storage directory");',
+    'const storageSecurityReport = readWindowsStorageSecurityReport({ directory: storage, expectedServiceSid: "S-1-5-19" });',
+    'const storageSecurity = validateWindowsStorageSecurityReport(storageSecurityReport, { directory: storage, expectedServiceSid: "S-1-5-19" });',
     'const whoami = join(process.env.SystemRoot, "System32", "whoami.exe");',
     'const account = execFileSync(whoami, [], { encoding: "utf8" }).trim();',
     'const failing = existsSync(join(storage, "fail-on-start"));',
-    'const record = { pid: process.pid, account, storage, node: process.version, failing }',
+    'const record = { pid: process.pid, account, storage, node: process.version, failing, storageAclVerified: storageSecurity.permissionsVerified && storageSecurity.daclProtected, storageOwnerVerified: storageSecurity.ownerVerified, storageIdentityVerified: storageSecurity.identityVerified }',
     'writeFileSync(join(storage, "started-" + process.pid + ".json"), JSON.stringify(record));',
     "if (failing) process.exit(23);",
     'function close(signal) {',
@@ -339,8 +360,15 @@ async function certifyWindowsScm() {
     mkdirSync(logDirectory, { recursive: true });
     icacls(serviceRoot, "(OI)(CI)(RX)");
     icacls(appDirectory, "(OI)(CI)(RX)");
-    icacls(storageDirectory, "(OI)(CI)(M)");
+    await configureProtectedStateAcl();
     icacls(logDirectory, "(OI)(CI)(M)");
+
+    const agentSourceDirectory = join(process.cwd(), "src", "agent");
+    copyFileSync(join(agentSourceDirectory, "windows-storage-security-native.js"),
+      join(appDirectory, "windows-storage-security-native.js"));
+    copyFileSync(join(agentSourceDirectory, "windows-storage-security.js"),
+      join(appDirectory, "windows-storage-security.js"));
+    writeFileSync(join(appDirectory, "package.json"), JSON.stringify({ type: "module" }), { mode: 0o644 });
     const appAcl = assertCommand(await command("icacls.exe", [appDirectory]), "verify Windows application directory ACL");
     assert(/LOCAL SERVICE.*RX/iu.test(appAcl.stdout), "LocalService does not have read/execute access to the application directory");
     const storageAcl = assertCommand(await command("icacls.exe", [storageDirectory]), "verify Windows state directory ACL");
@@ -383,6 +411,9 @@ async function certifyWindowsScm() {
     firstPid = first.pid;
     assert(first.storage === storageDirectory, "WinSW profile did not pass the configured storage directory");
     assert(/^nt authority\\local service$/iu.test(first.account), "WinSW host did not run as NT AUTHORITY\\LocalService: " + first.account);
+    assert(first.storageAclVerified === true, "native Windows ACL inspection did not validate the protected state DACL under LocalService");
+    assert(first.storageOwnerVerified === true, "native Windows ACL inspection did not verify LocalService state ownership");
+    assert(first.storageIdentityVerified === true, "native Windows ACL inspection did not verify the active LocalService process token");
 
     const queryBefore = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service before SCM restart");
     const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
@@ -440,6 +471,11 @@ async function certifyWindowsScm() {
       wrapperSizeBytes: wrapper.sizeBytes,
       serviceId,
       serviceAccount: first.account,
+      nativeStorageVerifier: "readWindowsStorageSecurityReport",
+      nativeStorageAclInspection: "passed",
+      storageOwnerVerified: first.storageOwnerVerified,
+      storageIdentityVerified: first.storageIdentityVerified,
+      storageAclVerified: first.storageAclVerified,
       applicationAcl: "LocalService read/execute",
       stateAcl: "LocalService modify",
       logAcl: "LocalService modify",
