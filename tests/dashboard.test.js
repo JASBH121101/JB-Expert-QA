@@ -486,10 +486,16 @@ test("dashboard serves the local UI, engine registry and restrictive browser hea
   assert.match(pageHtml, /Refresh evidence/);
   assert.match(pageHtml, /Top recurring findings/);
   assert.match(pageHtml, /analytics-assessment/);
+  assert.match(pageHtml, /Autonomous host control/);
+  assert.match(pageHtml, /phase5-host-start/);
+  assert.match(pageHtml, /Sanitized host diagnostics/);
 
   const script = await fetch(origin + "/assets/app.js");
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /javascript/);
+  const scriptText = await script.text();
+  assert.match(scriptText, /refreshPhase5Host/);
+  assert.match(scriptText, /operatePhase5Host/);
 
   const engines = await fetch(origin + "/api/engines");
   const data = await engines.json();
