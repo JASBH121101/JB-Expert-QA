@@ -55,7 +55,8 @@
     "./containment-controller-dispatch": "./src/agent/containment-controller-dispatch.js",
     "./contained-process-runner": "./src/agent/contained-process-runner.js",
     "./execution-event-journal-persistence": "./src/agent/execution-event-journal-persistence.js",
-    "./autonomous-execution-runner": "./src/agent/autonomous-execution-runner.js"
+    "./autonomous-execution-runner": "./src/agent/autonomous-execution-runner.js",
+    "./autonomous-execution-host": "./src/agent/autonomous-execution-host.js"
   },
   "files": [
     "src/**",
