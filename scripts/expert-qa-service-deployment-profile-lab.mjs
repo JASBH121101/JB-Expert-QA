@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  copyFileSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -311,16 +312,35 @@ async function certifyWindowsScm() {
     ]), "set disposable Windows service ACL");
   };
 
+  const configureProtectedStateAcl = async () => {
+    assertCommand(await command("icacls.exe", [storageDirectory, "/inheritance:r"]),
+      "remove inherited Windows state-directory ACL entries");
+    for (const [sid, rights] of [
+      ["*S-1-5-19", "(OI)(CI)(M)"],
+      ["*S-1-5-18", "(OI)(CI)(F)"],
+      ["*S-1-5-32-544", "(OI)(CI)(F)"]
+    ]) {
+      assertCommand(await command("icacls.exe", [storageDirectory, "/grant:r", sid + ":" + rights]),
+        "apply explicit Windows state-directory ACE for " + sid);
+    }
+    assertCommand(await command("icacls.exe", [storageDirectory, "/setowner", "*S-1-5-19"]),
+      "set LocalService as Windows state-directory owner");
+  };
+
   const fixture = [
     'import { existsSync, writeFileSync } from "node:fs";',
     'import { execFileSync } from "node:child_process";',
     'import { join } from "node:path";',
+    'import { readWindowsStorageSecurityReport } from "./windows-storage-security-native.js";',
+    'import { validateWindowsStorageSecurityReport } from "./windows-storage-security.js";',
     'const storage = process.env.JB_EXPERT_QA_STORAGE_DIRECTORY;',
     'if (!storage) throw new Error("missing host storage directory");',
+    'const storageSecurityReport = readWindowsStorageSecurityReport({ directory: storage, expectedServiceSid: "S-1-5-19" });',
+    'const storageSecurity = validateWindowsStorageSecurityReport(storageSecurityReport, { directory: storage, expectedServiceSid: "S-1-5-19" });',
     'const whoami = join(process.env.SystemRoot, "System32", "whoami.exe");',
     'const account = execFileSync(whoami, [], { encoding: "utf8" }).trim();',
     'const failing = existsSync(join(storage, "fail-on-start"));',
-    'const record = { pid: process.pid, account, storage, node: process.version, failing }',
+    'const record = { pid: process.pid, account, storage, node: process.version, failing, storageAclVerified: storageSecurity.permissionsVerified && storageSecurity.daclProtected, storageOwnerVerified: storageSecurity.ownerVerified, storageIdentityVerified: storageSecurity.identityVerified }',
     'writeFileSync(join(storage, "started-" + process.pid + ".json"), JSON.stringify(record));',
     "if (failing) process.exit(23);",
     'function close(signal) {',
@@ -339,8 +359,15 @@ async function certifyWindowsScm() {
     mkdirSync(logDirectory, { recursive: true });
     icacls(serviceRoot, "(OI)(CI)(RX)");
     icacls(appDirectory, "(OI)(CI)(RX)");
-    icacls(storageDirectory, "(OI)(CI)(M)");
+    await configureProtectedStateAcl();
     icacls(logDirectory, "(OI)(CI)(M)");
+
+    const agentSourceDirectory = join(process.cwd(), "src", "agent");
+    copyFileSync(join(agentSourceDirectory, "windows-storage-security-native.js"),
+      join(appDirectory, "windows-storage-security-native.js"));
+    copyFileSync(join(agentSourceDirectory, "windows-storage-security.js"),
+      join(appDirectory, "windows-storage-security.js"));
+    writeFileSync(join(appDirectory, "package.json"), JSON.stringify({ type: "module" }), { mode: 0o644 });
     const appAcl = assertCommand(await command("icacls.exe", [appDirectory]), "verify Windows application directory ACL");
     assert(/LOCAL SERVICE.*RX/iu.test(appAcl.stdout), "LocalService does not have read/execute access to the application directory");
     const storageAcl = assertCommand(await command("icacls.exe", [storageDirectory]), "verify Windows state directory ACL");
@@ -383,6 +410,9 @@ async function certifyWindowsScm() {
     firstPid = first.pid;
     assert(first.storage === storageDirectory, "WinSW profile did not pass the configured storage directory");
     assert(/^nt authority\\local service$/iu.test(first.account), "WinSW host did not run as NT AUTHORITY\\LocalService: " + first.account);
+    assert(first.storageAclVerified === true, "native Windows ACL inspection did not validate the protected state DACL under LocalService");
+    assert(first.storageOwnerVerified === true, "native Windows ACL inspection did not verify LocalService state ownership");
+    assert(first.storageIdentityVerified === true, "native Windows ACL inspection did not verify the active LocalService process token");
 
     const queryBefore = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service before SCM restart");
     const wrapperPidBefore = Number(queryBefore.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
@@ -403,6 +433,8 @@ async function certifyWindowsScm() {
     secondPid = second.pid;
     assert(secondPid !== firstPid, "SCM restart did not replace the host process");
     assert(/^nt authority\\local service$/iu.test(second.account), "restarted WinSW host changed service identity");
+    assert(second.storageAclVerified === true && second.storageOwnerVerified === true && second.storageIdentityVerified === true,
+      "native Windows ACL inspection failed after the SCM restart");
 
     const queryAfter = assertCommand(await command("sc.exe", ["queryex", serviceId]), "query generated Windows service after SCM restart");
     const wrapperPidAfter = Number(queryAfter.stdout.match(/PID\s*:\s*(\d+)/iu)?.[1]);
@@ -427,6 +459,8 @@ async function certifyWindowsScm() {
         /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
     }, "WinSW generated failure-action exhaustion", 30_000);
     const failedAttempts = startupFiles(storageDirectory).map(readJson).filter(item => item.failing);
+    assert(failedAttempts.every(item => item.storageAclVerified === true && item.storageOwnerVerified === true && item.storageIdentityVerified === true),
+      "a WinSW failure-action restart bypassed native LocalService ACL verification");
     assert(failedAttempts.length === profile.restartDelaysSeconds.length + 1, "WinSW generated failure-action sequence was not enforced exactly");
     assertCommand(await command(wrapperPath, ["uninstall"]), "WinSW uninstall disposable generated service");
     installed = false;
@@ -440,8 +474,13 @@ async function certifyWindowsScm() {
       wrapperSizeBytes: wrapper.sizeBytes,
       serviceId,
       serviceAccount: first.account,
+      nativeStorageVerifier: "readWindowsStorageSecurityReport",
+      nativeStorageAclInspection: "passed",
+      storageOwnerVerified: first.storageOwnerVerified,
+      storageIdentityVerified: first.storageIdentityVerified,
+      storageAclVerified: first.storageAclVerified,
       applicationAcl: "LocalService read/execute",
-      stateAcl: "LocalService modify",
+      stateAcl: "protected; LocalService Modify; LocalSystem and Administrators Full Control; object/container inheritance",
       logAcl: "LocalService modify",
       storageDirectory,
       profileSha256: createHash("sha256").update(profile.content).digest("hex"),
@@ -477,7 +516,7 @@ async function main() {
       : (() => { throw new Error("Unsupported platform for host deployment profile lab"); })();
 
   const evidence = {
-    schema: "jb.expert-qa.host-service-deployment-lab/v1",
+    schema: "jb.expert-qa.host-service-deployment-lab/v2",
     generatedAt: new Date().toISOString(),
     commit: process.env.GITHUB_SHA || null,
     workflowRunId: process.env.GITHUB_RUN_ID || null,

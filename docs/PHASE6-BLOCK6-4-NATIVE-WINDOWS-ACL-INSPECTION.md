@@ -29,8 +29,8 @@ The query confirms the current process SID and directory DACL at preflight/readi
 
 - Existing report-contract tests validate owner, identity, protected DACL, explicit allow-only principals, access levels, and accessor/hole rejection.
 - This block adds validation that ACEs cover child files and directories and are not inherit-only.
-- The native PowerShell query is only executed by Windows under the configured LocalService or NetworkService identity; ordinary Windows CI runners do not satisfy that deployment identity and must not weaken the test contract to pass.
+- Phase 6 Block 6.5 invokes the native PowerShell query inside a disposable WinSW process running as LocalService. The enclosing CI runner is not used as the service identity; it only provisions and removes the isolated test service and state directory. NetworkService and production hosts remain outside this lab's evidence.
 
 ## Status
 
-**Merged into `main` through PR #299** at commit `cdfc56a66a5202c12359c84f9f0abc6aa9f0c563` on 2026-11-25. The required Core, Security, Security Guard, package-distribution and JB Engines certification workflows completed successfully for the merged PR head. The native query is restricted to the configured LocalService/NetworkService runtime identity; ordinary hosted Windows CI does not run it as either service account. This merge does not provision a production account or DACL and does not install or activate an OS service.
+**Merged into `main` through PR #299** at commit `cdfc56a66a5202c12359c84f9f0abc6aa9f0c563` on 2026-11-25. The required Core, Security, Security Guard, package-distribution and JB Engines certification workflows completed successfully for the merged PR head. The native query is restricted to the configured LocalService/NetworkService runtime identity. Phase 6 Block 6.5 extends the disposable WinSW CI lab so a child service process actually runs the query as LocalService; this does not run the outer hosted runner as a service identity and does not certify NetworkService or a production host. No production account or DACL is provisioned, and no production OS service is installed or activated.
