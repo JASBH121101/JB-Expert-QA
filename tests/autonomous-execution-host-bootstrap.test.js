@@ -90,7 +90,7 @@ function options(orchestrator, storageDirectory, signalSource = new EventEmitter
     storageDirectory,
     signalSource,
     enabled: true,
-    hostOptions: { pollIntervalMs: 50, ...extra.hostOptions },
+    hostOptions: { pollIntervalMs: 100, ...extra.hostOptions },
     ...(extra.onDiagnostic ? { onDiagnostic: extra.onDiagnostic } : {}),
     ...(extra.signals ? { signals: extra.signals } : {})
   };
