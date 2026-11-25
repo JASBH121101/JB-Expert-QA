@@ -314,7 +314,6 @@ async function certifyWindowsScm() {
     ]), "set disposable Windows service ACL");
   };
 
-  const fixture = [
   const configureProtectedStateAcl = async () => {
     assertCommand(await command("icacls.exe", [storageDirectory, "/inheritance:r"]),
       "remove inherited Windows state-directory ACL entries");
@@ -328,6 +327,8 @@ async function certifyWindowsScm() {
       "*S-1-5-32-544:(OI)(CI)(F)"
     ]), "apply explicit protected Windows state-directory DACL");
   };
+
+  const fixture = [
 
     'import { existsSync, writeFileSync } from "node:fs";',
     'import { execFileSync } from "node:child_process";',
