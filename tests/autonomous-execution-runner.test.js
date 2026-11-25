@@ -120,6 +120,21 @@ test("runner validates configuration, dependencies and supervisor lifecycle", ()
 });
 
 
+test("only one runner can own a supervisor and concurrent stops are idempotent", async () => {
+  const sup = supervisor();
+  const journal = createExecutionEventJournal();
+  const first = createAutonomousExecutionRunner({ supervisor: sup.value, eventJournal: journal, pollIntervalMs: 5000 });
+  const second = createAutonomousExecutionRunner({ supervisor: sup.value, pollIntervalMs: 5000 });
+  first.start();
+  assert.throws(() => second.start(), (error) => error.code === "RUNNER_ALREADY_ATTACHED");
+  const [a, b] = await Promise.all([first.stop(), first.stop()]);
+  assert.equal(a.state, "stopped");
+  assert.equal(b.state, "stopped");
+  assert.equal(journal.listEvents().filter((event) => event.eventType === "AUTONOMOUS_RUNNER_STOPPED").length, 1);
+  second.start();
+  await second.stop();
+});
+
 test("runner drives a real queue, worker and supervisor on the host without CI orchestration", async () => {
   const journal = createExecutionEventJournal();
   const queue = createExecutionJobQueue({ eventJournal: journal });
