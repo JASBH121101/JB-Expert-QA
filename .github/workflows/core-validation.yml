@@ -69,6 +69,16 @@ jobs:
         run: npm run check --workspace @jb/advisor-engine
       - name: Run syntax checks and tests
         run: npm run check
+      - name: Run final autonomous independence certification
+        run: npm run certify:autonomous-independence -- --output="$RUNNER_TEMP/autonomous-independence-certificate.json"
+      - name: Upload autonomous independence certificate
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: jb-expert-qa-autonomous-independence-node-${{ matrix.node-version }}
+          path: $RUNNER_TEMP/autonomous-independence-certificate.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Run Malware Engine package regressions
         run: npm --workspace @jb/malware-engine run check
       - name: Run JB Threat Lab integration suite
