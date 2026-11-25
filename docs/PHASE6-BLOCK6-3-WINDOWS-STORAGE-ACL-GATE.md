@@ -70,15 +70,13 @@ The validation helper returns only sanitized boolean evidence. Raw paths and ACL
 ```js
 import {
   createPhase4AutonomousHostBootstrap,
-  validateWindowsStorageSecurityReport
+  createWindowsPowerShellStorageSecurityVerifier
 } from "@jb/expert-qa";
 
-// Implement this callback with a trusted native Windows security adapter.
-// The adapter must inspect the live process token and full effective NTFS DACL.
-function windowsStorageSecurityVerifier({ directory, expectedServiceSid }) {
-  const nativeReport = readActualWindowsSecurityState(directory);
-  return nativeReport;
-}
+// Uses the built-in read-only Windows PowerShell 5.1 security inspector.
+const windowsStorageSecurityVerifier = createWindowsPowerShellStorageSecurityVerifier({
+  timeoutMs: 10000
+});
 
 const host = createPhase4AutonomousHostBootstrap({
   enabled: true,
@@ -92,7 +90,7 @@ const host = createPhase4AutonomousHostBootstrap({
 });
 ```
 
-`readActualWindowsSecurityState()` above is intentionally an application-owned placeholder, not an exported package function. The application must implement and independently review it against the host's real token and NTFS ACL. The package's `validateWindowsStorageSecurityReport()` validates the returned contract; it does not itself query Windows or make an untrusted callback trustworthy.
+`createWindowsPowerShellStorageSecurityVerifier()` is the built-in optional adapter, exported both from the package root and `@jb/expert-qa/windows-storage-security-powershell`. It launches the fixed Windows PowerShell 5.1 executable with `shell: false`, a fixed encoded script, bounded timeout/output, and request values passed through environment variables. It reads the live process token SID, directory owner, complete NTFS DACL, inheritance state, and reparse-point status for every path component. It is read-only: it does not create the directory, change ACLs, install services, elevate privileges, or run user-provided commands. The bootstrap still validates the report using `validateWindowsStorageSecurityReport()` and fails closed on any mismatch.
 
 The same options pass through the Phase 4 integration factory into the autonomous host bootstrap. POSIX startup continues to use the existing realpath, owner, mode and private write-probe checks.
 
@@ -109,4 +107,4 @@ The same options pass through the Phase 4 integration factory into the autonomou
 
 Unit tests cover exact report shape, service SID and owner matching, protected DACL, explicit allow-only ACEs, allowed principals, rights, duplicate entries, inherited/deny ACEs and accessor rejection. The Windows CI host fixtures use a synthetic verifier to exercise the fail-closed integration contract; they do not constitute evidence of ACL correctness on a production machine.
 
-Production activation still requires an independently implemented native Windows verifier, operator-provisioned service identity and directory ACL, a reviewed WinSW profile, and an operator-controlled installation. No host machine or service is modified by this block.
+Production activation still requires an operator-provisioned LocalService or NetworkService identity and a state directory whose owner is that service SID, with a protected DACL limited to service `modify` plus LocalSystem and Administrators `full-control`. The built-in verifier checks these conditions but does not provision them. A reviewed WinSW profile and operator-controlled service installation remain separate steps. No host machine or service is modified by this block.
