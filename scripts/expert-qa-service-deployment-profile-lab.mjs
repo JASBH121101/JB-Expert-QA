@@ -197,6 +197,7 @@ async function certifySystemd() {
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "SIGTERM graceful shutdown marker after systemd stop");
     assertCommand(await privileged("systemctl", ["is-enabled", unitName]), "verify generated unit remains configured for boot start");
 
+    await privileged("systemctl", ["reset-failed", unitName]);
     assertCommand(await privileged("install", ["-o", serviceUser, "-g", serviceUser, "-m", "0600", "/dev/null", join(storageDirectory, "fail-on-start")]),
       "enable intentional disposable failure fixture");
     await command("sudo", ["-n", "systemctl", "start", unitName], 20_000);
@@ -376,6 +377,10 @@ async function certifyWindowsScm() {
 
     assertCommand(await command("sc.exe", ["stop", serviceId]), "stop generated Windows service through SCM");
     await waitFor(() => existsSync(join(storageDirectory, "shutdown-" + secondPid + ".txt")), "Ctrl+C graceful shutdown marker after SCM stop");
+    await waitFor(async () => {
+      const current = await command("sc.exe", ["query", serviceId]);
+      return /STATE\s*:\s*\d+\s+STOPPED/iu.test(current.stdout);
+    }, "Windows SCM stop after graceful shutdown");
     const stopped = await command("sc.exe", ["queryex", serviceId]);
     assert(stopped.exitCode !== 0 || /STATE\s*:\s*\d+\s+STOPPED/iu.test(stopped.stdout),
       "Windows SCM did not report the generated service as STOPPED");
