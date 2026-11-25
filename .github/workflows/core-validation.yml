@@ -70,13 +70,15 @@ jobs:
       - name: Run syntax checks and tests
         run: npm run check
       - name: Run final autonomous independence certification
-        run: npm run certify:autonomous-independence -- --output="$RUNNER_TEMP/autonomous-independence-certificate.json"
+        run: |
+          npm run certify:autonomous-independence -- --output="$RUNNER_TEMP/autonomous-independence-certificate.json"
+          test -s "$RUNNER_TEMP/autonomous-independence-certificate.json"
       - name: Upload autonomous independence certificate
         if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jb-expert-qa-autonomous-independence-node-${{ matrix.node-version }}
-          path: $RUNNER_TEMP/autonomous-independence-certificate.json
+          path: ${{ runner.temp }}/autonomous-independence-certificate.json
           if-no-files-found: error
           retention-days: 30
       - name: Run Malware Engine package regressions
