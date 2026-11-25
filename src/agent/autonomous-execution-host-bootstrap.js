@@ -405,7 +405,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     });
   }
 
-  function readinessChecks() {
+  async function readinessChecks() {
     const checks = [];
     const current = getHostServiceStatus();
     const currentHost = current?.host ?? hostStatus;
@@ -424,29 +424,23 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     } catch (error) {
       checks.push(freezeCheck("storage-directory-secure", false, safeErrorCode(error)));
     }
-    let locksHeld = false;
-    if (currentHost) {
-      const jobsLock = join(storageDirectory, "execution-jobs.json.lock");
-      const eventsLock = join(storageDirectory, "execution-events.json.lock");
-      locksHeld = inspectOwnedLock(jobsLock) && inspectOwnedLock(eventsLock);
-    }
+    const jobsLock = join(storageDirectory, "execution-jobs.json.lock");
+    const eventsLock = join(storageDirectory, "execution-events.json.lock");
+    const locksHeld = Boolean(currentHost) && inspectOwnedLock(jobsLock) && inspectOwnedLock(eventsLock);
     checks.push(freezeCheck("persistent-locks-owned", locksHeld));
 
     try {
-      const ledger = host ? host.verifyLedger() : null;
-      if (ledger && typeof ledger.then === "function") {
-        checks.push(freezeCheck("execution-ledger-valid", false, "ASYNC_LEDGER_PROBE_UNSUPPORTED"));
-      } else {
-        checks.push(freezeCheck("execution-ledger-valid", ledger?.valid === true));
-      }
+      const ledger = host ? await host.verifyLedger() : null;
+      checks.push(freezeCheck("execution-ledger-valid",
+        ledger?.valid === true && Number.isSafeInteger(ledger.entries) && ledger.entries >= 0));
     } catch (error) {
       checks.push(freezeCheck("execution-ledger-valid", false, safeErrorCode(error)));
     }
     return checks;
   }
 
-  function getReadiness() {
-    const checks = readinessChecks();
+  async function getReadiness() {
+    const checks = await readinessChecks();
     const ready = state === "running" && checks.every(check => check.status === "passed");
     return Object.freeze({
       status: ready ? "ready" : "not_ready",
@@ -456,9 +450,10 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     });
   }
 
-  function getDiagnostics() {
+  async function getDiagnostics() {
     const current = getHostServiceStatus();
     const currentHost = current?.host ?? hostStatus;
+    const readiness = await getReadiness();
     let recentEvents = [];
     try {
       if (host && state !== "closed") {
@@ -473,7 +468,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       component: "jb-expert-qa-autonomous-host",
       state,
       liveness: getLiveness(),
-      readiness: getReadiness(),
+      readiness,
       preflight: preflightSnapshot,
       engineCount: preflightSnapshot?.engineCount ?? 0,
       allowedEngineCount: preflightSnapshot?.allowedEngineCount ?? 0,
@@ -486,7 +481,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
         interrupted: currentHost.queue.interrupted ?? 0
       }) : null,
       ledger: currentHost ? Object.freeze({
-        verified: readinessChecks().some(check => check.name === "execution-ledger-valid" && check.status === "passed")
+        verified: readiness.checks.some(check => check.name === "execution-ledger-valid" && check.status === "passed")
       }) : null,
       lastFailureCode,
       recentDiagnostics: Object.freeze([...recentDiagnostics]),
@@ -501,7 +496,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
   }
 
   async function start() {
-    if (state === "running") return getStatus();
+    if (state === "running") return await getStatus();
     if (state !== "idle") {
       throw new AutonomousExecutionHostBootstrapError("BOOTSTRAP_TERMINAL", "host bootstrap cannot be restarted after stopping or failure");
     }
@@ -548,7 +543,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       hostStatus = service.getStatus().host;
       state = "running";
       emitDiagnostic("host_started", "HOST_STARTED");
-      return getStatus();
+      return await getStatus();
     } catch (error) {
       const code = safeErrorCode(error);
       lastFailureCode = code;
@@ -574,7 +569,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
         else if (host) await host.close();
         state = "closed";
         emitDiagnostic("host_stopped", "HOST_STOPPED");
-        return getStatus();
+        return await getStatus();
       } catch (error) {
         lastFailureCode = safeErrorCode(error);
         state = "failed";
@@ -585,8 +580,9 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     return stopPromise;
   }
 
-  function getStatus() {
+  async function getStatus() {
     const current = getHostServiceStatus();
+    const readiness = await getReadiness();
     return Object.freeze({
       state,
       enabled: true,
@@ -601,7 +597,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
       }) : null,
       preflight: preflightSnapshot,
       liveness: getLiveness(),
-      readiness: getReadiness(),
+      readiness,
       lastFailureCode
     });
   }
