@@ -104,7 +104,13 @@ test("native Windows verifier rejects non-local, root and non-normalized paths b
   skip: process.platform !== "win32"
 }, () => {
   const verify = createWindowsPowerShellStorageSecurityVerifier();
-  for (const directory of ["C:\\\\", "\\\\server\\\\share\\\\folder", "C:\\\\ProgramData\\\\..\\\\Windows"]) {
+  const slash = String.fromCharCode(92);
+  const invalidPaths = [
+    "C:" + slash,
+    slash + slash + "server" + slash + "share" + slash + "folder",
+    "C:" + slash + "ProgramData" + slash + ".." + slash + "Windows"
+  ];
+  for (const directory of invalidPaths) {
     assert.throws(
       () => verify({ directory, expectedServiceSid: "S-1-5-19" }),
       error => error instanceof WindowsPowerShellStorageVerifierError &&
