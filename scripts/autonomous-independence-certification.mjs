@@ -136,7 +136,7 @@ async function main() {
     if (NETWORK_BUILTINS.has(builtin)) networkModules.add(builtin);
   }
   for (const [file, source] of sourceByFile) {
-    if (/\\b(?:fetch|XMLHttpRequest|WebSocket)\\s*\\(/u.test(source)) {
+    if (/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/u.test(source)) {
       networkModules.add("network primitive reference in " + file);
     }
   }
@@ -155,7 +155,7 @@ async function main() {
     { externalImports: [...externalModules] });
   addCheck("host-dependency-graph-does-not-read-github-actions-runtime-state",
     ![...sourceByFile.values()].some(source =>
-      /process\\.env\\.(?:GITHUB_ACTIONS|CI)\\b/u.test(source)),
+      /process\.env\.(?:GITHUB_ACTIONS|CI)\b/u.test(source)),
     { requirement: "No Actions or CI environment state is required by the host module graph" });
   addCheck("host-dependency-graph-has-no-github-actions-runtime-dependency",
     ![...externalModules].some(item => GITHUB_PACKAGE_PREFIXES.some(prefix => item.startsWith(prefix)) ||
