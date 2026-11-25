@@ -16,7 +16,7 @@ function readOptions(value) {
   if (proto !== Object.prototype && proto !== null) {
     throw new AutonomousExecutionRunnerError("INVALID_OPTIONS", "options must be a plain object");
   }
-  const allowed = new Set(["supervisor", "runnerId", "pollIntervalMs", "maxJobsPerTick", "maxConsecutiveErrors"]);
+  const allowed = new Set(["supervisor", "runnerId", "pollIntervalMs", "maxJobsPerTick", "maxConsecutiveErrors", "eventJournal"]);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== "string" || !allowed.has(key)) {
@@ -31,19 +31,28 @@ function readOptions(value) {
   return out;
 }
 
-function ownMethod(target, name) {
+function ownMethod(target, name, errorCode = "INVALID_SUPERVISOR") {
   const d = target && Object.getOwnPropertyDescriptor(target, name);
   if (!d || !Object.hasOwn(d, "value") || typeof d.value !== "function") {
-    throw new AutonomousExecutionRunnerError("INVALID_SUPERVISOR", "supervisor must expose trusted " + name + "()");
+    throw new AutonomousExecutionRunnerError(errorCode, "dependency must expose trusted " + name + "()");
   }
   return d.value.bind(target);
 }
 
+/**
+ * Explicit host-side poller for the existing policy-gated execution supervisor.
+ * Construction is inert; the host must call start(). The runner never owns or
+ * closes the supervisor, queue, runtime, worker, or event journal.
+ */
 export function createAutonomousExecutionRunner(options = {}) {
   const config = readOptions(options);
   const getSupervisorStatus = ownMethod(config.supervisor, "getStatus");
   const startSupervisor = ownMethod(config.supervisor, "start");
   const drainSupervisor = ownMethod(config.supervisor, "drain");
+  const recordEvent = config.eventJournal === undefined
+    ? null
+    : ownMethod(config.eventJournal, "recordEvent", "INVALID_EVENT_JOURNAL");
+
   const runnerId = config.runnerId ?? "runner-" + Math.random().toString(36).slice(2, 12);
   const pollIntervalMs = config.pollIntervalMs ?? 1000;
   const maxJobsPerTick = config.maxJobsPerTick ?? 5;
@@ -67,23 +76,51 @@ export function createAutonomousExecutionRunner(options = {}) {
   let tickPromise = null;
   let timer = null;
   let wakeWait = null;
+  let nextPollAt = null;
   let lastTickAt = null;
   let lastActivityAt = null;
   let ticks = 0;
   let processed = 0;
   let consecutiveErrors = 0;
   let lastErrorCode = null;
+  let eventEmissionFailures = 0;
+
+  function emitEvent(eventType, severity = "info", code) {
+    if (!recordEvent) return;
+    try {
+      let supervisorId;
+      try {
+        const snapshot = getSupervisorStatus();
+        if (typeof snapshot?.supervisorId === "string" && ID_PATTERN.test(snapshot.supervisorId)) {
+          supervisorId = snapshot.supervisorId;
+        }
+      } catch {}
+      const result = recordEvent({
+        eventType,
+        severity,
+        stage: "runner",
+        ...(supervisorId ? { supervisorId } : {}),
+        ...(code ? { code } : {})
+      });
+      if (result && typeof result.then === "function") {
+        eventEmissionFailures += 1;
+        Promise.resolve(result).catch(() => {});
+      }
+    } catch {
+      eventEmissionFailures += 1;
+    }
+  }
 
   function status() {
     let supervisor;
     try { supervisor = getSupervisorStatus(); } catch { supervisor = null; }
+    const persistent = supervisor?.queue?.persistent;
     return Object.freeze({
       runnerId, state, started: state === "running", stopRequested,
       pollIntervalMs, maxJobsPerTick, maxConsecutiveErrors,
-      lastTickAt, lastActivityAt, ticks, processed,
-      consecutiveErrors, lastErrorCode,
-      queuePersistenceEnabled: supervisor?.queue?.persistence?.enabled === true ||
-        supervisor?.queue?.persistenceEnabled === true,
+      lastTickAt, lastActivityAt, nextPollAt, ticks, processed,
+      consecutiveErrors, lastErrorCode, eventEmissionFailures,
+      queuePersistenceEnabled: typeof persistent === "boolean" ? persistent : null,
       supervisorState: supervisor?.state ?? "unavailable"
     });
   }
@@ -98,7 +135,10 @@ export function createAutonomousExecutionRunner(options = {}) {
         const report = await drainSupervisor({ maxJobs: maxJobsPerTick });
         const count = Number.isSafeInteger(report?.processed) && report.processed >= 0 ? report.processed : 0;
         processed += count;
-        if (count > 0) lastActivityAt = new Date().toISOString();
+        if (count > 0) {
+          lastActivityAt = new Date().toISOString();
+          emitEvent("AUTONOMOUS_RUNNER_TICK", "info", "RUNNER_TICK_COMPLETED");
+        }
         consecutiveErrors = 0;
         lastErrorCode = null;
         return Object.freeze({ processed: count, report });
@@ -109,6 +149,8 @@ export function createAutonomousExecutionRunner(options = {}) {
         if (consecutiveErrors >= maxConsecutiveErrors) {
           state = "failed";
           stopRequested = true;
+          nextPollAt = null;
+          emitEvent("AUTONOMOUS_RUNNER_FAILED", "error", lastErrorCode);
         }
         return Object.freeze({ processed: 0, errorCode: lastErrorCode, consecutiveErrors });
       } finally {
@@ -120,8 +162,14 @@ export function createAutonomousExecutionRunner(options = {}) {
 
   function wait() {
     return new Promise((resolve) => {
+      nextPollAt = new Date(Date.now() + pollIntervalMs).toISOString();
       wakeWait = resolve;
-      timer = setTimeout(() => { timer = null; wakeWait = null; resolve(); }, pollIntervalMs);
+      timer = setTimeout(() => {
+        timer = null;
+        wakeWait = null;
+        nextPollAt = null;
+        resolve();
+      }, pollIntervalMs);
     });
   }
 
@@ -146,20 +194,30 @@ export function createAutonomousExecutionRunner(options = {}) {
     startSupervisor();
     state = "running";
     stopRequested = false;
+    emitEvent("AUTONOMOUS_RUNNER_STARTED", "info", "RUNNER_STARTED");
     loopPromise = runLoop();
     return status();
   }
 
   async function stop() {
-    if (state === "idle") { state = "stopped"; return status(); }
+    if (state === "idle") {
+      state = "stopped";
+      stopRequested = true;
+      emitEvent("AUTONOMOUS_RUNNER_STOPPED", "info", "RUNNER_STOPPED");
+      return status();
+    }
     if (state === "stopped" || state === "closed") return status();
     stopRequested = true;
     if (timer) { clearTimeout(timer); timer = null; }
+    nextPollAt = null;
     if (wakeWait) { const wake = wakeWait; wakeWait = null; wake(); }
     if (state !== "failed") state = "stopping";
     if (tickPromise) await tickPromise;
     if (loopPromise) await loopPromise;
-    if (state !== "failed") state = "stopped";
+    if (state !== "failed") {
+      state = "stopped";
+      emitEvent("AUTONOMOUS_RUNNER_STOPPED", "info", "RUNNER_STOPPED");
+    }
     return status();
   }
 
