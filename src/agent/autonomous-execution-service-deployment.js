@@ -199,12 +199,12 @@ export function createWindowsHostServiceProfile(options = {}) {
   const displayName = requiredText(config.displayName ?? "JB Expert QA Autonomous Host",
     "display name", /^[^\u0000-\u001F\u007F<>%]{1,120}$/u, 120);
   const description = requiredText(config.description ?? "JB Expert QA local autonomous execution host",
+    "description", /^[^\u0000-\u001F\u007F%]{1,240}$/u, 240);
   const serviceAccount = config.serviceAccount ?? "LocalService";
   if (!["LocalService", "NetworkService"].includes(serviceAccount)) {
     throw new AutonomousExecutionServiceDeploymentError("INVALID_SERVICE_ACCOUNT", "serviceAccount must be LocalService or NetworkService");
   }
   const serviceAccountName = "NT AUTHORITY\\" + serviceAccount;
-    "description", /^[^\u0000-\u001F\u007F%]{1,240}$/u, 240);
   const nodeExecutable = validateWindowsPath(config.nodeExecutable, "nodeExecutable");
   const entryPoint = validateWindowsPath(config.entryPoint, "entryPoint");
   const workingDirectory = validateWindowsPath(config.workingDirectory, "workingDirectory");
