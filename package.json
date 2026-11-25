@@ -42,7 +42,8 @@
     "test:dashboard": "node --test tests/dashboard.test.js tests/dashboard-analytics.test.js",
     "test:api-testing": "npm --workspace @jb/api-testing-engine run check",
     "test:autonomous-host-operations": "node --test tests/autonomous-execution-host-operations.test.js",
-    "certify:autonomous-independence": "node scripts/autonomous-independence-certification.mjs"
+    "certify:autonomous-independence": "node scripts/autonomous-independence-certification.mjs",
+    "test:phase4-autonomous-host": "node --test tests/phase4-autonomous-host-bootstrap.test.js"
   },
   "dependencies": {
     "axe-core": "4.14.0",
