@@ -57,6 +57,7 @@ The report binds:
 - generation time and runtime/platform/architecture;
 - OS service identifier, service identity and profile SHA-256;
 - exact wrapper version and verified digest on Windows;
+- native storage-inspector result, verified process SID, storage owner, protected DACL and child inheritance status on the Windows LocalService lab;
 - pre/post process identifiers and graceful signal result;
 - restart-limit attempt count and enforcement result;
 - final state and successful cleanup;
