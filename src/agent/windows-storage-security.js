@@ -1,6 +1,6 @@
 const SERVICE_SIDS = new Set(["S-1-5-19", "S-1-5-20"]);
 const PRIVILEGED_SIDS = new Set(["S-1-5-18", "S-1-5-32-544"]);
-const SID_PATTERN = /^S-1-(?:0|[1-9]\\d*)(?:-(?:0|[1-9]\\d*)){1,14}$/u;
+const SID_PATTERN = /^S-1-(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*)){1,14}$/u;
 
 export class WindowsStorageSecurityError extends Error {
   constructor(code, message) {
