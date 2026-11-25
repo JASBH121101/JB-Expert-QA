@@ -61,7 +61,7 @@ A compatible Node.js runtime (22 or newer), local storage, an application-suppli
 - Constructing/importing the bootstrap is inert. `enabled: true` is explicit opt-in and `start()` is explicit.
 - Preflight checks the trusted engine catalog, policy and permission allowlist, ledger and protected storage before runner start.
 - Persistent queue and event journal use exclusive locks; a second process cannot acquire the same stores while the first host owns them.
-- POSIX storage ownership and private permissions are verified by the bootstrap. Windows ACLs are not inspected or changed by the bootstrap; operators must provision and verify them.
+- POSIX storage ownership and private permissions are verified by the bootstrap. On Windows, the bootstrap invokes the built-in read-only PowerShell/.NET ACL inspector when an expected LocalService or NetworkService SID is configured, then validates the complete report (including child-file/directory inheritance). Neither platform has its permissions modified by bootstrap; operators must provision the Windows service identity and protected state-directory ACL before activation.
 - The service-profile builders only generate reviewable configuration. They do not install services, create accounts, write service files, change ACLs or elevate privileges.
 - Interrupted jobs remain quarantined. Recovery, disposition and retries require explicit operator calls; the host does not replay work automatically.
 - A stopped or failed bootstrap instance is terminal. An application supervisor must inspect the failure and construct a new bootstrap when appropriate.
