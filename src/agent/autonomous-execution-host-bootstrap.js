@@ -399,7 +399,21 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
     }
   }
 
+  function synchronizeServiceLifecycle() {
+    const current = getHostServiceStatus();
+    if (current?.state === "failed" && state !== "failed") {
+      state = "failed";
+      lastFailureCode ??= "HOST_SERVICE_FAILED";
+      emitDiagnostic("host_service_failed", lastFailureCode);
+    } else if (current?.state === "closed" && state === "running") {
+      state = "closed";
+      emitDiagnostic("host_service_closed", "HOST_SERVICE_CLOSED");
+    }
+    return current;
+  }
+
   function getLiveness() {
+    synchronizeServiceLifecycle();
     const alive = !["failed", "closed"].includes(state);
     return Object.freeze({
       status: alive ? "alive" : "not_alive",
@@ -410,7 +424,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
 
   async function readinessChecks() {
     const checks = [];
-    const current = getHostServiceStatus();
+    const current = synchronizeServiceLifecycle();
     const currentHost = current?.host ?? hostStatus;
     const running = state === "running" && current?.state === "running";
     checks.push(freezeCheck("service-running", running));
@@ -454,7 +468,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
   }
 
   async function getDiagnostics() {
-    const current = getHostServiceStatus();
+    const current = synchronizeServiceLifecycle();
     const currentHost = current?.host ?? hostStatus;
     const readiness = await getReadiness();
     let recentEvents = [];
@@ -584,7 +598,7 @@ export function createAutonomousExecutionHostBootstrap(options = {}) {
   }
 
   async function getStatus() {
-    const current = getHostServiceStatus();
+    const current = synchronizeServiceLifecycle();
     const readiness = await getReadiness();
     return Object.freeze({
       state,
