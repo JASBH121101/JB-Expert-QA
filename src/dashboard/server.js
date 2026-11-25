@@ -761,7 +761,7 @@ export function createDashboardServer({
         fail(response, 404, "not_found", "Route not found"); return;
       }
 
-      const phase5ApprovalOperation = /^\\/api\\/phase5\\/host\\/approvals\\/([0-9a-f-]{36})\\/(approve|deny)$/iu.exec(pathname);
+      const phase5ApprovalOperation = new RegExp("^/api/phase5/host/approvals/([0-9a-f-]{36})/(approve|deny)$", "iu").exec(pathname);
       if (request.method === "POST" && phase5ApprovalOperation) {
         if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
         if (!phase5HostControl || typeof phase5HostControl.approveApproval !== "function" ||
