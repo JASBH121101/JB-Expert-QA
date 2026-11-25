@@ -197,9 +197,9 @@ export function createWindowsHostServiceProfile(options = {}) {
   const serviceId = requiredText(config.serviceId ?? "JBExpertQA",
     "service ID", /^[A-Za-z0-9]{1,80}$/u, 80);
   const displayName = requiredText(config.displayName ?? "JB Expert QA Autonomous Host",
-    "display name", /^[^\u0000-\u001F\u007F<>]{1,120}$/u, 120);
+    "display name", /^[^\u0000-\u001F\u007F<>%]{1,120}$/u, 120);
   const description = requiredText(config.description ?? "JB Expert QA local autonomous execution host",
-    "description", /^[^\u0000-\u001F\u007F]{1,240}$/u, 240);
+    "description", /^[^\u0000-\u001F\u007F%]{1,240}$/u, 240);
   const nodeExecutable = validateWindowsPath(config.nodeExecutable, "nodeExecutable");
   const entryPoint = validateWindowsPath(config.entryPoint, "entryPoint");
   const workingDirectory = validateWindowsPath(config.workingDirectory, "workingDirectory");
