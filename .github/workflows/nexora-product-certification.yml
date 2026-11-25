@@ -130,4 +130,4 @@ jobs:
           name: nexora-threat-lab-certification-reports
           path: nexora-certification-reports/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
