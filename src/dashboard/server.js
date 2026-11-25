@@ -684,7 +684,7 @@ export function createDashboardServer({
         if (!sameOrigin(request)) { fail(response, 403, "origin_blocked", "Dashboard actions must originate from this local dashboard"); return; }
         if (!phase5HostControl) { fail(response, 503, "phase5_host_unavailable", "No application-owned autonomous host is connected"); return; }
         if (requestUrl.search) { fail(response, 400, "invalid_host_operation", "Host operation routes do not accept query parameters"); return; }
-        if (!rateAllowed(phase5HostOperationRateWindow, 3)) { fail(response, 429, "phase5_host_rate_limited", "The host control request limit was reached"); return; }
+        if (!rateAllowed(phase5HostOperationRateWindow, 5)) { fail(response, 429, "phase5_host_rate_limited", "The host control request limit was reached"); return; }
         if (phase5HostOperating) { fail(response, 409, "phase5_host_busy", "Another host lifecycle operation is already in progress"); return; }
         const body = await readBody(request, maximumBodyBytes);
         if (Object.keys(body).length !== 0) { fail(response, 400, "invalid_host_operation", "Host lifecycle requests must use an empty JSON object"); return; }
