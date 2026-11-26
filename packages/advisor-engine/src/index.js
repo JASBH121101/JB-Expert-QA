@@ -7,7 +7,7 @@
  */
 export const ENGINE_NAME = "JB Advisor Engine";
 export const ENGINE_ID = "JBAE";
-export const ENGINE_VERSION = "0.1.0";
+export const ENGINE_VERSION = "0.1.1";
 
 export { DOMAINS } from "./core/domains.js";
 import { DOMAINS } from "./core/domains.js";
