@@ -1,6 +1,6 @@
 {
   "name": "@jb/advisor-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first evidence-backed advisory engine for fragrance and personal technology.",
   "type": "module",
   "main": "./src/index.js",
