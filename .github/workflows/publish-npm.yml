@@ -6,6 +6,7 @@ on:
       - "npm-expert-qa-v*"
       - "npm-security-guard-v*"
       - "npm-malware-engine-v*"
+      - "npm-advisor-engine-v*"
 
 permissions:
   contents: read
@@ -92,3 +93,109 @@ jobs:
         run: npm test
       - name: Publish through npm Trusted Publishing (OIDC)
         run: npm publish ./packages/malware-engine --access public
+
+  publish-advisor-engine:
+    if: startsWith(github.ref, 'refs/tags/npm-advisor-engine-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Install npm with Trusted Publishing support
+        run: npm install --global npm@latest
+      - name: Verify npm Trusted Publishing CLI version
+        run: node -e "const v=require('child_process').execSync('npm --version',{encoding:'utf8'}).trim().split('.').map(Number); if(v[0]<11 || (v[0]===11 && v[1]<5) || (v[0]===11 && v[1]===5 && v[2]<1)) process.exit(1)"
+      - name: Enforce explicit distribution approval and exact release tag
+        env:
+          JBAE_DISTRIBUTION_APPROVED: ${{ vars.JBAE_DISTRIBUTION_APPROVED }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const pkg = JSON.parse(readFileSync("packages/advisor-engine/package.json", "utf8"));
+          if (process.env.JBAE_DISTRIBUTION_APPROVED !== "true") {
+            throw new Error("JBAE public distribution is not approved; set JBAE_DISTRIBUTION_APPROVED=true only after approval.");
+          }
+          if (!pkg.license || pkg.license === "UNLICENSED") {
+            throw new Error("JBAE publication blocked: choose and approve an explicit package license first.");
+          }
+          if (pkg.private === true) throw new Error("JBAE package is marked private.");
+          if (process.env.RELEASE_TAG !== "npm-advisor-engine-v" + pkg.version) {
+            throw new Error("Release tag must exactly match package version " + pkg.version);
+          }
+          NODE
+      - name: Verify publisher private key matches the pinned public key
+        env:
+          JB_QA_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.JBAE_UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createPrivateKey, createPublicKey } from "node:crypto";
+          import { readFileSync } from "node:fs";
+          if (!process.env.JB_QA_UPDATE_SIGNING_PRIVATE_KEY) {
+            throw new Error("Missing Actions secret JBAE_UPDATE_SIGNING_PRIVATE_KEY.");
+          }
+          const privateKey = createPrivateKey(process.env.JB_QA_UPDATE_SIGNING_PRIVATE_KEY);
+          const actualPublicKey = createPublicKey(privateKey);
+          const pinnedPublicKey = createPublicKey(readFileSync("releases/stable/jbae-update-public-key.pem", "utf8"));
+          if (privateKey.asymmetricKeyType !== "ed25519" || pinnedPublicKey.asymmetricKeyType !== "ed25519") {
+            throw new Error("The JBAE update signing key pair must be Ed25519.");
+          }
+          if (!actualPublicKey.export({ type: "spki", format: "der" }).equals(
+            pinnedPublicKey.export({ type: "spki", format: "der" })
+          )) {
+            throw new Error("The Actions private key does not match the pinned JBAE public key.");
+          }
+          NODE
+      - name: Install repository dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run full repository tests and JBAE release signing tests
+        run: npm run check
+      - name: Pack and clean-install all JB engine distributions
+        run: npm run test:package-distributions
+      - name: Prepare seven-day Ed25519 JBAE update manifest
+        env:
+          JBAE_DISTRIBUTION_APPROVED: ${{ vars.JBAE_DISTRIBUTION_APPROVED }}
+          JB_QA_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.JBAE_UPDATE_SIGNING_PRIVATE_KEY }}
+        run: npm run release:advisor-manifest
+      - name: Preserve prepared feed files for post-publication promotion
+        run: |
+          mkdir -p "$RUNNER_TEMP/jbae-feed"
+          cp releases/stable/jbae-update-manifest.json "$RUNNER_TEMP/jbae-feed/"
+          cp releases/stable/jbae-update-manifest.json.sig "$RUNNER_TEMP/jbae-feed/"
+      - name: Publish JBAE through npm OIDC Trusted Publishing
+        run: npm publish ./packages/advisor-engine --access public --ignore-scripts
+      - name: Verify published npm tarball exactly matches the signed manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from "node:child_process";
+          import { readFileSync } from "node:fs";
+          const manifest = JSON.parse(readFileSync("releases/stable/jbae-update-manifest.json", "utf8"));
+          const release = manifest.packages["@jb/advisor-engine"];
+          const published = JSON.parse(execFileSync("npm", [
+            "view", "@jb/advisor-engine@" + release.version, "dist", "--json"
+          ], { encoding: "utf8" }));
+          if (published.tarball !== release.dist.tarball || published.integrity !== release.dist.integrity) {
+            throw new Error("npm registry tarball or integrity does not match the signed update manifest.");
+          }
+          NODE
+      - name: Promote verified manifest and signature to the stable feed
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p releases/stable
+          cp "$RUNNER_TEMP/jbae-feed/jbae-update-manifest.json" releases/stable/
+          cp "$RUNNER_TEMP/jbae-feed/jbae-update-manifest.json.sig" releases/stable/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases/stable/jbae-update-manifest.json releases/stable/jbae-update-manifest.json.sig
+          git commit -m "chore(releases): publish signed JBAE update manifest"
+          git push origin main
