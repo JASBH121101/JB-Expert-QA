@@ -65,7 +65,7 @@ The manifest is JSON and is accompanied by a detached Base64 Ed25519 signature a
 
 A manifest must be signed by a trusted Ed25519 private key held by the publisher. The matching public key may be distributed to consumers; the private key must never be committed to this repository or embedded in an installed package. Configure it locally with `--public-key` or the `JB_QA_UPDATE_PUBLIC_KEY` environment variable.
 
-The manifest is currently a contract/schema, not a live release feed. Adding JBAE to the updater's allowlist only enables the updater to recognize a JBAE package entry; it does not publish that package or create an update. The current JBAE package remains version `0.1.0` and its metadata is `UNLICENSED`. No JBAE npm release, publisher key, signed release manifest or feed is configured. Do not publish the package publicly until its distribution and licensing are explicitly approved. Until an authorized publisher provisions the signing process, publishes the approved package and serves a fresh signed manifest, `update --check` cannot return a JBAE update.
+The updater manifest contract is implemented, and JBAE is included in the engine allowlist. The repository now prepares JBAE version 0.1.1 as a patch-release candidate and contains a guarded manifest-signing pipeline. This is not a published npm package or a live update feed. Public distribution remains blocked while the package license is UNLICENSED, the repository approval variable is unset, and the authorized signing/publishing configuration is incomplete. The release workflow deliberately fails closed until all gates are satisfied.
 
 ## Safety checks before installation
 
@@ -94,3 +94,31 @@ The updater does not treat package syntax checks as a substitute for the consumi
 - The initial implementation does not schedule background updates. It performs work only when the project owner invokes the command.
 - Automatic patch application is only available when `update --apply` is explicitly invoked; there is no silent background installation.
 - npm lifecycle scripts are disabled during staging, installation and rollback.
+
+
+
+## JBAE stable release feed
+
+The stable JBAE manifest is served directly from the repository's raw-content endpoint after a successful authorized npm publication:
+
+    https://raw.githubusercontent.com/JASBH121101/JB-Expert-QA/main/releases/stable/jbae-update-manifest.json
+
+Its detached Ed25519 signature is available by appending .sig to that URL. The pinned public verification key is stored at:
+
+    releases/stable/jbae-update-public-key.pem
+
+Copy that public key into the consuming host application through its trusted-key configuration. Do not download a new key automatically from the same manifest origin and treat it as trusted. The host must already trust this pinned public key.
+
+Check for a JBAE update:
+
+    jb-qa update --check --manifest https://raw.githubusercontent.com/JASBH121101/JB-Expert-QA/main/releases/stable/jbae-update-manifest.json --public-key ./trusted-jbae-update-key.pem
+
+Apply an approved patch update:
+
+    jb-qa update --apply @jb/advisor-engine --manifest https://raw.githubusercontent.com/JASBH121101/JB-Expert-QA/main/releases/stable/jbae-update-manifest.json --public-key ./trusted-jbae-update-key.pem
+
+The release workflow is triggered by a tag named npm-advisor-engine-v followed by the exact package version (for the current candidate, npm-advisor-engine-v0.1.1). Before that tag can publish anything, the package must have an explicitly approved non-UNLICENSED license, the repository Actions variable JBAE_DISTRIBUTION_APPROVED must be set to true, npm Trusted Publishing must be configured for this repository/workflow, and the Actions secret JBAE_UPDATE_SIGNING_PRIVATE_KEY must contain the private PEM matching the pinned public key.
+
+The publisher private key is never committed to this repository. The workflow builds and tests the package, computes the npm tarball integrity, creates a seven-day stable manifest, verifies its Ed25519 signature, publishes the package through npm OIDC Trusted Publishing, confirms that npm serves the exact tarball/integrity described by the manifest, and only then commits the manifest and detached signature to main. If any preflight, test, signing, publication, integrity, or feed-commit step fails, no new manifest is served.
+
+The pinned public key fingerprint (SHA-256 of the PEM file) is b3e5a5d6d99150da2760984997ad40b4ed5e3985c07aba7d4b2925991dd07c4f. Keep the private key confidential and retain an offline backup.
