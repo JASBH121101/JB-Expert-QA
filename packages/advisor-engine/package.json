@@ -15,7 +15,8 @@
     "docs/**",
     "data/**",
     "scripts/**",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test",
