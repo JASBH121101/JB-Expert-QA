@@ -52,7 +52,7 @@ test("refuses private packages and mismatched publisher keys", () => {
 test("rejects malformed artifact integrity and altered signed bytes", () => {
   assert.throws(() => createSignedAdvisorManifest({
     packageJson, integrity: "sha512-not-a-real-digest", privateKeyPem, publicKeyPem
-  }), /SHA-512 integrity/i);
+  }), /SHA-512/i);
   const result = createSignedAdvisorManifest({ packageJson, integrity, privateKeyPem, publicKeyPem });
   assert.throws(() => verifyUpdateManifest({
     raw: result.raw.replace("0.1.1", "0.1.2"),
