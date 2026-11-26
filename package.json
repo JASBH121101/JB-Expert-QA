@@ -48,7 +48,7 @@
     "test:advisor-release": "node --test tests/advisor-update-release.test.js"
   },
   "dependencies": {
-    "axe-core": "4.14.0",
+    "axe-core": "4.14.1",
     "playwright": "1.65.1",
     "pixelmatch": "8.0.0",
     "pngjs": "7.0.0",
