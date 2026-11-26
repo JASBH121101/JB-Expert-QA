@@ -56,7 +56,7 @@
     {
       "schema": "jb.engine.manifest/v1",
       "engineId": "jb.advisor-engine",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "contractsProvided": [],
       "contractsConsumed": [],
       "dependencies": [],
