@@ -52,4 +52,4 @@ JBAE does not import JB Expert QA, JB Security Guard, or JB Malware Engine at ru
 
 ## Status
 
-Development-stage engine. Integration and CI validation are in progress. No npm publication or production deployment is performed by this change.
+Release candidate 0.1.1 prepared for the signed update channel. It has not been published. Public distribution remains blocked until the package license and distribution channel are explicitly approved and the publisher credentials are configured. The Android host integration and physical-device update validation remain separate release gates.
