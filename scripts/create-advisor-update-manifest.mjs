@@ -21,7 +21,7 @@ function assertApprovedPackage(packageJson) {
   assert(packageJson.private !== true, "A private package cannot be published to the public npm registry");
   assert(typeof packageJson.license === "string" && packageJson.license.trim() && packageJson.license !== "UNLICENSED",
     "JBAE public publication is blocked until its package license is explicitly approved (license must not be UNLICENSED)");
-  assert(/^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(packageJson.version),
+  assert(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(packageJson.version),
     "JBAE package version must be a valid semver version");
 }
 
@@ -66,8 +66,8 @@ export function createSignedAdvisorManifest({ packageJson, integrity, privateKey
       }
     }
   };
-  const raw = JSON.stringify(manifest, null, 2) + "\\n";
-  const signature = sign(null, Buffer.from(raw, "utf8"), privateKey).toString("base64") + "\\n";
+  const raw = JSON.stringify(manifest, null, 2) + "\n";
+  const signature = sign(null, Buffer.from(raw, "utf8"), privateKey).toString("base64") + "\n";
   verifyUpdateManifest({ raw, signature, publicKey: publicKeyPem, now });
   return Object.freeze({ manifest, raw, signature });
 }
