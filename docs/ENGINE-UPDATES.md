@@ -1,10 +1,12 @@
 # JB Expert QA — secure engine updates
 
-The updater manages only the three direct engine dependencies:
+The updater can manage these direct engine dependencies when a signed release is actually published:
 
 - `@jb/expert-qa`
 - `@jb/security-guard`
 - `@jb/malware-engine`
+- `@jb/resilience-engine`
+- `@jb/advisor-engine` (JBAE)
 
 It does not modify application source files, deploy applications, publish packages, or contact an AI provider. Visual QA remains deterministic and local-first.
 
@@ -63,12 +65,12 @@ The manifest is JSON and is accompanied by a detached Base64 Ed25519 signature a
 
 A manifest must be signed by a trusted Ed25519 private key held by the publisher. The matching public key may be distributed to consumers; the private key must never be committed to this repository or embedded in an installed package. Configure it locally with `--public-key` or the `JB_QA_UPDATE_PUBLIC_KEY` environment variable.
 
-The manifest is currently a contract/schema, not a live release feed. Engine npm packages have not been published by this change, and no signing key is generated or stored here. Until a publisher provisions the signing process and publishes packages, `update --check` cannot return live releases.
+The manifest is currently a contract/schema, not a live release feed. Adding JBAE to the updater's allowlist only enables the updater to recognize a JBAE package entry; it does not publish that package or create an update. The current JBAE package remains version `0.1.0` and its metadata is `UNLICENSED`. No JBAE npm release, publisher key, signed release manifest or feed is configured. Do not publish the package publicly until its distribution and licensing are explicitly approved. Until an authorized publisher provisions the signing process, publishes the approved package and serves a fresh signed manifest, `update --check` cannot return a JBAE update.
 
 ## Safety checks before installation
 
 1. The manifest signature must verify and its validity window must not be expired.
-2. The package name must be in the three-engine allowlist.
+2. The package name must be in the five-engine allowlist.
 3. The tarball URL must use HTTPS and the npm registry host.
 4. The current Node.js version must meet the signed minimum.
 5. npm stages the exact package version with lifecycle scripts disabled.

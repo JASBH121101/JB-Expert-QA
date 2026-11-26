@@ -2,7 +2,8 @@ const ENGINE_PACKAGES = Object.freeze([
   "@jb/expert-qa",
   "@jb/security-guard",
   "@jb/malware-engine",
-  "@jb/resilience-engine"
+  "@jb/resilience-engine",
+  "@jb/advisor-engine"
 ]);
 
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;

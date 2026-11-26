@@ -355,3 +355,59 @@ test("rejects signed tarball URLs that do not match the exact package and versio
     publicKey: publicKeyPem
   }), /exact versioned artifact path/i);
 });
+
+
+test("accepts signed JBAE releases and detects updates for a direct Advisor Engine dependency", async () => {
+  const manifest = makeManifest();
+  manifest.packages["@jb/advisor-engine"] = {
+    version: "0.1.1",
+    nodeMinMajor: 22,
+    dist: {
+      tarball: "https://registry.npmjs.org/@jb%2fadvisor-engine/-/advisor-engine-0.1.1.tgz",
+      integrity
+    }
+  };
+  const signed = signManifest(manifest);
+  const verified = verifyUpdateManifest({ ...signed, publicKey: publicKeyPem });
+  assert.equal(verified.manifest.packages["@jb/advisor-engine"].version, "0.1.1");
+
+  const root = await mkdtemp(resolve(tmpdir(), "jb-advisor-consumer-"));
+  try {
+    const packageDirectory = resolve(root, "node_modules/@jb/advisor-engine");
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(resolve(root, "package.json"), JSON.stringify({
+      name: "jbae-consumer",
+      version: "1.0.0",
+      scripts: { test: "node --test" },
+      dependencies: { "@jb/advisor-engine": "0.1.0" }
+    }, null, 2) + "\n");
+    await writeFile(resolve(packageDirectory, "package.json"), JSON.stringify({
+      name: "@jb/advisor-engine",
+      version: "0.1.0",
+      type: "module",
+      main: "./index.js"
+    }, null, 2) + "\n");
+    await writeFile(resolve(packageDirectory, "index.js"), "export const engineId = 'JBAE';\n");
+    await writeFile(resolve(root, "package-lock.json"), JSON.stringify({
+      name: "jbae-consumer",
+      version: "1.0.0",
+      lockfileVersion: 3,
+      packages: {
+        "": { name: "jbae-consumer", version: "1.0.0" },
+        "node_modules/@jb/advisor-engine": {
+          version: "0.1.0",
+          integrity: "sha512-" + Buffer.alloc(64, 1).toString("base64")
+        }
+      }
+    }, null, 2) + "\n");
+
+    const plan = await buildUpdatePlan({ projectRoot: root, manifest: verified.manifest });
+    assert.equal(plan.length, 1);
+    assert.equal(plan[0].packageName, "@jb/advisor-engine");
+    assert.equal(plan[0].currentVersion, "0.1.0");
+    assert.equal(plan[0].candidateVersion, "0.1.1");
+    assert.equal(plan[0].decision, "candidate");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
