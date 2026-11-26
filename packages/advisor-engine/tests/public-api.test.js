@@ -5,7 +5,7 @@ import * as engine from "@jb/advisor-engine";
 test("public entry point exposes stable engine metadata", () => {
   assert.equal(engine.ENGINE_NAME, "JB Advisor Engine");
   assert.equal(engine.ENGINE_ID, "JBAE");
-  assert.equal(engine.ENGINE_VERSION, "0.1.0");
+  assert.equal(engine.ENGINE_VERSION, "0.1.1");
   assert.deepEqual(engine.getEngineInfo().domains, [
     engine.DOMAINS.FRAGRANCE,
     engine.DOMAINS.TECHNOLOGY,
