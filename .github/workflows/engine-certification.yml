@@ -79,7 +79,7 @@ jobs:
           name: expert-qa-security-node-${{ matrix.node }}
           path: certification-reports/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
   advisor-engine:
     name: Advisor Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
@@ -150,7 +150,7 @@ jobs:
           name: language-qa-benchmark-${{ matrix.os }}-node-${{ matrix.node }}
           path: ${{ runner.temp }}/jb-language-qa-benchmark/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
   expert-qa-package-cross-platform:
     name: Expert QA package / ${{ matrix.os }} / Node ${{ matrix.node }}
@@ -217,7 +217,7 @@ jobs:
             ${{ runner.temp }}/jb-threat-lab-unified-certification-report.v1.json
             ${{ runner.temp }}/jb-threat-lab-source-reports/*.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   security-guard:
     name: Security Guard tests / ${{ matrix.os }} / Node ${{ matrix.node }}
@@ -311,7 +311,7 @@ jobs:
           name: malware-engine-benchmark
           path: certification-reports/malware-benchmark/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
   resilience-engine:
     name: Resilience Engine tests / ${{ matrix.os }} / Node ${{ matrix.node }}
@@ -403,7 +403,7 @@ jobs:
           name: resilience-service-manager-lab-${{ matrix.os }}
           path: ${{ runner.temp }}/resilience-service-manager-lab.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   expert-qa-service-deployment-profile-live:
     name: Expert QA generated host service profile / ${{ matrix.os }}
@@ -432,7 +432,7 @@ jobs:
           name: expert-qa-service-deployment-profile-${{ matrix.os }}
           path: ${{ runner.temp }}/expert-qa-service-deployment-profile-lab.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   sccm-registry:
     name: SCCM hierarchy and evidence gates / Node ${{ matrix.node }}
@@ -462,7 +462,7 @@ jobs:
           name: jb-sccm-report-node-${{ matrix.node }}
           path: ${{ runner.temp }}/jb-sccm-report.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   api-testing-engine:
     name: API Testing Engine / ${{ matrix.os }} / Node ${{ matrix.node }}

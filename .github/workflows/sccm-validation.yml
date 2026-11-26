@@ -56,4 +56,4 @@ jobs:
           name: jb-sccm-report-node-${{ matrix.node }}
           path: ${{ runner.temp }}/jb-sccm-report.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7

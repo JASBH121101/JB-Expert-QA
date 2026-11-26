@@ -45,4 +45,4 @@ jobs:
           name: expert-qa-benchmark-${{ github.run_number }}
           path: benchmark-results/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7

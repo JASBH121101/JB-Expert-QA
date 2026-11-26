@@ -61,7 +61,7 @@ jobs:
           name: security-sbom-node-${{ matrix.node-version }}
           path: security-sbom.cdx.json
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
       - name: Validate JavaScript syntax
         run: |
           node --check src/specialists/security-rules.js
