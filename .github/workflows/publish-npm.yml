@@ -179,8 +179,27 @@ jobs:
           mkdir -p "$RUNNER_TEMP/jbae-feed"
           cp releases/stable/jbae-update-manifest.json "$RUNNER_TEMP/jbae-feed/"
           cp releases/stable/jbae-update-manifest.json.sig "$RUNNER_TEMP/jbae-feed/"
-      - name: Publish JBAE through npm OIDC Trusted Publishing
-        run: npm publish ./packages/advisor-engine --access public --ignore-scripts
+      - name: Publish JBAE through npm OIDC Trusted Publishing (idempotent)
+        env:
+          REGISTRY_METADATA: ${{ runner.temp }}/jbae-existing-registry-dist.json
+        run: |
+          version="$(node -p "require('./packages/advisor-engine/package.json').version")"
+          registry_metadata="$RUNNER_TEMP/jbae-existing-registry-dist.json"
+          if npm view "@jb/advisor-engine@$version" dist --json > "$registry_metadata" 2>/dev/null; then
+            node --input-type=module <<'NODE'
+            import { readFileSync } from "node:fs";
+            const release = JSON.parse(readFileSync("releases/stable/jbae-update-manifest.json", "utf8"))
+              .packages["@jb/advisor-engine"];
+            const published = JSON.parse(readFileSync(process.env.REGISTRY_METADATA, "utf8"));
+            if (published.tarball !== release.dist.tarball || published.integrity !== release.dist.integrity) {
+              throw new Error("The immutable npm version already exists with different tarball metadata; refusing to overwrite or publish a conflicting release.");
+            }
+            console.log("Exact JBAE package version is already published; reusing its verified immutable artifact.");
+            NODE
+          else
+            npm publish ./packages/advisor-engine --access public --ignore-scripts
+          fi
+
       - name: Verify published npm tarball exactly matches the signed manifest
         run: |
           node --input-type=module <<'NODE'
@@ -205,5 +224,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add releases/stable/jbae-update-manifest.json releases/stable/jbae-update-manifest.json.sig
-          git commit -m "chore(releases): publish signed JBAE update manifest"
-          git push origin main
+          if git diff --cached --quiet; then
+            echo "Stable JBAE feed already contains this exact manifest; no commit needed."
+          else
+            git commit -m "chore(releases): publish signed JBAE update manifest"
+            git push origin main
+          fi
