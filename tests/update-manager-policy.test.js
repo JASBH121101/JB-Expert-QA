@@ -104,8 +104,25 @@ test("policy covers each independently versioned engine", () => {
     "@jb/expert-qa",
     "@jb/security-guard",
     "@jb/malware-engine",
-    "@jb/resilience-engine"
+    "@jb/resilience-engine",
+    "@jb/advisor-engine"
   ]);
   assert.deepEqual(HYBRID_UPDATE_POLICY.automaticReleaseTypes, ["patch"]);
   assert.equal(HYBRID_UPDATE_POLICY.rollbackOnFailure, true);
+});
+
+
+test("JBAE accepts a verified patch after post-install tests pass", () => {
+  const result = evaluateHybridUpdate({
+    packageName: "@jb/advisor-engine",
+    currentVersion: "0.1.0",
+    candidateVersion: "0.1.1",
+    ...verified,
+    testsPassed: true
+  });
+  assert.deepEqual(result, {
+    decision: "auto-apply",
+    reason: "verified-compatible-patch",
+    releaseType: "patch"
+  });
 });
